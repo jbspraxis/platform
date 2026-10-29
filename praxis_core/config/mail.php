@@ -115,4 +115,19 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    /*
+    | Branded email (App\Mail\BrandedMail, docs/BRAND.md section 13). Not the framework's global
+    | "reply_to": team alerts set the visitor as Reply-To instead.
+    */
+
+    'brand' => [
+        'reply_to' => [
+            'address' => env('MAIL_REPLY_TO_ADDRESS', 'intelligence@jbspraxis.com'),
+            'name' => env('MAIL_REPLY_TO_NAME', 'JBS Praxis'),
+        ],
+        'site_url' => 'https://' . env('SITE_DOMAIN', 'jbspraxis.com'),
+        // The header lockup on its own white field (2x); must be reachable from the public internet
+        'logo' => env('MAIL_LOGO_URL', 'https://' . env('SITE_DOMAIN', 'jbspraxis.com') . '/assets/img/email/jbs-praxis-email-logo@2x.png'),
+    ],
+
 ];

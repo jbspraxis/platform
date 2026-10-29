@@ -33,3 +33,4 @@ _s6
 # Brand book build scratch
 brand/build/_render/
 brand/build/__pycache__/
+praxis_core/storage/app/email-samples/

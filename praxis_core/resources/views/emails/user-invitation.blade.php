@@ -1,33 +1,9 @@
-<div style="background-color: #0A1128; color: #FFFFFF; font-family: Arial, Helvetica, sans-serif; padding: 40px 20px; line-height: 1.6;">
-    <div style="max-width: 600px; margin: 0 auto; border-top: 4px solid #00E5FF; background-color: #111A3A; padding: 40px; border-radius: 4px;">
-        
-        <div style="font-family: 'Courier New', Courier, monospace; color: #00E5FF; font-size: 12px; letter-spacing: 2px; margin-bottom: 30px;">
-            > SYSTEM IDENTIFICATION: JBS PRAXIS<br>
-            > ORIGIN: COMMAND HQ<br>
-            > STATUS: IDENTITY ESTABLISHED
-        </div>
-
-        <h2 style="color: #FFFFFF; font-size: 24px; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px;">Operator Clearance Granted</h2>
-        
-        <p style="color: #A0AEC0; font-size: 15px; margin-bottom: 20px;">
-            Welcome to the grid, <strong style="color: #FFFFFF;">{{ strtoupper($firstName) }}</strong>.
-        </p>
-
-        <p style="color: #A0AEC0; font-size: 15px; margin-bottom: 40px;">
-            Your organizational profile has been successfully integrated into the Praxis Command Matrix. To activate your node, you must initialize your Zero-Knowledge Cryptographic Key. 
-            <br><br>
-            <span style="color: #FFBD2E; font-size: 13px;">WARNING: This initialization link is single-use and will expire. Command HQ cannot recover your key once it is hashed.</span>
-        </p>
-
-        <div style="text-align: center; margin-bottom: 40px;">
-            <a href="{{ $setupUrl }}" style="display: inline-block; background-color: #00E5FF; color: #0A1128; text-decoration: none; padding: 15px 30px; font-weight: bold; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; border-radius: 2px;">
-                INITIALIZE SECURE KEY
-            </a>
-        </div>
-
-        <p style="color: #A0AEC0; font-size: 13px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
-            <strong>JBS PRAXIS: BEYOND STRATEGY</strong><br>
-            If you did not request this clearance, disregard this transmission. Access the public terminal at <a href="https://jbspraxis.com" style="color: #00E5FF;">jbspraxis.com</a>.
-        </p>
-    </div>
-</div>
+@php($key = $forClient ? 'client' : 'staff')
+<x-mail.layout :preheader="__('emails.invitation.' . $key . '_preheader')" :headline="__('emails.invitation.' . $key . '_subject')">
+    <x-mail.greeting :first-name="$firstName" />
+    <x-mail.p>{{ __('emails.invitation.' . $key . '_intro') }}</x-mail.p>
+    <x-mail.button :url="$setupUrl" :label="__('emails.invitation.button')" />
+    <x-mail.small>{{ __('emails.invitation.not_expected') }}</x-mail.small>
+    <x-mail.signoff />
+    <x-slot:reason>{{ __('emails.invitation.' . $key . '_reason') }}</x-slot:reason>
+</x-mail.layout>
