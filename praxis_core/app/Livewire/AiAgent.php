@@ -193,42 +193,41 @@ class AiAgent extends Component
             return;
         }
 
-        try {
-            $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+        // Gemini 2.5 Flash first; when it is overloaded or slow (503/429/timeouts happen at busy
+        // times), retry once on the lighter model so the visitor still gets an answer.
+        @set_time_limit(60);
+        $aiText = null;
+        foreach (['gemini-2.5-flash' => 12, 'gemini-flash-lite-latest' => 15] as $model => $timeout) {
+            try {
+                $response = Http::timeout($timeout)->withHeaders([
+                    'Content-Type' => 'application/json',
+                    'x-goog-api-key' => $apiKey,
+                ])->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", [
+                    "system_instruction" => [
+                        "parts" => [["text" => $systemPrompt]]
+                    ],
+                    "contents" => $geminiHistory,
+                    "generationConfig" => [
+                        "temperature" => 0.25,
+                        "maxOutputTokens" => 800,
+                    ]
+                ]);
 
-            $response = Http::timeout(25)->withHeaders([
-                'Content-Type' => 'application/json',
-                'x-goog-api-key' => $apiKey,
-            ])->post($url, [
-                "system_instruction" => [
-                    "parts" => [["text" => $systemPrompt]]
-                ],
-                "contents" => $geminiHistory,
-                "generationConfig" => [
-                    "temperature" => 0.25,
-                    "maxOutputTokens" => 800,
-                ]
-            ]);
-
-            $aiText = $response->successful() ? $response->json('candidates.0.content.parts.0.text') : null;
-
-            if (! $aiText) {
-                Log::warning('AiAgent: Gemini request failed', ['status' => $response->status(), 'error' => $response->json('error.message')]);
+                $aiText = $response->successful() ? $response->json('candidates.0.content.parts.0.text') : null;
+                if ($aiText) {
+                    break;
+                }
+                Log::warning('AiAgent: Gemini request failed', ['model' => $model, 'status' => $response->status(), 'error' => $response->json('error.message')]);
+            } catch (\Exception $e) {
+                Log::warning('AiAgent: Gemini request error', ['model' => $model, 'message' => $e->getMessage()]);
             }
-
-            $this->messages[] = [
-                'id' => count($this->messages),
-                'role' => 'ai',
-                'content' => $aiText ?: $fallback,
-            ];
-        } catch (\Exception $e) {
-            Log::warning('AiAgent: Gemini request error', ['message' => $e->getMessage()]);
-            $this->messages[] = [
-                'id' => count($this->messages),
-                'role' => 'ai',
-                'content' => $fallback,
-            ];
         }
+
+        $this->messages[] = [
+            'id' => count($this->messages),
+            'role' => 'ai',
+            'content' => $aiText ?: $fallback,
+        ];
 
         $this->dispatch('scrollToBottom');
     }
