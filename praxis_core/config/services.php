@@ -54,12 +54,12 @@ return [
 
     // Inbox that receives website enquiries (contact form, bookings, cost reports)
     'leads' => [
-        'alert_email' => env('LEAD_ALERT_EMAIL', 'info@jbspraxis.com'),
+        'alert_email' => env('LEAD_ALERT_EMAIL', 'intelligence@jbspraxis.com'),
     ],
 
     // Inbox for System Health alerts and the 8am digest (HQ → System Health)
     'monitor' => [
-        'alert_email' => env('MONITOR_ALERT_EMAIL', env('LEAD_ALERT_EMAIL', 'info@jbspraxis.com')),
+        'alert_email' => env('MONITOR_ALERT_EMAIL', env('LEAD_ALERT_EMAIL', 'intelligence@jbspraxis.com')),
     ],
 
 ];

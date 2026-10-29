@@ -24,8 +24,10 @@ class IntelligenceBroadcast extends Mailable
 
     public function envelope(): Envelope
     {
+        // Sent from the system mailbox like every other site email; replies go to the Intelligence Desk
         return new Envelope(
-            from: new Address('intelligence@jbspraxis.com', 'JBS Praxis Intelligence Desk'),
+            from: new Address(config('mail.from.address'), config('mail.from.name')),
+            replyTo: [new Address('intelligence@jbspraxis.com', 'JBS Praxis Intelligence Desk')],
             subject: $this->subjectLine,
         );
     }
