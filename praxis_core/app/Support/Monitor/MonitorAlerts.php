@@ -33,7 +33,7 @@ class MonitorAlerts
                 $body .= "  {$hint}\n";
             }
         }
-        $body .= "\nOpen HQ → System Health → Errors and use \"Copy for AI\" to get a fix:\n" . url('/hq/system/health') . "\n";
+        $body .= "\nOpen HQ → System Health → Errors and use \"Copy for AI\" to get a fix:\n" . route('hq.system.health') . "\n";
 
         if (self::send('New error' . ($groups->count() > 1 ? 's' : '') . ' on jbspraxis.com', $body)) {
             DB::table('monitor_error_groups')->whereIn('id', $groups->pluck('id'))->update(['alerted_at' => now()]);
@@ -58,7 +58,7 @@ class MonitorAlerts
             if ($last && Carbon::parse($last)->gt(now()->subHours(6))) {
                 continue;
             }
-            if (self::allowed() && self::send("Health check failing: {$check['label']}", "{$check['label']}: {$check['detail']}\n\n" . ($check['fix'] ? "What to do: {$check['fix']}\n\n" : '') . url('/hq/system/health') . "\n")) {
+            if (self::allowed() && self::send("Health check failing: {$check['label']}", "{$check['label']}: {$check['detail']}\n\n" . ($check['fix'] ? "What to do: {$check['fix']}\n\n" : '') . route('hq.system.health') . "\n")) {
                 ErrorMonitor::setState($key, now()->toDateTimeString());
                 $sent++;
             }
@@ -85,7 +85,7 @@ class MonitorAlerts
             ->orderByDesc('occurrences')->limit(10)->get();
         $body .= "\nOPEN ERRORS SEEN IN THE LAST 24 HOURS\n";
         $body .= $top->isEmpty() ? "None.\n" : $top->map(fn ($g) => '- ' . self::line($g))->implode("\n") . "\n";
-        $body .= "\n" . url('/hq/system/health') . "\n";
+        $body .= "\n" . route('hq.system.health') . "\n";
 
         return self::send('Daily health report: ' . strtoupper(HealthChecks::worst($checks)) . ' | jbspraxis.com', $body, false);
     }

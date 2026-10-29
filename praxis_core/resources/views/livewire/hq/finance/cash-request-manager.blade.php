@@ -163,7 +163,7 @@
                 <div style="background: rgba(255,255,255,0.02); border: 1px dashed var(--erp-border-dark); padding: 20px; border-radius: 4px; margin-bottom: 20px; text-align: center;">
                     @if($selectedRequest->receipt_url)
                         <div style="color: #00FF66; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; margin-bottom: 10px; font-weight: bold;">[ RECEIPT ATTACHED ]</div>
-                        <a href="{{ route('secure.file', ['path' => $selectedRequest->receipt_url]) }}" target="_blank" style="color: var(--erp-teal); font-size: 0.8rem; text-decoration: underline;">View Uploaded Document</a>
+                        <a href="{{ route('hq.file', ['path' => $selectedRequest->receipt_url]) }}" target="_blank" style="color: var(--erp-teal); font-size: 0.8rem; text-decoration: underline;">View Uploaded Document</a>
                     @else
                         <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-muted); margin-bottom: 10px;">Upload Proof of Payment / Invoice (JPG/PNG)</label>
                         <input type="file" wire:model="receipt_file" style="color: var(--erp-white); font-size: 0.8rem; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.1); padding: 10px; border-radius: 2px; width: 100%; background: rgba(0,0,0,0.3);">

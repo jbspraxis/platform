@@ -7,8 +7,9 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Browser security headers on every response, and noindex on private areas
- * (HQ, client OS, task force, token links and private files).
+ * Browser security headers on every response, and noindex on private areas: all of
+ * HQ and the client portal (their own hosts), plus the old private paths on the
+ * public site, which now only redirect.
  */
 class SecurityHeaders
 {
@@ -29,7 +30,7 @@ class SecurityHeaders
         }
         $headers->remove('X-Powered-By');
 
-        if ($request->is(...self::PRIVATE_PATHS)) {
+        if (\App\Support\Hosts::isHq($request) || \App\Support\Hosts::isPortal($request) || $request->is(...self::PRIVATE_PATHS)) {
             $headers->set('X-Robots-Tag', 'noindex, nofollow');
         }
 

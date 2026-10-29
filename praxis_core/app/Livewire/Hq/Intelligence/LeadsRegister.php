@@ -312,7 +312,7 @@ class LeadsRegister extends Component
         DB::table('notifications')->insert([
             'id' => (string) Str::uuid(), 'user_id' => Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c',
             'title' => 'MANUAL PITCH INJECTED', 'message' => strtoupper($this->company) . " entered into pipeline. Leakage: " . $this->currency . " " . number_format($totalCOPQ),
-            'link_url' => '/hq/intelligence/leads', 'type' => 'System', 'is_read' => 0, 'created_at' => now()
+            'link_url' => route('hq.crm.leads', [], false), 'type' => 'System', 'is_read' => 0, 'created_at' => now()
         ]);
 
         $this->closeIntakeModal();
@@ -340,7 +340,7 @@ class LeadsRegister extends Component
         ]);
 
         // 2. Deep-Link redirect natively to the Consultation Hub
-        return $this->redirect('/hq/intelligence/consultation', navigate: true);
+        return $this->redirect(route('hq.crm.consult'), navigate: true);
     }
 
     // --- EXPORT PROTOCOL (crm.export) ---

@@ -232,7 +232,7 @@ class ConversionHub extends Component
                 'user_id' => $adminId,
                 'title' => $tier == 1 ? '🚨 TIER 1 LEAD DETECTED' : 'NEW PIPELINE ACQUISITION',
                 'message' => strtoupper($company) . " generated a COPQ diagnostic. Systemic leakage estimated at " . $currency . " " . number_format($totalCOPQ) . ".",
-                'link_url' => '/hq/intelligence/leads',
+                'link_url' => route('hq.crm.leads', [], false),
                 'type' => 'System',
                 'is_read' => 0,
                 'created_at' => now()

@@ -269,7 +269,7 @@ class BroadcastLedger extends Component
                     'user_id' => $adminId,
                     'title' => 'INTELLIGENCE BROADCAST DISPATCHED',
                     'message' => "Campaign '{$this->subject}' successfully queued for {$finalCount} selected targets. ETA to completion: {$totalMinutes} minutes.",
-                    'link_url' => '/hq/intelligence/broadcast-ledger',
+                    'link_url' => route('hq.crm.broadcast', [], false),
                     'type' => 'System',
                     'is_read' => 0,
                     'created_at' => now()

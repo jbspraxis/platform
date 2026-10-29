@@ -883,7 +883,7 @@
                                     <div class="vault-doc-title">{{ $sow->title }}</div>
                                     <div class="vault-doc-meta">REF: {{ $sow->proposal_ref }} | BIND DATE: {{ \Carbon\Carbon::parse($sow->updated_at)->format('M d, Y') }}</div>
                                 </div>
-                                <a href="{{ url('/portal/proposal/' . $sow->token_hash) }}" target="_blank" class="btn-submit" style="width: auto; padding: 8px 15px; font-size: 0.7rem; text-decoration: none;">
+                                <a href="{{ route('portal.proposal', ['token' => $sow->token_hash]) }}" target="_blank" class="btn-submit" style="width: auto; padding: 8px 15px; font-size: 0.7rem; text-decoration: none;">
                                     <i data-lucide="external-link" style="width: 14px; height: 14px;"></i> VIEW
                                 </a>
                             </div>
@@ -900,7 +900,7 @@
                                     <div class="vault-doc-title">{{ $signoff->project_title }}</div>
                                     <div class="vault-doc-meta">REF: {{ substr($signoff->token, 0, 12) }} | HASH: {{ substr($signoff->client_signature_hash, 0, 10) }}...</div>
                                 </div>
-                                <a href="{{ url('/signoff/gateway/' . $signoff->token) }}" target="_blank" class="btn-submit" style="width: auto; padding: 8px 15px; font-size: 0.7rem; text-decoration: none; border-color: var(--brand-accent); color: var(--brand-accent);">
+                                <a href="{{ route('portal.signoff.gateway', ['token' => $signoff->token]) }}" target="_blank" class="btn-submit" style="width: auto; padding: 8px 15px; font-size: 0.7rem; text-decoration: none; border-color: var(--brand-accent); color: var(--brand-accent);">
                                     <i data-lucide="external-link" style="width: 14px; height: 14px;"></i> VIEW
                                 </a>
                             </div>
@@ -1180,7 +1180,7 @@
                     @forelse($ticketAttachments as $att)
                         <div style="border: 1px solid var(--brand-border); padding: 10px; text-align: center; border-radius: 2px; background: rgba(0,0,0,0.5); transition: 0.3s;" onmouseover="this.style.borderColor='var(--brand-primary)'" onmouseout="this.style.borderColor='var(--brand-border)'">
                             <i data-lucide="image" style="width: 24px; height: 24px; color: #8A9BB2; margin-bottom: 10px;"></i><br>
-                            <a href="{{ route('secure.file', ['path' => $att->file_path]) }}" target="_blank" style="color: var(--brand-primary); font-size: 0.7rem; font-family: 'Roboto Mono', monospace; text-decoration: none; word-break: break-all;">
+                            <a href="{{ route('portal.file', ['path' => $att->file_path]) }}" target="_blank" style="color: var(--brand-primary); font-size: 0.7rem; font-family: 'Roboto Mono', monospace; text-decoration: none; word-break: break-all;">
                                 {{ Str::limit($att->file_name, 15) }}
                             </a>
                         </div>

@@ -181,7 +181,7 @@ class ProposalBuilder extends Component
         
         // ADDED 'Pending Auth' to the locked array so the UI shifts to the Dispatch Screen
         $this->isLocked = in_array($this->proposal->status, ['Pending Auth', 'Authorized', 'Converted', 'Expired']);
-        $this->magicLinkUrl = url('/portal/proposal/' . $this->proposal->token_hash);
+        $this->magicLinkUrl = route('portal.proposal', ['token' => $this->proposal->token_hash]);
 
         // Hydrate Setup
         $this->title = $this->proposal->title ?? 'Project Proposal';

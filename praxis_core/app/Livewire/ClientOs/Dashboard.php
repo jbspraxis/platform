@@ -694,7 +694,7 @@ class Dashboard extends Component
                 'source' => 'invite', 'created_at' => now(), 'updated_at' => now()
             ]);
 
-            $setupUrl = url('/client/setup/' . $token);
+            $setupUrl = route('client.setup', ['token' => $token]);
             $orgName = e($this->organization->name);
             $inviteName = e($this->inviteFirstName);
 

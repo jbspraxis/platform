@@ -56,6 +56,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Hosts
+    |--------------------------------------------------------------------------
+    |
+    | One app, three hosts: the public site, HQ (staff and task force) and the
+    | client portal (clients and every token link). Each host only serves its
+    | own routes and keeps its own login cookie (SESSION_DOMAIN stays unset).
+    | Locally: localhost, hq.localhost and portal.localhost.
+    |
+    */
+
+    'domains' => [
+        'site' => env('SITE_DOMAIN', 'jbspraxis.com'),
+        'hq' => env('HQ_DOMAIN', 'hq.jbspraxis.com'),
+        'portal' => env('PORTAL_DOMAIN', 'portal.jbspraxis.com'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

@@ -173,7 +173,7 @@
                             <td>
                                 @if(($doc->status === 'Draft' || $doc->status === 'Awaiting Signature') && $doc->token)
                                     <!-- We will link this to the frontend gateway in Phase 4 -->
-                                    <button onclick="navigator.clipboard.writeText('{{ url('/signoff/gateway/' . $doc->token) }}'); alert('Magic Link Copied to Clipboard!');" class="btn-action">
+                                    <button onclick="navigator.clipboard.writeText('{{ route('portal.signoff.gateway', ['token' => $doc->token]) }}'); alert('Magic Link Copied to Clipboard!');" class="btn-action">
                                         <i data-lucide="link" style="width: 14px; height: 14px;"></i> COPY LINK
                                     </button>
                                 @endif

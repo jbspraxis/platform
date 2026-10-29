@@ -130,7 +130,7 @@
                         @error('client_redirect') 
                             <div style="background: rgba(255, 189, 46, 0.1); border: 1px solid #FFBD2E; color: #FFBD2E; padding: 15px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: 700; text-align: center; border-radius: 4px; box-shadow: 0 0 15px rgba(255, 189, 46, 0.2); line-height: 1.6;">
                                 {{ $message }}<br><br>
-                                <a href="/client/login" style="color: #00E5FF; text-decoration: none; border-bottom: 1px dashed #00E5FF; padding-bottom: 2px; letter-spacing: 1px; transition: 0.3s;" onmouseover="this.style.color='#FFF'; this.style.borderColor='#FFF';" onmouseout="this.style.color='#00E5FF'; this.style.borderColor='#00E5FF';">
+                                <a href="{{ route('client.login') }}" style="color: #00E5FF; text-decoration: none; border-bottom: 1px dashed #00E5FF; padding-bottom: 2px; letter-spacing: 1px; transition: 0.3s;" onmouseover="this.style.color='#FFF'; this.style.borderColor='#FFF';" onmouseout="this.style.color='#00E5FF'; this.style.borderColor='#00E5FF';">
                                     > INITIATE SECURE CLIENT LOGIN
                                 </a>
                             </div>

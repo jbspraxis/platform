@@ -193,8 +193,8 @@ class ContactHub extends Component
             Mail::raw(
                 "Hello {$firstName},\n\n"
                 . "Thank you for contacting JBS Praxis. We have received your message and a member of our team will get back to you shortly.\n\n"
-                . "If you would like to choose a time now, book a free audit & demo here:\n" . url('/schedule') . "\n\n"
-                . "JBS Praxis\ninfo@jbspraxis.com\n" . url('/'),
+                . "If you would like to choose a time now, book a free audit & demo here:\n" . route('schedule') . "\n\n"
+                . "JBS Praxis\ninfo@jbspraxis.com\n" . route('home'),
                 function ($m) use ($visitor) {
                     $m->to($visitor)->subject('We have received your message | JBS Praxis');
                 }

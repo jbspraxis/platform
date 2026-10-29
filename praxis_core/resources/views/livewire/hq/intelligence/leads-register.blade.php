@@ -356,7 +356,7 @@
                         </div>
                         
                         <div style="display: flex; gap: 10px;">
-                            <a href="/dossier/{{ $selectedLead->report_token }}?exec=true" target="_blank" style="flex: 1; text-align: center; background: rgba(0,229,255,0.1); border: 1px solid var(--erp-teal); color: var(--erp-teal); font-family: 'Roboto Mono', monospace; font-size: 0.7rem; font-weight: bold; padding: 12px; text-decoration: none; border-radius: 2px;">VIEW FULL DOSSIER</a>
+                            <a href="{{ route('dossier.show', ['token' => $selectedLead->report_token]) }}?exec=true" target="_blank" style="flex: 1; text-align: center; background: rgba(0,229,255,0.1); border: 1px solid var(--erp-teal); color: var(--erp-teal); font-family: 'Roboto Mono', monospace; font-size: 0.7rem; font-weight: bold; padding: 12px; text-decoration: none; border-radius: 2px;">VIEW FULL DOSSIER</a>
                             
                             @if($showDiffModal && $diffOld && $diffNew)
                                 <div class="glass-modal">

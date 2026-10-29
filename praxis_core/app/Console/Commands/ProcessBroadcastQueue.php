@@ -47,8 +47,8 @@ class ProcessBroadcastQueue extends Command
                 $body = preg_replace('/\{\{\s*pipeline_stage\s*\}\}/i', $org->pipeline_stage ?? '', $body);
 
                 // 3. Inject the 1x1 Tracking Pixel & Unsubscribe Link
-                $pixelUrl = url("/tracking/open/{$campaign->id}/{$user->id}");
-                $unsubUrl = url("/tracking/unsubscribe/{$user->id}");
+                $pixelUrl = route('tracking.open', ['campaign_id' => $campaign->id, 'user_id' => $user->id]);
+                $unsubUrl = route('tracking.unsubscribe', ['user_id' => $user->id]);
                 
                 $trackingHtml = '<img src="'.$pixelUrl.'" width="1" height="1" style="display:none;" alt="" />';
                 $unsubHtml = '<br><br><div style="font-size: 11px; color: #888888; border-top: 1px solid #eeeeee; padding-top: 10px;">To stop receiving strategic updates from the Intelligence Desk, <a href="'.$unsubUrl.'" style="color: #00E5FF;">click here to unsubscribe</a>.</div>';

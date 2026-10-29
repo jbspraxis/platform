@@ -244,7 +244,7 @@ class ScheduleConsultation extends Component
                     'user_id' => $adminId,
                     'title' => 'NEW CONSULTATION REQUEST',
                     'message' => strtoupper(trim($this->enterpriseName)) . " requested a meeting for " . $startDateTime->format('M d @ H:i') . ". Awaiting approval in the Lobby.",
-                    'link_url' => '/hq/intelligence/consultation',
+                    'link_url' => route('hq.crm.consult', [], false),
                     'type' => 'System',
                     'is_read' => 0,
                     'created_at' => now()
@@ -280,7 +280,7 @@ class ScheduleConsultation extends Component
                 . "Thank you for booking a free audit & demo with JBS Praxis.\n\n"
                 . "Requested time: {$when}\nTopic: {$focus}\n\n"
                 . "Our team will confirm the meeting and send you the call details by email shortly.\n\n"
-                . "JBS Praxis\ninfo@jbspraxis.com\n" . url('/'),
+                . "JBS Praxis\ninfo@jbspraxis.com\n" . route('home'),
                 function ($m) use ($visitor) {
                     $m->to($visitor)->subject('Your audit & demo request | JBS Praxis');
                 }
@@ -299,7 +299,7 @@ class ScheduleConsultation extends Component
                 "New audit & demo request from jbspraxis.com.\n\n"
                 . "Name: {$this->fullName}\nJob title: {$this->title}\nEmail: {$visitor}\nPhone: {$this->phone}\n"
                 . "Company: {$this->enterpriseName}\nTopic: {$focus}\nRequested: {$when}\n\n"
-                . "Approve it in HQ: " . url('/hq/intelligence/consultation'),
+                . "Approve it in HQ: " . route('hq.crm.consult'),
                 function ($m) use ($team, $visitor) {
                     $m->to($team)->replyTo($visitor)->subject('New demo request: ' . trim($this->enterpriseName));
                 }

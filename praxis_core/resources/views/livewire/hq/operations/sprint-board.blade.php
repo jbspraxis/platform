@@ -174,7 +174,7 @@
                             
                             @if($task['has_active_qa'] ?? false)
                                 <div class="qa-alert-wrap">
-                                    <a href="/hq/operations/qa-hub?ticket={{ $task['qa_ticket_id'] }}" class="qa-alert-btn" wire:navigate>
+                                    <a href="{{ route('hq.ops.qa', ['ticket' => $task['qa_ticket_id']]) }}" class="qa-alert-btn" wire:navigate>
                                         <i data-lucide="shield-alert" style="width: 14px; height: 14px;"></i> VULNERABILITY REPORTED
                                     </a>
                                     

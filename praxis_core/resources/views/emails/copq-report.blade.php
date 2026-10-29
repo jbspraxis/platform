@@ -33,7 +33,7 @@
                 </table>
 
                 <div style="text-align: center; margin-bottom: 40px;">
-                    <a href="{{ url('/dossier/' . $assessment->report_token) }}" style="display: inline-block; background-color: #00E5FF; color: #0A1128; font-family: monospace; font-size: 12px; font-weight: bold; text-decoration: none; padding: 15px 30px; letter-spacing: 1px;">
+                    <a href="{{ route('dossier.show', ['token' => $assessment->report_token]) }}" style="display: inline-block; background-color: #00E5FF; color: #0A1128; font-family: monospace; font-size: 12px; font-weight: bold; text-decoration: none; padding: 15px 30px; letter-spacing: 1px;">
                         ACCESS SECURE DOSSIER
                     </a>
                 </div>

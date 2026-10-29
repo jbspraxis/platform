@@ -2387,11 +2387,11 @@
             flow.style.display = 'none';
 
             if (reportToken && reportToken !== 'ERROR') {
-                const fullDocUrl = `/dossier/${reportToken}`;
-                const execDocUrl = `/dossier/${reportToken}?exec=true`;
+                const fullDocUrl = @js(str(route('dossier.show', ['token' => 'TOKEN']))->beforeLast('TOKEN')->toString()) + reportToken; // the dossier lives on the client portal
+                const execDocUrl = fullDocUrl + '?exec=true';
                 document.getElementById('viewReportBtn').onclick = () => window.location.href = fullDocUrl;
                 document.getElementById('execModeBtn').onclick   = () => window.location.href = execDocUrl;
-                const qrUrl = encodeURIComponent(window.location.origin + execDocUrl);
+                const qrUrl = encodeURIComponent(execDocUrl);
                 document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${qrUrl}&color=0A1128&bgcolor=FFFFFF`;
                 window.currentCopqToken = reportToken;
             } else {

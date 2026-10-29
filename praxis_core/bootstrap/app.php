@@ -34,10 +34,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // 4. DYNAMIC SESSION EXPIRATION ROUTING
         $middleware->redirectGuestsTo(function (Request $request) {
-            if ($request->is('client') || $request->is('client/*')) {
+            // Each host has its own sign-in page: the portal for clients, HQ for staff
+            if (\App\Support\Hosts::isPortal($request)) {
                 return route('client.login');
             }
-            return route('login'); 
+            if ($request->is('taskforce') || $request->is('taskforce/*')) {
+                return route('taskforce.login');
+            }
+            return route('login');
         });
 
     })

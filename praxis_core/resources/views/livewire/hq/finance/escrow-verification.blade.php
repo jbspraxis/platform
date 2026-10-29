@@ -228,13 +228,13 @@
                             <div style="font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: #8A9BB2; margin-bottom: 10px;">CRYPTOGRAPHIC PROOF FILES</div>
                             <div style="display: flex; flex-direction: column; gap: 10px;">
                                 @if($selectedTx->proof_file_path)
-                                    <a href="{{ route('secure.file', ['path' => $selectedTx->proof_file_path]) }}" target="_blank" class="btn-action" style="font-size: 0.7rem; justify-content: flex-start; background: rgba(0,0,0,0.5);">
+                                    <a href="{{ route('hq.file', ['path' => $selectedTx->proof_file_path]) }}" target="_blank" class="btn-action" style="font-size: 0.7rem; justify-content: flex-start; background: rgba(0,0,0,0.5);">
                                         <i data-lucide="external-link" style="width: 14px; height: 14px;"></i> VIEW PRIMARY RECEIPT (POP)
                                     </a>
                                 @endif
                                 
                                 @if($selectedTx->wht_deducted > 0 && $selectedTx->wht_proof_file_path)
-                                    <a href="{{ route('secure.file', ['path' => $selectedTx->wht_proof_file_path]) }}" target="_blank" class="btn-action" style="font-size: 0.7rem; justify-content: flex-start; border-color: #FFBD2E; color: #FFBD2E; background: rgba(0,0,0,0.5);">
+                                    <a href="{{ route('hq.file', ['path' => $selectedTx->wht_proof_file_path]) }}" target="_blank" class="btn-action" style="font-size: 0.7rem; justify-content: flex-start; border-color: #FFBD2E; color: #FFBD2E; background: rgba(0,0,0,0.5);">
                                         <i data-lucide="external-link" style="width: 14px; height: 14px;"></i> VIEW TAX REVERSAL (WHT)
                                     </a>
                                 @endif

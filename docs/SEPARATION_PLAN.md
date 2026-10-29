@@ -65,6 +65,16 @@ Total: about 18–24 hours of work, over 2–3 sessions. Each phase is committed
 - Guards against climbing: only an owner gives or removes the Owner role or changes an owner's account; nobody else can give a role, or add a permission to a role, that they don't hold themselves; nobody can change an account with more access than their own; the last active owner can't be suspended or lose the role. The same rule applies in the portal (a client role can only be given by someone holding all of its permissions; the primary account can't be changed from the Team tab).
 - Screens: System & Access → Accounts (invite staff with roles, clients with a portal role) and Roles & Permissions (module × action matrix per role). Portal: Team tab assigns portal roles.
 
+### S4 notes (hosts)
+- One app, three hosts (`config/app.php` → `domains`, env `SITE_DOMAIN`, `HQ_DOMAIN`, `PORTAL_DOMAIN`; production defaults built in):
+  - `jbspraxis.com`: public site, website forms, broadcast tracking; `www.` redirects to it.
+  - `hq.jbspraxis.com`: HQ (paths without the old `/hq` prefix, e.g. `/finance/payroll`), staff setup links, the task force under `/taskforce`, staff files.
+  - `portal.jbspraxis.com`: client sign-in (`/login`), dashboard (`/`), setup links, and every token link: `/proposal/…`, `/signoff/…`, `/verify/…`, `/dossier/…`, `/tracker/…`, client files.
+- HQ and the portal answer only their own routes (anything else is 404; Livewire's endpoints and `/up` work everywhere). Each host has its own login cookie: `SESSION_DOMAIN` must stay unset on the server.
+- Old addresses keep working: `/hq/…`, `/client/…`, `/client-portal`, `/portal/proposal/…`, `/portal/tracker/…`, `/signoff/gateway/…`, `/verify/contract/…`, `/dossier/…`, `/taskforce/…` and `/files/…` on the site 301 to their new host and path (`App\Support\Hosts`).
+- Links are generated from route names, which carry their host; HQ notification links are stored host-relative (`/intelligence/leads`).
+- cPanel (with owner approval): create `hq` and `portal` subdomains, issue SSL (AutoSSL), and point both at the app's web root (`public_html/PRAXIS`) at S6. HSTS on the main site already includes subdomains, so certificates must exist before the subdomains are used.
+
 ## Not in this project
 - The new marketing app (PR2), the homepage and demo (PR3), proof pages (PR4).
 - Record scope (all / team / own) and field masking: not chosen. Two-step sign-in comes later.

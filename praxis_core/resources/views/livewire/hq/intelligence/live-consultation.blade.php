@@ -29,7 +29,7 @@
                  alert('ERROR: System token missing.');
                  return;
              }
-             const url = window.location.origin + '/dossier/' + token + '?exec=true';
+             const url = @js(str(route('dossier.show', ['token' => 'TOKEN']))->beforeLast('TOKEN')->toString()) + token + '?exec=true';
              const message = encodeURIComponent('JBS Praxis | Executive Diagnostic.\n\nYour Cost of Poor Quality (COPQ) dossier has been compiled. Access the secure brief here:\n\n' + url);
              window.open('https://wa.me/?text=' + message, '_blank');
              document.getElementById('transmissionModal').style.display = 'none';
@@ -230,7 +230,7 @@
                     <p style="font-size: 0.8rem; color: var(--erp-muted); line-height: 1.6; margin-bottom: 15px;">{{ $copqData->ai_friction_analysis }}</p>
                     
                     <div style="display: flex; gap: 10px; margin-bottom: 30px;">
-                        <a href="/dossier/{{ $copqData->report_token }}?exec=true" target="_blank" style="flex: 1; text-align: center; background: rgba(0,229,255,0.1); border: 1px solid var(--erp-teal); color: var(--erp-teal); font-family: 'Roboto Mono', monospace; font-size: 0.7rem; font-weight: bold; padding: 8px; text-decoration: none; border-radius: 2px;">OPEN DOSSIER</a>
+                        <a href="{{ route('dossier.show', ['token' => $copqData->report_token]) }}?exec=true" target="_blank" style="flex: 1; text-align: center; background: rgba(0,229,255,0.1); border: 1px solid var(--erp-teal); color: var(--erp-teal); font-family: 'Roboto Mono', monospace; font-size: 0.7rem; font-weight: bold; padding: 8px; text-decoration: none; border-radius: 2px;">OPEN DOSSIER</a>
                         <button wire:click="dispatchCopqEmail" style="flex: 1; background: transparent; border: 1px dashed var(--erp-muted); color: var(--erp-white); font-family: 'Roboto Mono', monospace; font-size: 0.7rem; font-weight: bold; padding: 8px; border-radius: 2px; cursor: pointer; transition: 0.3s;" onmouseover="this.style.borderColor='var(--erp-teal)'; this.style.color='var(--erp-teal)';" onmouseout="this.style.borderColor='var(--erp-muted)'; this.style.color='var(--erp-white)';">TRANSMIT SECURELY</button>
                     </div>
                 @else

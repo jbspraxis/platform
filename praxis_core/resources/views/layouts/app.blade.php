@@ -555,7 +555,7 @@
                     <ul class="footer-links">
                         <li><a href="/schedule" wire:navigate>{{ __('Book a free audit & demo') }}</a></li>
                         <li><a href="/contact" wire:navigate>{{ __('Send us a message') }}</a></li>
-                        <li><a href="/client/login">{{ __('Client login') }}</a></li>
+                        <li><a href="{{ route('client.login') }}">{{ __('Client login') }}</a></li>
                     </ul>
                 </div>
             </div>

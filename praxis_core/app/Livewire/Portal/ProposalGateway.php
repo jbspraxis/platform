@@ -292,7 +292,7 @@ class ProposalGateway extends Component
                     'updated_at' => $timestamp
                 ]);
                 
-                $setupUrl = url('/client/setup/' . $invitationToken);
+                $setupUrl = route('client.setup', ['token' => $invitationToken]);
                 try {
                     Mail::raw("JBS Praxis OS Initialization.\n\nYour SOW is cryptographically secured. Initialize your key to access your Executive Dashboard and Invoice #001:\n\n{$setupUrl}", function ($message) use ($clientUser) {
                         $message->to($clientUser->email)->subject('JBS PRAXIS: Action Required - Initialize Node');

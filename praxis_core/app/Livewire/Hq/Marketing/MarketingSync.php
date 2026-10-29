@@ -174,7 +174,7 @@ class MarketingSync extends Component
                     'title' => 'BUDGET APPROVAL REQUIRED',
                     'message' => "Marketing requested $" . number_format($this->budgetAmount, 2) . " for '{$this->campName}'.",
                     'type' => 'Financial',
-                    'link_url' => '/hq/marketing/campaigns',
+                    'link_url' => route('hq.marketing.campaigns', [], false),
                     'created_at' => now()
                 ]);
             }

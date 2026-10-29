@@ -447,7 +447,7 @@
             @if(($viewState ?? '') === 'completed')
                 <div style="margin-top: 30px; padding: 20px; border: 1px dashed rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); display: flex; gap: 20px; align-items: center;">
                     @php
-                        $baseUrl = url('/verify/contract');
+                        $baseUrl = str(route('portal.verify.contract', ['hash' => 'HASH']))->beforeLast('/HASH')->toString();
                         $hqHash = $proposal->hq_signature_hash ?? '';
                         $cliHash = $proposal->client_signature_hash ?? '';
                         $qrData = "URL:{$baseUrl}/{$cliHash} | ORG:{$hqHash} | CLT:{$cliHash}";
