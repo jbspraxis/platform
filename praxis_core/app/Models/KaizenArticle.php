@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str; // PRAXIS OVERRIDE: Required for String manipulation
 
 class KaizenArticle extends Model
@@ -24,9 +25,26 @@ class KaizenArticle extends Model
         'status',
         'published_at',
         'created_by',
+        'contributor_id',
         'updated_by',
         'deleted_by'
     ];
+
+    /**
+     * Adds first_name, last_name and job_title of the byline: the public contributor
+     * (client_users) when there is one, otherwise the staff author (users).
+     */
+    public function scopeWithAuthor($query)
+    {
+        return $query
+            ->leftJoin('users as author_staff', 'author_staff.id', '=', 'kaizen_articles.created_by')
+            ->leftJoin('client_users as author_contributor', 'author_contributor.id', '=', 'kaizen_articles.contributor_id')
+            ->addSelect(
+                DB::raw('COALESCE(author_contributor.first_name, author_staff.first_name) as first_name'),
+                DB::raw('COALESCE(author_contributor.last_name, author_staff.last_name) as last_name'),
+                DB::raw('COALESCE(author_contributor.job_title, author_staff.job_title) as job_title')
+            );
+    }
 
     /**
      * The "booted" method of the model.

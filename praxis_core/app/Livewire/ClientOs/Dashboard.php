@@ -6,6 +6,7 @@ use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\WithFileUploads;
+use App\Support\People;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -112,21 +113,17 @@ class Dashboard extends Component
 
     public function mount()
     {
-        $this->user = Auth::user();
-        
-        // Smarter Role & Clearance Check
-        $role = clone DB::table('roles')->where('id', $this->user->role_id)->first();
-        $isClient = $role && strtolower($role->name) === 'client';
-        $isPartner = $role && $role->clearance_level >= 4;
+        // Client accounts only (guard 'client', client_users); staff use HQ
+        $this->user = Auth::guard('client')->user();
 
-        if (!$isClient && !$isPartner) {
-            Auth::logout();
+        if (!$this->user || $this->user->status !== 'Active') {
+            Auth::guard('client')->logout();
             abort(403, 'UNAUTHORIZED NODE: Access restricted to Client Level Clearance.');
         }
 
         $this->organization = DB::table('organizations')->where('id', $this->user->organization_id)->first();
         if (!$this->organization) {
-            Auth::logout();
+            Auth::guard('client')->logout();
             abort(404, 'CRITICAL ERROR: No organization linked to this node.');
         }
 
@@ -243,7 +240,8 @@ class Dashboard extends Component
         })->toArray();
         $this->overallProgress = $completedWeight;
 
-        $this->liveLogs = DB::table('task_comments')->join('tasks', 'task_comments.task_id', '=', 'tasks.id')->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')->join('users', 'task_comments.user_id', '=', 'users.id')->where('project_phases.project_id', $this->activeProject->id)->orderBy('task_comments.created_at', 'desc')->limit(15)->select('task_comments.comment_text', 'task_comments.created_at', 'users.first_name', 'users.last_name')->get()->map(function($log) {
+        $logs = DB::table('task_comments')->join('tasks', 'task_comments.task_id', '=', 'tasks.id')->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')->where('project_phases.project_id', $this->activeProject->id)->orderBy('task_comments.created_at', 'desc')->limit(15)->select('task_comments.comment_text', 'task_comments.created_at');
+        $this->liveLogs = People::joinAuthor($logs, 'task_comments.user_id', 'task_comments.author_type')->get()->map(function($log) {
             return ['time' => Carbon::parse($log->created_at)->format('M d - H:i'), 'author' => strtoupper(substr($log->first_name, 0, 1) . '. ' . $log->last_name), 'text' => $log->comment_text];
         })->toArray();
 
@@ -287,10 +285,16 @@ class Dashboard extends Component
     public function loadTeamCommand()
     {
         if (!$this->user->is_primary_client) return;
-        $this->teamMembers = DB::table('users')
-            ->leftJoin('projects', 'users.restricted_project_id', '=', 'projects.id')
-            ->where('users.organization_id', $this->organization->id)
-            ->select('users.*', 'projects.title as restricted_project_title')
+        // Portal accounts of this organisation (not leads). Only display fields: the list is
+        // sent to the browser, so never select passwords or invitation tokens.
+        $this->teamMembers = DB::table('client_users')
+            ->leftJoin('projects', 'client_users.restricted_project_id', '=', 'projects.id')
+            ->where('client_users.organization_id', $this->organization->id)
+            ->whereIn('client_users.lifecycle_stage', ['Onboarding', 'Active'])
+            ->whereNull('client_users.deleted_at')
+            ->select('client_users.id', 'client_users.first_name', 'client_users.last_name', 'client_users.email', 'client_users.job_title',
+                     'client_users.status', 'client_users.lifecycle_stage', 'client_users.is_primary_client', 'client_users.restricted_project_id',
+                     'client_users.last_login_at', 'client_users.created_at', 'projects.title as restricted_project_title')
             ->get()->toArray();
     }
 
@@ -333,7 +337,7 @@ class Dashboard extends Component
             DB::table('qa_tickets')->insert([
                 'id' => $ticketId, 'project_id' => $this->activeProject->id, 'task_id' => $isGeneralMessage ? null : $this->qaTaskId,
                 'title' => $finalTitle, 'description' => $this->qaDescription, 'status' => 'Open', 'severity' => $this->qaSeverity,
-                'submitted_by' => $this->user->id, 'created_at' => now(), 'updated_at' => now()
+                'submitted_by' => $this->user->id, 'submitted_by_type' => 'client', 'created_at' => now(), 'updated_at' => now()
             ]);
 
             // NEW: Process attachment if uploaded during creation
@@ -342,7 +346,7 @@ class Dashboard extends Component
                 DB::table('qa_attachments')->insert([
                     'id' => (string) Str::uuid(),
                     'ticket_id' => $ticketId,
-                    'uploaded_by' => Auth::id(),
+                    'uploaded_by' => $this->user->id, 'uploader_type' => 'client',
                     'file_name' => $this->initialAttachment->getClientOriginalName(),
                     'file_path' => $path,
                     'mime_type' => $this->initialAttachment->getMimeType(),
@@ -372,7 +376,7 @@ class Dashboard extends Component
         DB::table('tasks')->where('id', $taskId)->update(['status' => 'Done', 'updated_at' => now()]);
         
         DB::table('task_comments')->insert([
-            'task_id' => $taskId, 'user_id' => Auth::id(),
+            'task_id' => $taskId, 'user_id' => $this->user->id, 'author_type' => 'client',
             'comment_text' => '[CLIENT VERIFICATION] Deliverable approved and structurally locked.', 'created_at' => now()
         ]);
 
@@ -395,21 +399,19 @@ class Dashboard extends Component
         if (!$this->selectedTicket) return;
 
         // Fetch non-internal comments only
-        $this->ticketComments = DB::table('qa_comments')
-            ->join('users', 'qa_comments.user_id', '=', 'users.id')
+        $comments = DB::table('qa_comments')
             ->where('qa_comments.ticket_id', $ticketId)
             ->where('qa_comments.is_internal_only', 0)
-            ->select('qa_comments.*', 'users.first_name', 'users.last_name')
-            ->orderBy('qa_comments.created_at', 'asc')
-            ->get()->toArray();
+            ->select('qa_comments.*')
+            ->orderBy('qa_comments.created_at', 'asc');
+        $this->ticketComments = People::joinAuthor($comments, 'qa_comments.user_id', 'qa_comments.author_type')->get()->toArray();
 
         // NEW: Fetch Evidence/Attachments
-        $this->ticketAttachments = DB::table('qa_attachments')
-            ->join('users', 'qa_attachments.uploaded_by', '=', 'users.id')
+        $attachments = DB::table('qa_attachments')
             ->where('qa_attachments.ticket_id', $ticketId)
-            ->select('qa_attachments.*', 'users.first_name', 'users.last_name')
-            ->orderBy('qa_attachments.created_at', 'desc')
-            ->get()->toArray();
+            ->select('qa_attachments.*')
+            ->orderBy('qa_attachments.created_at', 'desc');
+        $this->ticketAttachments = People::joinAuthor($attachments, 'qa_attachments.uploaded_by', 'qa_attachments.uploader_type', 'uploader')->get()->toArray();
 
         $this->dispatch('open-qa');
     }
@@ -428,7 +430,7 @@ class Dashboard extends Component
         DB::table('qa_attachments')->insert([
             'id' => (string) Str::uuid(),
             'ticket_id' => $this->selectedTicket->id,
-            'uploaded_by' => Auth::id(),
+            'uploaded_by' => $this->user->id, 'uploader_type' => 'client',
             'file_name' => $this->newQaAttachment->getClientOriginalName(),
             'file_path' => $path,
             'mime_type' => $this->newQaAttachment->getMimeType(),
@@ -447,7 +449,7 @@ class Dashboard extends Component
         $this->validate(['newCommentText' => 'required|string|min:2|max:5000']);
 
         DB::table('qa_comments')->insert([
-            'id' => (string) Str::uuid(), 'ticket_id' => $this->selectedTicket->id, 'user_id' => Auth::id(),
+            'id' => (string) Str::uuid(), 'ticket_id' => $this->selectedTicket->id, 'user_id' => $this->user->id, 'author_type' => 'client',
             'comment_text' => $this->newCommentText, 'is_internal_only' => 0,
             'created_at' => now(), 'updated_at' => now()
         ]);
@@ -498,7 +500,8 @@ class Dashboard extends Component
             DB::table('task_comments')->insert([
                 // The 'id' => (string) Str::uuid() has been removed below
                 'task_id' => $this->selectedTicket->task_id, 
-                'user_id' => Auth::id(),
+                'user_id' => $this->user->id,
+                'author_type' => 'client',
                 'comment_text' => '[CLIENT VERIFICATION] Deliverable verified and locked directly from QA Hub override.', 
                 'created_at' => now()
             ]);
@@ -557,7 +560,7 @@ class Dashboard extends Component
                 'wht_deducted' => $this->popWhtAmount ?: 0.00,
                 'wht_proof_file_path' => $whtFilePath,
                 'status' => 'Pending Verification', 
-                'created_by' => $this->user->id, 
+                'created_by' => null, 'client_user_id' => $this->user->id, 
                 'created_at' => now(), 
                 'updated_at' => now()
             ]);
@@ -612,7 +615,7 @@ class Dashboard extends Component
             $this->validate([
                 'inviteFirstName' => 'required|string|max:50', 
                 'inviteLastName' => 'required|string|max:50', 
-                'inviteEmail' => 'required|email|unique:users,email',
+                'inviteEmail' => 'required|email|unique:client_users,email',
                 'inviteProjectId' => 'nullable|string' // Added to prevent strict-type silent failures
             ]);
 
@@ -620,7 +623,9 @@ class Dashboard extends Component
                 session()->flash('team_error', '> ERR: Unknown project.'); return;
             }
 
-            if (DB::table('users')->where('organization_id', $this->organization->id)->count() >= 3) {
+            $portalAccounts = DB::table('client_users')->where('organization_id', $this->organization->id)
+                ->whereIn('lifecycle_stage', ['Onboarding', 'Active'])->whereNull('deleted_at')->count();
+            if ($portalAccounts >= 3) {
                 session()->flash('team_error', '> ERR: MAXIMUM NODE CAPACITY (3) REACHED.'); return;
             }
 
@@ -631,14 +636,14 @@ class Dashboard extends Component
             }
 
             $token = Str::random(60);
-            $clientRoleId = DB::table('roles')->where('slug', 'client_exec')->value('id') ?? 2;
 
-            DB::table('users')->insert([
-                'id' => (string) Str::uuid(), 'organization_id' => $this->organization->id, 'role_id' => $clientRoleId,
+            // No password until they open the setup link, so the account cannot sign in before then
+            DB::table('client_users')->insert([
+                'id' => (string) Str::uuid(), 'organization_id' => $this->organization->id,
                 'is_primary_client' => 0, 'restricted_project_id' => $this->inviteProjectId ?: null,
                 'first_name' => $this->inviteFirstName, 'last_name' => $this->inviteLastName, 'email' => $this->inviteEmail,
-                'password' => \Illuminate\Support\Facades\Hash::make(Str::random(20)), 
-                'invitation_token' => $token, 'lifecycle_stage' => 'Onboarding', 'status' => 'Active', 'created_at' => now()
+                'password' => null, 'invitation_token' => $token, 'lifecycle_stage' => 'Onboarding', 'status' => 'Active',
+                'source' => 'invite', 'created_at' => now(), 'updated_at' => now()
             ]);
 
             $setupUrl = url('/client/setup/' . $token);
@@ -680,7 +685,7 @@ class Dashboard extends Component
         if (!$this->user->is_primary_client || $this->user->id === $userId) return;
         if (!empty($projectId) && !$this->ownsProject($projectId)) return;
 
-        DB::table('users')->where('id', $userId)->where('organization_id', $this->organization->id)->update([
+        DB::table('client_users')->where('id', $userId)->where('organization_id', $this->organization->id)->update([
             'restricted_project_id' => empty($projectId) ? null : $projectId,
             'updated_at' => now()
         ]);
@@ -692,11 +697,11 @@ class Dashboard extends Component
     public function toggleSuspendUser($userId)
     {
         if (!$this->user->is_primary_client || $this->user->id === $userId) return;
-        $target = DB::table('users')->where('id', $userId)->where('organization_id', $this->organization->id)->first();
+        $target = DB::table('client_users')->where('id', $userId)->where('organization_id', $this->organization->id)->first();
         if ($target) {
             $newStatus = $target->status === 'Suspended' ? 'Active' : 'Suspended';
-            DB::table('users')->where('id', $userId)->update(['status' => $newStatus, 'updated_at' => now()]);
-            if ($newStatus === 'Suspended') DB::table('sessions')->where('user_id', $userId)->delete();
+            // A new remember token ends any 'remember me' logins; ClientActive signs out open sessions
+            DB::table('client_users')->where('id', $userId)->where('organization_id', $this->organization->id)->update(['status' => $newStatus, 'remember_token' => Str::random(60), 'updated_at' => now()]);
             $this->loadTeamCommand();
         }
     }
@@ -723,7 +728,7 @@ class Dashboard extends Component
 
     public function executeLogout()
     {
-        Auth::logout();
+        Auth::guard('client')->logout();
         return redirect()->route('client.login');
     }
 

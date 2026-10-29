@@ -20,7 +20,7 @@
         </p>
 
         <div style="text-align: center; margin-bottom: 40px;">
-            <a href="{{ route('client.setup', ['token' => $token]) }}" style="display: inline-block; background-color: #00E5FF; color: #0A1128; text-decoration: none; padding: 15px 30px; font-weight: bold; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; border-radius: 2px;">
+            <a href="{{ $setupUrl }}" style="display: inline-block; background-color: #00E5FF; color: #0A1128; text-decoration: none; padding: 15px 30px; font-weight: bold; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; border-radius: 2px;">
                 INITIALIZE SECURE KEY
             </a>
         </div>

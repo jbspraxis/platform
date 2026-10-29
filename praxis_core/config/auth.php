@@ -20,11 +20,18 @@ return [
     */
 
     'guards' => [
+        // Staff (HQ): the users table
         'web' => [
             'driver' => 'session',
             'provider' => 'users',
         ],
-        
+
+        // Clients (portal): the client_users table. A client account can never pass 'web'.
+        'client' => [
+            'driver' => 'session',
+            'provider' => 'client_users',
+        ],
+
         // [ INJECTED FOR THE STANDALONE TRACKER ]
         'tracker' => [
             'driver' => 'session',
@@ -42,6 +49,11 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', App\Models\User::class),
+        ],
+
+        'client_users' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\ClientUser::class,
         ],
 
         // [ INJECTED FOR THE STANDALONE TRACKER ]

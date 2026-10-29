@@ -15,11 +15,14 @@ class UserInvitation extends Mailable
 
     public $firstName;
     public $token;
+    public $setupUrl;
 
-    public function __construct($firstName, $token)
+    /** $forClient picks the portal setup page; staff set up their key on HQ. */
+    public function __construct($firstName, $token, bool $forClient = false)
     {
         $this->firstName = $firstName;
         $this->token = $token;
+        $this->setupUrl = route($forClient ? 'client.setup' : 'hq.setup', ['token' => $token]);
     }
 
     public function envelope(): Envelope

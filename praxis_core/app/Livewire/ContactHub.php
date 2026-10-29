@@ -120,24 +120,24 @@ class ContactHub extends Component
                 ]);
             }
 
-            // B. Find or Create User
-            $existingUser = DB::table('users')->where('email', $emailStr)->first();
-            
+            // B. Find or create the contact (a lead: client account with no password, so no portal access)
+            $existingUser = DB::table('client_users')->where('email', $emailStr)->first();
+
             if ($existingUser) {
                 $userId = $existingUser->id; // Grab existing user ID for the CRM Note
             } else {
                 $userId = (string) Str::uuid();
-                DB::table('users')->insert([
+                DB::table('client_users')->insert([
                     'id' => $userId,
                     'organization_id' => $orgId, // Attaches correctly to new or existing Org
                     'first_name' => $firstName,
                     'last_name' => $lastName,
                     'email' => $emailStr,
-                    'password' => Hash::make(Str::random(16)), 
                     'phone' => $this->countryCode . ' ' . $this->phone,
                     'job_title' => $this->title,
                     'status' => 'Active',
-                    'lifecycle_stage' => 'Lead Intake',
+                    'lifecycle_stage' => 'Lead',
+                    'source' => 'contact_form',
                     'created_at' => now(),
                     'updated_at' => now()
                 ]);
@@ -153,6 +153,7 @@ class ContactHub extends Component
                 'id' => (string) Str::uuid(),
                 'organization_id' => $orgId,
                 'author_id' => $userId, // Attributing the note securely to the correct user
+                'author_type' => 'client',
                 'note_text' => $noteContent,
                 'interaction_type' => 'Internal Note',
                 'created_at' => now(),

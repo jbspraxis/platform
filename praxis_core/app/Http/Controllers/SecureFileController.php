@@ -43,7 +43,8 @@ class SecureFileController extends Controller
             return true;
         }
 
-        if ($folder !== 'qa_evidence' || ! $user->organization_id) {
+        // Clients: only QA evidence on their own organisation's projects
+        if (! $user instanceof \App\Models\ClientUser || $folder !== 'qa_evidence' || ! $user->organization_id) {
             return false;
         }
 

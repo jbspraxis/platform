@@ -10,11 +10,10 @@ use Illuminate\Support\Facades\DB;
 /**
  * Keeps /hq for JBS Praxis staff only.
  *
- * Staff are active users whose role has clearance 4 or more, or who are on the
- * internal team (lifecycle_stage 'Strike Team'). Clients and leads share the
- * same 'web' login, so 'auth' alone is not enough. With a parameter
- * (hq.staff:4) the route also needs that clearance level, which keeps finance,
- * payroll, master data, CRM and role management with senior staff.
+ * Staff are active accounts in the users table (clients are client_users and sign in
+ * with the 'client' guard, so they never reach this check as staff). With a parameter
+ * (hq.staff:4) the route also needs that clearance level, which keeps finance, payroll,
+ * master data, CRM and role management with senior staff.
  */
 class HqStaff
 {
@@ -33,13 +32,17 @@ class HqStaff
 
     public static function allows($user, ?int $minClearance = null): bool
     {
-        if (! $user || $user->status !== 'Active') {
+        // Only staff accounts (users table); a client account (ClientUser) is never staff
+        if (! $user instanceof \App\Models\User || $user->status !== 'Active') {
             return false;
         }
 
-        $clearance = (int) (DB::table('roles')->where('id', $user->role_id)->value('clearance_level') ?? 0);
-        $isStaff = $clearance >= 4 || $user->lifecycle_stage === 'Strike Team';
+        if ($minClearance === null) {
+            return true;
+        }
 
-        return $isStaff && ($minClearance === null || $clearance >= $minClearance);
+        $clearance = (int) (DB::table('roles')->where('id', $user->role_id)->value('clearance_level') ?? 0);
+
+        return $clearance >= $minClearance;
     }
 }

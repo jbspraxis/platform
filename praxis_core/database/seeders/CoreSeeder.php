@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
 class CoreSeeder extends Seeder
 {
     public const INTERNAL_ORG_ID = 'c57cc72c-2073-11f1-b3a6-44a84221081c';
-    public const EDITORIAL_USER_ID = '7e0d1a2b-0000-4000-8000-0000000ed170';
+    public const EDITORIAL_USER_ID = \App\Models\User::EDITORIAL_ID;
 
     public function run(): void
     {
@@ -36,7 +36,6 @@ class CoreSeeder extends Seeder
             'job_title' => 'Editorial Team',
             'status' => 'Suspended',
             'lifecycle_stage' => 'System',
-            'is_subscribed' => 0,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

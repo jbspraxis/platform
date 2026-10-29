@@ -16,13 +16,8 @@ class KaizenArticleView extends Component
         $this->slug = $slug;
         
         // Fetch the article and join the author data in a single optimized query
-        $this->article = KaizenArticle::select(
-                'kaizen_articles.*', 
-                'users.first_name', 
-                'users.last_name', 
-                'users.job_title'
-            )
-            ->join('users', 'kaizen_articles.created_by', '=', 'users.id')
+        $this->article = KaizenArticle::select('kaizen_articles.*')
+            ->withAuthor()
             ->where('kaizen_articles.slug', $this->slug)
             ->where('kaizen_articles.status', 'Published')
             ->first();

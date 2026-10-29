@@ -26,9 +26,10 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\MonitorWatchdog::class,
         ]);
 
-        // 3. HQ ACCESS: staff only (clients and leads share the 'web' login)
+        // 3. HQ ACCESS: staff only (users table, 'web' guard); portal: active clients only ('client' guard)
         $middleware->alias([
             'hq.staff' => \App\Http\Middleware\HqStaff::class,
+            'client.active' => \App\Http\Middleware\ClientActive::class,
         ]);
 
         // 4. DYNAMIC SESSION EXPIRATION ROUTING

@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use Livewire\Component;
+use App\Models\ClientUser;
 use App\Models\KaizenArticle;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -77,30 +78,30 @@ class Kaizen extends Component
             DB::transaction(function () {
                 $nameParts = explode(' ', trim($this->fullName), 2);
 
-                // Every user needs an organisation: public contributors share one
-                $contributorOrgId = DB::table('organizations')->where('name', 'Kaizen Public Contributors')->value('id');
-                if (!$contributorOrgId) {
-                    $contributorOrgId = (string) Str::uuid();
-                    DB::table('organizations')->insert([
-                        'id' => $contributorOrgId, 'name' => 'Kaizen Public Contributors',
-                        'status' => 'Internal', 'created_at' => now(), 'updated_at' => now(),
-                    ]);
-                }
+                // 1. The contributor is a client contact (no password, so no portal access).
+                //    An existing client or lead keeps their own record and organisation.
+                $contributor = ClientUser::withTrashed()->where('email', $this->email)->first();
 
-                // 1. Check if the email already exists in the system
-                $user = User::where('email', $this->email)->first();
+                // 2. New contributors share one organisation
+                if (!$contributor) {
+                    $contributorOrgId = DB::table('organizations')->where('name', 'Kaizen Public Contributors')->value('id');
+                    if (!$contributorOrgId) {
+                        $contributorOrgId = (string) Str::uuid();
+                        DB::table('organizations')->insert([
+                            'id' => $contributorOrgId, 'name' => 'Kaizen Public Contributors',
+                            'status' => 'Internal', 'created_at' => now(), 'updated_at' => now(),
+                        ]);
+                    }
 
-                // 2. If no user exists, create a heavily restricted "Quarantined" profile
-                if (!$user) {
-                    $user = User::create([
+                    $contributor = ClientUser::create([
                         'organization_id' => $contributorOrgId,
                         'first_name'      => $nameParts[0],
                         'last_name'       => $nameParts[1] ?? 'Unknown',
                         'email'           => $this->email,
                         'job_title'       => $this->title,
-                        'password'        => Hash::make(Str::random(64)), // Impossibly long hash
-                        'status'          => 'Suspended', 
-                        'lifecycle_stage' => 'Public Contributor' 
+                        'status'          => 'Active',
+                        'lifecycle_stage' => 'Public Contributor',
+                        'source'          => 'kaizen',
                     ]);
                 }
 
@@ -121,7 +122,8 @@ class Kaizen extends Component
                     'is_public'           => false, 
                     'is_internal_sop'     => false,
                     'status'              => 'Pending Moderation',
-                    'created_by'          => $user->id,
+                    'created_by'          => User::EDITORIAL_ID,
+                    'contributor_id'      => $contributor->id,
                 ]);
 
                 // Tell senior staff there is an article to moderate
@@ -174,14 +176,9 @@ class Kaizen extends Component
 
     public function render()
     {
-        // Join the users table to get the author's name and designation
-        $articles = KaizenArticle::select(
-                'kaizen_articles.*', 
-                'users.first_name', 
-                'users.last_name', 
-                'users.job_title'
-            )
-            ->join('users', 'kaizen_articles.created_by', '=', 'users.id')
+        // The byline: public contributor if any, otherwise the staff author
+        $articles = KaizenArticle::select('kaizen_articles.*')
+            ->withAuthor()
             ->where('kaizen_articles.status', 'Published')
             ->orderBy('kaizen_articles.created_at', 'desc')
             ->get()

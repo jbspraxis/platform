@@ -94,11 +94,12 @@ class BroadcastLedger extends Component
 
     private function getRecipientQuery()
     {
-        $query = DB::table('users')
-            ->join('organizations', 'users.organization_id', '=', 'organizations.id')
-            ->where('users.is_subscribed', 1)
-            ->whereNotNull('users.email')
-            ->where('users.status', 'Active');
+        $query = DB::table('client_users')
+            ->join('organizations', 'client_users.organization_id', '=', 'organizations.id')
+            ->where('client_users.is_subscribed', 1)
+            ->whereNotNull('client_users.email')
+            ->where('client_users.status', 'Active')
+            ->whereNull('client_users.deleted_at');
 
         if ($this->filterStatus) { $query->where('organizations.status', $this->filterStatus); }
         if ($this->filterIndustry) { $query->where('organizations.industry', $this->filterIndustry); }
@@ -113,11 +114,11 @@ class BroadcastLedger extends Component
         // Fetch up to 200 matching records for UI rendering
         $records = $this->getRecipientQuery()
             ->select(
-                'users.id', 
-                'users.first_name', 
-                'users.last_name', 
-                'users.email', 
-                'users.job_title', 
+                'client_users.id', 
+                'client_users.first_name', 
+                'client_users.last_name', 
+                'client_users.email', 
+                'client_users.job_title', 
                 'organizations.name as company_name'
             )
             ->limit(200)
@@ -290,31 +291,31 @@ class BroadcastLedger extends Component
 
         if ($this->activeTab === 'queued') {
             $this->queuedLogs = DB::table('broadcast_logs')
-                ->join('users', 'broadcast_logs.user_id', '=', 'users.id')
-                ->join('organizations', 'users.organization_id', '=', 'organizations.id')
+                ->join('client_users', 'broadcast_logs.user_id', '=', 'client_users.id')
+                ->join('organizations', 'client_users.organization_id', '=', 'organizations.id')
                 ->join('broadcast_campaigns', 'broadcast_logs.campaign_id', '=', 'broadcast_campaigns.id')
                 ->where('broadcast_logs.status', 'Queued')
-                ->select('broadcast_logs.*', 'users.email', 'users.first_name', 'users.last_name', 'organizations.name as company_name', 'broadcast_campaigns.subject')
+                ->select('broadcast_logs.*', 'client_users.email', 'client_users.first_name', 'client_users.last_name', 'organizations.name as company_name', 'broadcast_campaigns.subject')
                 ->orderBy('broadcast_logs.created_at', 'desc')->limit(200)->get()->toArray();
         }
 
         if ($this->activeTab === 'sent') {
             $this->sentLogs = DB::table('broadcast_logs')
-                ->join('users', 'broadcast_logs.user_id', '=', 'users.id')
-                ->join('organizations', 'users.organization_id', '=', 'organizations.id')
+                ->join('client_users', 'broadcast_logs.user_id', '=', 'client_users.id')
+                ->join('organizations', 'client_users.organization_id', '=', 'organizations.id')
                 ->join('broadcast_campaigns', 'broadcast_logs.campaign_id', '=', 'broadcast_campaigns.id')
                 ->where('broadcast_logs.status', 'Sent')
-                ->select('broadcast_logs.*', 'users.email', 'users.first_name', 'users.last_name', 'organizations.name as company_name', 'broadcast_campaigns.subject')
+                ->select('broadcast_logs.*', 'client_users.email', 'client_users.first_name', 'client_users.last_name', 'organizations.name as company_name', 'broadcast_campaigns.subject')
                 ->orderBy('broadcast_logs.updated_at', 'desc')->limit(200)->get()->toArray();
         }
 
         if ($this->activeTab === 'failed') {
             $this->failedLogs = DB::table('broadcast_logs')
-                ->join('users', 'broadcast_logs.user_id', '=', 'users.id')
-                ->join('organizations', 'users.organization_id', '=', 'organizations.id')
+                ->join('client_users', 'broadcast_logs.user_id', '=', 'client_users.id')
+                ->join('organizations', 'client_users.organization_id', '=', 'organizations.id')
                 ->join('broadcast_campaigns', 'broadcast_logs.campaign_id', '=', 'broadcast_campaigns.id')
                 ->where('broadcast_logs.status', 'Failed')
-                ->select('broadcast_logs.*', 'users.email', 'users.first_name', 'users.last_name', 'organizations.name as company_name', 'broadcast_campaigns.subject')
+                ->select('broadcast_logs.*', 'client_users.email', 'client_users.first_name', 'client_users.last_name', 'organizations.name as company_name', 'broadcast_campaigns.subject')
                 ->orderBy('broadcast_logs.updated_at', 'desc')->limit(200)->get()->toArray();
         }
     }

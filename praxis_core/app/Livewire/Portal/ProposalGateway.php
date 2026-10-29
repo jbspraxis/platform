@@ -64,9 +64,10 @@ class ProposalGateway extends Component
         if (!$proposal) return;
 
         // Vector Person Validation (Strict Email Matching against active nodes)
-        $vectorPerson = DB::table('users')
+        $vectorPerson = DB::table('client_users')
             ->where('organization_id', $proposal->organization_id)
             ->where('email', $this->signerEmail)
+            ->whereNull('deleted_at')
             ->first();
 
         if (!$vectorPerson) {
@@ -275,18 +276,17 @@ class ProposalGateway extends Component
             if(!empty($notifications)) DB::table('notifications')->insert($notifications);
 
             // 7. Client Account Elevation & Magic Link Dispatch
-            $clientUser = DB::table('users')->where('organization_id', $organization->id)->where('email', $this->signerEmail)->first();
+            // The signer's lead contact becomes the organisation's primary portal account
+            $clientUser = DB::table('client_users')->where('organization_id', $organization->id)->where('email', $this->signerEmail)->whereNull('deleted_at')->first();
             if (!$clientUser) {
-                $clientUser = DB::table('users')->where('organization_id', $organization->id)->first();
+                $clientUser = DB::table('client_users')->where('organization_id', $organization->id)->whereNull('deleted_at')->orderBy('created_at')->first();
             }
 
             if ($clientUser) {
                 $invitationToken = Str::random(60);
-                $clientRoleId = DB::table('roles')->where('slug', 'client_exec')->value('id') ?? 2;
-                
-                DB::table('users')->where('id', $clientUser->id)->update([
-                    'role_id' => $clientRoleId,
-                    'invitation_token' => $invitationToken, 
+
+                DB::table('client_users')->where('id', $clientUser->id)->update([
+                    'invitation_token' => $invitationToken,
                     'lifecycle_stage' => 'Onboarding',
                     'is_primary_client' => 1, 
                     'updated_at' => $timestamp

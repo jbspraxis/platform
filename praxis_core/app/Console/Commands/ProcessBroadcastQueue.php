@@ -26,13 +26,18 @@ class ProcessBroadcastQueue extends Command
 
         foreach ($queuedLogs as $log) {
             try {
-                $user = DB::table('users')->where('id', $log->user_id)->first();
-                $org = DB::table('organizations')->where('id', $user->organization_id)->first();
+                // Recipients are client contacts (leads and clients)
+                $user = DB::table('client_users')->where('id', $log->user_id)->first();
                 $campaign = DB::table('broadcast_campaigns')->where('id', $log->campaign_id)->first();
 
                 if (!$user || !$campaign) {
                     throw new \Exception("Missing User or Campaign Data.");
                 }
+                // They may have unsubscribed or been removed after the campaign was queued
+                if (!$user->is_subscribed || $user->deleted_at) {
+                    throw new \Exception("Recipient unsubscribed or removed.");
+                }
+                $org = DB::table('organizations')->where('id', $user->organization_id)->first();
 
                 // 2. Parse Dynamic Variables (Regex makes it immune to AI spacing errors)
                 $body = $campaign->body_html;

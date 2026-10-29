@@ -37,7 +37,7 @@ class SetupAccount extends Component
 
     private function invitedUser()
     {
-        return DB::table('users')
+        return DB::table('client_users')
             ->where('invitation_token', $this->token)
             ->where('lifecycle_stage', 'Onboarding')
             ->first();
@@ -58,7 +58,7 @@ class SetupAccount extends Component
         }
 
         DB::transaction(function () use ($user) {
-            DB::table('users')->where('id', $user->id)->update([
+            DB::table('client_users')->where('id', $user->id)->update([
                 'password' => Hash::make($this->password),
                 'lifecycle_stage' => 'Active', // Graduate them
                 'invitation_token' => null, 
@@ -68,7 +68,7 @@ class SetupAccount extends Component
         });
 
         // Secure Authentication & Session Regeneration
-        Auth::loginUsingId($user->id);
+        Auth::guard('client')->loginUsingId($user->id);
         Session::regenerate();
 
         return redirect()->route('client.dashboard');

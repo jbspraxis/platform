@@ -130,14 +130,20 @@
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                         
                         <div>
-                            <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-teal); margin-bottom: 6px; font-weight: bold;">System Role (Clearance) *</label>
-                            <select wire:model="role_id" required class="cyber-select" style="border-color: rgba(0, 229, 255, 0.4);">
-                                <option value="">-- SELECT CLEARANCE LEVEL --</option>
-                                @foreach($roles as $role)
-                                    <option value="{{ $role->id }}">LVL {{ $role->clearance_level }} - {{ $role->name }}</option>
-                                @endforeach
-                            </select>
-                            @error('role_id') <span class="validation-error">{{ $message }}</span> @enderror
+                            @if($editingIsClient || $this->isClientForm())
+                                {{-- Client portal accounts have no staff role; the client's primary account manages their team --}}
+                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-teal); margin-bottom: 6px; font-weight: bold;">Account Type</label>
+                                <div style="font-size: 0.8rem; color: var(--erp-muted); padding: 10px 0;">Client portal account. The organisation's first account becomes its primary account.</div>
+                            @else
+                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-teal); margin-bottom: 6px; font-weight: bold;">System Role (Clearance) *</label>
+                                <select wire:model="role_id" required class="cyber-select" style="border-color: rgba(0, 229, 255, 0.4);">
+                                    <option value="">-- SELECT CLEARANCE LEVEL --</option>
+                                    @foreach($roles as $role)
+                                        <option value="{{ $role->id }}">LVL {{ $role->clearance_level }} - {{ $role->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('role_id') <span class="validation-error">{{ $message }}</span> @enderror
+                            @endif
                         </div>
 
                         <div>
@@ -224,7 +230,11 @@
 
                                 <td style="padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.02);">
                                     <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: var(--erp-muted);">
-                                        <span style="color: var(--erp-white); font-weight: bold;">LVL {{ $user->clearance_level }}</span> - {{ $user->role_name }}
+                                        @if($user->clearance_level !== null)
+                                            <span style="color: var(--erp-white); font-weight: bold;">LVL {{ $user->clearance_level }}</span> - {{ $user->role_name }}
+                                        @else
+                                            <span style="color: var(--erp-white); font-weight: bold;">PORTAL</span> - {{ $user->role_name }}
+                                        @endif
                                     </div>
                                 </td>
 

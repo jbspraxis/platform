@@ -49,6 +49,14 @@ HQ and the portal are **one codebase** (`praxis_core`) served on two subdomains.
 
 Total: about 18–24 hours of work, over 2–3 sessions. Each phase is committed locally and tested on the local copy. Production changes only once, at S6, after the owner's approval.
 
+### S2 notes (done)
+- Staff are `users` (guard `web`); everyone outside JBS Praxis is `client_users` (guard `client`): website leads (no password, cannot sign in), Kaizen contributors, and portal accounts (invited, set their own password).
+- Shared tables keep the person's id plus a type: `qa_tickets.submitted_by_type`, `qa_comments.author_type`, `task_comments.author_type`, `crm_notes.author_type`, `qa_attachments.uploader_type`. `App\Support\People::joinAuthor()` adds the name either way.
+- Kaizen articles: `created_by` is the "JBS Praxis Editorial" staff account (`User::EDITORIAL_ID`), the outside writer is `contributor_id`; the byline shows the contributor.
+- `ClientActive` middleware signs a suspended client out on their next request. Staff setup link now has its own page (`/hq/setup/{token}`); the invite email picks the staff or portal link.
+- Notifications stay staff-only. The client portal has no inbox, so the old "notify the client" rows (invoice issued, payment verified or rejected, ticket resolved) were never seen and are no longer written; emailing clients those events is a possible later addition.
+- The HQ gate is now "any active staff account", with clearance 4 still required for senior screens until S3 replaces clearance with roles.
+
 ## Not in this project
 - The new marketing app (PR2), the homepage and demo (PR3), proof pages (PR4).
 - Record scope (all / team / own) and field masking: not chosen. Two-step sign-in comes later.

@@ -14,7 +14,6 @@ use App\Livewire\Services;
 use App\Livewire\Careers;
 use App\Livewire\Kaizen;
 use App\Livewire\TelemetryNode;
-use App\Livewire\ClientPortal;
 use App\Http\Controllers\SitemapController;
 
 // =========================================================
@@ -61,8 +60,9 @@ Route::middleware('throttle:30,1')->group(function () {
         return view('copq-report', ['assessment' => $assessment, 'isExecMode' => $isExecMode]);
     })->name('dossier.show');
 
-    // 2.5 Client OS account setup link
+    // 2.5 Account setup links: clients (client_users) and staff (users)
     Route::get('/client/setup/{token}', \App\Livewire\ClientOs\SetupAccount::class)->name('client.setup');
+    Route::get('/hq/setup/{token}', \App\Livewire\Hq\Auth\SetupAccount::class)->name('hq.setup');
 
     // 2.6 The Client Project Tracker (Mobile-First Portal)
     Route::get('/portal/tracker/{token}', \App\Livewire\Portal\ProjectTracker::class)->name('portal.tracker');
@@ -75,10 +75,13 @@ Route::get('/client/login', \App\Livewire\ClientOs\LoginMatrix::class)->name('cl
 // =========================================================
 // ZONE 3: SECURE CLIENT OS (Auth Required)
 // =========================================================
-Route::middleware(['auth'])->group(function () {
+// Client accounts only (guard 'client', table client_users)
+Route::middleware(['auth:client', 'client.active'])->group(function () {
     Route::get('/client/dashboard', \App\Livewire\ClientOs\Dashboard::class)->name('client.dashboard');
+});
 
-    // Private uploads (receipts, payment proofs, QA evidence, CVs), checked per file
+// Private uploads (receipts, payment proofs, QA evidence, CVs): staff or client, checked per file
+Route::middleware(['auth:web,client'])->group(function () {
     Route::get('/files/{path}', [\App\Http\Controllers\SecureFileController::class, 'show'])->where('path', '.*')->name('secure.file');
 });
 
@@ -109,7 +112,7 @@ Route::get('/tracking/unsubscribe/{user_id}', function ($user_id) {
 })->middleware('throttle:30,1')->name('tracking.unsubscribe');
 
 Route::post('/tracking/unsubscribe/{user_id}', function ($user_id) {
-    DB::table('users')->where('id', $user_id)->update(['is_subscribed' => 0]);
+    DB::table('client_users')->where('id', $user_id)->update(['is_subscribed' => 0, 'updated_at' => now()]);
     return view('unsubscribe', ['userId' => $user_id, 'done' => true]);
 })->middleware('throttle:30,1')->name('tracking.unsubscribe.confirm');
 

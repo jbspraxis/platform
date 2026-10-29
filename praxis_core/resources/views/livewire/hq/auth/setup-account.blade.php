@@ -84,8 +84,8 @@
     
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const userName = "{{ strtoupper($user->first_name) }}";
-            const userEmail = "{{ strtolower($user->email) }}";
+            const userName = @js(e(strtoupper($firstName))); // escaped: the typewriter writes HTML
+            const userEmail = @js(e(strtolower($email)));
             
             const textToType = `> IDENTITY CONFIRMED: <span style="color: #FFFFFF; font-weight: bold;">${userName}</span><br>> UPLINK: <span style="color: #00E5FF;">${userEmail}</span><br>> STATUS: Awaiting zero-knowledge cryptographic lock. Please establish your permanent clearance key below.`;
             

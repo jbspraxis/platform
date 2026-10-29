@@ -95,7 +95,7 @@ class LiveConsultation extends Component
         $clientEmail = $copq ? $copq->corporate_email : null;
 
         if (!$clientEmail) {
-            $user = DB::table('users')->where('organization_id', $org->id)->first();
+            $user = DB::table('client_users')->where('organization_id', $org->id)->whereNull('deleted_at')->orderByDesc('is_primary_client')->first();
             $clientEmail = $user ? $user->email : null;
         }
 
@@ -268,7 +268,7 @@ class LiveConsultation extends Component
         // 6. Lock Data into the COPQ Vault
         $token = 'PRX-' . strtoupper(Str::random(24)) . '-' . date('Y');
         
-        $user = DB::table('users')->where('organization_id', $this->activeOrgId)->first();
+        $user = DB::table('client_users')->where('organization_id', $this->activeOrgId)->whereNull('deleted_at')->orderByDesc('is_primary_client')->first();
         $execEmail = $user ? $user->email : 'client@' . strtolower(str_replace(' ', '', $companyName)) . '.com';
         $execName = $user ? $user->first_name . ' ' . $user->last_name : 'Executive Board';
 

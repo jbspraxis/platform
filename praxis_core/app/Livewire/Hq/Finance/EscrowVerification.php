@@ -116,18 +116,6 @@ class EscrowVerification extends Component
                 DB::table('invoices')->where('id', $this->linkedInvoice->id)->update($updateData);
             }
 
-            // 3. Notify Client OS
-            $clientUsers = DB::table('users')->where('organization_id', $this->selectedTx->org_id)->pluck('id');
-            $notifications = [];
-            foreach($clientUsers as $cId) {
-                $notifications[] = [
-                    'id' => (string) Str::uuid(), 'user_id' => $cId, 
-                    'title' => 'ESCROW PAYMENT VERIFIED', 
-                    'message' => "Your transmission of {$this->selectedTx->currency} {$this->selectedTx->amount_claimed} for Invoice {$this->selectedTx->invoice_number} has been cryptographically cleared.", 
-                    'type' => 'Financial', 'created_at' => now()
-                ];
-            }
-            if(!empty($notifications)) DB::table('notifications')->insert($notifications);
 
             // 4. Immutable Audit Trail
             DB::table('system_audit_logs')->insert([
@@ -158,18 +146,6 @@ class EscrowVerification extends Component
                 'updated_at' => now()
             ]);
 
-            // Notify Client OS
-            $clientUsers = DB::table('users')->where('organization_id', $this->selectedTx->org_id)->pluck('id');
-            $notifications = [];
-            foreach($clientUsers as $cId) {
-                $notifications[] = [
-                    'id' => (string) Str::uuid(), 'user_id' => $cId, 
-                    'title' => 'PAYMENT TRANSMISSION REJECTED', 
-                    'message' => "Your uploaded POP for Invoice {$this->selectedTx->invoice_number} failed cryptographic verification. Please review and resubmit, or contact Command.", 
-                    'type' => 'Financial', 'created_at' => now()
-                ];
-            }
-            if(!empty($notifications)) DB::table('notifications')->insert($notifications);
             
             DB::table('system_audit_logs')->insert([
                 'user_id' => Auth::id(),

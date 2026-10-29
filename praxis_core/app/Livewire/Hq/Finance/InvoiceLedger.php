@@ -184,18 +184,6 @@ class InvoiceLedger extends Component
                 'created_at' => $timestamp
             ]);
 
-            // Notify Client OS
-            $clientUsers = DB::table('users')->where('organization_id', $org->id)->pluck('id');
-            $notifications = [];
-            foreach($clientUsers as $cId) {
-                $notifications[] = [
-                    'id' => (string) Str::uuid(), 'user_id' => $cId, 
-                    'title' => 'NEW INVOICE ISSUED', 
-                    'message' => "Invoice {$invNumber} has been cryptographically generated and is due on " . $dueDate->format('M d, Y') . ".", 
-                    'type' => 'Financial', 'created_at' => $timestamp
-                ];
-            }
-            if(!empty($notifications)) DB::table('notifications')->insert($notifications);
         });
 
         $this->showCreateModal = false;

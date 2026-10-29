@@ -11,6 +11,12 @@ class User extends Authenticatable
     use HasUuids, Notifiable;
 
     /**
+     * "JBS Praxis Editorial": a staff account that cannot sign in, used as the author of
+     * website articles and case studies (CoreSeeder creates it).
+     */
+    public const EDITORIAL_ID = '7e0d1a2b-0000-4000-8000-0000000ed170';
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>

@@ -120,18 +120,18 @@ class ConversionHub extends Component
             ]);
         }
 
-        // 2B. Find or Create User
-        $existingUser = DB::table('users')->where('email', $emailStr)->first();
-        
+        // 2B. Find or create the contact (a lead: client account with no password)
+        $existingUser = DB::table('client_users')->where('email', $emailStr)->first();
+
         if (!$existingUser) {
             $userId = (string) Str::uuid();
             $nameParts = explode(' ', trim($name), 2);
 
-            DB::table('users')->insert([
+            DB::table('client_users')->insert([
                 'id' => $userId, 'organization_id' => $orgId, // Attaches to existing or new Org
                 'first_name' => $nameParts[0], 'last_name' => $nameParts[1] ?? 'Unknown',
-                'email' => $emailStr, 'password' => Hash::make(Str::random(16)), 
-                'status' => 'Active', 'lifecycle_stage' => 'Lead',
+                'email' => $emailStr,
+                'status' => 'Active', 'lifecycle_stage' => 'Lead', 'source' => 'cost_report',
                 'created_at' => now(), 'updated_at' => now(),
             ]);
         }
@@ -225,11 +225,10 @@ class ConversionHub extends Component
         // 7. SYSTEM TELEMETRY (Notify the Admins)
         $admin = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')
                    ->where('roles.clearance_level', 5)->select('users.id')->first();
-        $adminId = $admin ? $admin->id : ($existingUser ? $existingUser->id : (string) Str::uuid()); // Fallback
-
-        DB::table('notifications')->insert([
+        // Notices are for staff; with no owner account yet, skip it rather than fail the report
+        if ($admin) DB::table('notifications')->insert([
             'id' => (string) Str::uuid(),
-            'user_id' => $adminId,
+            'user_id' => $admin->id,
             'title' => $tier == 1 ? '🚨 TIER 1 LEAD DETECTED' : 'NEW PIPELINE ACQUISITION',
             'message' => strtoupper($company) . " generated a COPQ diagnostic. Systemic leakage estimated at " . $currency . " " . number_format($totalCOPQ) . ".",
             'link_url' => '/hq/intelligence/leads',

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use App\Support\People;
 
 #[Layout('components.layouts.hq')]
 class QaHub extends Component
@@ -51,16 +52,15 @@ class QaHub extends Component
             ->join('projects', 'qa_tickets.project_id', '=', 'projects.id')
             ->join('organizations', 'projects.organization_id', '=', 'organizations.id')
             ->leftJoin('tasks', 'qa_tickets.task_id', '=', 'tasks.id')
-            ->join('users', 'qa_tickets.submitted_by', '=', 'users.id')
             ->select(
                 'qa_tickets.*',
                 'projects.title as project_title',
                 'organizations.name as client_name',
-                'tasks.title as task_title',
-                'users.first_name', 'users.last_name', 'users.email as submitter_email'
+                'tasks.title as task_title'
             )
             ->orderByRaw("FIELD(qa_tickets.severity, 'Critical', 'Medium', 'Low')") // Prioritize Critical
             ->orderBy('qa_tickets.created_at', 'desc');
+        People::joinAuthor($query, 'qa_tickets.submitted_by', 'qa_tickets.submitted_by_type', 'submitter', ['email' => 'submitter_email']);
 
         if ($this->filterStatus !== 'All') {
             if ($this->filterStatus === 'Open') {
@@ -101,20 +101,18 @@ class QaHub extends Component
         if (!$this->selectedTicket) return;
 
         // Load Native Threading (Comments)
-        $this->ticketComments = DB::table('qa_comments')
-            ->join('users', 'qa_comments.user_id', '=', 'users.id')
+        $comments = DB::table('qa_comments')
             ->where('qa_comments.ticket_id', $ticketId)
-            ->select('qa_comments.*', 'users.first_name', 'users.last_name', 'users.role_id')
-            ->orderBy('qa_comments.created_at', 'asc')
-            ->get()->toArray();
+            ->select('qa_comments.*')
+            ->orderBy('qa_comments.created_at', 'asc');
+        $this->ticketComments = People::joinAuthor($comments, 'qa_comments.user_id', 'qa_comments.author_type')->get()->toArray();
 
         // Load Evidence Gallery (Attachments)
-        $this->ticketAttachments = DB::table('qa_attachments')
-            ->join('users', 'qa_attachments.uploaded_by', '=', 'users.id')
+        $attachments = DB::table('qa_attachments')
             ->where('qa_attachments.ticket_id', $ticketId)
-            ->select('qa_attachments.*', 'users.first_name', 'users.last_name')
-            ->orderBy('qa_attachments.created_at', 'desc')
-            ->get()->toArray();
+            ->select('qa_attachments.*')
+            ->orderBy('qa_attachments.created_at', 'desc');
+        $this->ticketAttachments = People::joinAuthor($attachments, 'qa_attachments.uploaded_by', 'qa_attachments.uploader_type', 'uploader')->get()->toArray();
 
         // Check for Active COPQ Timer
         if ($this->selectedTicket['task_id']) {
@@ -242,15 +240,17 @@ class QaHub extends Component
                 'updated_at' => now()
             ]);
 
-            // Notify Client Dashboard
-            DB::table('notifications')->insert([
-                'id' => (string) Str::uuid(),
-                'user_id' => $this->selectedTicket['submitted_by'],
-                'title' => 'VULNERABILITY RESOLVED',
-                'message' => "HQ has successfully patched ticket: {$this->selectedTicket['title']}.",
-                'type' => 'QA_Update',
-                'created_at' => now()
-            ]);
+            // Notifications are for staff only; a client sees the new status on their QA list
+            if (($this->selectedTicket['submitted_by_type'] ?? 'client') === 'staff') {
+                DB::table('notifications')->insert([
+                    'id' => (string) Str::uuid(),
+                    'user_id' => $this->selectedTicket['submitted_by'],
+                    'title' => 'VULNERABILITY RESOLVED',
+                    'message' => "HQ has successfully patched ticket: {$this->selectedTicket['title']}.",
+                    'type' => 'QA_Update',
+                    'created_at' => now()
+                ]);
+            }
         });
 
         // Close offcanvas and refresh grid

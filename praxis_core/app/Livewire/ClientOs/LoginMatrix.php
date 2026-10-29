@@ -52,8 +52,10 @@ class LoginMatrix extends Component
             return;
         }
 
-        if (Auth::attempt(['email' => $this->email, 'password' => $this->password, 'status' => 'Active'])) {
+        // Client accounts only (client_users). Leads have no password, so they cannot sign in.
+        if (Auth::guard('client')->attempt(['email' => $this->email, 'password' => $this->password, 'status' => 'Active'])) {
             $this->clearLoginAttempts('client');
+            Auth::guard('client')->user()->forceFill(['last_login_at' => now()])->save();
             session()->regenerate();
             return redirect()->route('client.dashboard');
         } else {
@@ -72,11 +74,12 @@ class LoginMatrix extends Component
         if (! RateLimiter::tooManyAttempts($rateKey, 3)) {
             RateLimiter::hit($rateKey, 3600);
 
-            $client = DB::table('users')
-                ->join('roles', 'users.role_id', '=', 'roles.id')
-                ->where('roles.slug', 'client_exec')
-                ->where('users.email', $this->resetEmail)
-                ->select('users.first_name', 'users.last_name', 'users.email')
+            // Only portal accounts (a password set), not leads
+            $client = DB::table('client_users')
+                ->where('email', $this->resetEmail)
+                ->whereNotNull('password')
+                ->whereNull('deleted_at')
+                ->select('first_name', 'last_name', 'email')
                 ->first();
             if ($client) {
                 $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')->where('roles.clearance_level', '>=', 4)->select('users.id')->get();

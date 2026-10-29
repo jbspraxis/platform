@@ -194,14 +194,14 @@ class ScheduleConsultation extends Component
                 ]);
             }
 
-            // 1B. Find or Create User
-            $existingUser = DB::table('users')->where('email', $emailStr)->first();
+            // 1B. Find or create the contact (a lead: client account with no password)
+            $existingUser = DB::table('client_users')->where('email', $emailStr)->first();
 
             if (!$existingUser) {
                 $userId = (string) Str::uuid();
                 $nameParts = explode(' ', trim($this->fullName), 2);
 
-                DB::table('users')->insert([
+                DB::table('client_users')->insert([
                     'id' => $userId,
                     'organization_id' => $orgId, // Attaches to either the new or existing Org
                     'first_name' => $nameParts[0],
@@ -209,9 +209,9 @@ class ScheduleConsultation extends Component
                     'email' => $emailStr,
                     'phone' => $this->phone,
                     'job_title' => $this->title,
-                    'password' => Hash::make(Str::random(16)),
                     'status' => 'Active',
                     'lifecycle_stage' => 'Lead',
+                    'source' => 'booking',
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -237,11 +237,10 @@ class ScheduleConsultation extends Component
             // 4. System Telemetry (Notify Admins)
             $admin = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')
                        ->where('roles.clearance_level', 5)->select('users.id')->first();
-            $adminId = $admin ? $admin->id : ($existingUser ? $existingUser->id : (string) Str::uuid());
-
-            DB::table('notifications')->insert([
+            // Notices are for staff; with no owner account yet, skip it rather than fail the booking
+            if ($admin) DB::table('notifications')->insert([
                 'id' => (string) Str::uuid(),
-                'user_id' => $adminId,
+                'user_id' => $admin->id,
                 'title' => 'NEW CONSULTATION REQUEST',
                 'message' => strtoupper(trim($this->enterpriseName)) . " requested a meeting for " . $startDateTime->format('M d @ H:i') . ". Awaiting approval in the Lobby.",
                 'link_url' => '/hq/intelligence/consultation',
