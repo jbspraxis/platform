@@ -209,6 +209,9 @@
                 <a href="{{ route('hq.system.roles') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.system.roles') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>
                     IDENTITY & ACCESS
                 </a>
+                <a href="{{ route('hq.system.health') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.system.health') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>
+                    SYSTEM HEALTH
+                </a>
             </div>
         @endif
     @endif

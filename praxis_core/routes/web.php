@@ -210,6 +210,7 @@ Route::prefix('hq')->group(function () {
         // 7. SYSTEM ADMINISTRATION (Identity & Access)
         Route::prefix('system')->middleware('hq.staff:4')->group(function () {
             Route::get('/role-management', \App\Livewire\Hq\System\RoleManagement::class)->name('hq.system.roles');
+            Route::get('/health', \App\Livewire\Hq\System\SystemHealth::class)->name('hq.system.health');
         });
 
     });

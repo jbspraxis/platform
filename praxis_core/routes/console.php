@@ -19,3 +19,6 @@ Schedule::command('finance:sync-exchange-rates')->dailyAt('00:00');
 
 // 'finance:run-automations' (00:30) was removed: no such command exists, so it failed every night.
 // Add it back here once the ledger automation command is built.
+
+// HQ → System Health: heartbeat, new log errors, alerts, the 8am digest (app/Support/Monitor)
+Schedule::command('monitor:run')->everyFiveMinutes()->withoutOverlapping(10);

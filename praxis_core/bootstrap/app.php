@@ -20,8 +20,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
 
         // 2. LOCALE ENFORCER (Inject our new gatekeeper here)
+        //    + the System Health watchdog (alerts if the cron stops; runs after the response)
         $middleware->web(append: [
             \App\Http\Middleware\SetLocale::class,
+            \App\Http\Middleware\MonitorWatchdog::class,
         ]);
 
         // 3. HQ ACCESS: staff only (clients and leads share the 'web' login)
@@ -39,5 +41,15 @@ return Application::configure(basePath: dirname(__DIR__))
 
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Browsers (usually bots) trying to change protected Livewire values: the change is
+        // refused, which is the system working, so it is not reported as an error.
+        $exceptions->dontReport([
+            \Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException::class,
+            \Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException::class,
+        ]);
+
+        // Every reported error also goes to HQ → System Health (grouped, with "Copy for AI")
+        $exceptions->report(function (\Throwable $e) {
+            \App\Support\Monitor\ErrorMonitor::captureException($e);
+        });
     })->create();
