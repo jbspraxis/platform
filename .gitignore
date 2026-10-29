@@ -35,3 +35,4 @@ brand/build/_render/
 brand/build/__pycache__/
 praxis_core/storage/app/email-samples/
 _emails/
+_ui/

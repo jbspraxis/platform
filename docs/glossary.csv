@@ -1,0 +1,48 @@
+retired,pattern,use_en,use_fr,note
+matrix,\bmatri(x|ces)\b,"Overview, or the plain name of the thing","Vue d’ensemble, ou le nom de l’objet",screen names
+command,\bcommand( cent(er|re)| overview| hq| matrix)?\b,Overview,Vue d’ensemble,
+terminal,\bterminal\b,Sign in; Investor view; Audit log,Connexion ; Vue investisseur ; Journal d’audit,
+node,\bnodes?\b,team member (client side); staff member (JBS Praxis side),membre de l’équipe ; collaborateur,
+alpha node,\balpha\b,primary contact,interlocuteur principal,
+battlespace,\bbattlespace\b,project,projet,
+strike team,\bstrike( team)?\b,delivery team,équipe projet,
+task force,\btask ?force\b,delivery team,équipe projet,
+architect,\barchitects?\b,project lead; our team,responsable de projet ; notre équipe,
+architecture,\barchitecture\b,your systems; how your organisation runs,vos systèmes,"""system design"" on technical pages only"
+intelligence desk,\bintelligence( desk| &)?\b,The JBS Praxis team; Leads and proposals,L’équipe JBS Praxis ; Prospects et propositions,"the address intelligence@ is fine"
+operator,\b(operators?|operatives?|personnel)\b,staff member,collaborateur,
+clearance,\bclearance\b,role,rôle,
+access denied,\baccess denied\b,You don’t have permission to …,Vous n’avez pas l’autorisation de …,
+protocol,\bprotocols?\b,process,processus,
+override,\boverrides?\b,manual adjustment,ajustement manuel,
+transmission,\btransmi(t|ts|tted|tting|ssions?)\b|\buplink\b,send; message,envoyer ; message,
+payload,\bpayloads?\b,sent; document fingerprint (SHA-256),envoyé ; empreinte du document,
+dispatch,\bdispatch(ed|es|ing)?\b,send; notification,envoyer ; notification,
+telemetry,\btelemetry\b,activity,activité,
+target,\btargets?\b,recipients; project; country,destinataires ; projet ; pays,"""target"" only for a numeric goal"
+ledger,(?<!general )\bledgers?\b,"the plain plural: Proposals, Invoices, Messages, Broadcasts",Propositions ; Factures,"""general ledger"" in accounting only"
+executive,\bexecutive\b,"drop it, or leadership",direction,"""executive summary"" stays"
+initiate,\binitiat(e|ed|es|ing|ion)\b|\binitiali[sz](e|ed|es|ing|ation)\b,Start; Set up; Create; Book,Lancer ; Configurer ; Créer ; Réserver,
+authorize,\bauthori[sz](e|ed|es|ing|ation|ations)\b,approve; approval,approuver ; approbation,
+execute,\bexecut(e|ed|ing)\b,sign,signer,for contracts
+abort,\babort(ed|ing)?\b,Cancel,Annuler,
+terminate session,\bterminat(e|ed|ing)\b,Sign out,Se déconnecter,
+vault,\bvaults?\b,database; Documents,base de données ; Documents,
+nexus,\bnexus\b,JBS Praxis assistant,assistant JBS Praxis,
+dossier,\bdossiers?\b,cost of poor quality report,rapport sur le coût de la non-qualité,
+cryptographic,\bcryptograph(ic|ically|y)\b|\bzero[- ]knowledge\b,secure; private,sécurisé ; privé,
+kill switch,\bkill ?switch\b,Suspend access,Suspendre l’accès,
+defrost,\bdefrost(ed)?\b,Restore access,Rétablir l’accès,
+guillotine,\bguillotine\b,Access on hold: unpaid invoice,Accès suspendu : facture impayée,
+god mode,\bgod ?mode\b,manual time entry,saisie manuelle des temps,
+redline,\bredline\b,urgent support,assistance urgente,
+silent timers,\bsilent timers?\b,time tracking,suivi des temps,
+vulnerability,\bvulnerabilit(y|ies)\b,issue,anomalie,QA tickets
+escrow,\bescrow\b,payment verification,vérification des paiements,
+capital requisition,\bcapital requisitions?\b|\brequisitions?\b,cash request,demande de fonds,
+deploy,\bdeploy(ed|ing|ment|ments)?\b,project; go-live,projet ; mise en production,"for a project"
+vector person,\bvector\b,signatory,signataire,
+predictive framework,\bpredictive\b,the Praxis Method,la méthode Praxis,
+grid,\bthe grid\b,—,—,"""Welcome to the grid"""
+error prefix,(^|\s)(>\s*)?ERR:|^\s*>\s,plain sentence,phrase simple,"""> ERR:"" and ""> "" prompt prefixes"
+hype,\b(elite|cutting-edge|world-class|seamless|robust|revolutionary|next-generation|game-changing|supercharge|deterministic|immutable|forensic|zero-defect|unbreakable|tier-1)\b,say what is true,dire ce qui est vrai,section 4
