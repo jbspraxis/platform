@@ -21,7 +21,12 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\SetLocale::class,
         ]);
 
-        // 3. DYNAMIC SESSION EXPIRATION ROUTING
+        // 3. HQ ACCESS: staff only (clients and leads share the 'web' login)
+        $middleware->alias([
+            'hq.staff' => \App\Http\Middleware\HqStaff::class,
+        ]);
+
+        // 4. DYNAMIC SESSION EXPIRATION ROUTING
         $middleware->redirectGuestsTo(function (Request $request) {
             if ($request->is('client') || $request->is('client/*')) {
                 return route('client.login');

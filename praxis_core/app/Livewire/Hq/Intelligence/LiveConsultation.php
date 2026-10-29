@@ -150,7 +150,7 @@ class LiveConsultation extends Component
             $prompt = "Summarize the following historical CRM interactions with this client into one single, highly concise, authoritative briefing paragraph for a Lead Architect about to jump on a call. Notes: " . $historyText;
 
             try {
-                $apiKey = config('services.gemini.api_key') ?: env('***REMOVED***');
+                $apiKey = config('services.gemini.api_key');
                 $response = Http::timeout(4)->withHeaders(['Content-Type' => 'application/json'])
                     ->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", [
                     "contents" => [["role" => "user", "parts" => [["text" => $prompt]]]],
@@ -223,7 +223,7 @@ class LiveConsultation extends Component
         Be highly authoritative and uncompromising.";
         
         try {
-            $apiKey = config('services.gemini.api_key') ?: env('***REMOVED***');
+            $apiKey = config('services.gemini.api_key');
             $response = Http::timeout(4)->withHeaders(['Content-Type' => 'application/json'])
                 ->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", [
                 "contents" => [["role" => "user", "parts" => [["text" => $systemPrompt]]]],
@@ -436,7 +436,7 @@ APPROVED CASE STUDIES (USE THESE STRICTLY TO DEMONSTRATE DETERMINISTIC ROI. MATC
         $aiPayload = [];
         try {
             // FIX: Removed the env() wrapper around the hardcoded fallback key. Increased timeout to 15s.
-            $apiKey = config('services.gemini.api_key') ?: '***REMOVED***';
+            $apiKey = config('services.gemini.api_key');
             
             $response = Http::timeout(15)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", [
                 "contents" => [["role" => "user", "parts" => [["text" => $prompt]]]], 

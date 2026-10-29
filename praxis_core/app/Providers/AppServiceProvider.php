@@ -19,6 +19,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Re-run the HQ staff check on Livewire update requests, not only on page loads.
+        \Livewire\Livewire::addPersistentMiddleware([
+            \App\Http\Middleware\HqStaff::class,
+        ]);
     }
 }

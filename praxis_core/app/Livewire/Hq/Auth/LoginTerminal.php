@@ -48,11 +48,9 @@ class LoginTerminal extends Component
             $user = Auth::user();
             
             // ==========================================
-            // SECURITY GATE: BLOCK CLIENT CLEARANCE
+            // SECURITY GATE: STAFF ONLY (blocks clients and leads)
             // ==========================================
-            $role = DB::table('roles')->where('id', $user->role_id)->first();
-            
-            if ($role && strtolower($role->name) === 'client') {
+            if (! \App\Http\Middleware\HqStaff::allows($user)) {
                 Auth::logout();
                 session()->invalidate();
                 session()->regenerateToken();
@@ -77,8 +75,8 @@ class LoginTerminal extends Component
                 'created_at' => now(),
             ]);
 
-            // 4. Route to the Command Overview
-            return redirect()->route('hq.dash.admin');
+            // 4. Route to the Command Overview (senior staff) or the personal workspace
+            return redirect()->route(\App\Http\Middleware\HqStaff::allows($user, 4) ? 'hq.dash.admin' : 'hq.dash.workspace');
         }
 
         // Delay to prevent brute-force timing attacks

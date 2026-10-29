@@ -117,7 +117,7 @@ class ConversionHub extends Component
         Be highly authoritative and uncompromising.";
         
         try {
-            $apiKey = config('services.gemini.api_key') ?: env('***REMOVED***');
+            $apiKey = config('services.gemini.api_key');
             $response = Http::timeout(3)->withHeaders(['Content-Type' => 'application/json'])
                 ->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", [
                 "contents" => [["role" => "user", "parts" => [["text" => $systemPrompt]]]],

@@ -285,7 +285,7 @@ class Dashboard extends Component
 
             // NEW: Process attachment if uploaded during creation
             if ($this->initialAttachment) {
-                $path = $this->initialAttachment->store('qa_evidence', 'public');
+                $path = $this->initialAttachment->store('qa_evidence', 'local');
                 DB::table('qa_attachments')->insert([
                     'id' => (string) Str::uuid(),
                     'ticket_id' => $ticketId,
@@ -365,7 +365,7 @@ class Dashboard extends Component
             'newQaAttachment' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120' // 5MB max
         ]);
 
-        $path = $this->newQaAttachment->store('qa_evidence', 'public');
+        $path = $this->newQaAttachment->store('qa_evidence', 'local');
 
         DB::table('qa_attachments')->insert([
             'id' => (string) Str::uuid(),
@@ -472,11 +472,11 @@ class Dashboard extends Component
             'popWhtFile' => 'nullable|required_with:popWhtAmount|file|mimes:pdf,jpg,jpeg,png|max:5120',
         ]);
 
-        $filePath = $this->popFile->store('pop_receipts', 'public');
+        $filePath = $this->popFile->store('pop_receipts', 'local');
         
         $whtFilePath = null;
         if ($this->popWhtAmount > 0 && $this->popWhtFile) {
-            $whtFilePath = $this->popWhtFile->store('pop_receipts_wht', 'public');
+            $whtFilePath = $this->popWhtFile->store('pop_receipts_wht', 'local');
         }
 
         DB::transaction(function () use ($filePath, $whtFilePath) {

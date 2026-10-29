@@ -1108,7 +1108,7 @@
                     @forelse($ticketAttachments as $att)
                         <div style="border: 1px solid var(--brand-border); padding: 10px; text-align: center; border-radius: 2px; background: rgba(0,0,0,0.5); transition: 0.3s;" onmouseover="this.style.borderColor='var(--brand-primary)'" onmouseout="this.style.borderColor='var(--brand-border)'">
                             <i data-lucide="image" style="width: 24px; height: 24px; color: #8A9BB2; margin-bottom: 10px;"></i><br>
-                            <a href="{{ Storage::url($att->file_path) }}" target="_blank" style="color: var(--brand-primary); font-size: 0.7rem; font-family: 'Roboto Mono', monospace; text-decoration: none; word-break: break-all;">
+                            <a href="{{ route('secure.file', ['path' => $att->file_path]) }}" target="_blank" style="color: var(--brand-primary); font-size: 0.7rem; font-family: 'Roboto Mono', monospace; text-decoration: none; word-break: break-all;">
                                 {{ Str::limit($att->file_name, 15) }}
                             </a>
                         </div>

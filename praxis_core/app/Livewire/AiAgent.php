@@ -2,15 +2,28 @@
 
 namespace App\Livewire;
 
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 
 class AiAgent extends Component
 {
     public $userInput = '';
+
+    // Locked: the browser cannot rewrite the conversation or trigger extra replies
+    #[Locked]
     public array $messages = [];
+
+    #[Locked]
+    public bool $awaitingReply = false;
+
+    // Per visitor IP: 10 messages per 10 minutes, 40 per day. Conversations end at 20 questions.
+    private const PER_10_MIN = 10;
+    private const PER_DAY = 40;
+    private const MAX_TURNS = 20;
 
     // Universal Event Listener (Crash-Proof)
     protected $listeners = ['processAiQuery' => 'fetchAiResponse'];
@@ -30,25 +43,47 @@ class AiAgent extends Component
             'userInput' => 'required|string|max:1500'
         ]);
 
-        // Push User Message
+        // Push User Message (escaped when rendered)
         $this->messages[] = [
             'id' => count($this->messages),
             'role' => 'user',
-            'content' => htmlspecialchars($this->userInput),
+            'content' => $this->userInput,
         ];
-        
+
         $this->userInput = '';
         $this->dispatch('scrollToBottom');
 
+        $ip = request()->ip();
+        $userTurns = count(array_filter($this->messages, fn ($m) => $m['role'] === 'user'));
+        if ($userTurns > self::MAX_TURNS
+            || RateLimiter::tooManyAttempts('ai-agent:10m:' . $ip, self::PER_10_MIN)
+            || RateLimiter::tooManyAttempts('ai-agent:day:' . $ip, self::PER_DAY)) {
+            $this->messages[] = [
+                'id' => count($this->messages),
+                'role' => 'ai',
+                'content' => "You've reached the chat limit for now. Please try again later, or book a free audit & demo at [jbspraxis.com/schedule](https://jbspraxis.com/schedule).",
+            ];
+            return;
+        }
+        RateLimiter::hit('ai-agent:10m:' . $ip, 600);
+        RateLimiter::hit('ai-agent:day:' . $ip, 86400);
+
         // Trigger AI response instantly
+        $this->awaitingReply = true;
         $this->dispatch('processAiQuery');
     }
 
     public function fetchAiResponse()
     {
+        // Only answer a message the visitor actually sent through submitUserMessage()
+        if (! $this->awaitingReply) {
+            return;
+        }
+        $this->awaitingReply = false;
+
         $geminiHistory = [];
-        foreach ($this->messages as $msg) {
-            if ($msg['id'] === 0) continue; 
+        foreach (array_slice($this->messages, -12) as $msg) {
+            if ($msg['id'] === 0) continue;
             
             $geminiHistory[] = [
                 "role" => $msg['role'] === 'user' ? 'user' : 'model',
@@ -89,7 +124,7 @@ class AiAgent extends Component
         
         CORPORATE ORIGIN & IDENTITY (THE JBS DOSSIER):
         - The Origin: JBS evolved from 'Jireh Business Solutions'. For over 15 years, We witnessed African enterprises bleeding capital through undocumented workflows and theoretical consulting. We transitioned into 'JBS Praxis' to eradicate post-mortem consulting and replace it with Anticipatory Governance and 'Code as Law'.
-        - The Founders (The Triad): The Strike Team is led by TBFA (Managing Partner / Chief Praxis Architect), Israel S.A. (Senior Partner), and Gospel O. (Senior Partner). We maintain a semi-anonymous, results-driven executive presence.
+        - Leadership: JBS Praxis is led by senior management consultants, data engineers and full-stack architects. Never name or describe individual people; if asked, say leadership details are shared during a consultation.
         - Core Mission: To eradicate theoretical consulting. We observed that Organizations with a focus in Africa, bleed capital through undocumented workflows and siloed data. JBS Praxis was forged to bridge the fatal gap between boardroom strategy and server-room execution by engineering bespoke digital operating systems.
         - Geographic Footprint: We execute across Africa and the globe. 
           * Global HQ: Lekki, Lagos, Nigeria (ECOWAS Desk).
@@ -114,7 +149,7 @@ class AiAgent extends Component
                 We do not just build pages; we engineer Predictive Digital Operating Systems. For your sector, we integrate Process Safety and ISO 9001/27001 compliance directly into your database logic.
                 
                 Your Next Step: Before we discuss the interface, you need to see your baseline. Go to our Home Page and run the COPQ Diagnostic. It will instantly calculate your current capital leakage. Bring that report to your meeting with the Strike Team, which you can book here: www.jbspraxis.com/schedule.'
-            - 'Who founded JBS?': Respond: 'JBS Praxis originated from Jireh Business Solutions. It is spearheaded by TBFA, Israel S.A., and Gospel O.—a triad of elite management consultants, data engineers, and full-stack architects.'
+            - 'Who founded JBS?': Respond: 'JBS Praxis grew out of Jireh Business Solutions. It is led by senior management consultants, data engineers and full-stack architects. We share leadership details during a consultation, which you can book at www.jbspraxis.com/schedule.'
             - 'Where are you located?': Respond: 'Our Global HQ operates out of Lekki, Lagos, with our CEMAC intelligence desk in Bali, Douala. However, our digital architecture scales globally.'
 
         HOW WE DEPLOY (THE STRIKE TEAM & AGILE TRANSPARENCY):
@@ -147,19 +182,23 @@ class AiAgent extends Component
         - Whenever you mention a URL, format it as a clickable Markdown link like this: [Text](https://url.com).
         - Always close by commanding the user to take action (e.g., 'Initiate a Diagnostic Audit', 'Enter the Kaizen Hub', or 'Secure a Consultation').";
 
-        // API Execution
+        // API Execution (key from .env via config/services.php; sent as a header, not in the URL)
+        $apiKey = config('services.gemini.api_key');
+        $fallback = "Our assistant is unavailable right now. Please book a free audit & demo at [jbspraxis.com/schedule](https://jbspraxis.com/schedule) or email info@jbspraxis.com.";
+
+        if (empty($apiKey)) {
+            Log::error('AiAgent: GEMINI_API_KEY is not set.');
+            $this->messages[] = ['id' => count($this->messages), 'role' => 'ai', 'content' => $fallback];
+            $this->dispatch('scrollToBottom');
+            return;
+        }
+
         try {
-            $apiKey = config('services.gemini.api_key') ?: env('GEMINI_API_KEY');
-            
-            // Hardcode your key temporarily if .env caching still blocks it
-            if (empty($apiKey)) {
-                $apiKey = "***REMOVED***";
-            }
+            $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
-            $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" . $apiKey;
-
-            $response = Http::withHeaders([
+            $response = Http::timeout(25)->withHeaders([
                 'Content-Type' => 'application/json',
+                'x-goog-api-key' => $apiKey,
             ])->post($url, [
                 "system_instruction" => [
                     "parts" => [["text" => $systemPrompt]]
@@ -171,29 +210,23 @@ class AiAgent extends Component
                 ]
             ]);
 
-            if ($response->successful()) {
-                $aiText = $response->json('candidates.0.content.parts.0.text');
-                
-                $this->messages[] = [
-                    'id' => count($this->messages),
-                    'role' => 'ai',
-                    'content' => $aiText,
-                ];
-            } else {
-                $errorData = $response->json();
-                $googleError = $errorData['error']['message'] ?? 'Unknown JSON Format Error';
+            $aiText = $response->successful() ? $response->json('candidates.0.content.parts.0.text') : null;
 
-                $this->messages[] = [
-                    'id' => count($this->messages),
-                    'role' => 'ai',
-                    'content' => "> ERR: GOOGLE REJECTED PAYLOAD.\n> REASON: " . $googleError,
-                ];
+            if (! $aiText) {
+                Log::warning('AiAgent: Gemini request failed', ['status' => $response->status(), 'error' => $response->json('error.message')]);
             }
-        } catch (\Exception $e) {
+
             $this->messages[] = [
                 'id' => count($this->messages),
                 'role' => 'ai',
-                'content' => "> ERR: SEVERE NETWORK LATENCY DETECTED. STRIKE TEAM NOTIFIED.",
+                'content' => $aiText ?: $fallback,
+            ];
+        } catch (\Exception $e) {
+            Log::warning('AiAgent: Gemini request error', ['message' => $e->getMessage()]);
+            $this->messages[] = [
+                'id' => count($this->messages),
+                'role' => 'ai',
+                'content' => $fallback,
             ];
         }
 
@@ -203,6 +236,9 @@ class AiAgent extends Component
     // NATIVE REGEX MARKDOWN PARSER (100% Crash-Proof)
     public function renderMarkdown($text)
     {
+        // 0. Escape everything first; only the markup below is turned back into HTML
+        $text = e((string) $text);
+
         // 1. Convert **bold** to <strong>
         $text = preg_replace('/\*\*(.*?)\*\*/s', '<strong>$1</strong>', $text);
         
@@ -210,7 +246,7 @@ class AiAgent extends Component
         $text = preg_replace('/(?<!\*)\*(?!\*)(.*?)(?<!\*)\*(?!\*)/s', '<strong>$1</strong>', $text);
         
         // 3. Convert [Link Text](https://url.com) to clickable <a href>
-        $text = preg_replace('/\[([^\[]+)\]\(([^\)]+)\)/', '<a href="$2" target="_blank">$1</a>', $text);
+        $text = preg_replace('/\[([^\[\]]+)\]\((https?:\/\/[^\s\)]+)\)/', '<a href="$2" target="_blank" rel="noopener">$1</a>', $text);
         
         // 4. Convert basic - bullet points to •
         $text = preg_replace('/^- (.*)/m', '• $1', $text);

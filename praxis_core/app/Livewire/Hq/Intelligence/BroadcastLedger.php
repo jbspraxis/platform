@@ -170,7 +170,7 @@ class BroadcastLedger extends Component
         Raw Draft: {$this->rawBody}";
 
         try {
-            $apiKey = config('services.gemini.api_key') ?: '***REMOVED***';
+            $apiKey = config('services.gemini.api_key');
             
             $response = Http::timeout(15)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", [
                 "contents" => [["parts" => [["text" => $prompt]]]]

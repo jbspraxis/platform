@@ -187,7 +187,7 @@
                                 </div>
                                 @if(session()->has('message-'.$req->id)) <div style="color: #00FF66; font-size: 0.6rem; margin-top: 5px;">{{ session('message-'.$req->id) }}</div> @endif
                             @elseif($req->receipt_url)
-                                <a href="{{ Storage::url($req->receipt_url) }}" target="_blank" style="color: #00FF66; font-size: 0.7rem; font-family: 'Roboto Mono', monospace; text-decoration: underline;">[ VIEW RECEIPT ]</a>
+                                <a href="{{ route('secure.file', ['path' => $req->receipt_url]) }}" target="_blank" style="color: #00FF66; font-size: 0.7rem; font-family: 'Roboto Mono', monospace; text-decoration: underline;">[ VIEW RECEIPT ]</a>
                             @else
                                 <span style="font-size: 0.65rem; color: var(--erp-muted); font-family: 'Roboto Mono', monospace;">PENDING AUTH</span>
                             @endif

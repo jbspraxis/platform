@@ -72,6 +72,9 @@ Route::get('/portal/tracker/{token}', \App\Livewire\Portal\ProjectTracker::class
 // =========================================================
 Route::middleware(['auth'])->group(function () {
     Route::get('/client/dashboard', \App\Livewire\ClientOs\Dashboard::class)->name('client.dashboard');
+
+    // Private uploads (receipts, payment proofs, QA evidence, CVs), checked per file
+    Route::get('/files/{path}', [\App\Http\Controllers\SecureFileController::class, 'show'])->where('path', '.*')->name('secure.file');
 });
 
 
@@ -114,17 +117,17 @@ Route::prefix('hq')->group(function () {
         return redirect()->route('login'); 
     })->name('hq.logout');
 
-    // Protected HQ Routes
-    Route::middleware(['auth'])->group(function () {
-        
+    // Protected HQ Routes: staff only. 'hq.staff:4' marks screens for clearance 4+ (finance, payroll, HR, master data, CRM, roles).
+    Route::middleware(['auth', 'hq.staff'])->group(function () {
+
         // 1. COMMAND OVERVIEW
-        Route::get('/dashboard/admin', \App\Livewire\Hq\Dashboards\GlobalTelemetry::class)->name('hq.dash.admin');
+        Route::get('/dashboard/admin', \App\Livewire\Hq\Dashboards\GlobalTelemetry::class)->middleware('hq.staff:4')->name('hq.dash.admin');
         Route::get('/dashboard/workspace', \App\Livewire\Hq\Dashboards\MyWorkspace::class)->name('hq.dash.workspace');
-        Route::get('/dashboard/investor', \App\Livewire\Hq\Dashboards\InvestorTerminal::class)->name('hq.dash.investor');
-        Route::get('/dashboard/audit', \App\Livewire\Hq\Dashboards\AuditTerminal::class)->name('hq.dash.audit');
-        
+        Route::get('/dashboard/investor', \App\Livewire\Hq\Dashboards\InvestorTerminal::class)->middleware('hq.staff:4')->name('hq.dash.investor');
+        Route::get('/dashboard/audit', \App\Livewire\Hq\Dashboards\AuditTerminal::class)->middleware('hq.staff:4')->name('hq.dash.audit');
+
         // 2. MASTER DATA MANAGEMENT (MDM)
-        Route::prefix('mdm')->group(function () {
+        Route::prefix('mdm')->middleware('hq.staff:4')->group(function () {
             // Financial Sub-Module
             Route::get('/dictionary', \App\Livewire\Hq\Mdm\FinancialDictionary::class)->name('hq.mdm.dictionary');
             Route::get('/copq-matrices', \App\Livewire\Hq\Mdm\CopqMatrices::class)->name('hq.mdm.copq');
@@ -137,39 +140,42 @@ Route::prefix('hq')->group(function () {
         });
 
         // HUMAN CAPITAL (Newly Expanded HR Routes)
-        Route::prefix('hr')->group(function () {
+        Route::prefix('hr')->middleware('hq.staff:4')->group(function () {
             Route::get('/time-attendance', \App\Livewire\Hq\Hr\TimeAttendance::class)->name('hq.hr.time');
             Route::get('/compliance-contracts', \App\Livewire\Hq\Hr\ContractsAppraisals::class)->name('hq.hr.compliance');
         });
 
         // 3. FINANCIAL DISPATCH (Treasury, Ledger, Tax & Accounting)
         Route::prefix('finance')->group(function () {
-            // Treasury & Expenses
+            // Treasury & Expenses (any staff member can submit a cash request)
             Route::get('/cash-request', \App\Livewire\Hq\Finance\CashRequestSubmitter::class)->name('hq.finance.request');
-            Route::get('/cash-manager', \App\Livewire\Hq\Finance\CashRequestManager::class)->name('hq.finance.manager');
-            Route::get('/budget-matrix', \App\Livewire\Hq\Finance\ProjectBudgetManager::class)->name('hq.finance.budgets');
-            
-            // Invoicing & Escrow
-            Route::get('/invoice-ledger', \App\Livewire\Hq\Finance\InvoiceLedger::class)->name('hq.finance.invoices');
-            Route::get('/escrow-verification', \App\Livewire\Hq\Finance\EscrowVerification::class)->name('hq.finance.escrow');
-            
-            // Core IFRS Accounting
-            Route::get('/chart-of-accounts', \App\Livewire\Hq\Finance\ChartOfAccountsManager::class)->name('hq.finance.coa');
-            Route::get('/general-ledger', \App\Livewire\Hq\Finance\GeneralLedgerManager::class)->name('hq.finance.gl');
-            
-            // Payroll & Tax Engine (Newly Added Endpoints)
-            Route::get('/payroll', \App\Livewire\Hq\Finance\PayrollManager::class)->name('hq.finance.payroll');
-            Route::get('/tax-configurator', \App\Livewire\Hq\Finance\TaxConfigurator::class)->name('hq.finance.tax-config');
-            Route::get('/variable-compensation', \App\Livewire\Hq\Finance\VariableCompensation::class)->name('hq.finance.variables');
-            Route::get('/compliance-matrix', \App\Livewire\Hq\Finance\ComplianceMatrix::class)->name('hq.finance.matrix');
-            Route::get('/payslips', \App\Livewire\Hq\Finance\PayslipInspector::class)->name('hq.finance.payslips');
-            
-            // Executive BI (The Financial Matrix)
-            Route::get('/executive-bi', \App\Livewire\Hq\Finance\ExecutiveBiDashboard::class)->name('hq.finance.bi');
+
+            Route::middleware('hq.staff:4')->group(function () {
+                Route::get('/cash-manager', \App\Livewire\Hq\Finance\CashRequestManager::class)->name('hq.finance.manager');
+                Route::get('/budget-matrix', \App\Livewire\Hq\Finance\ProjectBudgetManager::class)->name('hq.finance.budgets');
+
+                // Invoicing & Escrow
+                Route::get('/invoice-ledger', \App\Livewire\Hq\Finance\InvoiceLedger::class)->name('hq.finance.invoices');
+                Route::get('/escrow-verification', \App\Livewire\Hq\Finance\EscrowVerification::class)->name('hq.finance.escrow');
+
+                // Core IFRS Accounting
+                Route::get('/chart-of-accounts', \App\Livewire\Hq\Finance\ChartOfAccountsManager::class)->name('hq.finance.coa');
+                Route::get('/general-ledger', \App\Livewire\Hq\Finance\GeneralLedgerManager::class)->name('hq.finance.gl');
+
+                // Payroll & Tax Engine (Newly Added Endpoints)
+                Route::get('/payroll', \App\Livewire\Hq\Finance\PayrollManager::class)->name('hq.finance.payroll');
+                Route::get('/tax-configurator', \App\Livewire\Hq\Finance\TaxConfigurator::class)->name('hq.finance.tax-config');
+                Route::get('/variable-compensation', \App\Livewire\Hq\Finance\VariableCompensation::class)->name('hq.finance.variables');
+                Route::get('/compliance-matrix', \App\Livewire\Hq\Finance\ComplianceMatrix::class)->name('hq.finance.matrix');
+                Route::get('/payslips', \App\Livewire\Hq\Finance\PayslipInspector::class)->name('hq.finance.payslips');
+
+                // Executive BI (The Financial Matrix)
+                Route::get('/executive-bi', \App\Livewire\Hq\Finance\ExecutiveBiDashboard::class)->name('hq.finance.bi');
+            });
         });
         
         // 4. INTELLIGENCE DESK (CRM / Lead Management)
-        Route::prefix('intelligence')->group(function () {
+        Route::prefix('intelligence')->middleware('hq.staff:4')->group(function () {
             Route::get('/leads', \App\Livewire\Hq\Intelligence\LeadsRegister::class)->name('hq.crm.leads');
             Route::get('/consultation', \App\Livewire\Hq\Intelligence\LiveConsultation::class)->name('hq.crm.consult');
             Route::get('/proposal-builder/{id?}', \App\Livewire\Hq\Intelligence\ProposalBuilder::class)->name('hq.crm.proposal');
@@ -177,7 +183,7 @@ Route::prefix('hq')->group(function () {
         });
         
         // 5. MARKETING & ROAS
-        Route::prefix('marketing')->group(function () {
+        Route::prefix('marketing')->middleware('hq.staff:4')->group(function () {
             Route::get('/campaigns', \App\Livewire\Hq\Marketing\MarketingSync::class)->name('hq.marketing.campaigns');
         });
 
@@ -193,7 +199,7 @@ Route::prefix('hq')->group(function () {
         });
         
         // 7. SYSTEM ADMINISTRATION (Identity & Access)
-        Route::prefix('system')->group(function () {
+        Route::prefix('system')->middleware('hq.staff:4')->group(function () {
             Route::get('/role-management', \App\Livewire\Hq\System\RoleManagement::class)->name('hq.system.roles');
         });
 

@@ -166,7 +166,7 @@
                     @forelse($ticketAttachments as $att)
                         <div class="evidence-card">
                             <i data-lucide="image" style="width: 24px; height: 24px; color: var(--erp-muted); margin-bottom: 10px;"></i><br>
-                            <a href="{{ Storage::url($att->file_path) }}" target="_blank">{{ Str::limit($att->file_name, 15) }}</a>
+                            <a href="{{ route('secure.file', ['path' => $att->file_path]) }}" target="_blank">{{ Str::limit($att->file_name, 15) }}</a>
                         </div>
                     @empty
                         <div style="grid-column: 1 / -1; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: var(--erp-muted); padding: 10px;">No attachments provided.</div>

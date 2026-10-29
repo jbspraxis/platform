@@ -167,7 +167,7 @@ class CashRequestManager extends Component
             'receipt_file' => 'required|image|max:5120', // 5MB max
         ]);
 
-        $path = $this->receipt_file->store('receipts', 'public');
+        $path = $this->receipt_file->store('receipts', 'local');
 
         DB::table('cash_requests')->where('id', $this->selectedRequest->id)->update([
             'receipt_url' => $path,

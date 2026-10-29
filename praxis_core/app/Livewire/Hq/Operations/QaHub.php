@@ -164,7 +164,7 @@ class QaHub extends Component
             'newAttachment' => 'required|file|max:10240' // Max 10MB (Selection 4-B)
         ]);
 
-        $path = $this->newAttachment->store('qa_evidence', 'public');
+        $path = $this->newAttachment->store('qa_evidence', 'local');
 
         DB::table('qa_attachments')->insert([
             'id' => (string) Str::uuid(),
