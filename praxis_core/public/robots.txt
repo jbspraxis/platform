@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /livewire/
+Disallow: /storage/
+Disallow: /client/
+Disallow: /hq/
+
+Sitemap: https://jbspraxis.com/sitemap.xml

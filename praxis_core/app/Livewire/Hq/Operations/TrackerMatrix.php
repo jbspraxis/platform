@@ -1,0 +1,370 @@
+<?php
+
+namespace App\Livewire\Hq\Operations;
+
+use Livewire\Component;
+use Livewire\WithFileUploads;
+use Livewire\Attributes\Layout;
+use App\Models\Tracker;
+use App\Models\TrackerMilestone;
+use App\Models\TrackerTask;
+use App\Models\TrackerMessage;
+use App\Models\TrackerUser;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+#[Layout('layouts.client-light')]
+class TrackerMatrix extends Component
+{
+    use WithFileUploads;
+
+    // ==========================================================================
+    // CORE STATE
+    // ==========================================================================
+    public $trackerId; 
+    
+    // ==========================================================================
+    // INJECTION & EDITING STATES
+    // ==========================================================================
+    
+    // Milestone State
+    public $newMilestoneTitle = '';
+    public $editingMilestoneId = null;
+    public $editingMilestoneTitle = '';
+
+    // Task State
+    public $newTaskTitle = '';
+    public $newTaskAssignee = '';
+    public $newTaskDueDate = '';
+    
+    public $activeTaskId = null;
+    public $editTaskTitle = '';
+    public $editTaskAssignee = '';
+    public $editTaskDueDate = '';
+
+    // Reassignment State
+    public $newAssigneeId = '';
+
+    // Communication State
+    public $chatMessage = '';
+    public $mediaUpload; 
+
+    // ==========================================================================
+    // INITIALIZATION & SECURITY PERIMETER
+    // ==========================================================================
+
+    public function mount($id)
+    {
+        $this->trackerId = $id;
+        $user = Auth::guard('tracker')->user();
+        
+        // Strict Isolation Matrix: Consultants only see explicitly assigned projects
+        if ($user->role === 'consultant') {
+            $hasAccess = DB::table('tracker_user_access')
+                           ->where('tracker_id', $id)
+                           ->where('user_id', $user->id)
+                           ->exists();
+            if (!$hasAccess) abort(403, 'SYSTEM HALT: Unauthorized Sector.');
+        }
+    }
+
+    // ==========================================================================
+    // MILESTONE ARCHITECTURE (CRUD)
+    // ==========================================================================
+
+    public function injectMilestone()
+    {
+        $this->authorizeAdmin();
+        
+        $this->validate(['newMilestoneTitle' => 'required|string|max:255']);
+
+        try {
+            DB::transaction(function () {
+                $tracker = Tracker::findOrFail($this->trackerId);
+
+                TrackerMilestone::create([
+                    'tracker_id' => $this->trackerId,
+                    'title' => $this->newMilestoneTitle,
+                    'sort_order' => $tracker->milestones()->count() + 1
+                ]);
+            });
+
+            $this->newMilestoneTitle = '';
+            $this->recalculateProgress();
+            
+            $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Milestone Injected Successfully.']);
+            $this->dispatch('modal-close', ['modal' => 'milestone']);
+            
+        } catch (\Exception $e) {
+            Log::error('Milestone Injection Failed: ' . $e->getMessage());
+            $this->dispatch('system-alert', ['type' => 'error', 'message' => 'System Error: Milestone injection failed.']);
+        }
+    }
+
+    public function updateMilestoneTitle()
+    {
+        $this->authorizeAdmin();
+        $this->validate(['editingMilestoneTitle' => 'required|string|max:255']);
+
+        $milestone = TrackerMilestone::findOrFail($this->editingMilestoneId);
+        $milestone->update(['title' => $this->editingMilestoneTitle]);
+
+        $this->editingMilestoneId = null;
+        $this->editingMilestoneTitle = '';
+        $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Milestone designation updated.']);
+    }
+
+    public function deleteMilestone($id)
+    {
+        $this->authorizeAdmin();
+
+        try {
+            DB::transaction(function () use ($id) {
+                $milestone = TrackerMilestone::where('tracker_id', $this->trackerId)->findOrFail($id);
+                
+                // Cascade delete associated tasks and their messages to prevent database orphans
+                $taskIds = $milestone->tasks()->pluck('id');
+                TrackerMessage::whereIn('task_id', $taskIds)->delete();
+                $milestone->tasks()->delete();
+                $milestone->delete();
+            });
+
+            $this->recalculateProgress();
+            $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Milestone and dependencies purged.']);
+            
+        } catch (\Exception $e) {
+            Log::error('Milestone Purge Failed: ' . $e->getMessage());
+            $this->dispatch('system-alert', ['type' => 'error', 'message' => 'System Error: Purge failed.']);
+        }
+    }
+
+    // ==========================================================================
+    // TASK NODE ENGINEERING (CRUD)
+    // ==========================================================================
+
+    public function injectTask($milestoneId)
+    {
+        $this->authorizeAdmin();
+        
+        $this->validate([
+            'newTaskTitle' => 'required|string|max:255',
+            'newTaskAssignee' => 'nullable|exists:tracker_users,id',
+            'newTaskDueDate' => 'nullable|date'
+        ]);
+
+        try {
+            DB::transaction(function () use ($milestoneId) {
+                // Ensure milestone belongs to active tracker
+                TrackerMilestone::where('tracker_id', $this->trackerId)->findOrFail($milestoneId);
+
+                TrackerTask::create([
+                    'milestone_id' => $milestoneId,
+                    'title' => $this->newTaskTitle,
+                    'assigned_to' => $this->newTaskAssignee ?: null,
+                    'due_date' => $this->newTaskDueDate ?: null,
+                    'status' => 'todo'
+                ]);
+            });
+
+            $this->reset(['newTaskTitle', 'newTaskAssignee', 'newTaskDueDate']);
+            $this->recalculateProgress();
+            
+            $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Task node deployed.']);
+            $this->dispatch('modal-close', ['modal' => 'task']);
+
+        } catch (\Exception $e) {
+            Log::error('Task Deployment Failed: ' . $e->getMessage());
+            $this->dispatch('system-alert', ['type' => 'error', 'message' => 'Deployment Failed.']);
+        }
+    }
+
+    public function updateTaskStatus($taskId, $newStatus)
+    {
+        $task = TrackerTask::whereHas('milestone', function($q) {
+            $q->where('tracker_id', $this->trackerId);
+        })->findOrFail($taskId);
+        
+        $user = Auth::guard('tracker')->user();
+
+        // Strict Consultant Matrix: Can only update their explicitly assigned nodes.
+        if ($user->role === 'consultant' && $task->assigned_to !== $user->id) {
+            $this->dispatch('system-alert', ['type' => 'error', 'message' => 'Override Denied: Task assigned to another operative.']);
+            return;
+        }
+
+        $task->update(['status' => $newStatus]);
+        $this->recalculateProgress();
+        $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Node status updated.']);
+    }
+
+    public function loadTaskForEditing($taskId)
+    {
+        $this->authorizeAdmin();
+        
+        $task = TrackerTask::findOrFail($taskId);
+        $this->activeTaskId = $task->id;
+        $this->editTaskTitle = $task->title;
+        $this->editTaskAssignee = $task->assigned_to;
+        $this->editTaskDueDate = $task->due_date;
+        
+        $this->dispatch('open-modal', ['modal' => 'editTask']);
+    }
+
+    public function updateTaskDetails()
+    {
+        $this->authorizeAdmin();
+        
+        $this->validate([
+            'editTaskTitle' => 'required|string|max:255',
+            'editTaskAssignee' => 'nullable|exists:tracker_users,id',
+            'editTaskDueDate' => 'nullable|date'
+        ]);
+
+        $task = TrackerTask::findOrFail($this->activeTaskId);
+        $task->update([
+            'title' => $this->editTaskTitle,
+            'assigned_to' => $this->editTaskAssignee ?: null,
+            'due_date' => $this->editTaskDueDate ?: null,
+        ]);
+
+        $this->reset(['activeTaskId', 'editTaskTitle', 'editTaskAssignee', 'editTaskDueDate']);
+        $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Task parameters updated.']);
+        $this->dispatch('modal-close', ['modal' => 'editTask']);
+    }
+
+    public function deleteTask($taskId)
+    {
+        $this->authorizeAdmin();
+
+        try {
+            DB::transaction(function () use ($taskId) {
+                $task = TrackerTask::findOrFail($taskId);
+                // Purge associated comms
+                TrackerMessage::where('task_id', $task->id)->delete();
+                $task->delete();
+            });
+
+            $this->recalculateProgress();
+            $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Task node purged.']);
+            
+        } catch (\Exception $e) {
+            Log::error('Task Purge Failed: ' . $e->getMessage());
+            $this->dispatch('system-alert', ['type' => 'error', 'message' => 'System Error: Purge failed.']);
+        }
+    }
+
+    public function reassignTask()
+    {
+        $this->authorizeAdmin();
+        
+        $this->validate(['newAssigneeId' => 'required|exists:tracker_users,id']);
+
+        TrackerTask::where('id', $this->activeTaskId)->update(['assigned_to' => $this->newAssigneeId]);
+        
+        $this->reset(['activeTaskId', 'newAssigneeId']);
+        
+        $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Operative reassigned.']);
+        $this->dispatch('modal-close', ['modal' => 'reassign']);
+    }
+
+    // ==========================================================================
+    // ALGORITHMIC PROGRESSION
+    // ==========================================================================
+    
+    private function recalculateProgress()
+    {
+        $totalTasks = TrackerTask::whereHas('milestone', function($q) {
+            $q->where('tracker_id', $this->trackerId);
+        })->count();
+
+        if ($totalTasks === 0) {
+            Tracker::where('id', $this->trackerId)->update(['progress_percentage' => 0]);
+            return;
+        }
+
+        $completedTasks = TrackerTask::whereHas('milestone', function($q) {
+            $q->where('tracker_id', $this->trackerId);
+        })->where('status', 'done')->count();
+
+        $percentage = ($completedTasks / $totalTasks) * 100;
+
+        Tracker::where('id', $this->trackerId)->update(['progress_percentage' => round($percentage, 2)]);
+    }
+
+    // ==========================================================================
+    // UNIFIED COMMUNICATIONS & MEDIA
+    // ==========================================================================
+
+    public function transmitMessage($taskId = null)
+    {
+        $this->validate([
+            'chatMessage' => 'required_without:mediaUpload|string|nullable|max:2000',
+            'mediaUpload' => 'nullable|image|max:10240' // 10MB Max Image Size
+        ]);
+
+        $user = Auth::guard('tracker')->user();
+        $mediaPath = null;
+
+        if ($this->mediaUpload) {
+            $mediaPath = $this->mediaUpload->store('tracker_media', 'public');
+        }
+
+        TrackerMessage::create([
+            'tracker_id' => $this->trackerId,
+            'task_id' => $taskId,
+            'sender_type' => 'staff',
+            'sender_user_id' => $user->id,
+            'body' => $this->chatMessage ?: null,
+            'media_path' => $mediaPath,
+            'media_type' => $this->mediaUpload ? 'image' : null,
+        ]);
+
+        $this->reset(['chatMessage', 'mediaUpload']);
+        
+        // Trigger Alpine.js to auto-scroll to the newest message natively
+        $this->dispatch('message-transmitted'); 
+    }
+
+    // ==========================================================================
+    // SECURITY UTILITIES
+    // ==========================================================================
+    
+    private function authorizeAdmin()
+    {
+        if (Auth::guard('tracker')->user()->role === 'consultant') {
+            abort(403, 'SYSTEM HALT: Unauthorized Operation.');
+        }
+    }
+
+    // ==========================================================================
+    // DATA HYDRATION & RENDER
+    // ==========================================================================
+
+    public function render()
+    {
+        // Eager load with specific ordering to prevent chaotic UI rendering
+        $activeTracker = Tracker::with([
+            'milestones' => function($q) { $q->orderBy('sort_order', 'asc'); },
+            'milestones.tasks' => function($q) { $q->orderBy('created_at', 'asc'); },
+            'milestones.tasks.assignee'
+        ])->findOrFail($this->trackerId);
+        
+        $messages = TrackerMessage::with(['sender', 'task'])
+            ->where('tracker_id', $this->trackerId)
+            ->orderBy('created_at', 'asc')
+            ->get();
+            
+        // Filter out archived/deleted users to prevent ghost assignments
+        $consultants = TrackerUser::where('is_active', true)
+            ->orderBy('name', 'asc')
+            ->get();
+
+        return view('livewire.hq.operations.tracker-matrix', [
+            'activeTracker' => $activeTracker,
+            'milestones' => $activeTracker->milestones,
+            'messages' => $messages,
+            'consultants' => $consultants
+        ]);
+    }
+}

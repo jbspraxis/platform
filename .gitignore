@@ -1,0 +1,21 @@
+# Secrets
+.env
+**/.env
+!praxis_core/.env.example
+
+# Installed packages (composer install / npm install bring them back)
+praxis_core/vendor/
+**/node_modules/
+
+# Logs, caches, sessions
+**/error_log
+praxis_core/storage/logs/*
+praxis_core/storage/framework/cache/*
+praxis_core/storage/framework/sessions/*
+praxis_core/storage/framework/views/*
+praxis_core/bootstrap/cache/*.php
+
+# Database dumps and downloads: they hold personal data
+*.sql
+*.sql.gz
+_downloads/
