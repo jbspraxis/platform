@@ -57,6 +57,20 @@ Total: about 18–24 hours of work, over 2–3 sessions. Each phase is committed
 - Notifications stay staff-only. The client portal has no inbox, so the old "notify the client" rows (invoice issued, payment verified or rejected, ticket resolved) were never seen and are no longer written; emailing clients those events is a possible later addition.
 - The HQ gate is now "any active staff account", with clearance 4 still required for senior screens until S3 replaces clearance with roles.
 
+### S5 notes (reset and owner)
+- The reset is the database rebuilt from migrations and seeders (`migrate:fresh --seed`): no people, no test records; reference data, website content, roles and permissions kept. `database/seeders/private/*.php` (legal entities, remittance accounts, internal organisation) must be on the server when it runs.
+- `php artisan app:invite-owner <email>` creates the owner's staff account with the Owner role and emails a one-time setup link to `hq.jbspraxis.com/setup/…`; the owner chooses the password. Re-running sends a fresh link. Later staff are invited from HQ → System & Access → Accounts.
+- Email checked live on 29 Oct: the site sends as `system@jbspraxis.com` (mail.jbspraxis.com:465, relayed by SMTP2GO); a real test reached the Gmail inbox with SPF, DKIM and DMARC passing. Broadcasts still send as `intelligence@`.
+
+### S6 runbook (owner approval)
+1. Back up the live files (`praxis_core` and `public_html/PRAXIS`) and the database (export) to `~/s6_backup_<date>/`.
+2. Maintenance mode on.
+3. Upload the code (S1–S5) and `database/seeders/private/`; check `.env` keeps `SESSION_DOMAIN` unset.
+4. `migrate:fresh --seed --force` (one-off cron), then `access:sync` output check.
+5. Point `hq` and `portal` at `public_html/PRAXIS`, clear the nginx cache, remove `~/jbs_subdomain_placeholder`.
+6. `app:invite-owner jbspraxisllc@gmail.com`; confirm the email arrives.
+7. Maintenance mode off; check the site, HQ, portal, old-address redirects and System Health.
+
 ### S3 notes (roles & permissions)
 - `config/access.php` is the single catalogue: 17 HQ modules and 7 portal modules, each with the actions that make sense (view, create, edit, delete, approve, export), plus the starter roles. `php artisan access:sync` (and the seeders) write it to `permissions` and add missing starter roles without touching roles the owner has edited.
 - Staff hold one or more roles (`staff_roles`); permissions add up. Clients hold one portal role (`client_users.role_id`); an organisation's primary account is always Client Admin. Clearance levels and `users.role_id` are gone.
