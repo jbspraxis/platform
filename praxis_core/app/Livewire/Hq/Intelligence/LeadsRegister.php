@@ -4,9 +4,11 @@ namespace App\Livewire\Hq\Intelligence;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 #[Layout('components.layouts.hq')]
 class LeadsRegister extends Component
@@ -18,25 +20,31 @@ class LeadsRegister extends Component
     public $showDrawer = false;
     public $selectedLead = null;
     
-    // Diff-Viewer State
+    // Diff-Viewer State: the two records being merged are set on the server only
     public $showDiffModal = false;
+    #[Locked]
     public $diffOld = null;
+    #[Locked]
     public $diffNew = null;
     public $mergeSelections = []; 
     
-    // The specific fields we want to compare
-    public $diffFields = [
-        'company_name' => 'Company Name',
-        'executive_name' => 'Executive Name',
+    // The only copq_assessments columns a merge may write, with their labels (sentence case, docs/BRAND.md section 12)
+    private const MERGE_FIELDS = [
+        'company_name' => 'Company name',
+        'executive_name' => 'Contact name',
         'copq_industry' => 'Industry',
-        'primary_tool' => 'Tech Stack',
-        'bottleneck' => 'Bottleneck',
-        'copq_turnover' => 'Turnover ($)',
+        'primary_tool' => 'Systems in use',
+        'bottleneck' => 'Main bottleneck',
+        'copq_turnover' => 'Annual turnover',
         'headcount' => 'Headcount',
-        'calculated_leakage' => 'Calculated COPQ ($)'
+        'calculated_leakage' => 'Cost of poor quality (a year)',
     ];
+
+    // Shown in the merge dialog; locked so the browser cannot name other columns for executeMerge to write
+    #[Locked]
+    public $diffFields = self::MERGE_FIELDS;
     
-    // Manual Intake State (The Full Matrix)
+    // Manual intake state
     public $showIntakeModal = false;
     public $name = '', $company = '', $email = '', $currency = 'NGN';
     public $industry = '', $tool = '', $bottleneck = '';
@@ -50,6 +58,15 @@ class LeadsRegister extends Component
     public $hourlyCost = ''; 
     public $errorRate = ''; 
     
+    // Field names in validation messages (sentence case, docs/BRAND.md section 12)
+    protected $validationAttributes = [
+        'company' => 'organisation name', 'name' => 'contact name', 'email' => 'work email',
+        'industry' => 'industry', 'tool' => 'system in use', 'bottleneck' => 'main bottleneck',
+        'turnover' => 'annual turnover', 'headcount' => 'total headcount', 'mgmtNodes' => 'number of managers who approve work',
+        'acv' => 'average contract value', 'manualHrs' => 'manual hours a week', 'hourlyCost' => 'hourly cost of a manager',
+        'errorRate' => 'error rate', 'currency' => 'currency',
+    ];
+
     // All MDM Collections dynamically loaded
     public $dbIndustries = [], $dbArchitectures = [], $dbBottlenecks = [], $dbCurrencies = [];
     public $stages = ['Lead Captured', 'Qualifying', 'In Consultation', 'Proposal Sent', 'Won / Lost'];
@@ -87,17 +104,17 @@ class LeadsRegister extends Component
             $org->org_id = $org->id;
             $org->company_name = $org->name;
             $org->is_duplicate_suspect = (bool) ($org->is_duplicate_suspect ?? 0);
-            $org->executive_name = $latestCopq->executive_name ?? 'Unknown';
-            $org->corporate_email = $latestCopq->corporate_email ?? 'Unknown';
+            $org->executive_name = $latestCopq->executive_name ?? 'No contact recorded';
+            $org->corporate_email = $latestCopq->corporate_email ?? '';
             $org->calculated_leakage = $latestCopq->calculated_leakage ?? 0;
             $org->copq_currency = $latestCopq->copq_currency ?? 'NGN';
             $org->lead_tier = $latestCopq->lead_tier ?? 3;
             $org->ai_friction_analysis = $latestCopq->ai_friction_analysis ?? '';
             $org->report_token = $latestCopq->report_token ?? '';
             $org->copq_turnover = $latestCopq->copq_turnover ?? 0;
-            $org->copq_industry = $latestCopq->copq_industry ?? 'Unknown';
-            $org->primary_tool = $latestCopq->primary_tool ?? 'Unknown';
-            $org->bottleneck = $latestCopq->bottleneck ?? 'Unknown';
+            $org->copq_industry = $latestCopq->copq_industry ?? 'Industry not given';
+            $org->primary_tool = $latestCopq->primary_tool ?? 'Not given';
+            $org->bottleneck = $latestCopq->bottleneck ?? 'Not given';
             
             return $org;
         });
@@ -162,7 +179,7 @@ class LeadsRegister extends Component
         $this->diffNew = $records[0];
         $this->diffOld = $records[1];
 
-        foreach (array_keys($this->diffFields) as $field) {
+        foreach (array_keys(self::MERGE_FIELDS) as $field) {
             $this->mergeSelections[$field] = 'new';
         }
 
@@ -180,10 +197,13 @@ class LeadsRegister extends Component
     {
         abort_unless(Auth::user()->can('crm.edit'), 403);
 
+        if (!$this->diffOld || !$this->diffNew) return;
+
         $finalData = [];
         
-        foreach (array_keys($this->diffFields) as $field) {
-            $finalData[$field] = $this->mergeSelections[$field] === 'old' 
+        // Only the whitelisted columns, whatever the component state says
+        foreach (array_keys(self::MERGE_FIELDS) as $field) {
+            $finalData[$field] = ($this->mergeSelections[$field] ?? 'new') === 'old' 
                 ? $this->diffOld->$field 
                 : $this->diffNew->$field;
         }
@@ -271,14 +291,13 @@ class LeadsRegister extends Component
             ]);
         }
 
-        // 3. Super-Fallback Narrative
-        $industryPart = $indData ? $indData->fallback_diagnostic : "Systemic friction detected within {COMPANY_NAME}.";
-        $bottleneckPart = $bnData ? $bnData->bottleneck_narrative : "Immediate architectural review required.";
+        // 3. Fallback summary (plain wording, docs/BRAND.md section 4)
+        $industryPart = $indData ? $indData->fallback_diagnostic : "We found signs of avoidable cost in how {COMPANY_NAME} runs.";
+        $bottleneckPart = $bnData ? $bnData->bottleneck_narrative : "We recommend a review of the main bottleneck.";
         $fallbackText = $industryPart . " " . $bottleneckPart;
-        $aiAnalysis = str_replace('{COMPANY_NAME}', strtoupper($this->company), $fallbackText);
+        $aiAnalysis = str_replace('{COMPANY_NAME}', $cleanOrgName, $fallbackText);
 
         // 4. Server-Side Mathematics (Using exact user inputs)
-        // Hardcoded assumption: 20% of headcount are management/approval nodes.
         $mgmtHeadcount = $this->mgmtNodes;
         
         $appraisalCost = ($mgmtHeadcount * $this->manualHrs * $this->hourlyCost * 52) * $appMult;
@@ -294,7 +313,7 @@ class LeadsRegister extends Component
         if ($this->turnover >= 5000000 || $totalCOPQ >= 250000) $tier = 1; 
         elseif ($this->turnover >= 1000000 || $totalCOPQ >= 50000) $tier = 2; 
 
-        // 6. Lock Data into the Vault
+        // 6. Save the assessment
         $token = 'PRX-' . strtoupper(Str::random(24)) . '-' . date('Y');
         DB::table('copq_assessments')->insert([
             'id' => (string) Str::uuid(), 'report_token' => $token, 'organization_id' => $orgId,
@@ -311,7 +330,7 @@ class LeadsRegister extends Component
         // 7. Notification Trigger
         DB::table('notifications')->insert([
             'id' => (string) Str::uuid(), 'user_id' => Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c',
-            'title' => 'MANUAL PITCH INJECTED', 'message' => strtoupper($this->company) . " entered into pipeline. Leakage: " . $this->currency . " " . number_format($totalCOPQ),
+            'title' => 'Lead added', 'message' => $cleanOrgName . " was added to the pipeline. Estimated cost of poor quality: " . $this->currency . " " . number_format($totalCOPQ) . " a year.",
             'link_url' => route('hq.crm.leads', [], false), 'type' => 'System', 'is_read' => 0, 'created_at' => now()
         ]);
 
@@ -327,13 +346,15 @@ class LeadsRegister extends Component
 
         $appointmentId = (string) Str::uuid();
         
-        // 1. Create a Pending Appointment in the Lobby
+        // 1. Create a Pending Appointment in the Lobby.
+        // Appointment times are stored as Lagos wall-clock time (WAT), like website bookings; the app runs in UTC.
+        $start = Carbon::now('Africa/Lagos')->addMinutes(15); // Buffers the start time slightly
         DB::table('appointments')->insert([
             'id' => $appointmentId,
             'organization_id' => $orgId,
-            'title' => 'Ad-Hoc Executive Consultation',
-            'start_time' => now()->addMinutes(15), // Buffers the start time slightly
-            'end_time' => now()->addMinutes(75),
+            'title' => 'Free audit (booked from HQ)',
+            'start_time' => $start->format('Y-m-d H:i:s'),
+            'end_time' => $start->copy()->addMinutes(60)->format('Y-m-d H:i:s'),
             'status' => 'Requested',
             'created_at' => now(),
             'updated_at' => now()
@@ -343,14 +364,14 @@ class LeadsRegister extends Component
         return $this->redirect(route('hq.crm.consult'), navigate: true);
     }
 
-    // --- EXPORT PROTOCOL (crm.export) ---
+    // --- CSV export (crm.export) ---
     public function exportCsv()
     {
         abort_unless(Auth::user()->can('crm.export'), 403);
 
-        $filename = "JBS_Pipeline_Extract_" . now()->format('Ymd_His') . ".csv";
+        $filename = "JBS_Praxis_leads_" . now()->format('Ymd_His') . ".csv";
         $headers = ["Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=$filename"];
-        $columns = ['Company', 'Contact', 'Email', 'Stage', 'Owner', 'COPQ', 'Currency', 'Tier', 'Date Acquired'];
+        $columns = ['Company', 'Contact', 'Email', 'Stage', 'Owner', 'Cost of poor quality', 'Currency', 'Tier', 'Date added'];
 
         $callback = function() use ($columns) {
             $file = fopen('php://output', 'w');
@@ -358,7 +379,7 @@ class LeadsRegister extends Component
             foreach ($this->leads as $lead) {
                 fputcsv($file, [
                     $lead->company_name, $lead->executive_name, $lead->corporate_email, $lead->pipeline_stage, 
-                    $lead->owner_first ? $lead->owner_first . ' ' . $lead->owner_last : 'Unclaimed',
+                    $lead->owner_first ? $lead->owner_first . ' ' . $lead->owner_last : 'Not assigned',
                     $lead->calculated_leakage, $lead->copq_currency, $lead->lead_tier, $lead->created_at
                 ]);
             }

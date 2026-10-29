@@ -66,12 +66,12 @@ class LiveConsultation extends Component
     public function approveMeeting($appointmentId, $meetingLink)
     {
         if (! Auth::user()->can('crm.approve')) {
-            session()->flash('error', 'AUTHORIZATION DENIED: Approving consultations is not in your role.');
+            session()->flash('error', "You don't have permission to approve free audits. Ask an administrator to change your role.");
             return;
         }
 
         if(empty(trim($meetingLink))) {
-            session()->flash('error', 'Meeting link is required for approval.');
+            session()->flash('error', 'Add the meeting link, then approve the free audit again.');
             return;
         }
 
@@ -81,7 +81,7 @@ class LiveConsultation extends Component
             $meetingLink = 'https://' . ltrim($meetingLink, '/');
         }
         if (!filter_var($meetingLink, FILTER_VALIDATE_URL)) {
-            session()->flash('error', 'Enter the full meeting link, for example https://meet.google.com/abc-defg-hij.');
+            session()->flash('error', "That meeting link isn't complete. Enter the full link, for example https://meet.google.com/abc-defg-hij.");
             return;
         }
 
@@ -92,7 +92,7 @@ class LiveConsultation extends Component
             'updated_at' => now()
         ]);
 
-        // FETCH EMAIL AND DISPATCH
+        // Find the client's email address and send the meeting link
         $appt = DB::table('appointments')->where('id', $appointmentId)->first();
         $org = DB::table('organizations')->where('id', $appt->organization_id)->first();
         
@@ -113,19 +113,19 @@ class LiveConsultation extends Component
                 Mail::to($clientEmail)
                     ->locale(MailLocale::forRecipient($org->preferred_language ?? null))
                     ->send(new MeetingApprovedMail($appt, $org->name, trim($meetingLink), $firstName));
-                session()->flash('success', 'Consultation Approved & Link Dispatched to Client.');
+                session()->flash('success', "Free audit approved. We sent the meeting link to {$clientEmail}.");
             } catch (\Exception $e) {
-                session()->flash('error', 'Consultation Approved, but SMTP Email Dispatch failed.');
+                session()->flash('error', "Free audit approved, but we couldn't email the meeting link to {$clientEmail}. Send it to the client yourself.");
             }
         } else {
-            session()->flash('success', 'Consultation Approved (No client email on file).');
+            session()->flash('success', 'Free audit approved. There is no client email on file, so send the meeting link to the client yourself.');
         }
 
         $this->loadLobby();
     }
 
     // ==========================================
-    // 2. THE WAR ROOM (TERMINAL LAUNCH)
+    // 2. START THE FREE AUDIT
     // ==========================================
     public function enterTerminal($orgId, $appId)
     {
@@ -158,7 +158,7 @@ class LiveConsultation extends Component
 
         if ($notes->count() > 2) {
             $historyText = $notes->pluck('note_text')->implode(" | ");
-            $prompt = "Summarize the following historical CRM interactions with this client into one single, highly concise, authoritative briefing paragraph for a Lead Architect about to jump on a call. Notes: " . $historyText;
+            $prompt = "Summarise the following notes from earlier conversations with this client in one short, plain paragraph for the JBS Praxis consultant who is about to join a call with them. Use British English and everyday business words. Do not add facts that are not in the notes. Notes: " . $historyText;
 
             try {
                 $apiKey = config('services.gemini.api_key');
@@ -183,12 +183,12 @@ class LiveConsultation extends Component
     }
 
     // ==========================================
-    // 3. FULL INLINE COPQ ENGINE (Matched to Frontend)
+    // 3. COST OF POOR QUALITY ESTIMATE (same formula as the website calculator)
     // ==========================================
     public function generateInlineCopq()
     {
         if (! Auth::user()->can('crm.create')) {
-            session()->flash('error', 'AUTHORIZATION DENIED: Creating diagnostics is not in your role.');
+            session()->flash('error', "You don't have permission to create cost of poor quality estimates. Ask an administrator to change your role.");
             return;
         }
 
@@ -226,17 +226,17 @@ class LiveConsultation extends Component
         $archetype = $indData->sector_archetype ?? 'COMMERCIAL';
         $archMandate = $indData->architectural_mandate ?? 'CLOUD-NATIVE MICROSERVICES';
         
-        $companyName = strtoupper($this->leadData->name);
-        $fallbackTemplate = $indData ? $indData->fallback_diagnostic : "Systemic friction detected within {COMPANY_NAME}'s current architectural parameters. Immediate architectural review required to neutralize operational bottlenecks and secure capital workflows.";
+        $companyName = $this->leadData->name;
+        $fallbackTemplate = $indData ? $indData->fallback_diagnostic : "We found signs of avoidable cost in how {COMPANY_NAME} runs today. We recommend a review of the main bottleneck and of the approvals around it.";
         $aiAnalysis = str_replace('{COMPANY_NAME}', $companyName, $fallbackTemplate);
 
-        // 3. The Elite Prompt
-        $systemPrompt = "You are an Elite Enterprise Architect at JBS Praxis. Write a clinical, ruthless 3-sentence diagnostic analysis (max 600 chars) for {$companyName}. 
-        CONTEXT: Their Sector Archetype is [{$archetype}]. They are running on [{$tool}] with a severe bottleneck in [{$bottleneck}]. 
-        RULE 1: Identify the systemic friction causing capital/resource leakage. 
-        RULE 2: You MUST propose our mandatory cure: [{$archMandate}]. 
-        RULE 3: Do not use generic software jargon; use terminology strictly native to a {$archetype} sector (e.g., if SOVEREIGN use 'public funds/civic deployment', if IMPACT use 'donor compliance/beneficiary reach', if ASSET_HEAVY use 'NPT/SCADA/supply chain spoilage', if COMMERCIAL use 'margins/client churn'). 
-        Be highly authoritative and uncompromising.";
+        // 3. The prompt (voice: docs/BRAND.md section 4)
+        $systemPrompt = "You are a senior consultant at JBS Praxis, a consulting and engineering firm for Africa's institutions. Write a plain, measured 3-sentence analysis (max 600 characters) for {$companyName}.
+        CONTEXT: Their sector type is [{$archetype}]. They use [{$tool}] and their main bottleneck is [{$bottleneck}].
+        RULE 1: Say where the bottleneck most likely costs them time or money.
+        RULE 2: Recommend this approach: [{$archMandate}].
+        RULE 3: Use the everyday words of a {$archetype} sector (e.g., if SOVEREIGN use 'public funds and services', if IMPACT use 'donor compliance and beneficiary reach', if ASSET_HEAVY use 'downtime and supply chain losses', if COMMERCIAL use 'margins and client churn').
+        RULE 4: Use British English, short sentences and plain business words. No hype, no war, hacking or medical metaphors, no guaranteed outcomes: write 'we estimate' or 'in our assessment'.";
         
         try {
             $apiKey = config('services.gemini.api_key');
@@ -250,7 +250,7 @@ class LiveConsultation extends Component
                 $aiAnalysis = $response->json('candidates.0.content.parts.0.text');
             }
         } catch (\Exception $e) {
-            // Silently fail. $aiAnalysis already contains the highly personalized database fallback!
+            // Keep the fallback summary from master data
         }
 
         // 4. Server-Side Mathematics (The Archetype Calculus)
@@ -281,12 +281,12 @@ class LiveConsultation extends Component
         if ($turnover >= 5000000 || $totalCOPQ >= 250000) $tier = 1; 
         elseif ($turnover >= 1000000 || $totalCOPQ >= 50000) $tier = 2; 
 
-        // 6. Lock Data into the COPQ Vault
+        // 6. Save the assessment
         $token = 'PRX-' . strtoupper(Str::random(24)) . '-' . date('Y');
         
         $user = DB::table('client_users')->where('organization_id', $this->activeOrgId)->whereNull('deleted_at')->orderByDesc('is_primary_client')->first();
         $execEmail = $user ? $user->email : 'client@' . strtolower(str_replace(' ', '', $companyName)) . '.com';
-        $execName = $user ? $user->first_name . ' ' . $user->last_name : 'Executive Board';
+        $execName = $user ? $user->first_name . ' ' . $user->last_name : 'Leadership team';
 
         DB::table('copq_assessments')->insert([
             'id' => (string) Str::uuid(), 'report_token' => $token, 'organization_id' => $this->activeOrgId,
@@ -305,20 +305,19 @@ class LiveConsultation extends Component
         // Update Org Industry to match
         DB::table('organizations')->where('id', $this->activeOrgId)->update(['industry' => $industry]);
         
-        session()->flash('success', 'Diagnostic Matrix Compiled and Secured.');
+        session()->flash('success', 'Cost of poor quality estimate saved.');
     }
 
     // ==========================================
-    // X. DISPATCH PLACEHOLDER (Pending Frontend Modal)
+    // X. SEND THE REPORT (opens the choice of channel)
     // ==========================================
     public function dispatchCopqEmail()
     {
-        // This will be wired up to the frontend modal you are building next.
-        // For now, it alerts the user that the logic will be deployed shortly.
+        // Email sending is not wired up yet; the page offers WhatsApp for now.
         
         /*
         if (!$this->copqData || empty($this->copqData->corporate_email)) {
-            session()->flash('error', 'Cannot dispatch: Valid corporate email missing from records.');
+            session()->flash('error', "We couldn't send the report because this lead has no email address. Add one, then send the report again.");
             return;
         }
 
@@ -327,37 +326,37 @@ class LiveConsultation extends Component
             Mail::to($this->copqData->corporate_email)
                 ->locale(MailLocale::forRecipient($this->leadData->preferred_language ?? null))
                 ->send(new CopqReportMail($this->copqData, true));
-            session()->flash('success', 'COPQ Dossier transmitted to client inbox.');
+            session()->flash('success', 'Cost of poor quality report sent to the client.');
         } catch (\Exception $e) {
-            session()->flash('error', 'Transmission failed: SMTP Configuration required.');
+            session()->flash('error', "We couldn't send the report because email isn't set up. Check the mail settings in System Health.");
         }
         */
 
         // Triggering a frontend event to open the upcoming Email/WhatsApp modal
         $this->dispatch('open-transmission-modal');
-        session()->flash('success', 'Transmission logic pending frontend deployment.');
+        session()->flash('success', 'Choose how to send the report. Sending by email is not available yet.');
     }
 
     // ==========================================
-    // 4. DISQUALIFICATION PROTOCOL
+    // 4. MARK THE LEAD AS LOST
     // ==========================================
     public function disqualifyLead($reason = '')
     {
         if (! Auth::user()->can('crm.edit')) {
-            session()->flash('error', 'AUTHORIZATION DENIED: Changing leads is not in your role.');
+            session()->flash('error', "You don't have permission to change leads. Ask an administrator to change your role.");
             return;
         }
 
         // Only approvers may archive without a written reason
         if (! Auth::user()->can('crm.approve') && empty(trim($reason))) {
-            session()->flash('error', 'AUTHORIZATION DENIED: Written justification required.');
+            session()->flash('error', 'Give a reason for marking this lead as lost. Only approvers can leave the reason blank.');
             return;
         }
 
         DB::table('organizations')->where('id', $this->activeOrgId)->update([
             'status' => 'Lost',
             'pipeline_stage' => 'Won / Lost',
-            'disqualification_reason' => trim($reason) ?: 'Archived directly by Level 5 Command',
+            'disqualification_reason' => trim($reason) ?: 'Marked as lost by an approver, no reason given',
             'updated_at' => now()
         ]);
 
@@ -370,13 +369,13 @@ class LiveConsultation extends Component
     }
 
     // ==========================================
-    // 5. PROPOSAL SYNTHESIS (THE CLOSER)
+    // 5. CLOSE THE FREE AUDIT AND DRAFT THE PROPOSAL
     // ==========================================
     public function closeAndSynthesize($rawNotesData)
     {
         if (! Auth::user()->can('crm.create')) {
             $this->dispatch('consultation-error');
-            session()->flash('error', 'AUTHORIZATION DENIED: Creating proposals is not in your role.');
+            session()->flash('error', "You don't have permission to create proposals. Ask an administrator to change your role.");
             return;
         }
 
@@ -385,13 +384,13 @@ class LiveConsultation extends Component
         $vis = $rawNotesData['vision'] ?? '';
         $pain = $rawNotesData['pain'] ?? '';
         $sla = $rawNotesData['sla'] ?? '';
-        $concatNotes = "CONTEXT & OPERATIONS: $ctx \n\nSCALE & VISION: $vis \n\nBOTTLENECKS: $pain \n\nREQUIREMENTS & BUDGET: $sla";
+        $concatNotes = "Context and operations: $ctx \n\nGrowth plans: $vis \n\nBottlenecks: $pain \n\nRequirements and budget: $sla";
 
-        // 2. Fetch COPQ Context to make the AI lethal
+        // 2. The cost of poor quality estimate, for context
         $copq = DB::table('copq_assessments')->where('organization_id', $this->activeOrgId)->orderBy('created_at', 'desc')->first();
-        $leakageStr = $copq ? "Calculated Annual Chaos Tax / Leakage: {$copq->copq_currency} " . number_format($copq->calculated_leakage) : "Unscored";
-        $bottleneckStr = $copq ? $copq->bottleneck : "Operational Friction";
-        $techStackStr = $copq ? $copq->primary_tool : "Legacy Systems";
+        $leakageStr = $copq ? "Estimated cost of poor quality a year: {$copq->copq_currency} " . number_format($copq->calculated_leakage) : "Not scored";
+        $bottleneckStr = $copq ? $copq->bottleneck : "Not recorded";
+        $techStackStr = $copq ? $copq->primary_tool : "Not recorded";
 
         // 3. Save raw notes to CRM History natively
         DB::table('crm_notes')->insert([
@@ -400,61 +399,41 @@ class LiveConsultation extends Component
             'interaction_type' => 'Meeting', 'created_at' => now(), 'updated_at' => now()
         ]);
 
-        // 4. THE JBS PRAXIS CORPORATE DNA (Anti-Hallucination Matrix)
+        // 4. Who JBS Praxis is and how it writes (docs/BRAND.md sections 1, 4 and 5). Proof is limited to the approved list.
         $companyDNA = "
-COMPANY IDENTITY: JBS Praxis. We are an elite hybrid management consulting & systems architecture and engineering firm. We engineer the Predictive Praxis Framework™ (PPF), shifting organizational governance from reactive, post-mortem firefighting to precognitive, deterministic forecasting. We conduct forensic operational audits and build algorithmic ecosystems that predict and neutralize bottlenecks, compliance risks, and capital leakage before they manifest.
- 
-SLOGAN: 'Beyond Strategy'. We do not write useless PDF reports; we engineer bespoke digital operating systems that make compliance structurally unavoidable.
- 
-TONE: Clinical, authoritative, aggressive yet highly corporate. Do not use fluffy marketing jargon (e.g., 'synergy', 'transformative journey'). Use technical terminology (e.g., 'architectural overhaul', 'capital leakage', 'zero-trust workflows', 'relational data vaulting', 'deterministic resilience', 'digital Poka-Yoke', 'algorithmic foresight', 'sprint velocity').
- 
-CORE METHODOLOGY (THE PPF & EXECUTION ENGINE):
-1. Diagnostics & Truth: Deploying Lean Six Sigma mapping and the PAF Matrix to quantify the Cost of Poor Quality (COPQ) and establish absolute empirical truth.
-2. Relational Data Vault: Eradicating data silos by sanitizing and centralizing data into high-velocity databases to form a Single Source of Truth.
-3. Algorithmic Foresight: Utilizing predictive engines to continuously analyze operational velocity and project future system failures.
-4. Autonomous Governance: Hardcoding ISO compliance into 'Code as Law' via digital Poka-Yoke logic gates, complete with an immutable, audited 'Glass-Break' emergency override protocol.
-5. Sovereign Handover & Kaizen: Executing continuous algorithmic recalibration and database indexing to guarantee zero-latency performance and unbreakable security.
-6. Execution Transparency (Agile Mastery): We operate with zero obscurity. Clients are integrated into a real-time Agile infrastructure, granting absolute visibility over Kanban boards, sprint backlogs, and live QA ticketing. This continuous feedback loop structurally eliminates scope creep and reassures stakeholders through empirical project velocity.
- 
-CORE CAPABILITIES & TECH STACK: 
-1. Corporate Governance: ISO 9001/27001, Internal Control Systems, Six Sigma, Poka-Yoke error prevention, Regulatory Gap Analysis, Agile/Scrum Methodologies.
-2. Data Engineering & Infrastructure: PostgreSQL, MongoDB, Apache Kafka (Event Streaming), AWS EKS (Kubernetes), Docker, CI/CD Pipelines, Zero-latency BI.
-3. Custom Enterprise Systems: Golang (Zero-Latency Microservices), Python/TensorFlow (AI/ML), Java/Spring Boot, C#/.NET Core, Node.js.
-4. Frontend & Mobile: Next.js/React, Vue.js, Flutter (Mobile OS), Swift (iOS), Kotlin (Android).
- 
-APPROVED CASE STUDIES (USE THESE STRICTLY TO DEMONSTRATE DETERMINISTIC ROI. MATCH THE CASE STUDY TO THE LEAD'S INDUSTRY):
- 
-- CS_1 (Beverage Production & Distribution): 'Tier-1 FMCG Asset Hemorrhage. Built an End-to-End Logistics & Fleet ERP. Deployed a web command center paired with a Mobile-First PWA for field operators. Integrated strict odometer validation APIs and cryptographic QR-code signatures for Proof of Delivery. ROI: Achieved 100% Asset Accountability and eradicated fuel log fraud.'
- 
-- CS_2 (Logistics & Procurement): 'Tier-1 Logistics ERP Deployment. Enterprise was bleeding capital via untracked manual approvals. Dismantled legacy workflows and engineered a bespoke ERP (Laravel/PostgreSQL/Livewire) with live fleet tracking APIs. ROI: Decimated manual approval times, achieving an 85% reduction in systemic latency and zero compliance breaches.'
- 
-- CS_3 (Fintech & Unified Commerce): 'Digital Escrow & Trust Infrastructure. A multi-billion informal trade sector was paralyzed by cash-on-delivery risk. Engineered a dual-layer Unified Commerce OS (Flutter/PostgreSQL) compliant with BEAC financial regulations. Integrated Mobile Money escrow, logistics webhooks, and banking-grade biometric KYC. ROI: Engineered a Zero Fraud Loop, instantly structuring informal vendors.'
- 
-- CS_4 (IT Infrastructure & Security): 'Global IT Operations Architecture. Client suffered from fragmented project lifecycles and opaque client reporting. We deployed a unified DevOps and Client Transparency Portal using Node.js and React. Hardcoded real-time Kanban tracking and sprint backlog matrices directly into the client-facing dashboard. ROI: 100% visibility into QA tickets, eradicating scope creep and reducing deployment friction by 60%.'
- 
-- CS_5 (Heavy Manufacturing): 'Predictive Maintenance OS. Unplanned machine downtime was causing severe capital leakage. Deployed IoT edge sensors feeding a Python/TensorFlow predictive engine via MQTT protocols. Applied Six Sigma mapping to hardcode digital Poka-Yoke logic into the assembly line. ROI: Predicted localized part failures up to 3 weeks in advance, reducing operational paralysis by 72%.'
- 
-- CS_6 (Pharmaceutical Supply Chain): 'Cold-Chain Regulatory Vault. Fragmented Excel sheets resulted in imminent ISO audit failures. We engineered an immutable distributed ledger (Java/Spring Boot framework) to track temperature-sensitive assets. ROI: Converted physical compliance manuals into automated logic gates, passing multinational audits with zero non-conformities.'
+COMPANY: JBS Praxis, consulting and engineering for Africa's institutions, working in Nigeria and Cameroon, in English and French, under IFRS and OHADA. We design how an institution should run, then build the system that makes it run that way and shows, every day, whether it does. We stay until the system holds, train the client's team, then hand over the keys.
+
+THE PRAXIS METHOD (four stages): 1. See: map how one area of the institution really runs today, starting with the free operations audit. 2. Design: design how it should run (processes, controls, roles, the numbers that matter). 3. Build: build and configure the system that runs it and shows it. 4. Hold: stay until it holds, train the team, then hand over.
+
+VOICE: Plain, precise, warm and measured, like a Big Four proposal. British English. Lead with the conclusion. Short sentences, active voice, everyday business words. Quantify the stakes with the cost of poor quality. Write 'we recommend', 'we estimate', 'in our assessment'. Never use hype (revolutionary, cutting-edge, world-class, seamless, robust, elite, deterministic, immutable, forensic, unbreakable) or metaphors from war, space, hacking or injury (command, deploy for people, strike, protocol, matrix, terminal, bleeding, haemorrhage). Never guarantee an outcome, a saving, a return on investment or an uptime figure.
+
+CAPABILITIES: finance and accounting systems (IFRS, OHADA), payroll and human capital, operations and projects, risk and governance (internal control, aligned with ISO 27001, never 'certified'), data and AI. Typical tools: Laravel, PostgreSQL or MySQL, Livewire, APIs to existing systems, Flutter for mobile.
+
+APPROVED PROOF (the only client work you may mention; never name a client, describe them as below; results are not yet quantified, so never state a percentage, figure or result for them):
+- Money: OHADA-compliant finance for a logistics and services company; IFRS reporting for another client.
+- Operations: real-time rig tracking, automated daily drilling reports, dual-signature tickets and a procurement pipeline for an oil and gas services company.
+- Risk and governance: governance work for a leading pharmaceutical manufacturer, delivered with a partner firm.
+- Data and AI: nfelia, a JBS Praxis product.
 ";
 
-        // 5. The Ultimate Prompt
+        // 5. The prompt
         $prompt = "
         $companyDNA
-        
-        TASK: You are the Lead Systems Architect at JBS Praxis. Analyze the consultant's rough notes and the COPQ diagnostic data below. Output a STRICT JSON payload representing the SOW narrative.
-        
+
+        TASK: You are a senior consultant at JBS Praxis. Read the consultant's notes from the free audit and the cost of poor quality estimate below, and write the narrative of a proposal (statement of work) as STRICT JSON.
+
         CLIENT DATA:
-        - Identified Bottleneck: $bottleneckStr
-        - Current Tech Stack: $techStackStr
+        - Main bottleneck: $bottleneckStr
+        - Systems in use: $techStackStr
         - $leakageStr
-        - Consultant Notes: $concatNotes
-        
+        - Consultant notes: $concatNotes
+
         RULES FOR JSON KEYS:
-        1. 'ai_executive_summary': Exactly 2 paragraphs. P1 must state their current reality and the exact capital they are losing ($leakageStr). P2 must state the JBS Praxis mandate to dismantle this chaos and engineer an unbreakable system.
-        2. 'ai_operational_strategy': Exactly 2 paragraphs detailing the technical deployment. Mention migrating from their current stack ($techStackStr) to a secure JBS Praxis architecture (e.g., PostgreSQL, Laravel, API bridges).
-        3. 'ai_slas_json': Generate an array of exactly 4 strict, measurable Service Level Agreements based on their notes. (e.g., [{'title': 'System Uptime', 'value': '99.9% Guaranteed'}, {'title': 'Data Migration', 'value': 'Zero-Loss Protocol'}]). Titles max 25 chars, values max 40 chars.
-        4. 'ai_case_study': Select the most relevant 'APPROVED CASE STUDY' from the DNA block above. Adapt it slightly to resonate with the client's industry, but you can invent sanitized cases that best adapt if you can't adapt it to any of our cases.
-        
+        1. 'ai_executive_summary': Exactly 2 paragraphs. P1 states the situation and the estimated cost of poor quality ($leakageStr), as an estimate. P2 states what we recommend and what it changes for the organisation.
+        2. 'ai_operational_strategy': Exactly 2 paragraphs on how we will do the work, following the Praxis Method (See, Design, Build, Hold). Mention moving from their current systems ($techStackStr) to the system we build, and how their team will take it over.
+        3. 'ai_slas_json': An array of exactly 4 measurable service levels we propose, based on their notes, written as proposals, not guarantees (e.g., [{'title': 'Support response', 'value': 'Within 1 working day'}, {'title': 'Data migration', 'value': 'Reconciled before go-live'}]). Titles max 25 characters, values max 40 characters, sentence case.
+        4. 'ai_case_study': Choose the most relevant item from APPROVED PROOF and describe it in 2 or 3 sentences: the situation and the system we built. Do not invent a client, a figure or a result. If nothing fits, describe how the Praxis Method would apply to this client instead, without claiming a past result.
+
         OUTPUT FORMAT: STRICT JSON ONLY. NO MARKDOWN BACKTICKS (```json).
         {
           \"ai_executive_summary\": \"...\",
@@ -493,7 +472,8 @@ APPROVED CASE STUDIES (USE THESE STRICTLY TO DEMONSTRATE DETERMINISTIC ROI. MATC
         } catch (\Exception $e) {
             // HARD HALT: Stop execution, hide frontend modal, show styled error.
             $this->dispatch('consultation-error');
-            session()->flash('error', 'NEURAL SYNTHESIS FAILED: ' . $e->getMessage());
+            report($e);
+            session()->flash('error', "We couldn't draft the proposal because the writing assistant didn't return a usable draft. Your notes are saved in the lead's history. Try again in a minute.");
             return; 
         }
 
@@ -532,7 +512,7 @@ APPROVED CASE STUDIES (USE THESE STRICTLY TO DEMONSTRATE DETERMINISTIC ROI. MATC
         
         $this->activeView = 'lobby';
         $this->loadLobby();
-        session()->flash('success', 'Consultation Synthesized. Proposal Draft Generated.');
+        session()->flash('success', 'Free audit closed. A draft proposal is ready in Proposals.');
     }
 
     public function render()

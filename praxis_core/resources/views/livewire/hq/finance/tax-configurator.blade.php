@@ -1,229 +1,193 @@
 <div>
-    <style>
-        /* --- GLOBAL CYBER STYLES --- */
-        .cyber-input, .cyber-select {
-            width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);
-            color: #FFFFFF; padding: 10px 12px; font-family: 'Roboto Mono', monospace;
-            font-size: 0.8rem; border-radius: 2px; transition: 0.3s;
-        }
-        .cyber-input:focus, .cyber-select:focus { 
-            border-color: #00E5FF; outline: none; background: rgba(0, 229, 255, 0.05); 
-        }
-        
-        .btn-action { 
-            background: transparent; border: 1px solid #00E5FF; color: #00E5FF; padding: 10px 20px; 
-            font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: bold; cursor: pointer; 
-            transition: 0.3s; border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; 
-        }
-        .btn-action:hover { background: #00E5FF; color: #0A1128; box-shadow: 0 0 15px rgba(0, 229, 255, 0.4); }
-        .btn-success { border-color: #00FF66; color: #00FF66; }
-        .btn-success:hover { background: #00FF66; color: #0A1128; box-shadow: 0 0 15px rgba(0, 255, 102, 0.4); }
-        .btn-danger { border-color: #FF3366; color: #FF3366; padding: 5px 10px; font-size: 0.7rem; }
-        .btn-danger:hover { background: #FF3366; color: #FFF; box-shadow: 0 0 15px rgba(255, 51, 102, 0.4); }
-
-        .nav-pill { padding: 8px 20px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; border-radius: 2px; cursor: pointer; transition: 0.3s; border: 1px solid transparent; background: transparent; color: #8A9BB2; }
-        .nav-pill.active { background: rgba(0, 229, 255, 0.1); border-color: #00E5FF; color: #00E5FF; font-weight: bold; }
-        .nav-pill:not(.active):hover { background: rgba(255,255,255,0.05); color: #FFF; }
-
-        .section-panel { background: rgba(10, 17, 40, 0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 25px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); margin-bottom: 20px;}
-        .section-header { font-family: 'Montserrat', sans-serif; font-size: 0.85rem; font-weight: bold; color: #00E5FF; margin-bottom: 20px; border-bottom: 1px dashed rgba(0, 229, 255, 0.3); padding-bottom: 10px; display: flex; align-items: center; gap: 8px;}
-        
-        /* Modals & Loaders */
-        .glass-overlay { position: fixed; inset: 0; background: rgba(3, 5, 10, 0.85); backdrop-filter: blur(8px); z-index: 9990; display: flex; align-items: center; justify-content: center; }
-        .success-box { background: #0A1128; border: 1px solid #00FF66; border-top: 4px solid #00FF66; border-radius: 4px; padding: 40px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.8); z-index: 9999; max-width: 420px; width: 90%; }
-        .spinner { border: 2px solid rgba(0, 229, 255, 0.1); border-top: 2px solid #00E5FF; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
-        .form-label { display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 4px; }
-        .helper-text { font-family: 'Roboto Mono', monospace; font-size: 0.55rem; color: #FFBD2E; margin-top: 4px; }
-    </style>
+    @php
+        $regionNames = ['NG' => 'Nigeria', 'CM' => 'Cameroon', 'KE' => 'Kenya', 'GLOBAL' => 'Other countries'];
+        $regionName = $regionNames[$activeRegion] ?? $activeRegion;
+    @endphp
 
     @if($showSuccessModal)
-        <div class="glass-overlay">
-            <div class="success-box">
-                <div style="font-size: 3rem; margin-bottom: 10px; text-shadow: 0 0 20px rgba(0,255,102,0.4);">✅</div>
-                <h2 style="font-family: 'Montserrat', sans-serif; color: #00FF66; margin-bottom: 10px; letter-spacing: 1px;">LEDGER UPDATED</h2>
-                <p style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: #8A9BB2; margin-bottom: 25px; line-height: 1.5;">{{ $successMessage }}</p>
-                <button wire:click="closeSuccessModal" class="btn-action btn-success" style="width: 100%;">ACKNOWLEDGE & CLOSE</button>
+        <div class="modal-backdrop">
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tax-saved-title">
+                <h2 id="tax-saved-title" class="modal-title">Tax rules saved</h2>
+                <p class="text-sm text-slate">{{ $successMessage }}</p>
+                <div class="modal-actions">
+                    <button type="button" wire:click="closeSuccessModal" class="btn btn-primary">Close</button>
+                </div>
             </div>
         </div>
     @endif
 
-    <div style="margin-bottom: 30px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-end;">
+    <div class="page-header">
         <div>
-            <h1 style="font-family: 'Montserrat', sans-serif; font-size: 1.2rem; color: #FFF; letter-spacing: 1px;">TAX & COMPLIANCE CONFIGURATOR</h1>
-            <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #8A9BB2;">GLOBAL STATUTORY PARAMETERS MASTER</p>
-        </div>
-        <div style="display: flex; gap: 10px;">
-            <button wire:click="setRegion('NG')" class="nav-pill {{ $activeRegion === 'NG' ? 'active' : '' }}">NIGERIA (PITA)</button>
-            <button wire:click="setRegion('CM')" class="nav-pill {{ $activeRegion === 'CM' ? 'active' : '' }}">CAMEROON (CGI)</button>
-            <button wire:click="setRegion('KE')" class="nav-pill {{ $activeRegion === 'KE' ? 'active' : '' }}">KENYA (KRA)</button>
-            <button wire:click="setRegion('GLOBAL')" class="nav-pill {{ $activeRegion === 'GLOBAL' ? 'active' : '' }}">GLOBAL (FLAT)</button>
+            <h1 class="page-title">Tax rules</h1>
+            <p class="page-subtitle">Set the payroll tax rates, pension and social contributions, and tax bands for each country.</p>
         </div>
     </div>
 
+    <div class="tabs" role="tablist">
+        <button type="button" role="tab" wire:click="setRegion('NG')" class="tab {{ $activeRegion === 'NG' ? 'is-active' : '' }}" aria-selected="{{ $activeRegion === 'NG' ? 'true' : 'false' }}">Nigeria (PITA)</button>
+        <button type="button" role="tab" wire:click="setRegion('CM')" class="tab {{ $activeRegion === 'CM' ? 'is-active' : '' }}" aria-selected="{{ $activeRegion === 'CM' ? 'true' : 'false' }}">Cameroon (CGI)</button>
+        <button type="button" role="tab" wire:click="setRegion('KE')" class="tab {{ $activeRegion === 'KE' ? 'is-active' : '' }}" aria-selected="{{ $activeRegion === 'KE' ? 'true' : 'false' }}">Kenya (KRA)</button>
+        <button type="button" role="tab" wire:click="setRegion('GLOBAL')" class="tab {{ $activeRegion === 'GLOBAL' ? 'is-active' : '' }}" aria-selected="{{ $activeRegion === 'GLOBAL' ? 'true' : 'false' }}">Other countries (flat rate)</button>
+    </div>
+
     @if(session()->has('error'))
-        <div style="background: rgba(255,51,102,0.1); border-left: 2px solid #FF3366; padding: 10px; margin-bottom: 20px; font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #FF3366;">
-            ⚠️ {{ session('error') }}
+        <div class="alert alert-danger mb-6" role="alert"><i data-lucide="circle-alert"></i><span>{{ session('error') }}</span></div>
+    @endif
+
+    @if(empty($config['id']))
+        <div class="alert alert-info mb-6" role="note">
+            <i data-lucide="info"></i>
+            <span>{{ $regionName }} has no saved tax rules yet. Fill in the rates and save to create them.</span>
         </div>
     @endif
 
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: start;">
-        
-        <div>
-            <form wire:submit.prevent="saveConfiguration">
-                <div class="section-panel">
-                    <div class="section-header">
-                        <i data-lucide="sliders" style="width: 16px; height: 16px;"></i> FLAT RATES & EXEMPTIONS [{{ $activeRegion }}]
+    <div class="grid items-start gap-6 xl:grid-cols-2">
+
+        <form wire:submit.prevent="saveConfiguration" class="card">
+            <h2 class="card-title mb-4">Rates and reliefs: {{ $regionName }}</h2>
+            <p class="help mb-4">Enter rates as decimals: 0.08 for 8%.</p>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div class="field">
+                    <label class="label" for="tx-minwage">Minimum wage (monthly)</label>
+                    <input id="tx-minwage" type="number" step="0.01" wire:model="config.minimum_wage" class="input" placeholder="e.g. 70000">
+                </div>
+            </div>
+
+            <hr class="divider my-5">
+            <h3 class="label mb-3">Pension and social contributions</h3>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div class="field">
+                    <label class="label" for="tx-pen-ee">Pension, employee rate</label>
+                    <input id="tx-pen-ee" type="number" step="0.0001" wire:model="config.pension_employee_rate" class="input" placeholder="e.g. 0.08">
+                </div>
+                <div class="field">
+                    <label class="label" for="tx-pen-er">Pension, employer rate</label>
+                    <input id="tx-pen-er" type="number" step="0.0001" wire:model="config.pension_employer_rate" class="input" placeholder="e.g. 0.10">
+                </div>
+                <div class="field">
+                    <label class="label" for="tx-health">Health insurance, employee rate</label>
+                    <input id="tx-health" type="number" step="0.0001" wire:model="config.health_employee_rate" class="input">
+                    <span class="help">NHIS in Nigeria.</span>
+                </div>
+                <div class="field">
+                    <label class="label" for="tx-housing">Housing fund, employee rate</label>
+                    <input id="tx-housing" type="number" step="0.0001" wire:model="config.housing_fund_rate" class="input">
+                </div>
+                <div class="field sm:col-span-2">
+                    <label class="label" for="tx-cap">Pension cap (optional)</label>
+                    <input id="tx-cap" type="number" step="0.01" wire:model="config.pension_cap_amount" class="input" placeholder="e.g. 750000">
+                    <span class="help">The most monthly gross pay that pension is taken from, such as the CNPS ceiling in Cameroon. Leave blank if there is no cap.</span>
+                </div>
+            </div>
+
+            <hr class="divider my-5">
+            <h3 class="label mb-3">Tax reliefs</h3>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div class="field">
+                    <label class="label" for="tx-fixed-ab">Fixed relief (monthly)</label>
+                    <input id="tx-fixed-ab" type="number" step="0.01" wire:model="config.fixed_abatement" class="input" placeholder="e.g. 41666.67">
+                </div>
+                <div class="field">
+                    <label class="label" for="tx-prop-ab">Proportional relief rate</label>
+                    <input id="tx-prop-ab" type="number" step="0.0001" wire:model="config.proportional_abatement_rate" class="input" placeholder="e.g. 0.30">
+                </div>
+                <div class="field">
+                    <label class="label" for="tx-cra-fixed">Consolidated relief allowance, fixed (yearly)</label>
+                    <input id="tx-cra-fixed" type="number" step="0.01" wire:model="config.cra_fixed_amount" class="input" placeholder="e.g. 200000">
+                </div>
+                <div class="field">
+                    <label class="label" for="tx-cra-rate">Consolidated relief allowance rate</label>
+                    <input id="tx-cra-rate" type="number" step="0.0001" wire:model="config.cra_proportional_rate" class="input" placeholder="e.g. 0.20">
+                </div>
+                <div class="field sm:col-span-2">
+                    <label class="label" for="tx-min-tax">Minimum tax rate</label>
+                    <input id="tx-min-tax" type="number" step="0.0001" wire:model="config.minimum_tax_rate" class="input" placeholder="e.g. 0.01">
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end">
+                <button type="submit" class="btn btn-primary" wire:loading.attr="disabled">
+                    <span wire:loading.remove wire:target="saveConfiguration">Save tax rules</span>
+                    <span wire:loading wire:target="saveConfiguration">Saving…</span>
+                </button>
+            </div>
+        </form>
+
+        <div class="card">
+            <h2 class="card-title mb-4">Tax bands: {{ $regionName }}</h2>
+
+            <div class="table-wrap mb-6 rounded-lg border border-line">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Band</th>
+                            <th class="num">From</th>
+                            <th class="num">To</th>
+                            <th class="num">Rate</th>
+                            <th><span class="sr-only">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($bands as $band)
+                            <tr>
+                                <td class="text-ink">{{ $band->band_name }}</td>
+                                <td class="num">{{ number_format($band->lower_limit, 0) }}</td>
+                                <td class="num">{{ $band->upper_limit ? number_format($band->upper_limit, 0) : 'No limit' }}</td>
+                                <td class="num">{{ rtrim(rtrim(number_format($band->tax_rate * 100, 2), '0'), '.') }}%</td>
+                                <td class="text-right">
+                                    <button type="button" wire:click="removeTaxBand('{{ $band->id }}')" class="btn btn-ghost btn-sm" style="color: var(--color-danger);" aria-label="Remove band {{ $band->band_name }}" onclick="confirm('Remove this tax band? Payroll runs created after this use the remaining bands.') || event.stopImmediatePropagation()"><i data-lucide="trash-2"></i></button>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5">
+                                    <div class="empty-state">
+                                        <strong>No tax bands yet</strong>
+                                        Without bands, payroll uses the flat rate. Add the first band below.
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <h3 class="label mb-3">Add a band</h3>
+            <form wire:submit.prevent="addTaxBand">
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="field sm:col-span-2">
+                        <label class="label" for="band-name">Band name</label>
+                        <input id="band-name" type="text" wire:model="newBandName" required class="input" placeholder="e.g. First ₦300,000">
+                        @error('newBandName') <span class="field-error">{{ $message }}</span> @enderror
                     </div>
-                    
-                    <div class="form-grid">
-                        <div>
-                            <label class="form-label">Statutory Minimum Wage</label>
-                            <input type="number" step="0.01" wire:model="config.minimum_wage" class="cyber-input" placeholder="e.g. 60000">
-                        </div>
+                    <div class="field">
+                        <label class="label" for="band-lower">From (lower limit)</label>
+                        <input id="band-lower" type="number" step="0.01" wire:model="newBandLower" required class="input">
+                        @error('newBandLower') <span class="field-error">{{ $message }}</span> @enderror
                     </div>
-
-                    <div style="border-top: 1px dashed rgba(255,255,255,0.1); margin: 15px 0;"></div>
-                    <div style="font-family: 'Montserrat', sans-serif; font-size: 0.7rem; color: #FFBD2E; margin-bottom: 10px; font-weight: bold;">SOCIAL & PENSION FUNDS</div>
-
-                    <div class="form-grid">
-                        <div>
-                            <label class="form-label">Pension (Employee Rate %)</label>
-                            <input type="number" step="0.0001" wire:model="config.pension_employee_rate" class="cyber-input" placeholder="e.g. 0.0800 for 8%">
-                        </div>
-                        <div>
-                            <label class="form-label">Pension (Employer Rate %)</label>
-                            <input type="number" step="0.0001" wire:model="config.pension_employer_rate" class="cyber-input" placeholder="e.g. 0.1000 for 10%">
-                        </div>
-                        <div>
-                            <label class="form-label">Health/NHIS (Employee Rate %)</label>
-                            <input type="number" step="0.0001" wire:model="config.health_employee_rate" class="cyber-input">
-                        </div>
-                        <div>
-                            <label class="form-label">Housing Fund (Employee Rate %)</label>
-                            <input type="number" step="0.0001" wire:model="config.housing_fund_rate" class="cyber-input">
-                        </div>
-                        <div style="grid-column: span 2;">
-                            <label class="form-label">Pension / CNPS Cap Amount</label>
-                            <input type="number" step="0.01" wire:model="config.pension_cap_amount" class="cyber-input" placeholder="e.g. 750000 (Leave blank if none)">
-                            <div class="helper-text">Maximum monthly gross subject to pension deductions (e.g. Cameroon CNPS).</div>
-                        </div>
+                    <div class="field">
+                        <label class="label" for="band-upper">To (upper limit, optional)</label>
+                        <input id="band-upper" type="number" step="0.01" wire:model="newBandUpper" class="input">
+                        <span class="help">Leave blank for the top band.</span>
+                        @error('newBandUpper') <span class="field-error">{{ $message }}</span> @enderror
                     </div>
-
-                    <div style="border-top: 1px dashed rgba(255,255,255,0.1); margin: 15px 0;"></div>
-                    <div style="font-family: 'Montserrat', sans-serif; font-size: 0.7rem; color: #00FF66; margin-bottom: 10px; font-weight: bold;">TAX RELIEFS & ABATEMENTS</div>
-
-                    <div class="form-grid">
-                        <div>
-                            <label class="form-label">Fixed Abatement (Monthly)</label>
-                            <input type="number" step="0.01" wire:model="config.fixed_abatement" class="cyber-input" placeholder="e.g. 41666.67">
-                        </div>
-                        <div>
-                            <label class="form-label">Proportional Abatement Rate</label>
-                            <input type="number" step="0.0001" wire:model="config.proportional_abatement_rate" class="cyber-input" placeholder="e.g. 0.3000 for 30%">
-                        </div>
-                        <div>
-                            <label class="form-label">CRA Fixed Amount (Annualized)</label>
-                            <input type="number" step="0.01" wire:model="config.cra_fixed_amount" class="cyber-input" placeholder="e.g. 200000">
-                        </div>
-                        <div>
-                            <label class="form-label">CRA Proportional Rate</label>
-                            <input type="number" step="0.0001" wire:model="config.cra_proportional_rate" class="cyber-input" placeholder="e.g. 0.2000 for 20%">
-                        </div>
-                        <div style="grid-column: span 2;">
-                            <label class="form-label">Minimum Statutory Tax Rate</label>
-                            <input type="number" step="0.0001" wire:model="config.minimum_tax_rate" class="cyber-input" placeholder="e.g. 0.0100 for 1%">
-                        </div>
+                    <div class="field sm:col-span-2">
+                        <label class="label" for="band-rate">Tax rate</label>
+                        <input id="band-rate" type="number" step="0.0001" wire:model="newBandRate" required class="input" placeholder="e.g. 0.07">
+                        <span class="help">As a decimal: 0.07 for 7%.</span>
+                        @error('newBandRate') <span class="field-error">{{ $message }}</span> @enderror
                     </div>
-
-                    <button type="submit" class="btn-action btn-success" style="width: 100%; margin-top: 10px;" wire:loading.attr="disabled">
-                        <span wire:loading.remove wire:target="saveConfiguration"><i data-lucide="save" style="width: 16px; height: 16px;"></i> SAVE CONFIGURATION</span>
-                        <span wire:loading wire:target="saveConfiguration">PROCESSING... <div class="spinner"></div></span>
+                </div>
+                <div class="mt-4 flex justify-end">
+                    <button type="submit" class="btn btn-secondary" wire:loading.attr="disabled">
+                        <span wire:loading.remove wire:target="addTaxBand" class="inline-flex items-center gap-2"><i data-lucide="plus"></i> Add band</span>
+                        <span wire:loading wire:target="addTaxBand">Adding…</span>
                     </button>
                 </div>
             </form>
         </div>
-
-        <div>
-            <div class="section-panel">
-                <div class="section-header">
-                    <i data-lucide="layers" style="width: 16px; height: 16px;"></i> PROGRESSIVE TAX BANDS [{{ $activeRegion }}]
-                </div>
-
-                <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; overflow-x: auto; margin-bottom: 20px;">
-                    <table style="width: 100%; border-collapse: collapse; text-align: left;">
-                        <thead>
-                            <tr>
-                                <th style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05);">Band Name</th>
-                                <th style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05);">Range Limit</th>
-                                <th style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05);">Tax Rate</th>
-                                <th style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: center;">Act</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($bands as $band)
-                                <tr>
-                                    <td style="padding: 12px; font-family: 'Inter', sans-serif; font-size: 0.75rem; color: #FFF; border-bottom: 1px solid rgba(255,255,255,0.02);">{{ $band->band_name }}</td>
-                                    <td style="padding: 12px; font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #00E5FF; border-bottom: 1px solid rgba(255,255,255,0.02);">
-                                        {{ number_format($band->lower_limit, 0) }} - {{ $band->upper_limit ? number_format($band->upper_limit, 0) : 'INFINITY' }}
-                                    </td>
-                                    <td style="padding: 12px; font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #00FF66; border-bottom: 1px solid rgba(255,255,255,0.02);">{{ ($band->tax_rate * 100) }}%</td>
-                                    <td style="padding: 12px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.02);">
-                                        <button wire:click="removeTaxBand('{{ $band->id }}')" class="btn-danger" style="background: transparent; border: 1px solid #FF3366; border-radius: 2px; cursor: pointer;"><i data-lucide="trash-2" style="width: 12px; height: 12px;"></i></button>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="4" style="text-align: center; padding: 20px; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: #8A9BB2;">No tax bands defined. System will use flat global rate.</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-
-                <div style="border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 15px;">
-                    <div style="font-family: 'Montserrat', sans-serif; font-size: 0.7rem; color: #FFF; margin-bottom: 10px; font-weight: bold;">ADD NEW BAND</div>
-                    <form wire:submit.prevent="addTaxBand">
-                        <div class="form-grid">
-                            <div style="grid-column: span 2;">
-                                <label class="form-label">Band Name / Description</label>
-                                <input type="text" wire:model="newBandName" required class="cyber-input" placeholder="e.g. First 300,000 NGN">
-                                @error('newBandName') <span style="color: #FF3366; font-size: 0.65rem; font-family: 'Roboto Mono', monospace;">{{ $message }}</span> @enderror
-                            </div>
-                            <div>
-                                <label class="form-label">Lower Limit (Start)</label>
-                                <input type="number" step="0.01" wire:model="newBandLower" required class="cyber-input">
-                                @error('newBandLower') <span style="color: #FF3366; font-size: 0.65rem; font-family: 'Roboto Mono', monospace;">{{ $message }}</span> @enderror
-                            </div>
-                            <div>
-                                <label class="form-label">Upper Limit (End)</label>
-                                <input type="number" step="0.01" wire:model="newBandUpper" class="cyber-input" placeholder="Leave blank for infinity">
-                                @error('newBandUpper') <span style="color: #FF3366; font-size: 0.65rem; font-family: 'Roboto Mono', monospace;">{{ $message }}</span> @enderror
-                            </div>
-                            <div style="grid-column: span 2;">
-                                <label class="form-label">Tax Rate (Decimal)</label>
-                                <input type="number" step="0.0001" wire:model="newBandRate" required class="cyber-input" placeholder="e.g. 0.0700 for 7%">
-                                @error('newBandRate') <span style="color: #FF3366; font-size: 0.65rem; font-family: 'Roboto Mono', monospace;">{{ $message }}</span> @enderror
-                            </div>
-                        </div>
-                        <button type="submit" class="btn-action" style="width: 100%;" wire:loading.attr="disabled">
-                            <span wire:loading.remove wire:target="addTaxBand"><i data-lucide="plus" style="width: 16px; height: 16px;"></i> APPEND BAND TO MATRIX</span>
-                            <span wire:loading wire:target="addTaxBand">APPENDING... <div class="spinner"></div></span>
-                        </button>
-                    </form>
-                </div>
-
-            </div>
-        </div>
     </div>
-
-    <script>
-        document.addEventListener('livewire:navigated', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); });
-        document.addEventListener('DOMContentLoaded', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); });
-        document.addEventListener('livewire:initialized', () => {
-            Livewire.hook('morph.updated', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); });
-        });
-    </script>
 </div>

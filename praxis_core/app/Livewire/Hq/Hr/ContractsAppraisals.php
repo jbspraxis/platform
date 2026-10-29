@@ -55,8 +55,7 @@ class ContractsAppraisals extends Component
     public function loadGridData()
     {
         if ($this->activeTab === 'contracts') {
-            // Architect Fix: Use a subquery to guarantee we only join the LATEST contract per employee
-            // preventing grid duplication when contracts are renewed.
+            // Join only the latest contract per staff member, so renewed contracts don't duplicate rows
             $latestContracts = DB::table('employment_contracts')
                 ->select('mdm_employee_id', DB::raw('MAX(created_at) as max_created_at'))
                 ->groupBy('mdm_employee_id');
@@ -128,7 +127,7 @@ class ContractsAppraisals extends Component
         // The route needs hr.view; issuing a contract needs hr.create, changing one needs hr.edit
         $hasContract = DB::table('employment_contracts')->where('mdm_employee_id', $this->selectedEmployeeId)->exists();
         if (!Auth::user()->can($hasContract ? 'hr.edit' : 'hr.create')) {
-            session()->flash('error', 'Authorization Error: Your role cannot issue or change employment contracts.');
+            session()->flash('error', "You don't have permission to issue or change employment contracts. Ask an administrator to change your role.");
             return;
         }
 
@@ -140,7 +139,7 @@ class ContractsAppraisals extends Component
 
         // OHADA Compliance Check
         if ($this->contract_type === 'CDD' && empty($this->contract_end_date)) {
-            session()->flash('error', 'OHADA Legal Constraint: Fixed-Term Contracts (CDD) must specify an explicit end date.');
+            session()->flash('error', 'A fixed-term contract (CDD) needs an end date under OHADA labour law. Add the contract end date, then save again.');
             return;
         }
 
@@ -160,9 +159,9 @@ class ContractsAppraisals extends Component
                     'notice_period_days' => $this->notice_period_days,
                     'severance_terms' => $this->severance_terms,
                     'hourly_rate_offered' => (float) $this->hourly_rate_offered,
-                    'status' => 'Sent', // Legal Fix: Always reset to Sent when terms change
-                    'signature_b64' => null, // Legal Fix: Void old signature if terms change
-                    'signed_at' => null, // Legal Fix: Clear signature timestamp
+                    'status' => 'Sent', // Changed terms go back to Sent
+                    'signature_b64' => null, // Earlier signature no longer applies
+                    'signed_at' => null, // Clear the signature time
                     'updated_at' => now(),
                     'updated_by' => Auth::id() ?? null
                 ];
@@ -179,12 +178,13 @@ class ContractsAppraisals extends Component
                 }
             });
 
-            $this->successMessage = "Employment contract terms legally secured. Previous signatures (if any) have been voided.";
+            $this->successMessage = "Contract terms saved and marked as sent for signature. Any earlier signature on this contract no longer applies.";
             $this->showSuccessModal = true;
             $this->loadGridData();
 
         } catch (Exception $e) {
-            session()->flash('error', "Ledger Error: " . $e->getMessage());
+            report($e);
+            session()->flash('error', "We couldn't save the contract, so nothing was changed. Try again, and if it still fails, ask an administrator to check the error log.");
         }
     }
 
@@ -221,12 +221,12 @@ class ContractsAppraisals extends Component
             'kpi_score_overall' => 'required|numeric|min:0|max:5',
         ]);
 
-        // Compliance Fix: Verify the logged-in user is actually the assigned line manager
+        // Only the assigned line manager may submit the appraisal
         $employee = DB::table('mdm_employees')->where('id', $this->selectedEmployeeId)->first();
         $currentUserId = Auth::id() ?? null;
         
         if ($employee->line_manager_id !== $currentUserId && $currentUserId !== null) {
-            session()->flash('error', 'Authorization Error: Only the assigned Line Manager can submit a performance appraisal for this employee.');
+            session()->flash('error', "Only this staff member's line manager can submit their appraisal.");
             return;
         }
 
@@ -244,29 +244,31 @@ class ContractsAppraisals extends Component
                 'updated_at' => now()
             ]);
 
-            $this->successMessage = "Performance appraisal officially logged. Awaiting finalization.";
+            $this->successMessage = "Appraisal submitted. Someone who can approve HR records finalises it next.";
             $this->showSuccessModal = true;
             $this->loadGridData();
             $this->selectedEmployeeId = null;
 
         } catch (Exception $e) {
-            session()->flash('error', "System Error: " . $e->getMessage());
+            report($e);
+            session()->flash('error', "We couldn't submit the appraisal, so nothing was saved. Try again, and if it still fails, ask an administrator to check the error log.");
         }
     }
 
     public function finalizeAppraisal($appraisalId)
     {
         if (!Auth::user()->can('hr.approve')) {
-            session()->flash('error', 'Authorization Error: Your role cannot finalize performance appraisals.');
+            session()->flash('error', "You don't have permission to finalise appraisals. Ask an administrator to change your role.");
             return;
         }
 
-        DB::table('performance_appraisals')->where('id', $appraisalId)->update([
+        // Only an appraisal that isn't final yet can be finalised
+        DB::table('performance_appraisals')->where('id', $appraisalId)->where('status', '!=', 'Finalized')->update([
             'status' => 'Finalized',
             'updated_at' => now()
         ]);
 
-        $this->successMessage = "Appraisal finalized. KPI scores are now permanently archived.";
+        $this->successMessage = "Appraisal finalised. The score can no longer be changed.";
         $this->showSuccessModal = true;
         $this->loadGridData();
     }

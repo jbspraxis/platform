@@ -4,12 +4,14 @@ namespace App\Livewire\Hq\Mdm;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Exception;
 
 #[Layout('components.layouts.hq')]
+#[Title('Legal entities')]
 class LegalEntityRegistry extends Component
 {
     public $entities = [];
@@ -38,7 +40,7 @@ class LegalEntityRegistry extends Component
     }
 
     /**
-     * Loads entities and aggregates HR metrics (Headcount & Cost) per jurisdiction.
+     * Loads the entities with active headcount and monthly pay per country.
      */
     public function loadEntities()
     {
@@ -104,20 +106,20 @@ class LegalEntityRegistry extends Component
                     ->where('id', '!=', $this->recordId)
                     ->exists();
                 
-                if ($exists) throw new Exception("Region Code {$data['region_code']} is already assigned to another legal entity.");
+                if ($exists) throw new Exception("Country code {$data['region_code']} already belongs to another legal entity. Edit that entity instead.");
 
                 DB::table('mdm_legal_entities')->where('id', $this->recordId)->update($data);
-                $this->successMessage = "Corporate identity for {$this->legal_name} legally updated.";
+                $this->successMessage = "{$this->legal_name} updated.";
             } else {
                 $exists = DB::table('mdm_legal_entities')->where('region_code', $data['region_code'])->exists();
-                if ($exists) throw new Exception("Jurisdiction {$data['region_code']} already exists in the registry.");
+                if ($exists) throw new Exception("There is already a legal entity for {$data['region_code']}. Edit it in the list instead of adding a new one.");
 
                 $data['id'] = Str::uuid()->toString();
                 $data['is_active'] = 1;
                 $data['created_at'] = now();
                 
                 DB::table('mdm_legal_entities')->insert($data);
-                $this->successMessage = "New corporate entity [{$this->legal_name}] registered for compliance.";
+                $this->successMessage = "{$this->legal_name} added to the legal entities.";
             }
 
             $this->showSuccessModal = true;

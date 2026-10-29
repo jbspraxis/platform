@@ -47,10 +47,10 @@ class GlobalTelemetry extends Component
             $this->kpis['active_deployments'] = DB::table('projects')->where('status', 'Active')->count();
             $this->kpis['total_leads'] = DB::table('organizations')->where('status', 'Lead')->count();
             
-            // Strike Team Active Logging (Who is working right now)
+            // Staff with a running time log (who is working right now)
             $this->kpis['strike_capacity'] = DB::table('task_time_logs')->whereNull('end_time')->distinct('user_id')->count();
 
-            // 2. Recent Intelligence (Leads)
+            // 2. Newest leads
             $this->recentLeads = DB::table('organizations')
                 ->where('status', 'Lead')
                 ->orderBy('created_at', 'desc')
@@ -110,7 +110,7 @@ class GlobalTelemetry extends Component
     {
         abort_unless(auth()->user()->can('dashboard.export'), 403);
 
-        $fileName = 'JBS_Praxis_Global_Telemetry_' . Carbon::now()->format('Y_m_d_H_i') . '.csv';
+        $fileName = 'JBS_Praxis_company_overview_' . Carbon::now()->format('Y_m_d_H_i') . '.csv';
 
         DB::table('system_audit_logs')->insert([
             'user_id' => auth()->id() ?? 'SYSTEM',
@@ -122,15 +122,15 @@ class GlobalTelemetry extends Component
         return Response::streamDownload(function () {
             $handle = fopen('php://output', 'w');
             
-            fputcsv($handle, ['--- JBS PRAXIS SYSTEM EXPORT ---']);
-            fputcsv($handle, ['Generated:', now()->toDateTimeString()]);
+            fputcsv($handle, ['JBS Praxis company overview']);
+            fputcsv($handle, ['Created (UTC)', now()->toDateTimeString()]);
             fputcsv($handle, []);
             
-            fputcsv($handle, ['KPI', 'Value']);
-            fputcsv($handle, ['Capital Cleared', $this->kpis['capital_cleared']]);
-            fputcsv($handle, ['A/R Pipeline', $this->kpis['ar_pipeline']]);
-            fputcsv($handle, ['Active Deployments', $this->kpis['active_deployments']]);
-            fputcsv($handle, ['Total Leads', $this->kpis['total_leads']]);
+            fputcsv($handle, ['Measure', 'Value']);
+            fputcsv($handle, ['Paid invoices, total', $this->kpis['capital_cleared']]);
+            fputcsv($handle, ['Unpaid invoices', $this->kpis['ar_pipeline']]);
+            fputcsv($handle, ['Active projects', $this->kpis['active_deployments']]);
+            fputcsv($handle, ['Open leads', $this->kpis['total_leads']]);
             
             fclose($handle);
         }, $fileName, [

@@ -93,11 +93,11 @@ class EscrowVerification extends Component
         $error = DB::transaction(function () {
             $tx = DB::table('transactions')->where('id', $this->selectedTx->id ?? null)->lockForUpdate()->first();
             if (!$tx || $tx->status !== 'Pending Verification') {
-                return '> ERR: This payment has already been handled. Refresh the list.';
+                return 'This payment has already been verified or rejected, so nothing was changed. The list has been refreshed.';
             }
             $invoice = DB::table('invoices')->where('id', $tx->invoice_id)->lockForUpdate()->first();
             if (!$invoice || $invoice->status === 'Cancelled') {
-                return '> ERR: The invoice for this payment is cancelled. Reject the payment or reissue the invoice.';
+                return "The invoice for this payment is cancelled, so the payment can't be verified. Mark the payment as not verified, or create a new invoice.";
             }
 
             // 1. Mark Transaction as Verified and lock the write-off amount
@@ -122,11 +122,11 @@ class EscrowVerification extends Component
                     'updated_at' => now()
                 ]);
             } else {
-                // Partial Payment Logic: Invoice remains Pending/Overdue, but Guillotine can be extended
+                // Partial payment: the invoice stays unpaid, but its due date can be extended
                 $updateData = ['wht_amount' => $verified->wht, 'updated_at' => now()];
 
                 if ($this->extend_guillotine_days > 0) {
-                    $updateData['status'] = 'Pending'; // Defrost if it was overdue
+                    $updateData['status'] = 'Pending'; // Restores portal access if it was overdue
                     $updateData['due_date'] = Carbon::parse($invoice->due_date)->addDays($this->extend_guillotine_days);
                 }
 
@@ -134,11 +134,11 @@ class EscrowVerification extends Component
             }
 
 
-            // 4. Immutable Audit Trail
+            // 4. Audit trail
             DB::table('system_audit_logs')->insert([
                 'user_id' => Auth::id(),
                 'action' => 'ESCROW_PAYMENT_VERIFIED',
-                'description' => "Verified TX {$tx->id}. Write-off: {$this->tolerance_writeoff}. " . ($this->extend_guillotine_days > 0 ? "Guillotine extended by {$this->extend_guillotine_days} days." : ""),
+                'description' => "Verified payment {$tx->id}. Write-off: {$this->tolerance_writeoff}. " . ($this->extend_guillotine_days > 0 ? "Due date extended by {$this->extend_guillotine_days} days." : ""),
                 'target_table' => 'transactions',
                 'target_id' => $tx->id,
                 'created_at' => now()
@@ -159,7 +159,7 @@ class EscrowVerification extends Component
 
         $this->showVerifyModal = false;
         $this->loadTransactions();
-        session()->flash('success', '> ESCROW VERIFICATION COMPLETE. FUNDS SECURED & LEDGER UPDATED.');
+        session()->flash('success', 'Payment verified and recorded in the general ledger.');
     }
 
     public function rejectTransaction()
@@ -192,13 +192,13 @@ class EscrowVerification extends Component
         if (!$handled) {
             $this->showVerifyModal = false;
             $this->loadTransactions();
-            session()->flash('error', '> ERR: This payment has already been handled. Refresh the list.');
+            session()->flash('error', 'This payment has already been verified or rejected, so nothing was changed. The list has been refreshed.');
             return;
         }
 
         $this->showVerifyModal = false;
         $this->loadTransactions();
-        session()->flash('error', '> TRANSACTION REJECTED. CLIENT OS ALERTED.');
+        session()->flash('error', 'Payment marked as not verified. The invoice stays unpaid; let the client know what to send instead.');
     }
 
     public function render()

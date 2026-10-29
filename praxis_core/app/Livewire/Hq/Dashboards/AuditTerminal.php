@@ -65,7 +65,7 @@ class AuditTerminal extends Component
                 ->whereYear('created_at', $currentYear)
                 ->count();
 
-            // 2. Immutable Ledger
+            // 2. Latest invoices
             $this->invoiceLedger = DB::table('invoices')
                 ->join('projects', 'invoices.project_id', '=', 'projects.id')
                 ->join('organizations', 'projects.organization_id', '=', 'organizations.id')
@@ -74,7 +74,7 @@ class AuditTerminal extends Component
                 ->limit(6)
                 ->get();
 
-            // 3. Escrow Logs
+            // 3. Payment verifications
             $this->escrowLogs = DB::table('transactions')
                 ->leftJoin('invoices', 'transactions.invoice_id', '=', 'invoices.id')
                 ->select('transactions.*', 'invoices.invoice_number', 'invoices.currency')
@@ -103,7 +103,7 @@ class AuditTerminal extends Component
         // The books are the invoice ledger, so finance exporters may take them too
         abort_unless(auth()->user()->can('audit.export') || auth()->user()->can('finance.export'), 403);
 
-        $fileName = 'Horizon_Segment_Audit_Ledger_' . Carbon::now()->format('Y_m_d') . '.csv';
+        $fileName = 'JBS_Praxis_invoices_' . Carbon::now()->format('Y_m_d') . '.csv';
 
         DB::table('system_audit_logs')->insert([
             'user_id' => auth()->id(),
@@ -114,7 +114,7 @@ class AuditTerminal extends Component
 
         return Response::streamDownload(function () {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Date', 'Invoice Number', 'Client', 'Status', 'Currency', 'Amount Due', 'VAT Amount', 'Total Amount', 'Paid Date']);
+            fputcsv($handle, ['Date', 'Invoice number', 'Client', 'Status', 'Currency', 'Amount due', 'VAT amount', 'Total amount', 'Paid on']);
 
             $data = DB::table('invoices')
                 ->join('projects', 'invoices.project_id', '=', 'projects.id')
@@ -133,7 +133,7 @@ class AuditTerminal extends Component
                     $row->amount_due,
                     $row->vat_amount,
                     $row->total_amount,
-                    $row->paid_at ?? 'N/A'
+                    $row->paid_at ?? 'Not paid'
                 ]);
             }
             fclose($handle);

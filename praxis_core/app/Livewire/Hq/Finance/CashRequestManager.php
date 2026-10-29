@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Finance;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -16,7 +17,10 @@ class CashRequestManager extends Component
 
     public $activeTab = 'pending_auth'; // pending_auth, pending_clearance, history
     
+    // Loaded on the server only; the browser must not change them
+    #[Locked]
     public $requests = [];
+    #[Locked]
     public $selectedRequest = null;
 
     // Authorization State (Seal B)
@@ -83,8 +87,12 @@ class CashRequestManager extends Component
         $this->validate([
             'authorizer_signature' => 'required|string'
         ], [
-            'authorizer_signature.required' => 'Cryptographic signature is required to authorize the deployment of funds.'
+            'authorizer_signature.required' => 'Sign in the signature box, then approve the request again.'
         ]);
+
+        if (! $this->ensureDecidable()) {
+            return;
+        }
 
         $userId = Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c';
         $ipAddress = request()->ip();
@@ -94,8 +102,8 @@ class CashRequestManager extends Component
         $rawData = $this->selectedRequest->reference . $userId . $ipAddress . $timestamp . substr($this->authorizer_signature, -50);
         $hash = hash('sha256', $rawData);
 
-        // Update Ledger
-        DB::table('cash_requests')->where('id', $this->selectedRequest->id)->update([
+        // Update the request (only while it is still awaiting approval)
+        $updated = DB::table('cash_requests')->where('id', $this->selectedRequest->id)->where('status', 'Pending Auth')->update([
             'status' => 'Authorized',
             'authorizer_id' => $userId,
             'authorizer_signature' => $this->authorizer_signature,
@@ -104,6 +112,13 @@ class CashRequestManager extends Component
             'authorized_at' => now(),
             'updated_at' => now(),
         ]);
+
+        if (! $updated) {
+            $this->addError('decision', 'This request has already been approved or rejected, so it was not changed. The list has been refreshed.');
+            $this->showAuthModal = false;
+            $this->loadRequests();
+            return;
+        }
 
         // Log System Event
         DB::table('system_audit_logs')->insert([
@@ -120,8 +135,8 @@ class CashRequestManager extends Component
             'id' => Str::uuid()->toString(),
             'user_id' => $this->selectedRequest->requester_id,
             'type' => 'System',
-            'title' => 'FUNDS AUTHORIZED',
-            'message' => "Request {$this->selectedRequest->reference} has been sealed and authorized for disbursement.",
+            'title' => 'Cash request approved',
+            'message' => "Your cash request {$this->selectedRequest->reference} was approved. Upload the receipt in Cash requests once you have spent the money.",
             'link_url' => '#',
             'is_read' => 0,
             'created_at' => now(),
@@ -135,18 +150,29 @@ class CashRequestManager extends Component
     {
         abort_unless(Auth::user()->can('expenses.approve'), 403);
 
-        DB::table('cash_requests')->where('id', $this->selectedRequest->id)->update([
+        if (! $this->ensureDecidable()) {
+            return;
+        }
+
+        $updated = DB::table('cash_requests')->where('id', $this->selectedRequest->id)->where('status', 'Pending Auth')->update([
             'status' => 'Rejected',
             'updated_at' => now(),
         ]);
+
+        if (! $updated) {
+            $this->addError('decision', 'This request has already been approved or rejected, so it was not changed. The list has been refreshed.');
+            $this->showAuthModal = false;
+            $this->loadRequests();
+            return;
+        }
 
         // Notify Requester of Rejection
         DB::table('notifications')->insert([
             'id' => Str::uuid()->toString(),
             'user_id' => $this->selectedRequest->requester_id,
             'type' => 'System',
-            'title' => 'REQUEST REJECTED',
-            'message' => "Request {$this->selectedRequest->reference} has been rejected by Super Admin.",
+            'title' => 'Cash request rejected',
+            'message' => "Your cash request {$this->selectedRequest->reference} was rejected. Ask Finance for the reason before you send a new one.",
             'link_url' => '#',
             'is_read' => 0,
             'created_at' => now(),
@@ -181,7 +207,7 @@ class CashRequestManager extends Component
         ]);
 
         $this->selectedRequest->receipt_url = $path; // Update local state to immediately show button
-        session()->flash('message', 'Receipt uploaded securely to the Vault.');
+        session()->flash('message', 'Receipt uploaded. Check it matches the amount paid, then close the request.');
     }
 
     public function clearLedger()
@@ -190,18 +216,27 @@ class CashRequestManager extends Component
 
         $userId = Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c';
 
+        // Only an approved request can be closed, and only once
+        $current = DB::table('cash_requests')->where('id', $this->selectedRequest->id)->first();
+        if (! $current || $current->status !== 'Authorized') {
+            $this->addError('decision', 'Only an approved request can be closed. This one has changed since you opened it; the list has been refreshed.');
+            $this->showClearanceModal = false;
+            $this->loadRequests();
+            return;
+        }
+
         DB::transaction(function () use ($userId) {
             
             // 1. Clear the Cash Request
-            DB::table('cash_requests')->where('id', $this->selectedRequest->id)->update([
+            $closed = DB::table('cash_requests')->where('id', $this->selectedRequest->id)->where('status', 'Authorized')->update([
                 'status' => 'Cleared',
                 'cleared_by' => $userId,
                 'cleared_at' => now(),
                 'updated_at' => now(),
             ]);
 
-            // 2. FINALIZATION: Deduct from the Project Budget spent column
-            if ($this->selectedRequest->project_id && $this->selectedRequest->financial_dictionary_id) {
+            // 2. Add the amount to the project budget's spending (once, only if this call closed it)
+            if ($closed && $this->selectedRequest->project_id && $this->selectedRequest->financial_dictionary_id) {
                 DB::table('project_budgets')
                     ->where('project_id', $this->selectedRequest->project_id)
                     ->where('dict_id', $this->selectedRequest->financial_dictionary_id)
@@ -213,6 +248,31 @@ class CashRequestManager extends Component
 
         $this->showClearanceModal = false;
         $this->loadRequests();
+    }
+
+    /**
+     * Approving or rejecting needs a request that is still awaiting approval,
+     * and nobody may decide on their own request (separation of duties).
+     */
+    private function ensureDecidable(): bool
+    {
+        $current = $this->selectedRequest
+            ? DB::table('cash_requests')->where('id', $this->selectedRequest->id)->first()
+            : null;
+
+        if (! $current || $current->status !== 'Pending Auth') {
+            $this->addError('decision', 'This request has already been approved or rejected, so it was not changed. The list has been refreshed.');
+            $this->showAuthModal = false;
+            $this->loadRequests();
+            return false;
+        }
+
+        if ((string) $current->requester_id === (string) Auth::id()) {
+            $this->addError('decision', "You can't approve or reject your own cash request. Ask another approver to review it.");
+            return false;
+        }
+
+        return true;
     }
 
     public function render()

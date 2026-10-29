@@ -4,11 +4,13 @@ namespace App\Livewire\Hq\Mdm;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 #[Layout('components.layouts.hq')]
+#[Title('Tax compliance')]
 class TaxCompliance extends Component
 {
     public $activeTab = 'tax'; // 'tax' or 'currency'
@@ -86,12 +88,12 @@ class TaxCompliance extends Component
 
         if ($this->editMode && $this->recordId) {
             DB::table('mdm_tax_compliance')->where('id', $this->recordId)->update($data);
-            $this->successMessage = "Tax jurisdiction updated securely.";
+            $this->successMessage = "VAT rule updated.";
         } else {
             $data['is_active'] = 1;
             $data['created_at'] = now();
             DB::table('mdm_tax_compliance')->insert($data);
-            $this->successMessage = "New tax jurisdiction integrated.";
+            $this->successMessage = "VAT rule added.";
         }
 
         $this->resetForms();
@@ -141,15 +143,15 @@ class TaxCompliance extends Component
 
         if ($this->currEditMode && $this->currId) {
             DB::table('mdm_exchange_rates')->where('id', $this->currId)->update($data);
-            $this->successMessage = "Currency peg updated.";
+            $this->successMessage = "Exchange rate updated.";
         } else {
             if (DB::table('mdm_exchange_rates')->where('currency_code', strtoupper($this->currency_code))->exists()) {
-                $this->addError('currency_code', 'Currency already exists.');
+                $this->addError('currency_code', 'That currency is already in the list. Edit its rate there instead.');
                 return;
             }
             $data['created_at'] = now();
             DB::table('mdm_exchange_rates')->insert($data);
-            $this->successMessage = "New global currency mapped.";
+            $this->successMessage = "Currency added.";
         }
 
         $this->resetForms();
@@ -201,19 +203,19 @@ class TaxCompliance extends Component
                         }
                     }
 
-                    $this->successMessage = "Global exchange rates synchronized securely via API. (Manual overrides preserved).";
+                    $this->successMessage = "Exchange rates updated from the rate service. Fixed rates were not changed.";
                     $this->showSuccessModal = true;
                     $this->loadData();
                 } else {
-                    $this->addError('api_sync', 'Received an empty rate array from the provider.');
+                    $this->addError('api_sync', "We couldn't update the rates because the rate service sent no rates. Try again later, or enter the rates by hand.");
                 }
             } else {
                 \Illuminate\Support\Facades\Log::warning('MDM Rate Sync Failed: HTTP ' . $response->status());
-                $this->addError('api_sync', 'Failed to connect to the exchange rate service.');
+                $this->addError('api_sync', "We couldn't reach the exchange rate service. Try again in a few minutes, or enter the rates by hand.");
             }
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('MDM Rate Sync Exception: ' . $e->getMessage());
-            $this->addError('api_sync', 'An unexpected system error occurred during synchronization.');
+            $this->addError('api_sync', "Something went wrong while updating the rates. Check the rates in the list, then try again or enter them by hand.");
         }
     }
 

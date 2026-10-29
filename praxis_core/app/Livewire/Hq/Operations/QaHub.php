@@ -26,17 +26,22 @@ class QaHub extends Component
 
     // Firehose State
     public $filterStatus = 'Open'; // Default to Open/Investigating
+    #[Locked]
     public $tickets = [];
-    
-    // Offcanvas Modal State
+
+    // Offcanvas Modal State: loaded on the server only (the browser must not swap in another ticket)
+    #[Locked]
     public $selectedTicket = null;
+    #[Locked]
     public $ticketComments = [];
+    #[Locked]
     public $ticketAttachments = [];
-    
+
     // Interaction State
     public $newCommentText = '';
     public $isInternalOnly = false;
     public $newAttachment;
+    #[Locked]
     public $activeTimerId = null;
 
     public function mount()
@@ -52,7 +57,7 @@ class QaHub extends Component
     }
 
     // --- 1. THE GLOBAL FIREHOSE ---
-    public function loadFirehose()
+    private function ticketQuery()
     {
         $query = DB::table('qa_tickets')
             ->join('projects', 'qa_tickets.project_id', '=', 'projects.id')
@@ -68,6 +73,41 @@ class QaHub extends Component
             ->orderBy('qa_tickets.created_at', 'desc');
         People::joinAuthor($query, 'qa_tickets.submitted_by', 'qa_tickets.submitted_by_type', 'submitter', ['email' => 'submitter_email']);
 
+        return $query;
+    }
+
+    /** SLA fields for one ticket row */
+    private function withSla($ticket): array
+    {
+        // Dynamic SLA Calculation (Question 8: B)
+        $created = Carbon::parse($ticket->created_at);
+        $slaHours = match($ticket->severity) {
+            'Critical' => 4,
+            'Medium' => 24,
+            'Low' => 72,
+            default => 24
+        };
+
+        $ticket->sla_deadline = $created->copy()->addHours($slaHours);
+        $ticket->is_breached = $ticket->sla_deadline->isPast() && in_array($ticket->status, ['Open', 'Investigating']);
+        $ticket->time_remaining = $ticket->sla_deadline->diffForHumans(['parts' => 2, 'short' => true]);
+
+        return (array) $ticket;
+    }
+
+    /** The ticket as it is now in the database, for someone who may see QA tickets (qa.view), or null */
+    private function freshTicket($ticketId): ?array
+    {
+        if (! Auth::user()->can('qa.view')) return null;
+        $ticket = $this->ticketQuery()->where('qa_tickets.id', $ticketId)->first();
+
+        return $ticket ? $this->withSla($ticket) : null;
+    }
+
+    public function loadFirehose()
+    {
+        $query = $this->ticketQuery();
+
         if ($this->filterStatus !== 'All') {
             if ($this->filterStatus === 'Open') {
                 $query->whereIn('qa_tickets.status', ['Open', 'Investigating']);
@@ -76,22 +116,7 @@ class QaHub extends Component
             }
         }
 
-        $this->tickets = $query->get()->map(function($ticket) {
-            // Dynamic SLA Calculation (Question 8: B)
-            $created = Carbon::parse($ticket->created_at);
-            $slaHours = match($ticket->severity) {
-                'Critical' => 4,
-                'Medium' => 24,
-                'Low' => 72,
-                default => 24
-            };
-            
-            $ticket->sla_deadline = $created->copy()->addHours($slaHours);
-            $ticket->is_breached = $ticket->sla_deadline->isPast() && in_array($ticket->status, ['Open', 'Investigating']);
-            $ticket->time_remaining = $ticket->sla_deadline->diffForHumans(['parts' => 2, 'short' => true]);
-            
-            return (array) $ticket;
-        })->toArray();
+        $this->tickets = $query->get()->map(fn ($ticket) => $this->withSla($ticket))->toArray();
     }
 
     public function updatedFilterStatus()
@@ -102,9 +127,12 @@ class QaHub extends Component
     // --- 2. OFFCANVAS TICKET TRIAGE ---
     public function openTicket($ticketId)
     {
-        $this->selectedTicket = collect($this->tickets)->firstWhere('id', $ticketId);
-        
+        // The id comes from the browser: load the ticket from the database and re-check access
+        $this->selectedTicket = $this->freshTicket($ticketId);
+        $this->activeTimerId = null;
+
         if (!$this->selectedTicket) return;
+        $ticketId = $this->selectedTicket['id'];
 
         // Load Native Threading (Comments)
         $comments = DB::table('qa_comments')
@@ -142,12 +170,33 @@ class QaHub extends Component
         $this->dispatch('open-offcanvas'); // Triggers Alpine.js UI
     }
 
+    /**
+     * The selected ticket, re-read from the database, when it can still be worked on (Open or Investigating).
+     * Flashes an error and returns null otherwise.
+     */
+    private function workableTicket(): ?array
+    {
+        $ticket = $this->selectedTicket ? $this->freshTicket($this->selectedTicket['id']) : null;
+        if (! $ticket) {
+            session()->flash('error', 'We couldn’t find that issue. Refresh the list and open it again.');
+            return null;
+        }
+        if (! in_array($ticket['status'], ['Open', 'Investigating'], true)) {
+            session()->flash('error', 'This issue is already resolved, so it can’t be changed.');
+            $this->selectedTicket = $ticket;
+            return null;
+        }
+
+        return $this->selectedTicket = $ticket;
+    }
+
     // --- 3. COMMUNICATION & EVIDENCE ---
     public function postComment()
     {
         abort_unless(Auth::user()->can('qa.edit'), 403);
+        if (! $this->workableTicket()) return;
 
-        $this->validate(['newCommentText' => 'required|string|min:2']);
+        $this->validate(['newCommentText' => 'required|string|min:2'], [], ['newCommentText' => 'reply']);
 
         DB::table('qa_comments')->insert([
             'id' => (string) Str::uuid(),
@@ -167,10 +216,11 @@ class QaHub extends Component
     public function uploadEvidence()
     {
         abort_unless(Auth::user()->can('qa.edit'), 403);
+        if (! $this->workableTicket()) return;
 
         $this->validate([
             'newAttachment' => 'required|file|max:10240' // Max 10MB (Selection 4-B)
-        ]);
+        ], [], ['newAttachment' => 'file']);
 
         $path = $this->newAttachment->store('qa_evidence', 'local');
 
@@ -193,14 +243,15 @@ class QaHub extends Component
     public function toggleReworkTimer()
     {
         abort_unless(Auth::user()->can('qa.edit'), 403);
+        if (! $this->workableTicket()) return;
 
         if (!$this->selectedTicket['task_id']) {
-            session()->flash('error', 'Cannot track rework time: Ticket is not linked to a specific Task.');
+            session()->flash('error', 'We can’t track rework time on this issue because it isn’t linked to a task.');
             return;
         }
 
         if ($this->activeTimerId) {
-            // Stop Timer (only this user's own open log; activeTimerId comes from the browser)
+            // Stop Timer (only this user's own open log)
             $openLog = DB::table('task_time_logs')->where('id', $this->activeTimerId)
                 ->where('user_id', Auth::id())->whereNull('end_time')->first();
             if ($openLog) {
@@ -221,7 +272,7 @@ class QaHub extends Component
                 ]);
             }
             $this->activeTimerId = null;
-            session()->flash('success', 'Rework COPQ Timer Paused.');
+            session()->flash('success', 'Rework timer paused. The time is added to the task.');
 
         } else {
             // Start Timer
@@ -232,7 +283,7 @@ class QaHub extends Component
                 'created_at' => now()
             ]);
             $this->openTicket($this->selectedTicket['id']); // Reload to grab the new Timer ID
-            session()->flash('success', 'Rework COPQ Timer Engaged. Recording...');
+            session()->flash('success', 'Rework timer started.');
         }
     }
 
@@ -241,9 +292,10 @@ class QaHub extends Component
     {
         // Only QA approvers (qa.approve) can officially resolve a QA Ticket
         if (! Auth::user()->can('qa.approve')) {
-            session()->flash('error', 'GATEKEEPER LOCK: Only Level 4/5 Command can verify and close vulnerabilities.');
+            session()->flash('error', 'You don’t have permission to resolve issues. Ask an administrator to change your role.');
             return;
         }
+        if (! $this->workableTicket()) return;
 
         DB::transaction(function () {
             DB::table('qa_tickets')->where('id', $this->selectedTicket['id'])->update([
@@ -258,8 +310,8 @@ class QaHub extends Component
                 DB::table('notifications')->insert([
                     'id' => (string) Str::uuid(),
                     'user_id' => $this->selectedTicket['submitted_by'],
-                    'title' => 'VULNERABILITY RESOLVED',
-                    'message' => "HQ has successfully patched ticket: {$this->selectedTicket['title']}.",
+                    'title' => 'Issue resolved',
+                    'message' => "The issue you reported, ‘{$this->selectedTicket['title']}’, is resolved. See it in Quality and issues.",
                     'type' => 'QA_Update',
                     'created_at' => now()
                 ]);
@@ -270,7 +322,7 @@ class QaHub extends Component
         $this->dispatch('close-offcanvas');
         $this->loadFirehose();
         $this->selectedTicket = null;
-        session()->flash('success', 'Vulnerability Patched. Client Notified.');
+        session()->flash('success', 'Issue resolved. The person who reported it now sees it as resolved.');
     }
 
     public function render()

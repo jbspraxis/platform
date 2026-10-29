@@ -276,7 +276,7 @@ class ActiveDeployments extends Component
     public function createProject()
     {
         if (! Auth::user()->can('projects.create')) {
-            session()->flash('error', 'ACCESS DENIED: Insufficient clearance to initialize deployments.');
+            session()->flash('error', 'You don’t have permission to create projects. Ask an administrator to change your role.');
             return;
         }
 
@@ -287,6 +287,9 @@ class ActiveDeployments extends Component
             'newStatus' => 'required|string|in:Scoping,Active,Locked,Completed,Cancelled',
             'newStartDate' => 'nullable|date',
             'newEndDate' => 'nullable|date|after_or_equal:newStartDate',
+        ], [], [
+            'newOrgId' => 'client', 'newTitle' => 'project name', 'newBudget' => 'budget', 'newStatus' => 'status',
+            'newStartDate' => 'start date', 'newEndDate' => 'planned end date',
         ]);
 
         $projectId = (string) Str::uuid();
@@ -315,14 +318,14 @@ class ActiveDeployments extends Component
         }
 
         $this->loadData();
-        session()->flash('success', 'New deployment successfully initialized.');
+        session()->flash('success', 'Project created.');
     }
 
     // --- FINANCIAL LOCK OVERRIDE (finance.approve) ---
     public function toggleFinancialLock($projectId)
     {
         if (! Auth::user()->can('finance.approve')) {
-            session()->flash('error', 'ACCESS DENIED: Only Level 5 Super Admins can override the financial matrix.');
+            session()->flash('error', 'You don’t have permission to put projects on hold. Ask an administrator to change your role.');
             return;
         }
 
@@ -344,50 +347,50 @@ class ActiveDeployments extends Component
             DB::table('system_audit_logs')->insert([
                 'user_id' => Auth::id(),
                 'action' => $newLockStatus ? 'PROJECT_LOCKED' : 'PROJECT_UNLOCKED',
-                'description' => "Financial lock state changed for Project: {$project->title}",
+                'description' => ($newLockStatus ? "Project put on hold: " : "Hold released on project: ") . $project->title,
                 'ip_address' => request()->ip(),
                 'created_at' => now()
             ]);
         });
 
         $this->loadData();
-        session()->flash('success', $newLockStatus ? 'Project Executions Locked.' : 'Lock Overridden. Executions Restored.');
+        session()->flash('success', $newLockStatus ? 'Project put on hold. It stays on hold until someone releases the hold.' : 'Hold released. The project is active again.');
     }
 
     // --- CSV EXPORT ---
     public function exportCsv()
     {
         if (! Auth::user()->can('projects.export')) {
-            session()->flash('error', 'ACCESS DENIED: Insufficient clearance to export deployments.');
+            session()->flash('error', 'You don’t have permission to export projects. Ask an administrator to change your role.');
             return;
         }
 
         $data = $this->activeTab === 'matrix' ? $this->matrixProjects : $this->ledgerProjects;
 
         if (empty($data)) {
-            session()->flash('error', 'No data available to export.');
+            session()->flash('error', 'There are no projects to export. Clear the search or filters and try again.');
             return;
         }
 
-        $filename = 'deployments_' . $this->activeTab . '_' . now()->format('Y_m_d_His') . '.csv';
+        $filename = 'projects_' . ($this->activeTab === 'matrix' ? 'active' : 'all') . '_' . now()->format('Y_m_d_His') . '.csv';
 
         return response()->streamDownload(function () use ($data) {
             $file = fopen('php://output', 'w');
             
             if ($this->activeTab === 'matrix') {
-                fputcsv($file, ['Client', 'Project', 'Status', 'Locked', 'Story Points Done', 'Total Points', 'Progress %', 'Burn %', 'Spent $', 'Bleeding']);
+                fputcsv($file, ['Client', 'Project', 'Status', 'On hold', 'Story points done', 'Total story points', 'Progress %', 'Budget used %', 'Spent (USD)', 'Spending ahead of progress']);
                 foreach ($data as $p) {
                     fputcsv($file, [
                         $p['client_name'], $p['title'], $p['status'], 
-                        $p['is_financially_locked'] ? 'YES' : 'NO',
+                        $p['is_financially_locked'] ? 'Yes' : 'No',
                         $p['completed_points'], $p['total_points'], $p['progress_percent'], 
                         $this->canSeeMoney ? $p['burn_percent'] : '',
                         $this->canSeeMoney ? round($p['spent_amount'], 2) : '',
-                        $p['is_bleeding'] ? 'YES' : 'NO'
+                        $p['is_bleeding'] ? 'Yes' : 'No'
                     ]);
                 }
             } else {
-                fputcsv($file, ['Client', 'Project', 'Status', 'Budget', 'Start Date', 'Target End Date']);
+                fputcsv($file, ['Client', 'Project', 'Status', 'Budget', 'Start date', 'Planned end date']);
                 foreach ($data as $p) {
                     fputcsv($file, [
                         $p['client_name'], $p['title'], $p['status'], 

@@ -5,6 +5,7 @@ namespace App\Livewire\Hq\Operations;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use App\Models\Tracker;
 use App\Models\TrackerMilestone;
 use App\Models\TrackerTask;
@@ -22,7 +23,9 @@ class TrackerMatrix extends Component
     // ==========================================================================
     // CORE STATE
     // ==========================================================================
-    public $trackerId; 
+    // Set in mount after the access check; the browser must not switch to another tracker
+    #[Locked]
+    public $trackerId;
     
     // ==========================================================================
     // INJECTION & EDITING STATES
@@ -65,7 +68,7 @@ class TrackerMatrix extends Component
                            ->where('tracker_id', $id)
                            ->where('user_id', $user->id)
                            ->exists();
-            if (!$hasAccess) abort(403, 'SYSTEM HALT: Unauthorized Sector.');
+            if (!$hasAccess) abort(403, 'You don’t have access to this project tracker. Ask your project lead to add you to it.');
         }
     }
 
@@ -77,7 +80,7 @@ class TrackerMatrix extends Component
     {
         $this->authorizeAdmin();
         
-        $this->validate(['newMilestoneTitle' => 'required|string|max:255']);
+        $this->validate(['newMilestoneTitle' => 'required|string|max:255'], [], ['newMilestoneTitle' => 'milestone name']);
 
         try {
             DB::transaction(function () {
@@ -93,26 +96,26 @@ class TrackerMatrix extends Component
             $this->newMilestoneTitle = '';
             $this->recalculateProgress();
             
-            $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Milestone Injected Successfully.']);
+            $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Milestone added.']);
             $this->dispatch('modal-close', ['modal' => 'milestone']);
             
         } catch (\Exception $e) {
             Log::error('Milestone Injection Failed: ' . $e->getMessage());
-            $this->dispatch('system-alert', ['type' => 'error', 'message' => 'System Error: Milestone injection failed.']);
+            $this->dispatch('system-alert', ['type' => 'error', 'message' => 'We couldn’t add the milestone. Try again.']);
         }
     }
 
     public function updateMilestoneTitle()
     {
         $this->authorizeAdmin();
-        $this->validate(['editingMilestoneTitle' => 'required|string|max:255']);
+        $this->validate(['editingMilestoneTitle' => 'required|string|max:255'], [], ['editingMilestoneTitle' => 'milestone name']);
 
         $milestone = TrackerMilestone::findOrFail($this->editingMilestoneId);
         $milestone->update(['title' => $this->editingMilestoneTitle]);
 
         $this->editingMilestoneId = null;
         $this->editingMilestoneTitle = '';
-        $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Milestone designation updated.']);
+        $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Milestone renamed.']);
     }
 
     public function deleteMilestone($id)
@@ -131,11 +134,11 @@ class TrackerMatrix extends Component
             });
 
             $this->recalculateProgress();
-            $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Milestone and dependencies purged.']);
+            $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Milestone deleted, with its tasks and their messages.']);
             
         } catch (\Exception $e) {
             Log::error('Milestone Purge Failed: ' . $e->getMessage());
-            $this->dispatch('system-alert', ['type' => 'error', 'message' => 'System Error: Purge failed.']);
+            $this->dispatch('system-alert', ['type' => 'error', 'message' => 'We couldn’t delete the milestone. Try again.']);
         }
     }
 
@@ -151,7 +154,7 @@ class TrackerMatrix extends Component
             'newTaskTitle' => 'required|string|max:255',
             'newTaskAssignee' => 'nullable|exists:tracker_users,id',
             'newTaskDueDate' => 'nullable|date'
-        ]);
+        ], [], ['newTaskTitle' => 'task name', 'newTaskAssignee' => 'person', 'newTaskDueDate' => 'due date']);
 
         try {
             DB::transaction(function () use ($milestoneId) {
@@ -170,12 +173,12 @@ class TrackerMatrix extends Component
             $this->reset(['newTaskTitle', 'newTaskAssignee', 'newTaskDueDate']);
             $this->recalculateProgress();
             
-            $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Task node deployed.']);
+            $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Task added.']);
             $this->dispatch('modal-close', ['modal' => 'task']);
 
         } catch (\Exception $e) {
             Log::error('Task Deployment Failed: ' . $e->getMessage());
-            $this->dispatch('system-alert', ['type' => 'error', 'message' => 'Deployment Failed.']);
+            $this->dispatch('system-alert', ['type' => 'error', 'message' => 'We couldn’t add the task. Try again.']);
         }
     }
 
@@ -189,13 +192,13 @@ class TrackerMatrix extends Component
 
         // Strict Consultant Matrix: Can only update their explicitly assigned nodes.
         if ($user->role === 'consultant' && $task->assigned_to !== $user->id) {
-            $this->dispatch('system-alert', ['type' => 'error', 'message' => 'Override Denied: Task assigned to another operative.']);
+            $this->dispatch('system-alert', ['type' => 'error', 'message' => 'This task is assigned to someone else, so you can’t change its status.']);
             return;
         }
 
         $task->update(['status' => $newStatus]);
         $this->recalculateProgress();
-        $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Node status updated.']);
+        $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Task status updated.']);
     }
 
     public function loadTaskForEditing($taskId)
@@ -219,7 +222,7 @@ class TrackerMatrix extends Component
             'editTaskTitle' => 'required|string|max:255',
             'editTaskAssignee' => 'nullable|exists:tracker_users,id',
             'editTaskDueDate' => 'nullable|date'
-        ]);
+        ], [], ['editTaskTitle' => 'task name', 'editTaskAssignee' => 'person', 'editTaskDueDate' => 'due date']);
 
         $task = TrackerTask::findOrFail($this->activeTaskId);
         $task->update([
@@ -229,7 +232,7 @@ class TrackerMatrix extends Component
         ]);
 
         $this->reset(['activeTaskId', 'editTaskTitle', 'editTaskAssignee', 'editTaskDueDate']);
-        $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Task parameters updated.']);
+        $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Task updated.']);
         $this->dispatch('modal-close', ['modal' => 'editTask']);
     }
 
@@ -246,11 +249,11 @@ class TrackerMatrix extends Component
             });
 
             $this->recalculateProgress();
-            $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Task node purged.']);
+            $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Task deleted.']);
             
         } catch (\Exception $e) {
             Log::error('Task Purge Failed: ' . $e->getMessage());
-            $this->dispatch('system-alert', ['type' => 'error', 'message' => 'System Error: Purge failed.']);
+            $this->dispatch('system-alert', ['type' => 'error', 'message' => 'We couldn’t delete the task. Try again.']);
         }
     }
 
@@ -258,13 +261,13 @@ class TrackerMatrix extends Component
     {
         $this->authorizeAdmin();
         
-        $this->validate(['newAssigneeId' => 'required|exists:tracker_users,id']);
+        $this->validate(['newAssigneeId' => 'required|exists:tracker_users,id'], [], ['newAssigneeId' => 'person']);
 
         TrackerTask::where('id', $this->activeTaskId)->update(['assigned_to' => $this->newAssigneeId]);
         
         $this->reset(['activeTaskId', 'newAssigneeId']);
         
-        $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Operative reassigned.']);
+        $this->dispatch('system-alert', ['type' => 'success', 'message' => 'Task reassigned.']);
         $this->dispatch('modal-close', ['modal' => 'reassign']);
     }
 
@@ -301,7 +304,7 @@ class TrackerMatrix extends Component
         $this->validate([
             'chatMessage' => 'required_without:mediaUpload|string|nullable|max:2000',
             'mediaUpload' => 'nullable|image|max:10240' // 10MB Max Image Size
-        ]);
+        ], [], ['chatMessage' => 'message', 'mediaUpload' => 'image']);
 
         $user = Auth::guard('tracker')->user();
         $mediaPath = null;
@@ -333,7 +336,7 @@ class TrackerMatrix extends Component
     private function authorizeAdmin()
     {
         if (Auth::guard('tracker')->user()->role === 'consultant') {
-            abort(403, 'SYSTEM HALT: Unauthorized Operation.');
+            abort(403, 'Only the project lead can change milestones and tasks.');
         }
     }
 

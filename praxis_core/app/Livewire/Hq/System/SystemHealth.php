@@ -8,6 +8,7 @@ use App\Support\Monitor\LogScanner;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -17,6 +18,7 @@ use Livewire\Component;
  * The data comes from app/Support/Monitor (monitor:run every 5 minutes).
  */
 #[Layout('components.layouts.hq')]
+#[Title('System Health')]
 class SystemHealth extends Component
 {
     private const STATUSES = ['new', 'investigating', 'fixed', 'ignored'];

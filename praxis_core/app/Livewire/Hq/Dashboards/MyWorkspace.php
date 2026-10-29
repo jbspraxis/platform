@@ -66,7 +66,7 @@ class MyWorkspace extends Component
                 ->select('task_time_logs.*', 'tasks.title as task_title')
                 ->first();
 
-            // 4. Pending Approvals (command-level widget: dashboard.view)
+            // 4. Proposals awaiting client signature (overview-level widget: dashboard.view)
             if (Auth::user()->can('dashboard.view')) {
                 $this->pendingApprovals = DB::table('proposals')
                     ->join('organizations', 'proposals.organization_id', '=', 'organizations.id')
@@ -79,9 +79,10 @@ class MyWorkspace extends Component
             }
 
             // 5. Upcoming Appointments (Calendar Sync)
+            // Appointment times are stored as Lagos wall-clock time (WAT), so compare with Lagos time, not UTC
             $this->upcomingAppointments = DB::table('appointments')
                 ->leftJoin('organizations', 'appointments.organization_id', '=', 'organizations.id')
-                ->where('appointments.start_time', '>=', $now)
+                ->where('appointments.start_time', '>=', Carbon::now('Africa/Lagos')->format('Y-m-d H:i:s'))
                 ->whereIn('appointments.status', ['Scheduled'])
                 // Assuming you might be the host, or you want to see all executive appointments
                 ->select('appointments.*', 'organizations.name as client_name')
@@ -114,13 +115,13 @@ class MyWorkspace extends Component
         // Your own assigned tasks, or any task if you may log time
         $ownTask = DB::table('tasks')->where('id', $taskId)->where('assigned_to', $userId)->exists();
         if (! $ownTask && ! Auth::user()->can('timesheets.create')) {
-            session()->flash('error', 'You can only time tasks assigned to you.');
+            session()->flash('error', 'You can only log time on tasks assigned to you.');
             return;
         }
 
         // Prevent starting if a timer is already running
         if ($this->activeTimer) {
-            session()->flash('error', 'A chronometer is already active. Halt it first.');
+            session()->flash('error', 'A timer is already running. Stop it before you start another.');
             return;
         }
 

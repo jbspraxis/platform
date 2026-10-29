@@ -1,483 +1,488 @@
-<div style="position: relative; overflow: hidden; min-height: 85vh;">
+<div>
+    @php
+        // Display labels for stored values (docs/BRAND.md section 12); the stored values stay as they are.
+        $platformNames = [
+            'META' => 'Meta', 'META (FACEBOOK)' => 'Meta (Facebook)', 'GOOGLE' => 'Google', 'LINKEDIN' => 'LinkedIn',
+            'INSTAGRAM' => 'Instagram', 'FACEBOOK' => 'Facebook', 'TWITTER' => 'X (Twitter)', 'X' => 'X',
+            'YOUTUBE' => 'YouTube', 'TIKTOK' => 'TikTok', 'WHATSAPP' => 'WhatsApp',
+        ];
+        $platformName = fn ($p) => $platformNames[strtoupper((string) $p)] ?? \Illuminate\Support\Str::ucfirst(strtolower((string) $p));
+        $campaignStatus = fn ($s) => match ($s) {
+            'PENDING_APPROVAL' => ['Awaiting approval', 'pill-warning'],
+            'REVISION_REQUIRED' => ['Changes requested', 'pill-danger'],
+            'PLANNED' => ['Approved', 'pill-info'],
+            'ACTIVE' => ['Live', 'pill-success'],
+            default => [\Illuminate\Support\Str::ucfirst(strtolower(str_replace('_', ' ', (string) $s))), 'pill-neutral'],
+        };
+        $assetStatus = fn ($s) => strtolower((string) $s) === 'active'
+            ? ['Active', 'pill-success']
+            : [\Illuminate\Support\Str::ucfirst(strtolower(str_replace('_', ' ', (string) $s))), 'pill-warning'];
+        $usd = fn ($amount) => '$' . number_format((float) $amount, 2);
+        $tabs = ['campaigns' => 'Campaigns', 'assets' => 'Accounts and logins', 'social' => 'Social reach'];
+    @endphp
+
     <style>
-        .nav-pill { padding: 8px 20px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; border-radius: 2px; cursor: pointer; transition: 0.3s; border: 1px solid var(--erp-border-dark); background: transparent; color: var(--erp-muted); }
-        .nav-pill.active { background: rgba(0, 229, 255, 0.1); border-color: var(--erp-teal); color: var(--erp-teal); font-weight: bold; }
-        .nav-pill:not(.active):hover { background: rgba(255,255,255,0.05); color: var(--erp-white); }
-        
-        .bloomberg-table { width: 100%; border-collapse: collapse; text-align: left; }
-        .bloomberg-table th { font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); padding: 15px; border-bottom: 1px solid var(--erp-teal); text-transform: uppercase; background: rgba(0,229,255,0.05); }
-        .bloomberg-table td { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.02); vertical-align: middle; font-size: 0.85rem; color: #E2E8F0; }
-        .bloomberg-table tr:hover td { background: rgba(0, 229, 255, 0.03); }
-
-        .status-badge { padding: 5px 10px; border-radius: 2px; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; font-weight: bold; text-transform: uppercase; display: inline-block; }
-        .status-planned { background: rgba(255,255,255,0.1); color: var(--erp-muted); border: 1px solid var(--erp-muted); }
-        .status-pending { background: rgba(255, 189, 46, 0.1); color: #FFBD2E; border: 1px solid #FFBD2E; }
-        .status-revision { background: rgba(255, 51, 102, 0.1); color: var(--erp-red); border: 1px solid var(--erp-red); }
-        .status-active { background: rgba(0, 255, 102, 0.1); color: #00FF66; border: 1px solid #00FF66; }
-
-        .btn-action { background: transparent; border: 1px solid var(--erp-border-dark); color: var(--erp-white); padding: 6px 12px; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; cursor: pointer; border-radius: 2px; transition: 0.3s; }
-        .btn-action:hover { border-color: var(--erp-teal); color: var(--erp-teal); }
-        
-        .btn-primary { background: var(--erp-teal); color: var(--erp-bg-main); border: 1px solid var(--erp-teal); padding: 10px 20px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: bold; cursor: pointer; transition: 0.3s; display: inline-flex; align-items: center; gap: 8px; }
-        .btn-primary:hover { background: var(--erp-white); box-shadow: 0 0 15px rgba(0,229,255,0.4); }
-
-        .cyber-input, .cyber-select, .cyber-textarea { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--erp-border-dark); color: var(--erp-white); padding: 12px; font-family: 'Inter', sans-serif; font-size: 0.85rem; border-radius: 2px; outline: none; transition: 0.3s; }
-        .cyber-input:focus, .cyber-select:focus, .cyber-textarea:focus { border-color: var(--erp-teal); background: rgba(0,229,255,0.02); }
-        .cyber-select option { background-color: var(--erp-bg-main); }
-        .form-label { font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: var(--erp-muted); text-transform: uppercase; margin-bottom: 5px; display: block; }
-        
-        .glass-modal { position: fixed; inset: 0; background: rgba(3, 5, 10, 0.9); backdrop-filter: blur(10px); z-index: 99999; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .modal-box { background: var(--erp-bg-main); border: 1px solid var(--erp-border-dark); border-top: 3px solid var(--erp-teal); border-radius: 4px; padding: 30px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); max-width: 800px; width: 100%; max-height: 90vh; overflow-y: auto; }
-        .modal-header { font-family: 'Montserrat', sans-serif; font-size: 1.3rem; color: var(--erp-white); text-transform: uppercase; margin-bottom: 20px; border-bottom: 1px dashed var(--erp-border-dark); padding-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
-
-        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px; }
-        .metric-card { background: rgba(10, 17, 40, 0.6); border: 1px solid var(--erp-border-dark); padding: 20px; border-left: 2px solid var(--erp-teal); }
-        .metric-title { font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); text-transform: uppercase; margin-bottom: 5px; }
-        .metric-val { font-family: 'Roboto Mono', monospace; font-size: 1.5rem; color: var(--erp-white); font-weight: bold; }
-
-        .vault-container { background: rgba(0, 229, 255, 0.05); border: 1px dashed var(--erp-teal); padding: 20px; margin-bottom: 20px; font-family: 'Roboto Mono', monospace; }
-        .history-list { list-style: none; font-size: 0.75rem; color: var(--erp-muted); border-left: 2px solid var(--erp-border-dark); padding-left: 15px; margin-top: 15px; }
-        .history-list li { margin-bottom: 10px; }
-        .history-list li span { color: var(--erp-white); }
-        .offcanvas-backdrop { position: fixed; inset: 0; background: rgba(3, 5, 10, 0.7); backdrop-filter: blur(5px); z-index: 99998; }
-        .offcanvas-panel { position: fixed; top: 0; right: 0; bottom: 0; width: 100%; max-width: 600px; background: var(--erp-bg-main); border-left: 2px solid var(--erp-teal); box-shadow: -20px 0 50px rgba(0,0,0,0.8); z-index: 99999; overflow-y: auto; padding: 40px 30px; animation: slideInRight 0.3s forwards; }
-        .offcanvas-header { font-family: 'Montserrat', sans-serif; font-size: 1.3rem; color: var(--erp-white); text-transform: uppercase; margin-bottom: 30px; border-bottom: 1px dashed var(--erp-border-dark); padding-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
-        
-        @keyframes slideInRight {
-            from { transform: translateX(100%); }
-            to { transform: translateX(0); }
-        }
+        .mk-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(12, 20, 43, 0.4); }
+        .mk-panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 41; width: 100%; max-width: 600px; display: flex; flex-direction: column; background: var(--color-paper); border-left: 1px solid var(--color-line); box-shadow: var(--shadow-float); }
+        .mk-panel-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px 24px; border-bottom: 1px solid var(--color-line); }
+        .mk-panel-body { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+        .mk-panel-foot { display: flex; justify-content: flex-end; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--color-line); }
+        .mk-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0; }
+        .mk-facts dt { font-size: 0.8125rem; color: var(--color-muted); }
+        .mk-facts dd { margin: 2px 0 0; color: var(--color-ink); word-break: break-word; }
     </style>
 
-    <div style="margin-bottom: 25px; border-bottom: 1px solid var(--erp-border-dark); padding-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-end;">
+    <div class="page-header">
         <div>
-            <h1 style="font-family: 'Montserrat', sans-serif; font-size: 1.3rem; color: var(--erp-white); letter-spacing: 1px;">MARKETING SYNC & ROAS</h1>
-            <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-teal); margin-top: 5px;">[ LEVEL 0.25 AGENCY ISOLATION ]</p>
-        </div>
-        <div style="display: flex; gap: 10px;">
-            <button wire:click="switchTab('campaigns')" class="nav-pill {{ $activeTab === 'campaigns' ? 'active' : '' }}">CAMPAIGN COMMAND</button>
-            <button wire:click="switchTab('assets')" class="nav-pill {{ $activeTab === 'assets' ? 'active' : '' }}">DIGITAL ASSETS & CREDENTIALS</button>
-            <button wire:click="switchTab('social')" class="nav-pill {{ $activeTab === 'social' ? 'active' : '' }}">ORGANIC TELEMETRY</button>
+            <h1 class="page-title">Marketing</h1>
+            <p class="page-subtitle">Plan campaign budgets, follow ad spend and results, and keep the logins for our social accounts.</p>
         </div>
     </div>
 
+    <div class="tabs" role="tablist" aria-label="Marketing">
+        @foreach($tabs as $key => $label)
+            <button type="button" role="tab" wire:click="switchTab('{{ $key }}')" class="tab {{ $activeTab === $key ? 'is-active' : '' }}" aria-selected="{{ $activeTab === $key ? 'true' : 'false' }}">{{ $label }}</button>
+        @endforeach
+    </div>
+
     @if (session()->has('success'))
-        <div style="background: rgba(0,255,102,0.1); border: 1px solid #00FF66; color: #00FF66; padding: 10px 15px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; margin-bottom: 15px;">> {{ session('success') }}</div>
+        <div class="alert alert-success" role="status" style="margin-bottom: 16px;"><i data-lucide="check-circle"></i><span>{{ session('success') }}</span></div>
     @endif
     @if (session()->has('warning'))
-        <div style="background: rgba(255,189,46,0.1); border: 1px solid #FFBD2E; color: #FFBD2E; padding: 10px 15px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; margin-bottom: 15px;">> {{ session('warning') }}</div>
+        <div class="alert alert-warning" role="status" style="margin-bottom: 16px;"><i data-lucide="triangle-alert"></i><span>{{ session('warning') }}</span></div>
     @endif
     @if ($errors->any())
-        <div style="background: rgba(255,51,102,0.1); border: 1px solid var(--erp-red); color: var(--erp-red); padding: 10px 15px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; margin-bottom: 15px;">
-            @foreach ($errors->all() as $error) <div>> {{ $error }}</div> @endforeach
+        <div class="alert alert-danger" role="alert" style="margin-bottom: 16px;">
+            <i data-lucide="circle-alert"></i>
+            <div>@foreach ($errors->all() as $error) <div>{{ $error }}</div> @endforeach</div>
         </div>
     @endif
 
     @if($activeTab === 'campaigns')
-        <div class="metrics-grid">
-            <div class="metric-card">
-                <div class="metric-title">TOTAL AD SPEND (API)</div>
-                <div class="metric-val" style="color: var(--erp-amber);">${{ number_format(collect($campaigns)->sum('actual_spend'), 2) }}</div>
+        @php $all = collect($campaigns); @endphp
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4" style="margin-bottom: 24px;">
+            <div class="card">
+                <div class="stat-label">Ad spend (from the ad platforms)</div>
+                <div class="stat-value">{{ $usd($all->sum('actual_spend')) }}</div>
             </div>
-            <div class="metric-card">
-                <div class="metric-title">AVG. ACQUISITION COST (CAC)</div>
-                <div class="metric-val" style="color: var(--erp-red);">${{ collect($campaigns)->avg('calculated_cac') ? number_format(collect($campaigns)->avg('calculated_cac'), 2) : '0.00' }}</div>
+            <div class="card">
+                <div class="stat-label">Average cost per acquisition</div>
+                <div class="stat-value">{{ $all->avg('calculated_cac') ? $usd($all->avg('calculated_cac')) : '$0.00' }}</div>
             </div>
-            <div class="metric-card">
-                <div class="metric-title">TOTAL OPPORTUNITIES</div>
-                <div class="metric-val">{{ collect($campaigns)->sum('opportunities') }}</div>
+            <div class="card">
+                <div class="stat-label">Opportunities</div>
+                <div class="stat-value">{{ number_format($all->sum('opportunities')) }}</div>
             </div>
-            <div class="metric-card" style="border-left-color: #00FF66;">
-                <div class="metric-title">LIQUID ROAS (CASH SECURED)</div>
-                <div class="metric-val" style="color: #00FF66;">${{ number_format(collect($campaigns)->sum('liquid_roas'), 2) }}</div>
+            <div class="card">
+                <div class="stat-label">Return on ad spend (cash received)</div>
+                <div class="stat-value">{{ $usd($all->sum('liquid_roas')) }}</div>
             </div>
         </div>
 
-        <div style="background: rgba(10, 17, 40, 0.6); border: 1px solid var(--erp-border-dark); border-radius: 4px; padding: 30px; min-height: 500px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: var(--erp-muted);">> CAMPAIGN LEDGER</div>
+        <section class="card" style="padding: 0;">
+            <div class="card-header" style="padding: 20px 24px 0;">
+                <h2 class="card-title">Campaigns</h2>
                 @can('marketing.create')
-                <button wire:click="$set('showCreateModal', true)" class="btn-primary">
-                    <i data-lucide="plus" style="width: 16px; height: 16px;"></i> DRAFT NEW BUDGET
+                <button type="button" wire:click="$set('showCreateModal', true)" class="btn btn-primary">
+                    <i data-lucide="plus"></i> Request a campaign budget
                 </button>
                 @endcan
             </div>
 
-            <table class="bloomberg-table">
-                <thead>
-                    <tr>
-                        <th>Campaign Name & UTM</th>
-                        <th>Platform</th>
-                        <th>Status</th>
-                        <th>Approved Budget</th>
-                        <th>API Spend</th>
-                        <th>Liquid ROAS</th>
-                        <th style="text-align: right;">Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($campaigns as $camp)
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td>
-                                <div style="font-weight: bold; color: var(--erp-white); margin-bottom: 4px;">{{ $camp['name'] }}</div>
-                                <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted);">{{ $camp['utm_campaign_tag'] ?? 'Pending Generation' }}</div>
-                            </td>
-                            <td style="font-family: 'Roboto Mono', monospace; font-weight: bold; color: var(--erp-teal);">{{ $camp['platform'] }}</td>
-                            <td>
-                                @if($camp['status'] === 'PENDING_APPROVAL')
-                                    <span class="status-badge status-pending">AWAITING L4/L5</span>
-                                @elseif($camp['status'] === 'REVISION_REQUIRED')
-                                    <span class="status-badge status-revision">REVISION REQ</span>
-                                @elseif($camp['status'] === 'PLANNED')
-                                    <span class="status-badge status-planned">HQ APPROVED (READY)</span>
-                                @elseif($camp['status'] === 'ACTIVE')
-                                    <span class="status-badge status-active">LIVE (TRACKING)</span>
-                                @else
-                                    <span class="status-badge" style="background: rgba(255,255,255,0.1); color: var(--erp-muted); border: 1px solid var(--erp-muted);">{{ $camp['status'] }}</span>
-                                @endif
-                            </td>
-                            <td style="font-family: 'Roboto Mono', monospace;">${{ number_format($camp['budget_amount'], 2) }}</td>
-                            <td style="font-family: 'Roboto Mono', monospace; color: var(--erp-amber);">${{ number_format($camp['actual_spend'], 2) }}</td>
-                            <td style="font-family: 'Roboto Mono', monospace; color: #00FF66; font-weight: bold;">${{ number_format($camp['liquid_roas'], 2) }}</td>
-                            <td style="text-align: right;">
-                                @if($canApprove && $camp['status'] === 'PENDING_APPROVAL')
-                                    <button wire:click="openReviewModal('{{ $camp['id'] }}')" class="btn-action" style="border-color: #FFBD2E; color: #FFBD2E;">REVIEW & APPROVE</button>
-                                @endif
-
-                                @if($camp['status'] === 'PLANNED')
-                                    <button wire:click="openActivateModal('{{ $camp['id'] }}')" class="btn-action" style="border-color: #00FF66; color: #00FF66;">LINK META/GOOGLE ID</button>
-                                @endif
-
-                                @if($camp['status'] === 'REVISION_REQUIRED')
-                                    <button wire:click="openReviewModal('{{ $camp['id'] }}')" class="btn-action" style="border-color: var(--erp-red); color: var(--erp-red);">VIEW REJECTION</button>
-                                @endif
-                            </td>
+                            <th>Campaign and tracking tag</th>
+                            <th>Platform</th>
+                            <th>Status</th>
+                            <th class="num" style="text-align: right;">Approved budget</th>
+                            <th class="num" style="text-align: right;">Spend</th>
+                            <th class="num" style="text-align: right;">Return (cash received)</th>
+                            <th><span class="sr-only">Actions</span></th>
                         </tr>
-                    @empty
-                        <tr><td colspan="7" style="text-align: center; padding: 40px; color: var(--erp-muted); font-family: 'Roboto Mono', monospace;">NO CAMPAIGNS IN SYSTEM</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+                    </thead>
+                    <tbody>
+                        @forelse($campaigns as $camp)
+                            @php [$statusText, $statusPill] = $campaignStatus($camp['status']); @endphp
+                            <tr>
+                                <td>
+                                    <div class="font-semibold text-ink">{{ $camp['name'] }}</div>
+                                    <div class="text-caption text-muted" style="word-break: break-all;">{{ $camp['utm_campaign_tag'] ?? 'Not created yet' }}</div>
+                                </td>
+                                <td>{{ $platformName($camp['platform']) }}</td>
+                                <td><span class="pill {{ $statusPill }}">{{ $statusText }}</span></td>
+                                <td class="num">{{ $usd($camp['budget_amount']) }}</td>
+                                <td class="num">{{ $usd($camp['actual_spend']) }}</td>
+                                <td class="num">{{ $usd($camp['liquid_roas']) }}</td>
+                                <td style="text-align: right; white-space: nowrap;">
+                                    @if($canApprove && $camp['status'] === 'PENDING_APPROVAL')
+                                        <button type="button" wire:click="openReviewModal('{{ $camp['id'] }}')" class="btn btn-secondary btn-sm">Review</button>
+                                    @endif
+
+                                    @if($camp['status'] === 'PLANNED')
+                                        <button type="button" wire:click="openActivateModal('{{ $camp['id'] }}')" class="btn btn-secondary btn-sm">Link campaign ID</button>
+                                    @endif
+
+                                    @if($camp['status'] === 'REVISION_REQUIRED')
+                                        <button type="button" wire:click="openReviewModal('{{ $camp['id'] }}')" class="btn btn-secondary btn-sm">See requested changes</button>
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="7">
+                                    <div class="empty-state">
+                                        <strong>No campaigns yet</strong>
+                                        Request a budget for a campaign. Once it is approved, link it to the ad platform to track its spend.
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
     @endif
 
     @if($activeTab === 'assets')
-        <div style="background: rgba(10, 17, 40, 0.6); border: 1px solid var(--erp-border-dark); border-radius: 4px; padding: 30px; min-height: 500px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: var(--erp-muted);">> CORPORATE DIGITAL FOOTPRINT & CREDENTIAL VAULT</div>
+        <section class="card" style="padding: 0;">
+            <div class="card-header" style="padding: 20px 24px 0;">
+                <div>
+                    <h2 class="card-title">Accounts and logins</h2>
+                    <p class="help" style="margin: 4px 0 0;">Our social and advertising accounts. Passwords are stored encrypted.</p>
+                </div>
                 @can('marketing.create')
-                <button wire:click="$set('showAssetModal', true)" class="btn-primary"><i data-lucide="shield" style="width: 16px; height: 16px;"></i> REGISTER NEW ASSET</button>
+                <button type="button" wire:click="$set('showAssetModal', true)" class="btn btn-primary"><i data-lucide="plus"></i> Add account</button>
                 @endcan
             </div>
-            
-            <table class="bloomberg-table">
-                <thead>
-                    <tr>
-                        <th>Platform / Channel</th>
-                        <th>Account Name</th>
-                        <th>Login ID</th>
-                        <th>Status</th>
-                        <th style="text-align: right;">Security</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($socialAccounts as $asset)
+
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td style="font-weight: bold; color: var(--erp-white); font-family: 'Roboto Mono', monospace;">{{ $asset['platform'] }}</td>
-                            <td>{{ $asset['account_name'] }}</td>
-                            <td style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-muted);">{{ $asset['login_identifier'] ?? 'N/A' }}</td>
-                            <td><span class="status-badge status-{{ strtolower($asset['status']) === 'active' ? 'active' : 'pending' }}">{{ $asset['status'] }}</span></td>
-                            <td style="text-align: right;">
-                                <button wire:click="openCredentialModal('{{ $asset['id'] }}')" class="btn-action" style="border-color: var(--erp-teal); color: var(--erp-teal);">
-                                    <i data-lucide="key" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> MANAGE ACCESS
-                                </button>
-                            </td>
+                            <th>Platform</th>
+                            <th>Account name</th>
+                            <th>Login</th>
+                            <th>Status</th>
+                            <th><span class="sr-only">Actions</span></th>
                         </tr>
-                    @empty
-                        <tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--erp-muted); font-family: 'Roboto Mono', monospace;">NO DIGITAL ASSETS REGISTERED.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+                    </thead>
+                    <tbody>
+                        @forelse($socialAccounts as $asset)
+                            @php [$assetText, $assetPill] = $assetStatus($asset['status']); @endphp
+                            <tr>
+                                <td class="font-semibold text-ink">{{ $platformName($asset['platform']) }}</td>
+                                <td>{{ $asset['account_name'] }}</td>
+                                <td class="text-small">{{ $asset['login_identifier'] ?? 'Not recorded' }}</td>
+                                <td><span class="pill {{ $assetPill }}">{{ $assetText }}</span></td>
+                                <td style="text-align: right;">
+                                    <button type="button" wire:click="openCredentialModal('{{ $asset['id'] }}')" class="btn btn-secondary btn-sm">
+                                        <i data-lucide="key"></i> Manage login
+                                    </button>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5">
+                                    <div class="empty-state">
+                                        <strong>No accounts yet</strong>
+                                        Add our social and advertising accounts here so their logins are kept in one place.
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
     @endif
 
     @if($activeTab === 'social')
-        <div style="background: rgba(10, 17, 40, 0.6); border: 1px solid var(--erp-border-dark); border-radius: 4px; padding: 30px; min-height: 500px;">
-            <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: var(--erp-muted); margin-bottom: 20px;">> ORGANIC BRAND HEALTH (API SYNCED)</div>
-            
-            <table class="bloomberg-table">
-                <thead>
-                    <tr>
-                        <th>Platform</th>
-                        <th>Account Name</th>
-                        <th>Total Followers</th>
-                        <th>Weekly Reach</th>
-                        <th>Engagement Rate</th>
-                        <th>Last Sync</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($socialAccounts as $social)
+        <section class="card" style="padding: 0;">
+            <div class="card-header" style="padding: 20px 24px 0;">
+                <h2 class="card-title">Social reach</h2>
+            </div>
+
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td style="font-weight: bold; color: var(--erp-white);">{{ $social['platform'] }}</td>
-                            <td>{{ $social['account_name'] }}</td>
-                            <td style="font-family: 'Roboto Mono', monospace; color: var(--erp-teal);">{{ number_format($social['total_followers']) }}</td>
-                            <td style="font-family: 'Roboto Mono', monospace;">{{ number_format($social['weekly_reach']) }}</td>
-                            <td style="font-family: 'Roboto Mono', monospace; color: #00FF66;">{{ $social['engagement_rate'] }}%</td>
-                            <td style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-muted);">{{ $social['last_synced_at'] ?? 'Never' }}</td>
+                            <th>Platform</th>
+                            <th>Account name</th>
+                            <th class="num" style="text-align: right;">Followers</th>
+                            <th class="num" style="text-align: right;">Reach this week</th>
+                            <th class="num" style="text-align: right;">Engagement rate</th>
+                            <th>Last updated</th>
                         </tr>
-                    @empty
-                        <tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--erp-muted); font-family: 'Roboto Mono', monospace;">NO ACCOUNTS LINKED. AWAITING API INTEGRATION.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+                    </thead>
+                    <tbody>
+                        @forelse($socialAccounts as $social)
+                            <tr>
+                                <td class="font-semibold text-ink">{{ $platformName($social['platform']) }}</td>
+                                <td>{{ $social['account_name'] }}</td>
+                                <td class="num">{{ number_format($social['total_followers']) }}</td>
+                                <td class="num">{{ number_format($social['weekly_reach']) }}</td>
+                                <td class="num">{{ $social['engagement_rate'] }}%</td>
+                                <td class="text-small" style="font-variant-numeric: tabular-nums;">{{ !empty($social['last_synced_at']) ? \Carbon\Carbon::parse($social['last_synced_at'])->format('j M Y, H:i') : 'Never' }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6">
+                                    <div class="empty-state">
+                                        <strong>No accounts to show</strong>
+                                        Add an account in Accounts and logins. Its followers and reach appear here once they are updated from the platform.
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
     @endif
 
+    {{-- Request a campaign budget --}}
     @if($showCreateModal)
-        <div class="offcanvas-backdrop" wire:click="$set('showCreateModal', false)"></div>
-        <div class="offcanvas-panel">
-            <div class="offcanvas-header">
-                <span>> INITIATE CAMPAIGN DRAFT</span>
-                <button wire:click="$set('showCreateModal', false)" style="background: transparent; border: none; color: var(--erp-muted); cursor: pointer; font-size: 1.8rem; transition: 0.3s;" onmouseover="this.style.color='var(--erp-teal)'" onmouseout="this.style.color='var(--erp-muted)'">×</button>
+        <div class="mk-backdrop" wire:click="$set('showCreateModal', false)"></div>
+        <aside class="mk-panel" role="dialog" aria-modal="true" aria-labelledby="mk-create-title">
+            <div class="mk-panel-head">
+                <h2 id="mk-create-title" class="section-title" style="margin: 0;">Request a campaign budget</h2>
+                <button type="button" wire:click="$set('showCreateModal', false)" class="btn btn-ghost btn-sm" aria-label="Close"><i data-lucide="x"></i></button>
             </div>
-            
-            <form wire:submit.prevent="submitDraft" style="display: flex; flex-direction: column; min-height: calc(100% - 80px);">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                    <div><label class="form-label">CAMPAIGN ALIAS</label><input type="text" wire:model="campName" class="cyber-input" placeholder="e.g. Q2 ERP Logistics Push"></div>
-                    <div>
-                        <label class="form-label">AD NETWORK PLATFORM</label>
-                        <select wire:model="platform" class="cyber-select">
-                            <option value="META">Meta (Facebook & IG)</option>
-                            <option value="GOOGLE">Google Search / Display</option>
-                            <option value="LINKEDIN">LinkedIn B2B</option>
-                        </select>
-                    </div>
-                </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                    <div>
-                        <label class="form-label">TRAFFIC TARGET (LANDING PAGE)</label>
-                        <select wire:model="targetUrl" class="cyber-select">
-                            <option value="/">Homepage (COPQ Conversion Hub)</option>
-                            <option value="/framework">The Framework</option>
-                            <option value="/kaizen">Kaizen Articles</option>
-                            <option value="/contact">Direct Diagnostic Request</option>
-                        </select>
-                    </div>
-                    <div><label class="form-label">BUDGET REQUEST (USD)</label><input type="number" step="0.01" wire:model="budgetAmount" class="cyber-input" placeholder="$0.00"></div>
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                    <div><label class="form-label">START DATE</label><input type="date" wire:model="startDate" class="cyber-input"></div>
-                    <div><label class="form-label">END DATE (OPTIONAL)</label><input type="date" wire:model="endDate" class="cyber-input"></div>
-                </div>
-
-                <div style="border-top: 1px dashed var(--erp-border-dark); padding-top: 20px; margin-top: 10px; margin-bottom: 20px;">
-                    <label class="form-label">> CREATIVE ASSETS (SELECT ONE)</label>
-                    <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
-                        <div>
-                            <label style="font-size: 0.65rem; color: var(--erp-muted);">LOCAL UPLOAD (Under 10MB)</label>
-                            <input type="file" wire:model="creativeFile" class="cyber-input" style="padding: 9px;">
-                            <div wire:loading wire:target="creativeFile" style="font-family: 'Roboto Mono'; font-size: 0.65rem; color: var(--erp-teal); margin-top: 5px;">Uploading to Praxis Vault...</div>
+            <form wire:submit.prevent="submitDraft" class="flex flex-col" style="flex: 1; min-height: 0;">
+                <div class="mk-panel-body">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="field">
+                            <label class="label" for="mk-name">Campaign name</label>
+                            <input id="mk-name" type="text" wire:model="campName" class="input" placeholder="e.g. Q2 logistics ERP campaign">
                         </div>
-                        <div>
-                            <label style="font-size: 0.65rem; color: var(--erp-muted);">EXTERNAL LINK (Figma/Drive >10MB)</label>
-                            <input type="text" wire:model="creativeLink" class="cyber-input" placeholder="https://...">
+                        <div class="field">
+                            <label class="label" for="mk-platform">Ad platform</label>
+                            <select id="mk-platform" wire:model="platform" class="select">
+                                @foreach(['META' => 'Meta (Facebook and Instagram)', 'GOOGLE' => 'Google (search and display)', 'LINKEDIN' => 'LinkedIn'] as $value => $label)
+                                    <option value="{{ $value }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label class="label" for="mk-url">Landing page</label>
+                            <select id="mk-url" wire:model="targetUrl" class="select">
+                                <option value="/">Home page (cost of poor quality calculator)</option>
+                                <option value="/framework">The Praxis Method</option>
+                                <option value="/kaizen">JBS Praxis Insights</option>
+                                <option value="/contact">Contact page (free audit request)</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label class="label" for="mk-budget">Budget (USD)</label>
+                            <input id="mk-budget" type="number" step="0.01" wire:model="budgetAmount" class="input" placeholder="e.g. 1500.00">
+                        </div>
+                        <div class="field">
+                            <label class="label" for="mk-start">Start date</label>
+                            <input id="mk-start" type="date" wire:model="startDate" class="input">
+                        </div>
+                        <div class="field">
+                            <label class="label" for="mk-end">End date (optional)</label>
+                            <input id="mk-end" type="date" wire:model="endDate" class="input">
                         </div>
                     </div>
+
+                    <fieldset class="flex flex-col gap-4" style="border: 0; border-top: 1px solid var(--color-line); padding: 16px 0 0; margin: 0;">
+                        <legend class="card-title" style="float: left; width: 100%; margin-bottom: 4px;">Creative</legend>
+                        <p class="help" style="margin: 0;">Upload the file, or link to it if it is larger than 10 MB.</p>
+                        <div class="field">
+                            <label class="label" for="mk-file">Upload a file (optional, under 10 MB)</label>
+                            <input id="mk-file" type="file" wire:model="creativeFile" class="input" style="padding: 7px;">
+                            <span wire:loading wire:target="creativeFile" class="help">Uploading…</span>
+                        </div>
+                        <div class="field">
+                            <label class="label" for="mk-link">Link to the file (optional)</label>
+                            <input id="mk-link" type="text" wire:model="creativeLink" class="input" placeholder="e.g. https://drive.google.com/…">
+                        </div>
+                    </fieldset>
+
+                    <div class="field">
+                        <label class="label" for="mk-remarks">Notes for the approver (optional)</label>
+                        <textarea id="mk-remarks" wire:model="remarks" class="textarea" placeholder="e.g. Who the ads are for and why" style="min-height: 120px;"></textarea>
+                    </div>
                 </div>
 
-                <div style="margin-bottom: auto;">
-                    <label class="form-label">STRATEGIC REMARKS (TO HQ)</label>
-                    <textarea wire:model="remarks" class="cyber-textarea" placeholder="Explain the targeting rationale..." style="min-height: 120px;"></textarea>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--erp-border-dark); padding-top: 25px; margin-top: 30px;">
-                    <button type="button" wire:click="$set('showCreateModal', false)" style="background: transparent; border: none; color: var(--erp-muted); cursor: pointer; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; transition: 0.3s;" onmouseover="this.style.color='var(--erp-white)'" onmouseout="this.style.color='var(--erp-muted)'">CANCEL DRAFT</button>
-                    <button type="submit" class="btn-primary" wire:loading.attr="disabled">
-                        <span wire:loading.remove wire:target="submitDraft">SUBMIT TO COMMAND (L5)</span>
-                        <span wire:loading wire:target="submitDraft">ENCRYPTING & ROUTING...</span>
+                <div class="mk-panel-foot">
+                    <button type="button" wire:click="$set('showCreateModal', false)" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-primary" wire:loading.attr="disabled" wire:target="submitDraft">
+                        <span wire:loading.remove wire:target="submitDraft">Send for approval</span>
+                        <span wire:loading wire:target="submitDraft">Sending…</span>
                     </button>
                 </div>
             </form>
-        </div>
+        </aside>
     @endif
 
+    {{-- Add an account --}}
     @if($showAssetModal)
-        <div class="offcanvas-backdrop" wire:click="$set('showAssetModal', false)"></div>
-        <div class="offcanvas-panel" style="display: flex; flex-direction: column;">
-            <div class="offcanvas-header">
-                <span>> SECURE ASSET REGISTRATION</span>
-                <button wire:click="$set('showAssetModal', false)" style="background: transparent; border: none; color: var(--erp-muted); cursor: pointer; font-size: 1.8rem; transition: 0.3s;" onmouseover="this.style.color='var(--erp-teal)'" onmouseout="this.style.color='var(--erp-muted)'">×</button>
+        <div class="mk-backdrop" wire:click="$set('showAssetModal', false)"></div>
+        <aside class="mk-panel" role="dialog" aria-modal="true" aria-labelledby="mk-asset-title">
+            <div class="mk-panel-head">
+                <h2 id="mk-asset-title" class="section-title" style="margin: 0;">Add account</h2>
+                <button type="button" wire:click="$set('showAssetModal', false)" class="btn btn-ghost btn-sm" aria-label="Close"><i data-lucide="x"></i></button>
             </div>
-            <form wire:submit.prevent="registerDigitalAsset" style="display: flex; flex-direction: column; flex-grow: 1;">
-                <div style="flex-grow: 1;">
-                    <div style="margin-bottom: 25px;">
-                        <label class="form-label">PLATFORM / NETWORK</label>
-                        <input type="text" wire:model="assetPlatform" class="cyber-input" placeholder="e.g. Meta Business Manager">
+            <form wire:submit.prevent="registerDigitalAsset" class="flex flex-col" style="flex: 1; min-height: 0;">
+                <div class="mk-panel-body">
+                    <div class="field">
+                        <label class="label" for="mk-asset-platform">Platform</label>
+                        <input id="mk-asset-platform" type="text" wire:model="assetPlatform" class="input" placeholder="e.g. Meta Business Manager">
                     </div>
-                    <div style="margin-bottom: 25px;">
-                        <label class="form-label">ACCOUNT NAME</label>
-                        <input type="text" wire:model="assetName" class="cyber-input" placeholder="e.g. Praxis Official">
+                    <div class="field">
+                        <label class="label" for="mk-asset-name">Account name</label>
+                        <input id="mk-asset-name" type="text" wire:model="assetName" class="input">
                     </div>
-                    <div style="margin-bottom: 25px;">
-                        <label class="form-label">LOGIN EMAIL / USERNAME</label>
-                        <input type="text" wire:model="loginIdentifier" class="cyber-input" placeholder="admin@jbspraxis.com">
+                    <div class="field">
+                        <label class="label" for="mk-asset-login">Login email or username</label>
+                        <input id="mk-asset-login" type="text" wire:model="loginIdentifier" class="input" placeholder="e.g. name@jbspraxis.com" autocomplete="off">
                     </div>
-                    <div style="margin-bottom: 25px;">
-                        <label class="form-label">MASTER PASSWORD</label>
-                        <input type="password" wire:model="assetPassword" class="cyber-input" placeholder="Will be AES-256 encrypted">
+                    <div class="field">
+                        <label class="label" for="mk-asset-password">Password</label>
+                        <input id="mk-asset-password" type="password" wire:model="assetPassword" class="input" autocomplete="new-password">
+                        <span class="help">Stored encrypted.</span>
                     </div>
-                    <div style="margin-bottom: 25px;">
-                        <label class="form-label">PERSONAL ADMIN PROFILE URL (META/LINKEDIN REQUIRED)</label>
-                        <input type="url" wire:model="adminProfileLink" class="cyber-input" placeholder="https://facebook.com/personal-profile-link">
-                        <span style="font-size: 0.65rem; color: var(--erp-muted); margin-top: 8px; display: block; line-height: 1.4;">If the platform requires a personal account to manage the business page, link the personal profile here.</span>
+                    <div class="field">
+                        <label class="label" for="mk-asset-admin">Personal admin profile link (optional)</label>
+                        <input id="mk-asset-admin" type="url" wire:model="adminProfileLink" class="input" placeholder="e.g. https://facebook.com/…">
+                        <span class="help">Meta and LinkedIn need a personal account to manage a business page. Link that personal profile here.</span>
                     </div>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--erp-border-dark); padding-top: 25px; margin-top: 30px;">
-                    <button type="button" wire:click="$set('showAssetModal', false)" style="background: transparent; border: none; color: var(--erp-muted); cursor: pointer; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; transition: 0.3s;" onmouseover="this.style.color='var(--erp-white)'" onmouseout="this.style.color='var(--erp-muted)'">CANCEL</button>
-                    <button type="submit" class="btn-primary" wire:loading.attr="disabled">LOCK CREDENTIALS IN VAULT</button>
+                <div class="mk-panel-foot">
+                    <button type="button" wire:click="$set('showAssetModal', false)" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-primary" wire:loading.attr="disabled" wire:target="registerDigitalAsset">Add account</button>
                 </div>
             </form>
-        </div>
+        </aside>
     @endif
 
+    {{-- Manage an account's login --}}
     @if($showCredentialModal && $selectedAsset)
-        <div class="offcanvas-backdrop" wire:click="$set('showCredentialModal', false)"></div>
-        <div class="offcanvas-panel" style="display: flex; flex-direction: column; border-left-color: var(--erp-red);">
-            <div class="offcanvas-header" style="border-bottom-color: var(--erp-red);">
-                <span style="color: var(--erp-red);"><i data-lucide="shield-alert" style="display: inline-block; vertical-align: middle;"></i> ACCESS CONTROL</span>
-                <button wire:click="$set('showCredentialModal', false)" style="background: transparent; border: none; color: var(--erp-muted); cursor: pointer; font-size: 1.8rem; transition: 0.3s;" onmouseover="this.style.color='var(--erp-red)'" onmouseout="this.style.color='var(--erp-muted)'">×</button>
+        <div class="mk-backdrop" wire:click="$set('showCredentialModal', false)"></div>
+        <aside class="mk-panel" role="dialog" aria-modal="true" aria-labelledby="mk-cred-title">
+            <div class="mk-panel-head">
+                <h2 id="mk-cred-title" class="section-title" style="margin: 0;">Login for {{ $selectedAsset->account_name }}</h2>
+                <button type="button" wire:click="$set('showCredentialModal', false)" class="btn btn-ghost btn-sm" aria-label="Close"><i data-lucide="x"></i></button>
             </div>
 
-            <div style="flex-grow: 1; overflow-y: auto;">
-                <div class="vault-container">
-                    <div style="margin-bottom: 15px;"><span style="color: var(--erp-muted); font-size: 0.65rem; display: block; margin-bottom: 4px;">ASSET:</span> <span style="color: var(--erp-white); font-size: 1.1rem;">{{ $selectedAsset->account_name }} ({{ $selectedAsset->platform }})</span></div>
-                    <div style="margin-bottom: 15px;"><span style="color: var(--erp-muted); font-size: 0.65rem; display: block; margin-bottom: 4px;">LOGIN ID:</span> <span style="color: var(--erp-white);">{{ $selectedAsset->login_identifier }}</span></div>
-                    <div style="margin-bottom: 15px;"><span style="color: var(--erp-muted); font-size: 0.65rem; display: block; margin-bottom: 4px;">ADMIN LINK:</span> <span style="color: var(--erp-white); word-break: break-all;">{{ $selectedAsset->admin_profile_link ?? 'N/A' }}</span></div>
-                    
-                    <div style="margin-top: 25px; border-top: 1px dashed var(--erp-teal); padding-top: 20px;">
-                        <span style="color: var(--erp-teal); font-weight: bold; font-size: 0.75rem; margin-bottom: 10px; display: block;">CURRENT ENCRYPTED PASSWORD:</span>
-                        <div style="background: rgba(0,0,0,0.5); border: 1px solid var(--erp-border-dark); padding: 15px; font-size: 1.3rem; color: var(--erp-red); text-align: center; letter-spacing: 4px;">
-                            {{ $decryptedPassword }}
-                        </div>
+            <div class="mk-panel-body">
+                <dl class="mk-facts">
+                    <div><dt>Account</dt><dd>{{ $selectedAsset->account_name }} ({{ $platformName($selectedAsset->platform) }})</dd></div>
+                    <div><dt>Login</dt><dd>{{ $selectedAsset->login_identifier }}</dd></div>
+                    <div style="grid-column: 1 / -1;"><dt>Personal admin profile</dt><dd>{{ ($selectedAsset->admin_profile_link ?? null) ?: 'Not recorded' }}</dd></div>
+                    <div style="grid-column: 1 / -1;">
+                        <dt>Current password</dt>
+                        <dd class="callout" style="margin-top: 6px; font-size: 1rem; font-variant-numeric: tabular-nums; word-break: break-all;">{{ $decryptedPassword }}</dd>
                     </div>
-                </div>
+                </dl>
 
                 @can('marketing.edit')
-                <div style="margin-top: 30px; background: rgba(255,51,102,0.05); border: 1px solid rgba(255,51,102,0.2); padding: 25px;">
-                    <label class="form-label" style="color: var(--erp-red);">UPDATE PASSWORD (OVERWRITE VAULT)</label>
-                    <input type="password" wire:model="newPassword" class="cyber-input" placeholder="Type new password to overwrite..." style="margin-bottom: 15px; border-color: rgba(255,51,102,0.4);">
-                    <button wire:click="updateAssetPassword" class="btn-primary" style="width: 100%; justify-content: center; background: var(--erp-red); border-color: var(--erp-red);">ENCRYPT & OVERWRITE</button>
-                    <span style="font-size: 0.65rem; color: var(--erp-red); text-align: center; display: block; margin-top: 12px; opacity: 0.8;">WARNING: This action is permanently logged in the Audit Trail. L5 will be notified.</span>
+                <div class="flex flex-col gap-3" style="padding-top: 20px; border-top: 1px solid var(--color-line);">
+                    <div class="field">
+                        <label class="label" for="mk-new-password">New password</label>
+                        <input id="mk-new-password" type="password" wire:model="newPassword" class="input" autocomplete="new-password">
+                        <span class="help">The change is recorded in the audit trail, and staff who can see account passwords are notified.</span>
+                    </div>
+                    <div>
+                        <button type="button" wire:click="updateAssetPassword" class="btn btn-primary" wire:loading.attr="disabled" wire:target="updateAssetPassword">Change password</button>
+                    </div>
                 </div>
                 @endcan
 
                 @if($canSeeCredentials && count($credentialHistory) > 0)
-                    <div style="margin-top: 30px; border-top: 1px solid var(--erp-border-dark); padding-top: 20px;">
-                        <span style="font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: var(--erp-muted); text-transform: uppercase;">> IMMUTABLE MODIFICATION LEDGER</span>
-                        <ul class="history-list">
+                    <div style="padding-top: 20px; border-top: 1px solid var(--color-line);">
+                        <h3 class="card-title" style="margin-bottom: 8px;">Password changes</h3>
+                        <ul class="flex flex-col gap-2 text-small" style="list-style: none; margin: 0; padding: 0;">
                             @foreach($credentialHistory as $log)
-                                <li><span style="color: var(--erp-white);">{{ \Carbon\Carbon::parse($log['created_at'])->format('M d, Y H:i') }}</span> | Changed by: {{ $log['user_name'] }}</li>
+                                <li><span class="text-ink" style="font-variant-numeric: tabular-nums;">{{ \Carbon\Carbon::parse($log['created_at'])->format('j M Y, H:i') }}</span> · changed by {{ $log['user_name'] }}</li>
                             @endforeach
                         </ul>
                     </div>
                 @endif
             </div>
-        </div>
+        </aside>
     @endif
 
+    {{-- Review a campaign --}}
     @if($showReviewModal && $selectedCampaign)
-        <div class="offcanvas-backdrop" wire:click="$set('showReviewModal', false)"></div>
-        <div class="offcanvas-panel" style="display: flex; flex-direction: column;">
-            <div class="offcanvas-header" style="border-bottom-color: {{ $selectedCampaign->status === 'REVISION_REQUIRED' ? 'var(--erp-red)' : 'var(--erp-teal)' }};">
-                <span>> CAMPAIGN AUDIT</span>
-                <button wire:click="$set('showReviewModal', false)" style="background: transparent; border: none; color: var(--erp-muted); cursor: pointer; font-size: 1.8rem; transition: 0.3s;" onmouseover="this.style.color='var(--erp-teal)'" onmouseout="this.style.color='var(--erp-muted)'">×</button>
-            </div>
-            
-            <div style="flex-grow: 1;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; margin-bottom: 25px;">
-                    <div>
-                        <span style="color: var(--erp-muted); display: block; font-size: 0.65rem; margin-bottom: 4px;">NAME:</span> 
-                        <span style="color: var(--erp-white);">{{ $selectedCampaign->name }}</span>
-                    </div>
-                    <div>
-                        <span style="color: var(--erp-muted); display: block; font-size: 0.65rem; margin-bottom: 4px;">PLATFORM:</span> 
-                        <span style="color: var(--erp-teal); font-weight: bold;">{{ $selectedCampaign->platform }}</span>
-                    </div>
-                    <div>
-                        <span style="color: var(--erp-muted); display: block; font-size: 0.65rem; margin-bottom: 4px;">TARGET URL:</span> 
-                        <span style="color: var(--erp-white); word-break: break-all;">jbspraxis.com{{ $selectedCampaign->target_url }}</span>
-                    </div>
-                    <div>
-                        <span style="color: var(--erp-muted); display: block; font-size: 0.65rem; margin-bottom: 4px;">BUDGET REQ:</span> 
-                        <span style="color: var(--erp-amber); font-weight: bold; font-size: 1.1rem;">${{ number_format($selectedCampaign->budget_amount, 2) }}</span>
-                    </div>
+        @php [$reviewText, $reviewPill] = $campaignStatus($selectedCampaign->status); @endphp
+        <div class="mk-backdrop" wire:click="$set('showReviewModal', false)"></div>
+        <aside class="mk-panel" role="dialog" aria-modal="true" aria-labelledby="mk-review-title">
+            <div class="mk-panel-head">
+                <div class="flex items-center gap-3">
+                    <h2 id="mk-review-title" class="section-title" style="margin: 0;">Campaign review</h2>
+                    <span class="pill {{ $reviewPill }}">{{ $reviewText }}</span>
                 </div>
+                <button type="button" wire:click="$set('showReviewModal', false)" class="btn btn-ghost btn-sm" aria-label="Close"><i data-lucide="x"></i></button>
+            </div>
 
-                <label class="form-label">STRATEGIC REMARKS</label>
-                <div style="background: rgba(255,255,255,0.02); padding: 20px; border-left: 2px solid var(--erp-teal); font-size: 0.85rem; color: #B0B8C4; margin-bottom: 25px; white-space: pre-wrap; line-height: 1.5;">{{ $selectedCampaign->remarks ?? 'No remarks provided.' }}</div>
+            <div class="mk-panel-body">
+                <dl class="mk-facts">
+                    <div><dt>Name</dt><dd>{{ $selectedCampaign->name }}</dd></div>
+                    <div><dt>Platform</dt><dd>{{ $platformName($selectedCampaign->platform) }}</dd></div>
+                    <div><dt>Landing page</dt><dd>jbspraxis.com{{ $selectedCampaign->target_url }}</dd></div>
+                    <div><dt>Budget requested</dt><dd class="font-semibold" style="font-variant-numeric: tabular-nums;">{{ $usd($selectedCampaign->budget_amount) }}</dd></div>
+                </dl>
+
+                <div>
+                    <div class="label" style="margin-bottom: 6px;">Notes from the requester</div>
+                    <p class="text-small" style="margin: 0; padding: 12px 16px; background: var(--color-mist); border-radius: var(--radius-card); white-space: pre-wrap;">{{ $selectedCampaign->remarks ?? 'No notes.' }}</p>
+                </div>
 
                 @if($selectedCampaign->status === 'REVISION_REQUIRED')
-                    <div style="background: rgba(255,51,102,0.1); padding: 20px; border: 1px solid var(--erp-red); font-size: 0.85rem; color: var(--erp-red); margin-bottom: 25px; line-height: 1.5;">
-                        <strong style="display: block; margin-bottom: 8px;">> HQ REJECTION DIRECTIVE:</strong>
-                        {{ $selectedCampaign->rejection_reason }}
+                    <div class="alert alert-danger">
+                        <i data-lucide="circle-alert"></i>
+                        <div><strong>Changes requested</strong><div>{{ $selectedCampaign->rejection_reason }}</div></div>
                     </div>
                 @endif
 
                 @if($canApprove && $selectedCampaign->status === 'PENDING_APPROVAL')
-                    <div style="border-top: 1px dashed var(--erp-border-dark); padding-top: 25px; margin-top: 10px;">
-                        <label class="form-label" style="color: var(--erp-red);">REJECTION DIRECTIVE (REQUIRED FOR DENIAL)</label>
-                        <textarea wire:model="rejectionReason" class="cyber-textarea" placeholder="If rejecting, state the operational reason..." style="border-color: var(--erp-red); min-height: 100px;"></textarea>
+                    <div class="field" style="padding-top: 20px; border-top: 1px solid var(--color-line);">
+                        <label class="label" for="mk-reason">Reason for returning it</label>
+                        <textarea id="mk-reason" wire:model="rejectionReason" class="textarea" placeholder="e.g. Narrow the audience to finance directors" style="min-height: 100px;"></textarea>
+                        <span class="help">Needed only if you return the campaign for changes. The requester sees it.</span>
                     </div>
                 @endif
             </div>
 
-            <div style="border-top: 1px solid var(--erp-border-dark); padding-top: 25px; margin-top: 30px;">
+            <div class="mk-panel-foot" style="flex-wrap: wrap; align-items: center;">
                 @if($canApprove && $selectedCampaign->status === 'PENDING_APPROVAL')
-                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px;">
-                        <button wire:click="rejectCampaign" class="btn-action" style="color: var(--erp-red); border-color: var(--erp-red); background: rgba(255,51,102,0.05); padding: 12px 20px; flex: 1; text-align: center;">REJECT TO AGENCY</button>
-                        <button wire:click="approveCampaign" class="btn-primary" style="background: #00FF66; color: #0A1128; border-color: #00FF66; padding: 12px 20px; flex: 2; justify-content: center;">
-                            APPROVE & SPAWN CASH REQ
-                        </button>
-                    </div>
+                    <span class="help" style="margin-right: auto;">Approving creates a cash request for the budget in Finance.</span>
+                    <button type="button" wire:click="rejectCampaign" class="btn btn-secondary">Return for changes</button>
+                    <button type="button" wire:click="approveCampaign" class="btn btn-primary">Approve budget</button>
                 @else
-                    <div style="display: flex; justify-content: flex-end;">
-                        <button type="button" wire:click="$set('showReviewModal', false)" class="btn-primary" style="background: transparent; border-color: var(--erp-border-dark); color: var(--erp-white);">CLOSE AUDIT</button>
-                    </div>
+                    <button type="button" wire:click="$set('showReviewModal', false)" class="btn btn-secondary">Close</button>
                 @endif
             </div>
-        </div>
+        </aside>
     @endif
 
+    {{-- Link the approved campaign to the ad platform --}}
     @if($showActivateModal && $selectedCampaign)
-        <div class="offcanvas-backdrop" wire:click="$set('showActivateModal', false)"></div>
-        <div class="offcanvas-panel" style="display: flex; flex-direction: column; border-left-color: #00FF66;">
-            <div class="offcanvas-header" style="border-bottom-color: #00FF66;">
-                <span style="color: #00FF66;">> LINK EXTERNAL TELEMETRY</span>
-                <button wire:click="$set('showActivateModal', false)" style="background: transparent; border: none; color: var(--erp-muted); cursor: pointer; font-size: 1.8rem; transition: 0.3s;" onmouseover="this.style.color='#00FF66'" onmouseout="this.style.color='var(--erp-muted)'">×</button>
+        <div class="mk-backdrop" wire:click="$set('showActivateModal', false)"></div>
+        <aside class="mk-panel" role="dialog" aria-modal="true" aria-labelledby="mk-link-title">
+            <div class="mk-panel-head">
+                <h2 id="mk-link-title" class="section-title" style="margin: 0;">Link the campaign to {{ $platformName($selectedCampaign->platform) }}</h2>
+                <button type="button" wire:click="$set('showActivateModal', false)" class="btn btn-ghost btn-sm" aria-label="Close"><i data-lucide="x"></i></button>
             </div>
-            
-            <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px;">
-                <i data-lucide="link" style="width: 64px; height: 64px; color: #00FF66; margin-bottom: 20px;"></i>
-                <h3 style="font-family: 'Montserrat', sans-serif; font-size: 1.3rem; color: var(--erp-white); text-transform: uppercase; margin-bottom: 15px;">LINK TO {{ $selectedCampaign->platform }}</h3>
-                <p style="font-size: 0.9rem; color: var(--erp-muted); margin-bottom: 30px; line-height: 1.6;">
-                    HQ has approved the budget. Create the ad in {{ $selectedCampaign->platform }} and paste the Campaign ID below so our Cron Job can sync the API telemetry.
-                </p>
-                
-                <div style="width: 100%; text-align: left; margin-bottom: 30px;">
-                    <label class="form-label" style="color: #00FF66;">EXTERNAL CAMPAIGN ID</label>
-                    <input type="text" wire:model="externalCampaignId" class="cyber-input" placeholder="e.g. 238491029384" style="text-align: center; font-family: 'Roboto Mono', monospace; font-size: 1.2rem; padding: 15px; border-color: rgba(0,255,102,0.3); background: rgba(0,255,102,0.05); color: #00FF66;">
+
+            <div class="mk-panel-body">
+                <p class="text-small" style="margin: 0;">The budget is approved. Create the campaign in {{ $platformName($selectedCampaign->platform) }}, then paste its campaign ID here so its spend can be tracked.</p>
+                <div class="field">
+                    <label class="label" for="mk-ext-id">Campaign ID on {{ $platformName($selectedCampaign->platform) }}</label>
+                    <input id="mk-ext-id" type="text" wire:model="externalCampaignId" class="input" placeholder="e.g. 238491029384" style="font-variant-numeric: tabular-nums;">
                 </div>
             </div>
 
-            <div style="border-top: 1px solid var(--erp-border-dark); padding-top: 25px; margin-top: auto; display: flex; gap: 15px;">
-                <button wire:click="$set('showActivateModal', false)" style="flex: 1; background: transparent; border: 1px solid var(--erp-muted); color: var(--erp-white); padding: 12px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; cursor: pointer; border-radius: 2px; transition: 0.3s;" onmouseover="this.style.borderColor='var(--erp-white)'" onmouseout="this.style.borderColor='var(--erp-muted)'">CANCEL</button>
-                <button wire:click="activateCampaign" style="flex: 2; background: #00FF66; color: #0A1128; border: none; padding: 12px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: bold; cursor: pointer; border-radius: 2px; transition: 0.3s;" onmouseover="this.style.boxShadow='0 0 15px rgba(0,255,102,0.4)'" onmouseout="this.style.boxShadow='none'">ACTIVATE TELEMETRY</button>
+            <div class="mk-panel-foot">
+                <button type="button" wire:click="$set('showActivateModal', false)" class="btn btn-secondary">Cancel</button>
+                <button type="button" wire:click="activateCampaign" class="btn btn-primary">Link campaign</button>
             </div>
-        </div>
+        </aside>
     @endif
-
-    <script> document.addEventListener('livewire:navigated', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); }); </script>
 </div>

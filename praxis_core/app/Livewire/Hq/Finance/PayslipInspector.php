@@ -54,7 +54,7 @@ class PayslipInspector extends Component
             return;
         }
 
-        // 1. Fetch Immutable Ledger Line
+        // 1. Fetch the payroll line
         $line = DB::table('payroll_lines')
             ->where('payroll_run_id', $this->selectedRunId)
             ->where('user_id', $this->selectedEmployeeId)
@@ -72,9 +72,9 @@ class PayslipInspector extends Component
             ->select('mdm_employees.*', 'users.first_name', 'users.last_name')
             ->first();
 
-        // Failsafe: Prevent null-pointer crash on archived profiles
+        // The staff record may have been removed since the run
         if (!$emp) {
-            session()->flash('error', 'Employee demographic profile has been archived or purged. Pro-forma generation aborted.');
+            session()->flash('error', "We couldn't show this payslip because the staff member's record is no longer in the staff directory. Ask HR to restore the record, then try again.");
             $this->payslipData = null;
             return;
         }
@@ -91,7 +91,7 @@ class PayslipInspector extends Component
             ->where('leave_year', $leaveYear)
             ->first();
 
-        // 6. Generate Security Hash (For Digital Signature / QR Code)
+        // 6. Document fingerprint (SHA-256)
         $hashString = $run->id . $line->id . $line->net_pay . $emp->employee_code;
         $securityHash = hash('sha256', $hashString);
 
@@ -103,17 +103,17 @@ class PayslipInspector extends Component
             default => 'N/A'
         };
 
-        // 7. Construct the Legal Payload
+        // 7. Build the payslip data
         $this->payslipData = [
             // Header & Identification
             'employer_name' => $employer->legal_name ?? 'JBS Praxis ' . ($run->region_code === 'CM' ? 'SARL' : 'LLC'),
-            'employer_address' => $employer->registered_address ?? 'Official HQ Address',
+            'employer_address' => $employer->registered_address ?? 'Address not recorded',
             'employer_tax_id' => $employer->tax_identification_number ?? 'N/A',
             'employer_social_id' => $employer->employer_social_security_code ?? 'N/A',
             
             'employee_name' => $emp->first_name . ' ' . $emp->last_name,
             'employee_code' => $emp->employee_code,
-            'employee_address' => $emp->residential_address ?? 'Address on file',
+            'employee_address' => $emp->residential_address ?? 'Address not recorded',
             'marital_status' => $emp->marital_status,
             'dependents' => $emp->dependents_count,
             'job_classification' => $emp->job_classification,

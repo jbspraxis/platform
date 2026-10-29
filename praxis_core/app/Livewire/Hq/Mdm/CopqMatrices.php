@@ -4,10 +4,12 @@ namespace App\Livewire\Hq\Mdm;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 #[Layout('components.layouts.hq')]
+#[Title('Cost of poor quality tables')]
 class CopqMatrices extends Component
 {
     public $activeTab = 'industries'; // 'industries', 'architectures', or 'bottlenecks'

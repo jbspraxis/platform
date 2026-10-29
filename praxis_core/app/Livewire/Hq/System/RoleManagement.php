@@ -7,6 +7,7 @@ use App\Support\Access;
 use App\Support\MailLocale;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
 use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +25,7 @@ use Exception;
  * and the last active owner can't be suspended or lose the role.
  */
 #[Layout('components.layouts.hq')]
+#[Title('Accounts')]
 class RoleManagement extends Component
 {
     // --- DATAGRID & UI STATE ---
@@ -72,7 +74,7 @@ class RoleManagement extends Component
     }
 
     /**
-     * Identifies the core JBS Praxis organization to separate Internal vs Client ledgers.
+     * Finds the JBS Praxis organisation, which separates staff accounts from client accounts.
      */
     private function resolveJbsPraxisId()
     {
@@ -212,7 +214,7 @@ class RoleManagement extends Component
                     DB::table($table)->where('id', $this->editingUserId)->update($identity + ['updated_at' => now()]);
                     $userId = $this->editingUserId;
 
-                    $this->successMessage = "Operator record and access updated successfully.";
+                    $this->successMessage = "Account updated.";
                 } else {
                     // CREATE NEW USER: no password until they open the setup link
                     $userId = Str::uuid()->toString();
@@ -238,11 +240,11 @@ class RoleManagement extends Component
 
                     DB::table($table)->insert($record);
 
-                    // Dispatch Invitation Email
+                    // Send the invitation email
                     Mail::to($this->email)->locale($this->invitationLocale($isClient, $finalOrgId))
                         ->send(new \App\Mail\UserInvitation($this->first_name, $invitationToken, $isClient));
 
-                    $this->successMessage = "User generated and cryptographic invitation transmitted successfully.";
+                    $this->successMessage = "Account created. We've sent {$this->first_name} an invitation to set a password.";
                 }
 
                 if (!$isClient) {
@@ -257,7 +259,8 @@ class RoleManagement extends Component
             $this->loadLedger();
 
         } catch (Exception $e) {
-            session()->flash('error', "System Matrix Error: " . $e->getMessage());
+            report($e);
+            session()->flash('error', "We couldn't save the account, and nothing was changed. Check the details and try again.");
         }
     }
 
@@ -273,7 +276,7 @@ class RoleManagement extends Component
         $roles = DB::table('roles')->where('audience', 'staff')->whereNull('deleted_at')->whereIn('id', $this->role_ids)->get();
 
         if ($roles->count() !== count(array_unique($this->role_ids))) {
-            $this->addError('role_ids', 'Unknown role.');
+            $this->addError('role_ids', 'One of the roles no longer exists. Reload the page and choose the roles again.');
             return false;
         }
 
@@ -400,11 +403,11 @@ class RoleManagement extends Component
                 'updated_at' => now()
             ]);
 
-            // Transmit the email
+            // Send the email
             Mail::to($user->email)->locale($this->invitationLocale($isClient, $user->organization_id))
                 ->send(new \App\Mail\UserInvitation($user->first_name, $token, $isClient));
 
-            $this->successMessage = "Zero-Knowledge Init re-transmitted to " . strtoupper($user->first_name) . ".";
+            $this->successMessage = "Invitation sent again to {$user->first_name} at {$user->email}. The earlier link no longer works.";
             $this->showSuccessModal = true;
             $this->loadLedger();
         }
@@ -425,7 +428,7 @@ class RoleManagement extends Component
         }
         if (!$isClient && Access::isOwner(User::find($user->id))) {
             if ($user->status === 'Active' && $this->activeOwnerCount() <= 1) {
-                session()->flash('error', 'This is the only active owner and cannot be suspended.');
+                session()->flash('error', "This is the only active owner, so the account can't be suspended. Make someone else an owner first.");
                 return;
             }
         }

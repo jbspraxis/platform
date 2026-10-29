@@ -126,11 +126,19 @@ class VariableCompensation extends Component
 
         try {
             DB::transaction(function () use ($periodString) {
-                foreach ($this->employeeVariables as $empId => $data) {
-                    // Critical Treasury Protection: Skip if this month is already locked by the CFO
-                    if ($data['is_processed'] == 1) continue;
+                // Rows locked by an approved payroll run, read from the database (not from the page)
+                $lockedIds = DB::table('monthly_payroll_variables')
+                    ->where('payroll_period', $periodString)
+                    ->where('is_processed', 1)
+                    ->pluck('mdm_employee_id')
+                    ->map(fn ($id) => (string) $id)
+                    ->flip();
 
-                    // Atomic Upsert prevents duplicate rows if 'variable_id' state is out of sync
+                foreach ($this->employeeVariables as $empId => $data) {
+                    // Skip rows already locked by an approved payroll run
+                    if ($data['is_processed'] == 1 || isset($lockedIds[(string) $empId])) continue;
+
+                    // Upsert prevents duplicate rows if 'variable_id' is out of sync
                     DB::table('monthly_payroll_variables')->updateOrInsert(
                         [
                             'mdm_employee_id' => $empId,
@@ -149,12 +157,13 @@ class VariableCompensation extends Component
                 }
             });
 
-            $this->successMessage = "Variable compensations and deductions committed to the ledger for " . Carbon::create($this->targetYear, $this->targetMonth, 1)->format('M Y') . ".";
+            $this->successMessage = "Variable pay for " . Carbon::create($this->targetYear, $this->targetMonth, 1)->format('F Y') . " saved. The payroll run for that month uses it.";
             $this->showSuccessModal = true;
             $this->loadVariables();
 
         } catch (Exception $e) {
-            session()->flash('error', "Ledger Update Failed: " . $e->getMessage());
+            report($e);
+            session()->flash('error', "We couldn't save variable pay, so nothing was changed. Check that every amount is a number, then save again.");
         }
     }
 

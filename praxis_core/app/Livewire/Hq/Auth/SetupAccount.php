@@ -5,6 +5,7 @@ namespace App\Livewire\Hq\Auth;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Title;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Session;
  * password. Clients use ClientOs\SetupAccount on the portal instead.
  */
 #[Layout('components.layouts.auth')]
+#[Title('Choose your password')]
 class SetupAccount extends Component
 {
     // Locked: the browser cannot swap the token. Only display fields are kept in
@@ -31,13 +33,15 @@ class SetupAccount extends Component
     public $password = '';
     public $passwordConfirmation = '';
 
+    private const LINK_INVALID = 'This setup link has expired or has already been used. Ask an administrator to send you a new one.';
+
     public function mount($token)
     {
         $this->token = $token;
 
         $user = $this->invitedUser();
         if (!$user) {
-            abort(404, 'CRYPTOGRAPHIC LINK INVALID, EXPIRED, OR ALREADY CONSUMED.');
+            abort(404, self::LINK_INVALID);
         }
         $this->firstName = $user->first_name;
         $this->email = $user->email;
@@ -57,12 +61,15 @@ class SetupAccount extends Component
             'password' => 'required|string|min:8',
             'passwordConfirmation' => 'required|same:password'
         ], [
-            'passwordConfirmation.same' => '> ERR: Cryptographic keys do not match.'
+            'password.required' => 'Choose a password.',
+            'password.min' => 'Use at least 8 characters.',
+            'passwordConfirmation.required' => 'Type your password again to confirm it.',
+            'passwordConfirmation.same' => "The two passwords don't match. Type the same password in both fields.",
         ]);
 
         $user = $this->invitedUser();
         if (!$user) {
-            abort(404, 'CRYPTOGRAPHIC LINK INVALID, EXPIRED, OR ALREADY CONSUMED.');
+            abort(404, self::LINK_INVALID);
         }
 
         DB::transaction(function () use ($user) {
@@ -75,7 +82,7 @@ class SetupAccount extends Component
                 'updated_at' => now()
             ]);
 
-            // Log the initialization in the forensic audit
+            // Record the account setup in the audit log
             DB::table('system_audit_logs')->insert([
                 'user_id' => $user->id,
                 'action' => 'AUTH_INIT_KEY',

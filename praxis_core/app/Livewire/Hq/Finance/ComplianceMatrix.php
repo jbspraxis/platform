@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Finance;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Services\Payroll\CameroonTaxCalculator;
@@ -17,9 +18,14 @@ class ComplianceMatrix extends Component
     public $matrix_run_filter = 'live';   
     public $matrix_region_filter = 'ALL'; 
     
+    // Calculated on the server only; the browser must not change them (the exports read them)
+    #[Locked]
     public $payrollRuns = [];
+    #[Locked]
     public $matrix_kpis = [];
+    #[Locked]
     public $remittance_list = [];
+    #[Locked]
     public $statutory_remittance_list = [];
 
     public function mount()
@@ -179,7 +185,7 @@ class ComplianceMatrix extends Component
 
         foreach ($lines as $line) {
             // Restore Phase 9 Data Integrity Fallback
-            $fullName = $line->first_name ? ($line->first_name . ' ' . $line->last_name) : 'Archived User (' . substr($line->user_id, 0, 8) . ')';
+            $fullName = $line->first_name ? ($line->first_name . ' ' . $line->last_name) : 'Former staff member (' . substr($line->user_id, 0, 8) . ')';
             $social_id = $run->region_code === 'CM' ? $line->social_security_number : $line->rsa_number;
 
             $statutory_remittance[] = [
@@ -212,8 +218,7 @@ class ComplianceMatrix extends Component
     }
 
     /**
-     * PHASE 10 EXPORT: BANK REMITTANCE
-     * Bulletproof RFC 4180 CSV Generation
+     * Export: net pay bank file (RFC 4180 CSV)
      */
     public function exportBankRemittance()
     {
@@ -224,7 +229,7 @@ class ComplianceMatrix extends Component
 
         return response()->streamDownload(function () {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ["Employee Name", "Bank Name", "Account Number", "Currency", "Net Pay Amount"]);
+            fputcsv($handle, ["Employee name", "Bank name", "Account number", "Currency", "Net pay"]);
 
             foreach ($this->remittance_list as $row) {
                 fputcsv($handle, [
@@ -240,8 +245,7 @@ class ComplianceMatrix extends Component
     }
 
     /**
-     * PHASE 10 EXPORT: STATUTORY / TAX REMITTANCE
-     * Bulletproof RFC 4180 CSV Generation
+     * Export: tax and pension remittance (RFC 4180 CSV)
      */
     public function exportStatutoryRemittance()
     {
@@ -253,8 +257,8 @@ class ComplianceMatrix extends Component
         return response()->streamDownload(function () {
             $handle = fopen('php://output', 'w');
             fputcsv($handle, [
-                "Employee Name", "Jurisdiction", "Tax ID (TIN/NIU)", "Social ID (RSA/CNPS)", "Currency", 
-                "Income Tax (PAYE/IRPP)", "Employee Pension Share", "Employer Pension Share", "Total Pension Remittance", "Other Employer Liabilities"
+                "Employee name", "Country", "Tax ID (TIN/NIU)", "Social security ID (RSA/CNPS)", "Currency", 
+                "Income tax (PAYE/IRPP)", "Employee pension share", "Employer pension share", "Total pension to pay", "Other employer contributions"
             ]);
 
             foreach ($this->statutory_remittance_list as $row) {

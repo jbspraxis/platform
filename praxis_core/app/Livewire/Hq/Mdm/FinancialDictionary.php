@@ -4,11 +4,13 @@ namespace App\Livewire\Hq\Mdm;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
 #[Layout('components.layouts.hq')]
+#[Title('Financial dictionary')]
 class FinancialDictionary extends Component
 {
     public $dictionary = [];
@@ -22,21 +24,21 @@ class FinancialDictionary extends Component
     public $uom = '1 Phase'; 
     public $default_unit_rate_usd = 0.00;
 
-    // ERP UPGRADE: Categories now hold their native Dual-Sided Ledger routing codes
+    // Each category carries its item code letter and the income and expense accounts it posts to (labels are display only)
     public $availableCategories = [
-        'Consulting' =>        ['label' => 'Consulting & Advisory',    'code' => 'C', 'income' => '4000', 'expense' => '5000'],
-        'Strategy' =>          ['label' => 'Business Strategy',        'code' => 'Z', 'income' => '4000', 'expense' => '5000'],
-        'Data' =>              ['label' => 'Data Architecture',        'code' => 'D', 'income' => '4000', 'expense' => '5000'],
-        'Engineering' =>       ['label' => 'Software Engineering',     'code' => 'E', 'income' => '4000', 'expense' => '5000'],
+        'Consulting' =>        ['label' => 'Consulting and advisory',    'code' => 'C', 'income' => '4000', 'expense' => '5000'],
+        'Strategy' =>          ['label' => 'Business strategy',        'code' => 'Z', 'income' => '4000', 'expense' => '5000'],
+        'Data' =>              ['label' => 'Data systems',             'code' => 'D', 'income' => '4000', 'expense' => '5000'],
+        'Engineering' =>       ['label' => 'Software engineering',     'code' => 'E', 'income' => '4000', 'expense' => '5000'],
         'Security' =>          ['label' => 'Cybersecurity',            'code' => 'S', 'income' => '4000', 'expense' => '5000'],
-        'Infrastructure' =>    ['label' => 'Cloud Infrastructure',     'code' => 'I', 'income' => '4100', 'expense' => '5200'],
-        'Software' =>          ['label' => 'Software / SaaS Licenses', 'code' => 'W', 'income' => '4100', 'expense' => '5200'],
-        'Human Capital' =>     ['label' => 'Payroll & Strike Team',    'code' => 'H', 'income' => null,   'expense' => '6000'],
-        'Marketing & Acquisition'=>['label' => 'Marketing Campaigns',  'code' => 'M', 'income' => null,   'expense' => '6100'],
-        'Travel' =>            ['label' => 'Travel & Logistics',       'code' => 'T', 'income' => '4000', 'expense' => '6200'],
-        'Operating Expense' => ['label' => 'Internal OPEX / Cash Req', 'code' => 'O', 'income' => null,   'expense' => '6300'],
-        'Hardware' =>          ['label' => 'Procurement / PO',         'code' => 'P', 'income' => '4200', 'expense' => '5000'],
-        'Financial' =>         ['label' => 'Banking & Gateway Fees',   'code' => 'F', 'income' => null,   'expense' => '6950'],
+        'Infrastructure' =>    ['label' => 'Cloud infrastructure',     'code' => 'I', 'income' => '4100', 'expense' => '5200'],
+        'Software' =>          ['label' => 'Software and SaaS licences', 'code' => 'W', 'income' => '4100', 'expense' => '5200'],
+        'Human Capital' =>     ['label' => 'Payroll and staff costs',   'code' => 'H', 'income' => null,   'expense' => '6000'],
+        'Marketing & Acquisition'=>['label' => 'Marketing campaigns',  'code' => 'M', 'income' => null,   'expense' => '6100'],
+        'Travel' =>            ['label' => 'Travel and logistics',     'code' => 'T', 'income' => '4000', 'expense' => '6200'],
+        'Operating Expense' => ['label' => 'Office costs and cash requests', 'code' => 'O', 'income' => null,   'expense' => '6300'],
+        'Hardware' =>          ['label' => 'Purchases and purchase orders',   'code' => 'P', 'income' => '4200', 'expense' => '5000'],
+        'Financial' =>         ['label' => 'Bank and payment fees',   'code' => 'F', 'income' => null,   'expense' => '6950'],
     ];
 
     public function mount()
@@ -103,7 +105,7 @@ class FinancialDictionary extends Component
                 $incomeId = null;
                 if ($categoryData['income']) {
                     $incomeAccount = DB::table('chart_of_accounts')->where('account_code', $categoryData['income'])->first();
-                    if (!$incomeAccount) throw new Exception("Critical: Income account {$categoryData['income']} not found in COA.");
+                    if (!$incomeAccount) throw new Exception("We couldn't save the item because income account {$categoryData['income']} isn't in the chart of accounts. Add it in Chart of accounts, then save again.");
                     $incomeId = $incomeAccount->id;
                 }
 
@@ -111,7 +113,7 @@ class FinancialDictionary extends Component
                 $expenseId = null;
                 if ($categoryData['expense']) {
                     $expenseAccount = DB::table('chart_of_accounts')->where('account_code', $categoryData['expense'])->first();
-                    if (!$expenseAccount) throw new Exception("Critical: Expense account {$categoryData['expense']} not found in COA.");
+                    if (!$expenseAccount) throw new Exception("We couldn't save the item because expense account {$categoryData['expense']} isn't in the chart of accounts. Add it in Chart of accounts, then save again.");
                     $expenseId = $expenseAccount->id;
                 }
 

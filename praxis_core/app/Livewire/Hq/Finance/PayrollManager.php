@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Finance;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -13,9 +14,15 @@ use Exception;
 class PayrollManager extends Component
 {
     public $activeTab = 'ledger'; // 'ledger', 'inspector'
+
+    // Loaded on the server only; the browser must not change them
+    #[Locked]
     public $payrollRuns = [];
+    #[Locked]
     public $selectedRunId = null;
+    #[Locked]
     public $runDetails = [];
+    #[Locked]
     public $runLines = [];
     
     // Draft Generation State
@@ -83,7 +90,7 @@ class PayrollManager extends Component
     }
 
     /**
-     * STAGE 1: MAKER - Generate the Draft Ledger
+     * Stage 1: the preparer creates the draft run
      */
     public function generateDraftRun()
     {
@@ -106,7 +113,9 @@ class PayrollManager extends Component
             ->exists();
 
         if ($existingRun) {
-            session()->flash('error', "A payroll ledger for {$periodStart} [{$this->targetRegion}] already exists in the pipeline.");
+            $periodLabel = date('F Y', strtotime($periodStart));
+            $regionLabel = $this->targetRegion === 'ALL' ? 'all countries' : $this->targetRegion;
+            session()->flash('error', "A payroll run for {$periodLabel} ({$regionLabel}) already exists. Open it from the list below instead of creating another.");
             return;
         }
 
@@ -164,34 +173,42 @@ class PayrollManager extends Component
                     DB::table('payroll_lines')->insert($lines);
                 }
 
-                $this->successMessage = "Draft Payroll Run [{$refNumber}] generated successfully with " . count($lines) . " personnel lines. Pending checker review.";
+                $lineCount = count($lines);
+                $this->successMessage = "Draft payroll run {$refNumber} created with {$lineCount} " . ($lineCount === 1 ? 'staff member' : 'staff members') . ". Someone other than you checks it next.";
             });
 
             $this->showSuccessModal = true;
             $this->loadPayrollRuns();
 
         } catch (Exception $e) {
-            session()->flash('error', "Draft Generation Failed: " . $e->getMessage());
+            report($e);
+            session()->flash('error', "We couldn't create the draft payroll run. Try again, and if it still fails, ask an administrator to check the error log.");
         }
     }
 
     /**
-     * STAGE 2: CHECKER - Submit for Approval
+     * Stage 2: a second person checks it and sends it for approval
      */
     public function submitForReview($runId)
     {
         abort_unless(Auth::user()->can('payroll.edit'), 403);
 
-        $run = collect($this->payrollRuns)->firstWhere('id', $runId);
+        // Read the run from the database, not from component state
+        $run = DB::table('payroll_runs')->where('id', $runId)->first();
         $currentUserId = Auth::id() ?? 'sys-admin';
 
-        // Segregation of Duties: Maker cannot be Checker
-        if ($run->maker_id === $currentUserId) {
-            session()->flash('error', "Compliance Violation: The Maker cannot review their own ledger.");
+        if (! $run) {
+            session()->flash('error', "We couldn't find that payroll run. Refresh the page and try again.");
             return;
         }
 
-        DB::table('payroll_runs')
+        // Segregation of duties: the person who prepared the run cannot check it
+        if ((string) $run->maker_id === (string) $currentUserId) {
+            session()->flash('error', "You prepared this payroll run, so someone else must check it.");
+            return;
+        }
+
+        $updated = DB::table('payroll_runs')
             ->where('id', $runId)
             ->where('status', 'Draft')
             ->update([
@@ -200,32 +217,49 @@ class PayrollManager extends Component
                 'reviewed_at' => now(),
                 'updated_at' => now()
             ]);
-        
-        $this->successMessage = "Ledger escalated to Pending Review.";
+
+        if (! $updated) {
+            session()->flash('error', "This payroll run is no longer a draft, so it wasn't sent for approval. The list has been refreshed.");
+            $this->loadPayrollRuns();
+            $this->viewRun($runId);
+            return;
+        }
+
+        $this->successMessage = "Payroll run checked and sent for approval.";
         $this->showSuccessModal = true;
         $this->loadPayrollRuns();
         $this->viewRun($runId);
     }
 
     /**
-     * STAGE 3: APPROVER (CFO) - Lock and Approve
+     * Stage 3: an approver (not the preparer or checker) approves and locks it
      */
     public function approveRun($runId)
     {
         abort_unless(Auth::user()->can('payroll.approve'), 403);
 
-        $run = collect($this->payrollRuns)->firstWhere('id', $runId);
+        // Read the run from the database, not from component state
+        $run = DB::table('payroll_runs')->where('id', $runId)->first();
         $currentUserId = Auth::id() ?? 'sys-admin';
 
-        // Segregation of Duties: Checker cannot be Approver
-        if ($run->checker_id === $currentUserId) {
-            session()->flash('error', "Compliance Violation: The Checker cannot finalize the treasury approval.");
+        if (! $run) {
+            session()->flash('error', "We couldn't find that payroll run. Refresh the page and try again.");
+            return;
+        }
+
+        // Segregation of duties: whoever prepared or checked the run cannot approve it
+        if ((string) $run->maker_id === (string) $currentUserId) {
+            session()->flash('error', "You prepared this payroll run, so you can't approve it. Ask another approver to approve it.");
+            return;
+        }
+        if ($run->checker_id && (string) $run->checker_id === (string) $currentUserId) {
+            session()->flash('error', "You checked this payroll run, so you can't approve it. Ask another approver to approve it.");
             return;
         }
 
         try {
-            DB::transaction(function () use ($runId, $run, $currentUserId) {
-                DB::table('payroll_runs')
+            $approved = DB::transaction(function () use ($runId, $run, $currentUserId) {
+                $updated = DB::table('payroll_runs')
                     ->where('id', $runId)
                     ->whereIn('status', ['Draft', 'Pending_Review'])
                     ->update([
@@ -234,31 +268,45 @@ class PayrollManager extends Component
                         'approved_at' => now(),
                         'updated_at' => now()
                     ]);
-                
+
+                if (! $updated) {
+                    return false;
+                }
+
                 // Once approved, lock the variable inputs for this specific period
                 DB::table('monthly_payroll_variables')
                     ->where('payroll_period', $run->pay_period_start)
                     ->update(['is_processed' => 1]);
+
+                return true;
             });
 
-            $this->successMessage = "Ledger officially APPROVED and locked by Treasury.";
+            if (! $approved) {
+                session()->flash('error', "This payroll run has already been approved or paid, so it wasn't changed. The list has been refreshed.");
+                $this->loadPayrollRuns();
+                $this->viewRun($runId);
+                return;
+            }
+
+            $this->successMessage = "Payroll run approved. Variable pay for this month is now locked.";
             $this->showSuccessModal = true;
             $this->loadPayrollRuns();
             $this->viewRun($runId);
 
         } catch (Exception $e) {
-            session()->flash('error', "Approval Failed: " . $e->getMessage());
+            report($e);
+            session()->flash('error', "We couldn't approve the payroll run. Try again, and if it still fails, ask an administrator to check the error log.");
         }
     }
 
     /**
-     * STAGE 4: TREASURY - Mark as Disbursed
+     * Stage 4: mark the run as paid
      */
     public function disburseRun($runId)
     {
         abort_unless(Auth::user()->can('payroll.approve'), 403);
 
-        DB::table('payroll_runs')
+        $updated = DB::table('payroll_runs')
             ->where('id', $runId)
             ->where('status', 'Approved')
             ->update([
@@ -266,21 +314,34 @@ class PayrollManager extends Component
                 'disbursed_at' => now(),
                 'updated_at' => now()
             ]);
-        
-        $this->successMessage = "Funds marked as DISBURSED. Finalizing ledger closure.";
+
+        if (! $updated) {
+            session()->flash('error', "Only an approved payroll run can be marked as paid. This one has changed; the list has been refreshed.");
+            $this->loadPayrollRuns();
+            $this->viewRun($runId);
+            return;
+        }
+
+        $this->successMessage = "Payroll run marked as paid. It can no longer be changed.";
         $this->showSuccessModal = true;
         $this->loadPayrollRuns();
         $this->viewRun($runId);
     }
 
     /**
-     * STAGE 5: REJECTION - Return to Draft & Unlock
+     * Stage 5: return the run to draft and unlock variable pay
      */
     public function rejectRun($runId)
     {
         abort_unless(Auth::user()->can('payroll.approve'), 403);
 
-        $run = collect($this->payrollRuns)->firstWhere('id', $runId);
+        // Read the run from the database, not from component state
+        $run = DB::table('payroll_runs')->where('id', $runId)->first();
+
+        if (! $run) {
+            session()->flash('error', "We couldn't find that payroll run. Refresh the page and try again.");
+            return;
+        }
 
         try {
             DB::transaction(function () use ($runId, $run) {
@@ -302,13 +363,14 @@ class PayrollManager extends Component
                     ->update(['is_processed' => 0]);
             });
 
-            $this->successMessage = "Ledger rejected and returned to Draft status. Variables unlocked for corrections.";
+            $this->successMessage = "Payroll run returned to draft. Variable pay for this month is unlocked so it can be corrected.";
             $this->showSuccessModal = true;
             $this->loadPayrollRuns();
             $this->viewRun($runId);
 
         } catch (Exception $e) {
-            session()->flash('error', "Rejection Failed: " . $e->getMessage());
+            report($e);
+            session()->flash('error', "We couldn't return the payroll run to draft. Try again, and if it still fails, ask an administrator to check the error log.");
         }
     }
 

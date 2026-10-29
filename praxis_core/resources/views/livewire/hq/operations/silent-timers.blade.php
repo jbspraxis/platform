@@ -1,267 +1,248 @@
-<div wire:poll.60s="loadAllData" style="display: flex; flex-direction: column; min-height: 100vh; padding-bottom: 50px;">
-    <style>
-        /* Fluid Layout (No clipping) */
-        .page-header { margin-bottom: 25px; border-bottom: 1px solid var(--erp-border-dark); padding-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-end; }
-        
-        .tab-nav { display: flex; gap: 5px; border-bottom: 1px solid var(--erp-border-dark); margin-bottom: 25px; }
-        .tab-btn { background: transparent; border: 1px solid transparent; border-bottom: none; color: var(--erp-muted); padding: 12px 25px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; cursor: pointer; transition: 0.3s; font-weight: bold; outline: none; }
-        .tab-btn:hover { color: var(--erp-teal); background: rgba(0,229,255,0.02); }
-        .tab-btn.active { color: var(--erp-teal); border-color: var(--erp-border-dark); background: rgba(10, 17, 40, 0.8); border-top: 2px solid var(--erp-teal); border-radius: 4px 4px 0 0; }
-
-        .bloomberg-table { width: 100%; border-collapse: collapse; text-align: left; background: rgba(10, 17, 40, 0.4); border: 1px solid var(--erp-border-dark); }
-        .bloomberg-table th { font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); padding: 15px; border-bottom: 1px solid var(--erp-teal); text-transform: uppercase; background: rgba(0,229,255,0.05); }
-        .bloomberg-table td { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.02); vertical-align: middle; font-size: 0.8rem; color: #E2E8F0; }
-        .bloomberg-table tbody tr:hover td { background: rgba(0, 229, 255, 0.05); }
-        
-        /* Group Headers for Ledger */
-        .group-header td { background: rgba(255,255,255,0.02); color: var(--erp-gold); font-family: 'Roboto Mono', monospace; font-weight: bold; font-size: 0.85rem; border-top: 2px solid var(--erp-border-dark); }
-
-        .status-badge { padding: 4px 8px; border-radius: 2px; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; font-weight: bold; text-transform: uppercase; display: inline-block; border: 1px solid transparent; }
-        .badge-live { background: rgba(0, 255, 102, 0.1); color: #00FF66; border-color: #00FF66; animation: pulse-green 2s infinite; }
-        .badge-rework { background: rgba(255, 189, 46, 0.1); color: #FFBD2E; border-color: #FFBD2E; }
-        .badge-terminated { background: rgba(255, 51, 102, 0.1); color: var(--erp-red); border-color: var(--erp-red); }
-        .badge-anomaly { background: rgba(255, 51, 102, 0.1); color: var(--erp-red); border-color: var(--erp-red); }
-
-        @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(0, 255, 102, 0.4); } 70% { box-shadow: 0 0 0 4px rgba(0, 255, 102, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 255, 102, 0); } }
-
-        .btn-action { background: transparent; border: 1px solid var(--erp-border-dark); color: var(--erp-white); padding: 8px 15px; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; cursor: pointer; border-radius: 2px; transition: 0.3s; display: inline-flex; align-items: center; gap: 8px; font-weight: bold; }
-        .btn-action:hover { border-color: var(--erp-teal); color: var(--erp-teal); }
-        .btn-danger { color: var(--erp-red); border-color: var(--erp-red); }
-        .btn-danger:hover { background: rgba(255,51,102,0.1); color: var(--erp-red); }
-        .btn-success { color: #00FF66; border-color: #00FF66; }
-        .btn-success:hover { background: rgba(0,255,102,0.1); color: #00FF66; }
-
-        .cyber-select { background: rgba(0,0,0,0.3); border: 1px solid var(--erp-border-dark); color: var(--erp-teal); padding: 8px 12px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; outline: none; transition: 0.3s; font-weight: bold; }
-        .cyber-select option { background-color: var(--erp-bg-main); }
-        .cyber-input { background: rgba(0,0,0,0.3); border: 1px solid var(--erp-border-dark); color: var(--erp-white); padding: 8px 12px; font-family: 'Inter', sans-serif; font-size: 0.85rem; border-radius: 2px; outline: none; transition: 0.3s; width: 100%; }
-        .cyber-input:focus { border-color: var(--erp-teal); }
-
-        .god-mode-box { background: rgba(255, 51, 102, 0.05); border: 1px dashed var(--erp-red); padding: 25px; margin-top: 40px; border-radius: 4px; }
-        .god-mode-header { font-family: 'Montserrat', sans-serif; font-size: 1.1rem; color: var(--erp-red); font-weight: bold; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
-    </style>
+<div wire:poll.60s="loadAllData">
+    @php $cols = $canSeeMoney ? 6 : 5; @endphp
 
     <div class="page-header">
         <div>
-            <h1 style="font-family: 'Montserrat', sans-serif; font-size: 1.3rem; color: var(--erp-white); letter-spacing: 1px;">SILENT TIMERS & EOD MANAGER</h1>
-            <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-teal); margin-top: 5px;">[ LIVE MARGIN TELEMETRY & LEDGER AUDIT ]</p>
+            <h1 class="page-title">Time tracking</h1>
+            <p class="page-subtitle">{{ $canSeeAll ? 'Timers running now, time that needs a second look, the time log and correction requests.' : 'Your finished timers. A timer runs while one of your tasks is In progress.' }}</p>
         </div>
-        <div style="display: flex; gap: 15px; align-items: center;">
-            <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #00FF66; display: flex; align-items: center; gap: 5px;">
-                <span style="display: inline-block; width: 6px; height: 6px; background: #00FF66; border-radius: 50%; box-shadow: 0 0 5px #00FF66; animation: pulse-green 2s infinite;"></span> LIVE RADAR (60s)
-            </div>
-        </div>
+        <p class="help">Updates every 60 seconds.</p>
     </div>
 
     @if (session()->has('error'))
-        <div style="background: rgba(255,51,102,0.1); border: 1px solid var(--erp-red); color: var(--erp-red); padding: 10px 15px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; margin-bottom: 15px;">> {{ session('error') }}</div>
+        <div class="alert alert-danger mb-4" role="alert"><i data-lucide="circle-alert"></i> <span>{{ session('error') }}</span></div>
     @endif
     @if (session()->has('success'))
-        <div style="background: rgba(0,255,102,0.1); border: 1px solid #00FF66; color: #00FF66; padding: 10px 15px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; margin-bottom: 15px;">> {{ session('success') }}</div>
+        <div class="alert alert-success mb-4" role="status"><i data-lucide="check-circle"></i> <span>{{ session('success') }}</span></div>
     @endif
 
-    <div class="tab-nav">
+    <div class="tabs" role="tablist">
         @if($canSeeAll)
-            <button wire:click="$set('activeTab', 'live_burn')" class="tab-btn {{ $activeTab === 'live_burn' ? 'active' : '' }}">
-                <i data-lucide="activity" style="width: 14px; height: 14px; display: inline-block; vertical-align: text-bottom;"></i> LIVE BURN
-            </button>
-            <button wire:click="$set('activeTab', 'anomalies')" class="tab-btn {{ $activeTab === 'anomalies' ? 'active' : '' }}">
-                <i data-lucide="alert-triangle" style="width: 14px; height: 14px; display: inline-block; vertical-align: text-bottom;"></i> ANOMALIES
-            </button>
+            <button type="button" role="tab" wire:click="$set('activeTab', 'live_burn')" class="tab {{ $activeTab === 'live_burn' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'live_burn' ? 'true' : 'false' }}">Running now</button>
+            <button type="button" role="tab" wire:click="$set('activeTab', 'anomalies')" class="tab {{ $activeTab === 'anomalies' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'anomalies' ? 'true' : 'false' }}">To check</button>
         @endif
-        
-        <button wire:click="$set('activeTab', 'ledger')" class="tab-btn {{ $activeTab === 'ledger' ? 'active' : '' }}">
-            <i data-lucide="book-open" style="width: 14px; height: 14px; display: inline-block; vertical-align: text-bottom;"></i> MASTER LEDGER
-        </button>
-        
+
+        <button type="button" role="tab" wire:click="$set('activeTab', 'ledger')" class="tab {{ $activeTab === 'ledger' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'ledger' ? 'true' : 'false' }}">Time log</button>
+
         @if($canManage)
-            <button wire:click="$set('activeTab', 'corrections')" class="tab-btn {{ $activeTab === 'corrections' ? 'active' : '' }}">
-                <i data-lucide="clipboard-check" style="width: 14px; height: 14px; display: inline-block; vertical-align: text-bottom;"></i> CORRECTIONS QUEUE
-            </button>
+            <button type="button" role="tab" wire:click="$set('activeTab', 'corrections')" class="tab {{ $activeTab === 'corrections' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'corrections' ? 'true' : 'false' }}">Correction requests</button>
         @endif
     </div>
 
-    <!-- TAB 1: LIVE BURN -->
+    <!-- Tab 1: running now -->
     @if($activeTab === 'live_burn' && $canSeeAll)
-        <div style="overflow-x: auto;">
-            <table class="bloomberg-table">
-                <thead>
-                    <tr>
-                        <th>ENGINEER (NODE)</th>
-                        <th>BATTLESPACE (PROJECT & TASK)</th>
-                        <th>START TIME</th>
-                        <th>ELAPSED</th>
-                        @if($canSeeMoney) <th>CURRENT MARGIN BURN</th> @endif
-                        <th>STATUS</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($liveBurnData as $burn)
+        <div class="card p-0">
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td style="font-weight: bold; color: var(--erp-white);">{{ $burn['first_name'] }} {{ $burn['last_name'] }}</td>
-                            <td>
-                                <div style="color: var(--erp-teal); font-family: 'Roboto Mono', monospace; font-size: 0.7rem; margin-bottom: 3px;">> {{ $burn['project_title'] }}</div>
-                                <div>{{ $burn['task_title'] }}</div>
-                            </td>
-                            <td style="font-family: 'Roboto Mono', monospace;">{{ \Carbon\Carbon::parse($burn['start_time'])->format('M d, H:i') }}</td>
-                            <td style="font-family: 'Roboto Mono', monospace; color: #FFBD2E; font-weight: bold;">{{ $burn['live_duration'] }}</td>
-                            @if($canSeeMoney)
-                                <td style="font-family: 'Roboto Mono', monospace; color: var(--erp-red); font-weight: bold;">- ${{ number_format($burn['live_cost'], 2) }}</td>
-                            @endif
-                            <td>
-                                @if($burn['is_rework'])
-                                    <span class="status-badge badge-rework">COPQ REWORK</span>
-                                @else
-                                    <span class="status-badge badge-live">ACTIVE EXECUTION</span>
-                                @endif
-                            </td>
+                            <th>Staff member</th>
+                            <th>Project and task</th>
+                            <th>Started</th>
+                            <th class="num">Running for</th>
+                            @if($canSeeMoney) <th class="num">Cost so far</th> @endif
+                            <th>Type</th>
                         </tr>
-                    @empty
-                        <tr><td colspan="{{ $canSeeMoney ? '6' : '5' }}" style="text-align: center; padding: 40px; color: var(--erp-muted);">NO ACTIVE TIMERS IN THE MATRIX.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-    @endif
-
-    <!-- TAB 2: ANOMALIES -->
-    @if($activeTab === 'anomalies' && $canSeeAll)
-        <div style="overflow-x: auto;">
-            <table class="bloomberg-table">
-                <thead>
-                    <tr>
-                        <th>ENGINEER (NODE)</th>
-                        <th>TASK TITLE</th>
-                        <th>ESTIMATED (HOURS)</th>
-                        <th>ACTUAL LOGGED</th>
-                        <th>FLAG REASON</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($anomaliesData as $anomaly)
-                        @php
-                            $estimate = $anomaly->estimated_hours ?: ($anomaly->story_points * 3);
-                            $actual = $anomaly->actual_hours_logged;
-                            $reason = $actual > ($estimate * 1.5) ? 'EXCEEDS 1.5X ESTIMATE' : 'CONTINUOUS LOG > 4 HRS';
-                        @endphp
-                        <tr>
-                            <td style="font-weight: bold; color: var(--erp-white);">{{ $anomaly->first_name }} {{ $anomaly->last_name }}</td>
-                            <td>{{ $anomaly->title }}</td>
-                            <td style="font-family: 'Roboto Mono', monospace;">{{ number_format($estimate, 2) }} HRS</td>
-                            <td style="font-family: 'Roboto Mono', monospace; color: var(--erp-red); font-weight: bold;">{{ number_format($actual, 2) }} HRS</td>
-                            <td><span class="status-badge badge-anomaly">{{ $reason }}</span></td>
-                        </tr>
-                    @empty
-                        <tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--erp-muted);">SYSTEM NOMINAL. NO ANOMALIES DETECTED.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-    @endif
-
-    <!-- TAB 3: MASTER LEDGER -->
-    @if($activeTab === 'ledger')
-        @if($canSeeAll)
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <div style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-teal);">> LEDGER GROUPING PREFERENCE</div>
-                <select wire:model.live="ledgerGroupBy" class="cyber-select">
-                    <option value="engineer">VIEW BY NODE (Engineer)</option>
-                    <option value="project">VIEW BY BATTLESPACE (Project)</option>
-                </select>
-            </div>
-        @endif
-
-        <div style="overflow-x: auto;">
-            <table class="bloomberg-table">
-                <thead>
-                    <tr>
-                        <th>{{ $ledgerGroupBy === 'engineer' ? 'PROJECT / TASK' : 'ENGINEER / TASK' }}</th>
-                        <th>START TIME</th>
-                        <th>END TIME</th>
-                        <th>DURATION</th>
-                        @if($canSeeMoney) <th>MARGIN COST</th> @endif
-                        <th>FLAGS</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($ledgerData as $groupName => $logs)
-                        <tr class="group-header">
-                            <td colspan="{{ $canSeeMoney ? '6' : '5' }}">> {{ strtoupper($groupName) }}</td>
-                        </tr>
-                        @foreach($logs as $log)
+                    </thead>
+                    <tbody>
+                        @forelse($liveBurnData as $burn)
                             <tr>
+                                <td class="font-medium text-ink">{{ $burn['first_name'] }} {{ $burn['last_name'] }}</td>
                                 <td>
-                                    @if($ledgerGroupBy === 'engineer')
-                                        <div style="color: var(--erp-teal); font-family: 'Roboto Mono', monospace; font-size: 0.7rem; margin-bottom: 3px;">{{ $log->project_title }}</div>
-                                        <div>{{ $log->task_title }}</div>
-                                    @else
-                                        <div style="font-weight: bold; color: var(--erp-white); margin-bottom: 3px;">{{ $log->first_name }} {{ $log->last_name }}</div>
-                                        <div style="font-size: 0.75rem; color: var(--erp-muted);">{{ $log->task_title }}</div>
-                                    @endif
+                                    <div class="help">{{ $burn['project_title'] }}</div>
+                                    <div>{{ $burn['task_title'] }}</div>
                                 </td>
-                                <td style="font-family: 'Roboto Mono', monospace;">{{ \Carbon\Carbon::parse($log->start_time)->format('M d, H:i') }}</td>
-                                <td style="font-family: 'Roboto Mono', monospace;">{{ \Carbon\Carbon::parse($log->end_time)->format('M d, H:i') }}</td>
-                                <td style="font-family: 'Roboto Mono', monospace; font-weight: bold;">{{ number_format($log->duration_minutes / 60, 2) }} HRS</td>
-                                
+                                <td class="num text-left">{{ \Carbon\Carbon::parse($burn['start_time'])->format('j M, H:i') }}</td>
+                                <td class="num font-semibold text-ink">{{ $burn['live_duration'] }}</td>
                                 @if($canSeeMoney)
-                                    <td style="font-family: 'Roboto Mono', monospace; color: {{ $log->is_rework ? 'var(--erp-red)' : 'var(--erp-muted)' }};">
-                                        ${{ number_format($log->cost_calculated, 2) }}
-                                    </td>
+                                    <td class="num">${{ number_format($burn['live_cost'], 2) }}</td>
                                 @endif
-                                
                                 <td>
-                                    @if($log->is_rework)
-                                        <span class="status-badge badge-rework" style="margin-right: 5px;">COPQ REWORK</span>
-                                    @endif
-                                    @if($log->is_system_terminated)
-                                        <span class="status-badge badge-terminated">SYSTEM TERMINATED</span>
+                                    @if($burn['is_rework'])
+                                        <span class="pill pill-warning">Rework</span>
+                                    @else
+                                        <span class="pill pill-info">Work</span>
                                     @endif
                                 </td>
                             </tr>
-                        @endforeach
-                    @empty
-                        <tr><td colspan="{{ $canSeeMoney ? '6' : '5' }}" style="text-align: center; padding: 40px; color: var(--erp-muted);">NO HISTORICAL LOGS FOUND.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
+                        @empty
+                            <tr><td colspan="{{ $cols }}">
+                                <div class="empty-state">
+                                    <strong>No timers running</strong>
+                                    A timer starts when a staff member moves a task into In progress, and stops when the task moves on.
+                                </div>
+                            </td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
         </div>
     @endif
 
-    <!-- TAB 4: CORRECTIONS QUEUE & GOD MODE -->
-    @if($activeTab === 'corrections' && $canManage)
-        <div style="margin-bottom: 40px;">
-            <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: #FFBD2E; margin-bottom: 15px;">> PENDING L4 TIME CORRECTION REQUESTS</div>
-            <div style="overflow-x: auto;">
-                <table class="bloomberg-table">
+    <!-- Tab 2: to check -->
+    @if($activeTab === 'anomalies' && $canSeeAll)
+        <div class="card p-0">
+            <div class="table-wrap">
+                <table class="table">
                     <thead>
                         <tr>
-                            <th>ENGINEER</th>
-                            <th>TASK</th>
-                            <th>REQUESTED WINDOW</th>
-                            <th>EXPLANATION</th>
-                            <th>ACTIONS</th>
+                            <th>Staff member</th>
+                            <th>Task</th>
+                            <th class="num">Estimate</th>
+                            <th class="num">Logged</th>
+                            <th>Why it’s here</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($anomaliesData as $anomaly)
+                            @php
+                                $estimate = $anomaly->estimated_hours ?: ($anomaly->story_points * 3);
+                                $actual = $anomaly->actual_hours_logged;
+                                $reason = $actual > ($estimate * 1.5) ? 'More than 1.5 times the estimate' : 'One entry longer than 4 hours';
+                            @endphp
+                            <tr>
+                                <td class="font-medium text-ink">{{ $anomaly->first_name }} {{ $anomaly->last_name }}</td>
+                                <td>{{ $anomaly->title }}</td>
+                                <td class="num">{{ number_format($estimate, 2) }} h</td>
+                                <td class="num font-semibold text-danger">{{ number_format($actual, 2) }} h</td>
+                                <td><span class="pill pill-warning">{{ $reason }}</span></td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="5">
+                                <div class="empty-state">
+                                    <strong>Nothing to check</strong>
+                                    A task appears here when its logged time passes 1.5 times the estimate, or when one time entry runs longer than 4 hours.
+                                </div>
+                            </td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+
+    <!-- Tab 3: time log -->
+    @if($activeTab === 'ledger')
+        @if($canSeeAll)
+            <div class="mb-4 flex flex-wrap items-end justify-between gap-4">
+                <p class="help">The latest 100 finished time entries.</p>
+                <div class="field">
+                    <label for="ledger-group" class="label">Group by</label>
+                    <select id="ledger-group" wire:model.live="ledgerGroupBy" class="select">
+                        <option value="engineer">Staff member</option>
+                        <option value="project">Project</option>
+                    </select>
+                </div>
+            </div>
+        @endif
+
+        <div class="card p-0">
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>{{ $ledgerGroupBy === 'engineer' ? 'Project and task' : 'Staff member and task' }}</th>
+                            <th>Started</th>
+                            <th>Ended</th>
+                            <th class="num">Duration</th>
+                            @if($canSeeMoney) <th class="num">Cost</th> @endif
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($ledgerData as $groupName => $logs)
+                            <tr class="bg-mist">
+                                <td colspan="{{ $cols }}" class="font-semibold text-ink">{{ $groupName }}</td>
+                            </tr>
+                            @foreach($logs as $log)
+                                <tr>
+                                    <td>
+                                        @if($ledgerGroupBy === 'engineer')
+                                            <div class="help">{{ $log->project_title }}</div>
+                                            <div>{{ $log->task_title }}</div>
+                                        @else
+                                            <div class="font-medium text-ink">{{ $log->first_name }} {{ $log->last_name }}</div>
+                                            <div class="help">{{ $log->task_title }}</div>
+                                        @endif
+                                    </td>
+                                    <td class="num text-left">{{ \Carbon\Carbon::parse($log->start_time)->format('j M, H:i') }}</td>
+                                    <td class="num text-left">{{ \Carbon\Carbon::parse($log->end_time)->format('j M, H:i') }}</td>
+                                    <td class="num font-semibold text-ink">{{ number_format($log->duration_minutes / 60, 2) }} h</td>
+
+                                    @if($canSeeMoney)
+                                        <td class="num {{ $log->is_rework ? 'text-danger' : '' }}">${{ number_format($log->cost_calculated, 2) }}</td>
+                                    @endif
+
+                                    <td>
+                                        <div class="flex flex-wrap gap-2">
+                                            @if($log->is_rework)
+                                                <span class="pill pill-warning">Rework</span>
+                                            @endif
+                                            @if($log->is_system_terminated)
+                                                <span class="pill pill-neutral">Stopped automatically</span>
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        @empty
+                            <tr><td colspan="{{ $cols }}">
+                                <div class="empty-state">
+                                    <strong>No time logged yet</strong>
+                                    {{ $canSeeAll ? 'Finished timers appear here, grouped as you choose.' : 'Your finished timers appear here once you move a task out of In progress.' }}
+                                </div>
+                            </td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+
+    <!-- Tab 4: correction requests and manual time entry -->
+    @if($activeTab === 'corrections' && $canManage)
+        <h2 class="section-title">Waiting for review</h2>
+        <div class="card mb-8 p-0">
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Staff member</th>
+                            <th>Task</th>
+                            <th>Time requested</th>
+                            <th>Reason</th>
+                            <th><span class="sr-only">Actions</span></th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($correctionRequests as $req)
                             <tr>
-                                <td style="font-weight: bold; color: var(--erp-white);">{{ $req->first_name }} {{ $req->last_name }}</td>
+                                <td class="font-medium text-ink">{{ $req->first_name }} {{ $req->last_name }}</td>
                                 <td>{{ $req->task_title }}</td>
-                                <td style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem;">
-                                    {{ \Carbon\Carbon::parse($req->requested_start_time)->format('M d, H:i') }}<br>
-                                    to {{ \Carbon\Carbon::parse($req->requested_end_time)->format('M d, H:i') }}
+                                <td class="whitespace-nowrap">
+                                    <span class="num text-left">{{ \Carbon\Carbon::parse($req->requested_start_time)->format('j M, H:i') }}</span>
+                                    <span class="muted">to</span>
+                                    <span class="num text-left">{{ \Carbon\Carbon::parse($req->requested_end_time)->format('j M, H:i') }}</span>
                                 </td>
-                                <td><div style="max-width: 250px; font-size: 0.75rem; color: var(--erp-muted);">{{ $req->reason_for_correction }}</div></td>
+                                <td><div class="help max-w-[280px]">{{ $req->reason_for_correction }}</div></td>
                                 <td>
-                                    <button wire:click="approveCorrection('{{ $req->id }}')" class="btn-action btn-success" style="margin-right: 5px;">
-                                        <i data-lucide="check" style="width: 14px; height: 14px;"></i> APPROVE
-                                    </button>
-                                    <button wire:click="rejectCorrection('{{ $req->id }}')" class="btn-action btn-danger">
-                                        <i data-lucide="x" style="width: 14px; height: 14px;"></i> REJECT
-                                    </button>
+                                    <div class="flex flex-wrap justify-end gap-2">
+                                        <button type="button" wire:click="approveCorrection('{{ $req->id }}')" class="btn btn-primary btn-sm">
+                                            <i data-lucide="check"></i> Approve
+                                        </button>
+                                        <button type="button" wire:click="rejectCorrection('{{ $req->id }}')" class="btn btn-secondary btn-sm">
+                                            <i data-lucide="x"></i> Reject
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--erp-muted);">NO PENDING CORRECTION REQUESTS.</td></tr>
+                            <tr><td colspan="5">
+                                <div class="empty-state">
+                                    <strong>No correction requests</strong>
+                                    When a staff member asks to correct their time, the request appears here for you to approve or reject.
+                                </div>
+                            </td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -269,48 +250,50 @@
         </div>
 
         @if($canInject)
-            <div class="god-mode-box">
-                <div class="god-mode-header">
-                    <i data-lucide="shield-alert" style="width: 24px; height: 24px;"></i> L5 SUPER ADMIN OVERRIDE (GOD MODE INJECTION)
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Manual time entry</h2>
                 </div>
-                <p style="font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: var(--erp-muted); margin-bottom: 20px;">Forcefully inject time into the General Ledger bypassing the request queue. This action is permanently audited.</p>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap: 15px; align-items: end;">
-                    <div>
-                        <label style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-red); display: block; margin-bottom: 5px;">SELECT NODE (USER)</label>
-                        <select wire:model="godModeUserId" class="cyber-select" style="width: 100%;">
-                            <option value="">-- Select Engineer --</option>
+                <p class="help mb-4">Add time for a staff member without a correction request. The entry is approved at once, counts towards pay and project cost, and is recorded in the audit trail.</p>
+
+                <div class="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+                    <div class="field">
+                        <label for="manual-user" class="label">Staff member</label>
+                        <select id="manual-user" wire:model="godModeUserId" class="select">
+                            <option value="">Choose a staff member</option>
                             @foreach($allUsers as $u)
                                 <option value="{{ $u->id }}">{{ $u->first_name }} {{ $u->last_name }}</option>
                             @endforeach
                         </select>
+                        @error('godModeUserId') <span class="field-error">{{ $message }}</span> @enderror
                     </div>
-                    <div>
-                        <label style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-red); display: block; margin-bottom: 5px;">SELECT TASK</label>
-                        <select wire:model="godModeTaskId" class="cyber-select" style="width: 100%;">
-                            <option value="">-- Select Task --</option>
+                    <div class="field">
+                        <label for="manual-task" class="label">Task</label>
+                        <select id="manual-task" wire:model="godModeTaskId" class="select">
+                            <option value="">Choose a task</option>
                             @foreach($allTasks as $t)
                                 <option value="{{ $t->id }}">{{ \Illuminate\Support\Str::limit($t->title, 30) }}</option>
                             @endforeach
                         </select>
+                        @error('godModeTaskId') <span class="field-error">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="field">
+                        <label for="manual-start" class="label">Start</label>
+                        <input id="manual-start" type="datetime-local" wire:model="godModeStartTime" class="input">
+                        @error('godModeStartTime') <span class="field-error">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="field">
+                        <label for="manual-end" class="label">End</label>
+                        <input id="manual-end" type="datetime-local" wire:model="godModeEndTime" class="input">
+                        @error('godModeEndTime') <span class="field-error">{{ $message }}</span> @enderror
                     </div>
                     <div>
-                        <label style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-red); display: block; margin-bottom: 5px;">START TIME</label>
-                        <input type="datetime-local" wire:model="godModeStartTime" class="cyber-input">
-                    </div>
-                    <div>
-                        <label style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-red); display: block; margin-bottom: 5px;">END TIME</label>
-                        <input type="datetime-local" wire:model="godModeEndTime" class="cyber-input">
-                    </div>
-                    <div>
-                        <button wire:click="executeGodMode" class="btn-action btn-danger" onclick="confirm('Execute God Mode? This permanently alters the financial ledger.') || event.stopImmediatePropagation()">
-                            <i data-lucide="zap" style="width: 16px; height: 16px;"></i> INJECT TIME
+                        <button type="button" wire:click="executeGodMode" class="btn btn-primary w-full" onclick="confirm('Add this time? It is approved at once and counts towards pay and project cost.') || event.stopImmediatePropagation()">
+                            <i data-lucide="plus"></i> Add time
                         </button>
                     </div>
                 </div>
             </div>
         @endif
     @endif
-
-    <script> document.addEventListener('livewire:navigated', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); }); </script>
 </div>

@@ -1,261 +1,227 @@
 <div>
-    <style>
-        /* --- GLOBAL CYBER STYLES --- */
-        .cyber-input, .cyber-select {
-            width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);
-            color: #FFFFFF; padding: 10px 12px; font-family: 'Roboto Mono', monospace;
-            font-size: 0.8rem; border-radius: 2px; transition: 0.3s;
-        }
-        .cyber-input:focus, .cyber-select:focus { 
-            border-color: #00E5FF; outline: none; background: rgba(0, 229, 255, 0.05); 
-        }
-        .cyber-select option { background-color: #0A1128; color: #FFF; }
-        
-        .btn-action { 
-            background: transparent; border: 1px solid #00E5FF; color: #00E5FF; padding: 10px 20px; 
-            font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: bold; cursor: pointer; 
-            transition: 0.3s; border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; 
-        }
-        .btn-action:hover:not(:disabled) { background: #00E5FF; color: #0A1128; box-shadow: 0 0 15px rgba(0, 229, 255, 0.4); }
-        .btn-action:disabled { border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.2); cursor: not-allowed; }
-        
-        .btn-success { border-color: #00FF66; color: #00FF66; }
-        .btn-success:hover:not(:disabled) { background: #00FF66; color: #0A1128; box-shadow: 0 0 15px rgba(0, 255, 102, 0.4); }
-        
-        .btn-warning { border-color: #FFBD2E; color: #FFBD2E; }
-        .btn-warning:hover:not(:disabled) { background: #FFBD2E; color: #0A1128; box-shadow: 0 0 15px rgba(255, 189, 46, 0.4); }
-        
-        .btn-danger { border-color: #FF3366; color: #FF3366; }
-        .btn-danger:hover:not(:disabled) { background: #FF3366; color: #FFF; box-shadow: 0 0 15px rgba(255, 51, 102, 0.4); }
-
-        .nav-pill { padding: 8px 20px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; border-radius: 2px; cursor: pointer; transition: 0.3s; border: 1px solid transparent; background: transparent; color: #8A9BB2; }
-        .nav-pill.active { background: rgba(0, 229, 255, 0.1); border-color: #00E5FF; color: #00E5FF; font-weight: bold; }
-
-        /* Status Badges */
-        .status-badge { padding: 4px 8px; border-radius: 2px; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; font-weight: bold; text-transform: uppercase; border: 1px solid; }
-        .status-draft { color: #8A9BB2; border-color: #8A9BB2; background: rgba(138, 155, 178, 0.1); }
-        .status-review { color: #FFBD2E; border-color: #FFBD2E; background: rgba(255, 189, 46, 0.1); }
-        .status-approved { color: #00E5FF; border-color: #00E5FF; background: rgba(0, 229, 255, 0.1); }
-        .status-disbursed { color: #00FF66; border-color: #00FF66; background: rgba(0, 255, 102, 0.1); }
-
-        /* Modals & Panels */
-        .glass-overlay { position: fixed; inset: 0; background: rgba(3, 5, 10, 0.85); backdrop-filter: blur(8px); z-index: 9990; display: flex; align-items: center; justify-content: center; }
-        .success-box { background: #0A1128; border: 1px solid #00FF66; border-top: 4px solid #00FF66; border-radius: 4px; padding: 40px; text-align: center; max-width: 420px; width: 90%; }
-        .spinner { border: 2px solid rgba(0, 229, 255, 0.1); border-top: 2px solid #00E5FF; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        .table-panel { background: rgba(10, 17, 40, 0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); overflow-x: auto; }
-        th { font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); text-transform: uppercase; text-align: left; }
-        td { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.02); font-family: 'Inter', sans-serif; font-size: 0.8rem; color: #FFF; }
-        
-        .audit-trail { font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; display: flex; gap: 15px; margin-top: 10px; }
-        .audit-step { background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 2px; border: 1px solid rgba(255,255,255,0.05); }
-    </style>
+    @php
+        // Stored statuses stay as they are; these are the labels people read
+        $statusLabels = ['Draft' => 'Draft', 'Pending_Review' => 'Awaiting approval', 'Approved' => 'Approved', 'Disbursed' => 'Paid'];
+        $statusPills = ['Draft' => 'pill-neutral', 'Pending_Review' => 'pill-warning', 'Approved' => 'pill-info', 'Disbursed' => 'pill-success'];
+        $regionLabels = ['ALL' => 'All countries', 'NG' => 'Nigeria', 'CM' => 'Cameroon', 'KE' => 'Kenya'];
+        $me = (string) auth()->id();
+    @endphp
 
     @if($showSuccessModal)
-        <div class="glass-overlay">
-            <div class="success-box">
-                <div style="font-size: 3rem; margin-bottom: 10px;">✅</div>
-                <h2 style="font-family: 'Montserrat', sans-serif; color: #00FF66; margin-bottom: 10px; letter-spacing: 1px;">WORKFLOW UPDATED</h2>
-                <p style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: #8A9BB2; margin-bottom: 25px;">{{ $successMessage }}</p>
-                <button wire:click="closeSuccessModal" class="btn-action btn-success" style="width: 100%;">ACKNOWLEDGE & CLOSE</button>
+        <div class="modal-backdrop">
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="payroll-done-title">
+                <h2 id="payroll-done-title" class="modal-title">Payroll run updated</h2>
+                <p class="text-sm text-slate">{{ $successMessage }}</p>
+                <div class="modal-actions">
+                    <button type="button" wire:click="closeSuccessModal" class="btn btn-primary">Close</button>
+                </div>
             </div>
         </div>
     @endif
 
-    <div style="margin-bottom: 30px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-end;">
+    <div class="page-header">
         <div>
-            <h1 style="font-family: 'Montserrat', sans-serif; font-size: 1.2rem; color: #FFF; letter-spacing: 1px;">TREASURY COMMAND CENTER</h1>
-            <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #8A9BB2;">PAYROLL LEDGER & DISBURSEMENT PIPELINE</p>
-        </div>
-        <div style="display: flex; gap: 10px;">
-            <button wire:click="setTab('ledger')" class="nav-pill {{ $activeTab === 'ledger' ? 'active' : '' }}">MASTER LEDGER</button>
-            <button wire:click="setTab('inspector')" class="nav-pill {{ $activeTab === 'inspector' ? 'active' : '' }}">PAYSLIP INSPECTOR</button>
+            <h1 class="page-title">Payroll</h1>
+            <p class="page-subtitle">Prepare each month's payroll run, have a second person check it, then approve it and mark it as paid.</p>
         </div>
     </div>
 
+    <div class="tabs" role="tablist">
+        <button type="button" role="tab" wire:click="setTab('ledger')" class="tab {{ $activeTab === 'ledger' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'ledger' ? 'true' : 'false' }}">Payroll runs</button>
+        <button type="button" role="tab" wire:click="setTab('inspector')" class="tab {{ $activeTab === 'inspector' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'inspector' ? 'true' : 'false' }}">Payslips</button>
+    </div>
+
     @if(session()->has('error'))
-        <div style="background: rgba(255,51,102,0.1); border-left: 2px solid #FF3366; padding: 10px; margin-bottom: 20px; font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #FF3366;">
-            ⚠️ {{ session('error') }}
-        </div>
+        <div class="alert alert-danger mb-6" role="alert"><i data-lucide="circle-alert"></i><span>{{ session('error') }}</span></div>
     @endif
 
     @if($activeTab === 'ledger')
-        
-        @if(!$selectedRunId)
-            <div style="background: rgba(0, 229, 255, 0.05); border: 1px dashed rgba(0, 229, 255, 0.3); padding: 20px; border-radius: 4px; margin-bottom: 30px; display: flex; align-items: flex-end; gap: 15px;">
-                <div>
-                    <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #00E5FF; margin-bottom: 4px;">Period Month</label>
-                    <input type="number" min="1" max="12" wire:model="draftPeriodMonth" class="cyber-input" style="width: 100px;">
-                </div>
-                <div>
-                    <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #00E5FF; margin-bottom: 4px;">Period Year</label>
-                    <input type="number" min="2020" wire:model="draftPeriodYear" class="cyber-input" style="width: 120px;">
-                </div>
-                <div>
-                    <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #00E5FF; margin-bottom: 4px;">Target Jurisdiction</label>
-                    <select wire:model="targetRegion" class="cyber-select" style="width: 200px;">
-                        <option value="ALL">Global (All Regions)</option>
-                        <option value="NG">Nigeria (PITA)</option>
-                        <option value="CM">Cameroon (CGI)</option>
-                        <option value="KE">Kenya (KRA)</option>
-                    </select>
-                </div>
-                @can('payroll.create')
-                <button wire:click="generateDraftRun" class="btn-action" wire:loading.attr="disabled">
-                    <span wire:loading.remove wire:target="generateDraftRun"><i data-lucide="play" style="width: 14px; height: 14px;"></i> GENERATE DRAFT LEDGER</span>
-                    <span wire:loading wire:target="generateDraftRun">CALCULATING... <div class="spinner"></div></span>
-                </button>
-                @endcan
-            </div>
 
-            <div class="table-panel">
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr>
-                            <th>Ref Number</th>
-                            <th>Pay Period</th>
-                            <th>Jurisdiction</th>
-                            <th>Pipeline Status</th>
-                            <th style="text-align: right;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($payrollRuns as $run)
-                            <tr style="transition: background 0.2s;" onmouseover="this.style.background='rgba(0, 229, 255, 0.03)'" onmouseout="this.style.background='transparent'">
-                                <td style="font-family: 'Roboto Mono', monospace; color: #00E5FF; font-weight: bold;">{{ $run->reference_number }}</td>
-                                <td style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem;">
-                                    {{ \Carbon\Carbon::parse($run->pay_period_start)->format('M Y') }}
-                                </td>
-                                <td>{{ $run->region_code }}</td>
-                                <td>
-                                    <span class="status-badge 
-                                        {{ $run->status === 'Draft' ? 'status-draft' : '' }}
-                                        {{ $run->status === 'Pending_Review' ? 'status-review' : '' }}
-                                        {{ $run->status === 'Approved' ? 'status-approved' : '' }}
-                                        {{ $run->status === 'Disbursed' ? 'status-disbursed' : '' }}">
-                                        {{ str_replace('_', ' ', $run->status) }}
-                                    </span>
-                                </td>
-                                <td style="text-align: right;">
-                                    <button wire:click="viewRun('{{ $run->id }}')" style="background: transparent; border: 1px solid #8A9BB2; color: #8A9BB2; padding: 4px 10px; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; cursor: pointer; border-radius: 2px;">INSPECT RUN</button>
-                                </td>
-                            </tr>
-                        @empty
+        @if(!$selectedRunId)
+            @can('payroll.create')
+            <div class="card mb-6">
+                <h2 class="card-title mb-4">Create a draft payroll run</h2>
+                <div class="flex flex-wrap items-end gap-4">
+                    <div class="field">
+                        <label class="label" for="pr-month">Month</label>
+                        <input id="pr-month" type="number" min="1" max="12" wire:model="draftPeriodMonth" class="input" style="width: 100px; font-variant-numeric: tabular-nums;">
+                        @error('draftPeriodMonth') <span class="field-error">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="field">
+                        <label class="label" for="pr-year">Year</label>
+                        <input id="pr-year" type="number" min="2020" wire:model="draftPeriodYear" class="input" style="width: 120px; font-variant-numeric: tabular-nums;">
+                        @error('draftPeriodYear') <span class="field-error">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="field">
+                        <label class="label" for="pr-region">Country</label>
+                        <select id="pr-region" wire:model="targetRegion" class="select" style="min-width: 200px;">
+                            <option value="ALL">All countries</option>
+                            <option value="NG">Nigeria (PITA)</option>
+                            <option value="CM">Cameroon (CGI)</option>
+                            <option value="KE">Kenya (KRA)</option>
+                        </select>
+                    </div>
+                    <button type="button" wire:click="generateDraftRun" class="btn btn-primary" wire:loading.attr="disabled">
+                        <span wire:loading.remove wire:target="generateDraftRun">Create draft run</span>
+                        <span wire:loading wire:target="generateDraftRun">Creating…</span>
+                    </button>
+                </div>
+            </div>
+            @endcan
+
+            <div class="card p-0">
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
                             <tr>
-                                <td colspan="5" style="text-align: center; padding: 40px; color: #8A9BB2; font-family: 'Roboto Mono', monospace; font-size: 0.8rem;">> NO HISTORICAL PAYROLL LEDGERS DETECTED.</td>
+                                <th>Reference</th>
+                                <th>Pay period</th>
+                                <th>Country</th>
+                                <th>Status</th>
+                                <th class="text-right">Action</th>
                             </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            @forelse($payrollRuns as $run)
+                                <tr>
+                                    <td class="font-semibold text-ink" style="font-variant-numeric: tabular-nums;">{{ $run->reference_number }}</td>
+                                    <td style="font-variant-numeric: tabular-nums;">{{ \Carbon\Carbon::parse($run->pay_period_start)->format('M Y') }}</td>
+                                    <td>{{ $regionLabels[$run->region_code] ?? $run->region_code }}</td>
+                                    <td><span class="pill {{ $statusPills[$run->status] ?? 'pill-neutral' }}">{{ $statusLabels[$run->status] ?? $run->status }}</span></td>
+                                    <td class="text-right">
+                                        <button type="button" wire:click="viewRun('{{ $run->id }}')" class="btn btn-secondary btn-sm">Open run</button>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5">
+                                        <div class="empty-state">
+                                            <strong>No payroll runs yet</strong>
+                                            Choose a month and country above, then create a draft run.
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
         @else
-            <div style="margin-bottom: 20px;">
-                <button wire:click="closeRunView" style="background: transparent; border: none; color: #8A9BB2; font-family: 'Roboto Mono', monospace; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 5px;">
-                    <i data-lucide="arrow-left" style="width: 14px; height: 14px;"></i> BACK TO MASTER LEDGER
+            <div class="mb-4">
+                <button type="button" wire:click="closeRunView" class="btn btn-ghost btn-sm">
+                    <i data-lucide="arrow-left"></i> Back to payroll runs
                 </button>
             </div>
 
-            <div style="background: rgba(10, 17, 40, 0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 25px; margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 20px;">
+            @php
+                $preparedByMe = $me !== '' && (string) ($runDetails['maker_id'] ?? '') === $me;
+                $checkedByMe = $me !== '' && (string) ($runDetails['checker_id'] ?? '') === $me;
+            @endphp
+
+            <div class="card mb-6">
+                <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <h2 style="font-family: 'Montserrat', sans-serif; color: #FFF; margin: 0; font-size: 1.2rem;">LEDGER: {{ $runDetails['reference_number'] }}</h2>
-                        <div style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #8A9BB2; margin-top: 5px;">
-                            Period: {{ \Carbon\Carbon::parse($runDetails['pay_period_start'])->format('F Y') }} | Region: {{ $runDetails['region_code'] }}
-                        </div>
-                        
-                        <div class="audit-trail">
-                            <div class="audit-step">
-                                <span style="color: #FFF;">Maker:</span> {{ $runDetails['maker_first'] ?? 'Pending' }} {{ $runDetails['maker_last'] ?? '' }}
-                            </div>
-                            <div class="audit-step">
-                                <span style="color: #FFBD2E;">Checker:</span> {{ $runDetails['checker_first'] ?? 'Pending' }} {{ $runDetails['checker_last'] ?? '' }}
-                            </div>
-                            <div class="audit-step">
-                                <span style="color: #00FF66;">Approver:</span> {{ $runDetails['approver_first'] ?? 'Pending' }} {{ $runDetails['approver_last'] ?? '' }}
-                            </div>
-                        </div>
+                        <h2 class="section-title mb-1" style="font-variant-numeric: tabular-nums;">Payroll run {{ $runDetails['reference_number'] }}</h2>
+                        <p class="text-sm muted">{{ \Carbon\Carbon::parse($runDetails['pay_period_start'])->format('F Y') }} · {{ $regionLabels[$runDetails['region_code']] ?? $runDetails['region_code'] }}</p>
                     </div>
-                    <div style="text-align: right;">
-                        <span class="status-badge 
-                            {{ $runDetails['status'] === 'Draft' ? 'status-draft' : '' }}
-                            {{ $runDetails['status'] === 'Pending_Review' ? 'status-review' : '' }}
-                            {{ $runDetails['status'] === 'Approved' ? 'status-approved' : '' }}
-                            {{ $runDetails['status'] === 'Disbursed' ? 'status-disbursed' : '' }}" style="font-size: 0.8rem; padding: 6px 12px;">
-                            CURRENT STATE: {{ str_replace('_', ' ', $runDetails['status']) }}
-                        </span>
-                    </div>
+                    <span class="pill {{ $statusPills[$runDetails['status']] ?? 'pill-neutral' }}">{{ $statusLabels[$runDetails['status']] ?? $runDetails['status'] }}</span>
                 </div>
 
-                <div style="display: flex; gap: 15px; justify-content: flex-end; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
-                    
+                <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+                    <div class="rounded-lg bg-mist p-3">
+                        <dt class="stat-label">Prepared by</dt>
+                        <dd class="font-medium text-ink">{{ trim(($runDetails['maker_first'] ?? '') . ' ' . ($runDetails['maker_last'] ?? '')) ?: 'Not recorded' }}</dd>
+                    </div>
+                    <div class="rounded-lg bg-mist p-3">
+                        <dt class="stat-label">Checked by</dt>
+                        <dd class="font-medium text-ink">{{ trim(($runDetails['checker_first'] ?? '') . ' ' . ($runDetails['checker_last'] ?? '')) ?: 'Not yet checked' }}</dd>
+                    </div>
+                    <div class="rounded-lg bg-mist p-3">
+                        <dt class="stat-label">Approved by</dt>
+                        <dd class="font-medium text-ink">{{ trim(($runDetails['approver_first'] ?? '') . ' ' . ($runDetails['approver_last'] ?? '')) ?: 'Not yet approved' }}</dd>
+                    </div>
+                </dl>
+
+                <hr class="divider">
+
+                <div class="flex flex-wrap items-center justify-end gap-3">
                     @if($runDetails['status'] === 'Draft' && auth()->user()->can('payroll.edit'))
-                        <button wire:click="submitForReview('{{ $selectedRunId }}')" class="btn-action btn-warning">
-                            <i data-lucide="send" style="width: 14px; height: 14px;"></i> SUBMIT FOR CHECKER REVIEW
-                        </button>
+                        @if($preparedByMe)
+                            <span class="help">You prepared this run, so someone else checks it.</span>
+                        @else
+                            <button type="button" wire:click="submitForReview('{{ $selectedRunId }}')" class="btn btn-primary">
+                                <i data-lucide="send"></i> Mark as checked and send for approval
+                            </button>
+                        @endif
                     @endif
 
                     @if($runDetails['status'] === 'Pending_Review' && auth()->user()->can('payroll.approve'))
-                        <button wire:click="rejectRun('{{ $selectedRunId }}')" class="btn-action btn-danger">
-                            <i data-lucide="x-circle" style="width: 14px; height: 14px;"></i> REJECT TO DRAFT
+                        <button type="button" wire:click="rejectRun('{{ $selectedRunId }}')" class="btn btn-secondary">
+                            <i data-lucide="rotate-ccw"></i> Return to draft
                         </button>
-                        <button wire:click="approveRun('{{ $selectedRunId }}')" class="btn-action btn-success">
-                            <i data-lucide="check-circle" style="width: 14px; height: 14px;"></i> CFO APPROVE & LOCK LEDGER
-                        </button>
+                        @if($preparedByMe || $checkedByMe)
+                            <span class="help">You {{ $preparedByMe ? 'prepared' : 'checked' }} this run, so another approver approves it.</span>
+                        @else
+                            <button type="button" wire:click="approveRun('{{ $selectedRunId }}')" class="btn btn-primary">
+                                <i data-lucide="check"></i> Approve payroll run
+                            </button>
+                        @endif
                     @endif
 
                     @if($runDetails['status'] === 'Approved' && auth()->user()->can('payroll.approve'))
-                        <button wire:click="rejectRun('{{ $selectedRunId }}')" class="btn-action btn-danger">
-                            <i data-lucide="alert-triangle" style="width: 14px; height: 14px;"></i> REVOKE APPROVAL
+                        <button type="button" wire:click="rejectRun('{{ $selectedRunId }}')" class="btn btn-secondary">
+                            <i data-lucide="rotate-ccw"></i> Withdraw approval
                         </button>
-                        <button wire:click="disburseRun('{{ $selectedRunId }}')" class="btn-action" style="border-color: #00FF66; color: #00FF66; background: rgba(0,255,102,0.1);">
-                            <i data-lucide="banknote" style="width: 14px; height: 14px;"></i> MARK AS DISBURSED
+                        <button type="button" wire:click="disburseRun('{{ $selectedRunId }}')" class="btn btn-primary">
+                            <i data-lucide="banknote"></i> Mark as paid
                         </button>
                     @endif
 
                     @if($runDetails['status'] === 'Disbursed')
-                        <div style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #00FF66; display: flex; align-items: center; gap: 5px;">
-                            <i data-lucide="lock" style="width: 14px; height: 14px;"></i> LEDGER PERMANENTLY LOCKED
-                        </div>
-                        <button class="btn-action" disabled style="opacity: 0.5;">EXPORT BANK REMITTANCE CSV (Phase 10)</button>
+                        <span class="help flex items-center gap-1"><i data-lucide="lock" style="width: 14px; height: 14px;"></i> Paid. This run can no longer be changed.</span>
+                        <button type="button" class="btn btn-secondary" disabled style="opacity: 0.5; cursor: not-allowed;" title="Not available yet">Download bank payment file</button>
                     @endif
-
                 </div>
             </div>
 
-            <div class="table-panel">
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr>
-                            <th>Personnel</th>
-                            <th>Cash Gross</th>
-                            <th>Taxable Gross (inc. BIK)</th>
-                            <th>Total Tax/Pension</th>
-                            <th style="text-align: right; color: #00FF66;">Net Payout</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($runLines as $line)
-                            <tr style="transition: background 0.2s;" onmouseover="this.style.background='rgba(0, 229, 255, 0.03)'" onmouseout="this.style.background='transparent'">
-                                <td>
-                                    <div style="font-weight: bold; color: #FFF;">{{ $line->first_name }} {{ $line->last_name }}</div>
-                                    <div style="font-size: 0.65rem; color: #8A9BB2; font-family: 'Roboto Mono', monospace; margin-top: 4px;">{{ $line->employee_code }} | {{ $line->tax_region }}</div>
-                                </td>
-                                <td style="font-family: 'Roboto Mono', monospace;">{{ number_format($line->gross_pay, 2) }}</td>
-                                <td style="font-family: 'Roboto Mono', monospace; color: #FFBD2E;">{{ number_format($line->taxable_gross ?? 0, 2) }}</td>
-                                <td style="font-family: 'Roboto Mono', monospace; color: #FF3366;">-{{ number_format($line->total_deductions ?? 0, 2) }}</td>
-                                <td style="text-align: right; font-family: 'Roboto Mono', monospace; font-size: 0.95rem; font-weight: bold; color: #00FF66;">
-                                    {{ number_format($line->net_pay ?? 0, 2) }}
-                                </td>
-                            </tr>
-                        @empty
+            <div class="card p-0">
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
                             <tr>
-                                <td colspan="5" style="text-align: center; padding: 40px; color: #8A9BB2; font-family: 'Roboto Mono', monospace; font-size: 0.8rem;">> RUN GENERATED BUT NO APPLICABLE EMPLOYEES FOUND FOR THIS PERIOD.</td>
+                                <th>Staff member</th>
+                                <th class="num">Gross pay</th>
+                                <th class="num">Taxable pay (incl. benefits in kind)</th>
+                                <th class="num">Tax and pension</th>
+                                <th class="num">Net pay</th>
                             </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            @forelse($runLines as $line)
+                                <tr>
+                                    <td>
+                                        <div class="font-medium text-ink">{{ $line->first_name }} {{ $line->last_name }}</div>
+                                        <div class="help" style="font-variant-numeric: tabular-nums;">{{ $line->employee_code }} · {{ $regionLabels[$line->tax_region] ?? $line->tax_region }}</div>
+                                    </td>
+                                    <td class="num">{{ number_format($line->gross_pay, 2) }}</td>
+                                    <td class="num">{{ number_format($line->taxable_gross ?? 0, 2) }}</td>
+                                    <td class="num">−{{ number_format($line->total_deductions ?? 0, 2) }}</td>
+                                    <td class="num font-semibold text-ink">{{ number_format($line->net_pay ?? 0, 2) }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5">
+                                        <div class="empty-state">
+                                            <strong>No staff members in this run</strong>
+                                            No active staff member with current pay details matched this month and country.
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
         @endif
@@ -263,17 +229,12 @@
     @endif
 
     @if($activeTab === 'inspector')
-        <div style="text-align: center; padding: 60px; color: #8A9BB2; font-family: 'Roboto Mono', monospace; font-size: 0.85rem; border: 1px dashed rgba(255,255,255,0.1); border-radius: 4px;">
-            <i data-lucide="file-text" style="width: 32px; height: 32px; opacity: 0.5; margin-bottom: 10px;"></i><br>
-            > PAYSLIP INSPECTOR MODULE WILL BE IMPLEMENTED IN PHASE 11
+        <div class="card">
+            <div class="empty-state">
+                <strong>Payslips have their own screen</strong>
+                Open Payslips to see each staff member's payslip for a payroll run.
+                <div class="mt-4"><a href="{{ route('hq.finance.payslips') }}" wire:navigate class="btn btn-primary">Open payslips</a></div>
+            </div>
         </div>
     @endif
-
-    <script>
-        document.addEventListener('livewire:navigated', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); });
-        document.addEventListener('DOMContentLoaded', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); });
-        document.addEventListener('livewire:initialized', () => {
-            Livewire.hook('morph.updated', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); });
-        });
-    </script>
 </div>

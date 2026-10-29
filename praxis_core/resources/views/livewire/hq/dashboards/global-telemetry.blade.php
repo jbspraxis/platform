@@ -1,169 +1,157 @@
 <div>
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid var(--erp-border-dark); margin-bottom: 30px; padding-bottom: 10px;">
-        <div style="display: flex; gap: 15px;">
-            <a href="{{ route('hq.dash.admin') }}" wire:navigate class="ws-tab active" style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--erp-teal); padding: 5px 15px; background: rgba(0, 229, 255, 0.05); border: 1px solid var(--erp-teal); border-radius: 4px; text-decoration: none;">[ GLOBAL_TELEMETRY ]</a>
-            <a href="{{ route('hq.dash.workspace') }}" wire:navigate class="ws-tab" style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--erp-muted); padding: 5px 15px; border: 1px solid transparent; text-decoration: none; transition: 0.3s;" onmouseover="this.style.color='#FFF'" onmouseout="this.style.color='var(--erp-muted)'">[ MY_WORKSPACE ]</a>
-            <a href="{{ route('hq.dash.investor') }}" wire:navigate class="ws-tab" style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--erp-muted); padding: 5px 15px; border: 1px solid transparent; text-decoration: none; transition: 0.3s;" onmouseover="this.style.color='#FFF'" onmouseout="this.style.color='var(--erp-muted)'">[ INVESTOR_TERMINAL ]</a>
-            <a href="{{ route('hq.dash.audit') }}" wire:navigate class="ws-tab" style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--erp-muted); padding: 5px 15px; border: 1px solid transparent; text-decoration: none; transition: 0.3s;" onmouseover="this.style.color='#FFF'" onmouseout="this.style.color='var(--erp-muted)'">[ AUDIT_TERMINAL ]</a>
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Company overview</h1>
+            <p class="page-subtitle">Cash, invoices, projects and leads across JBS Praxis. Figures as of {{ \Carbon\Carbon::now('Africa/Lagos')->format('j M Y, H:i') }} WAT.</p>
         </div>
         @can('dashboard.export')
-        <button wire:click="exportTelemetry" wire:loading.attr="disabled" style="background: transparent; border: 1px solid var(--erp-teal); color: var(--erp-teal); font-family: 'Roboto Mono', monospace; font-size: 0.75rem; font-weight: bold; padding: 10px 20px; border-radius: 2px; cursor: pointer; transition: 0.3s;" onmouseover="this.style.background='var(--erp-teal)'; this.style.color='#0A1128';" onmouseout="this.style.background='transparent'; this.style.color='var(--erp-teal)'">
-            <span wire:loading.remove>EXPORT TELEMETRY (CSV)</span>
-            <span wire:loading>EXPORTING...</span>
+        <button type="button" wire:click="exportTelemetry" wire:loading.attr="disabled" wire:target="exportTelemetry" class="btn btn-secondary">
+            <i data-lucide="download"></i>
+            <span wire:loading.remove wire:target="exportTelemetry">Download CSV</span>
+            <span wire:loading wire:target="exportTelemetry">Preparing file…</span>
         </button>
         @endcan
     </div>
 
-    <div style="margin-bottom: 25px;">
-        <h1 style="font-family: 'Roboto Mono', monospace; font-size: 1.5rem; color: var(--erp-white); margin-bottom: 5px; letter-spacing: 1px;">JBS PRAXIS COMMAND CORE</h1>
-        <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-muted);">SUPER ADMIN OMNI-VIEW | UTC: {{ \Carbon\Carbon::now('UTC')->format('Y-m-d H:i:s') }}</p>
-    </div>
+    <nav class="tabs" aria-label="Overviews">
+        <a href="{{ route('hq.dash.admin') }}" wire:navigate class="tab is-active" aria-current="page">Company overview</a>
+        <a href="{{ route('hq.dash.workspace') }}" wire:navigate class="tab">My workspace</a>
+        <a href="{{ route('hq.dash.investor') }}" wire:navigate class="tab">Investor view</a>
+        <a href="{{ route('hq.dash.audit') }}" wire:navigate class="tab">Audit log</a>
+    </nav>
 
-    <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-bottom: 30px;">
-        <div style="background: rgba(10, 17, 40, 0.85); border: 1px solid var(--erp-border-dark); border-top: 2px solid #00FF66; padding: 20px; border-radius: 4px;">
-            <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); margin-bottom: 10px; text-transform: uppercase;">> Total Capital Cleared</div>
-            <div style="font-size: 1.8rem; font-weight: 800; font-family: 'Roboto Mono', monospace; color: #00FF66; text-shadow: 0 0 10px rgba(0, 255, 102, 0.2); line-height: 1;">
-                ${{ number_format($kpis['capital_cleared'], 2) }}
-            </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4" style="margin-bottom: 24px;">
+        <div class="card">
+            <div class="stat-label">Paid invoices, total</div>
+            <div class="stat-value">${{ number_format($kpis['capital_cleared'], 2) }}</div>
         </div>
-
-        <div style="background: rgba(10, 17, 40, 0.85); border: 1px solid var(--erp-border-dark); border-top: 2px solid #FFBD2E; padding: 20px; border-radius: 4px;">
-            <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); margin-bottom: 10px; text-transform: uppercase;">> A/R Pipeline (Pending)</div>
-            <div style="font-size: 1.8rem; font-weight: 800; font-family: 'Roboto Mono', monospace; color: #FFBD2E; line-height: 1;">
-                ${{ number_format($kpis['ar_pipeline'], 2) }}
-            </div>
+        <div class="card">
+            <div class="stat-label">Unpaid invoices</div>
+            <div class="stat-value">${{ number_format($kpis['ar_pipeline'], 2) }}</div>
         </div>
-
-        <div style="background: rgba(10, 17, 40, 0.85); border: 1px solid var(--erp-border-dark); border-top: 2px solid var(--erp-gold); padding: 20px; border-radius: 4px;">
-            <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); margin-bottom: 10px; text-transform: uppercase;">> Active Deployments</div>
-            <div style="font-size: 1.8rem; font-weight: 800; font-family: 'Roboto Mono', monospace; color: var(--erp-gold); line-height: 1;">
-                {{ str_pad($kpis['active_deployments'], 2, '0', STR_PAD_LEFT) }}
-            </div>
+        <div class="card">
+            <div class="stat-label">Active projects</div>
+            <div class="stat-value">{{ number_format($kpis['active_deployments']) }}</div>
         </div>
-
-        <div style="background: rgba(10, 17, 40, 0.85); border: 1px solid var(--erp-border-dark); border-top: 2px solid var(--erp-teal); padding: 20px; border-radius: 4px;">
-            <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); margin-bottom: 10px; text-transform: uppercase;">> Total Leads Infiltrated</div>
-            <div style="font-size: 1.8rem; font-weight: 800; font-family: 'Roboto Mono', monospace; color: var(--erp-teal); line-height: 1;">
-                {{ str_pad($kpis['total_leads'], 2, '0', STR_PAD_LEFT) }}
-            </div>
+        <div class="card">
+            <div class="stat-label">Open leads</div>
+            <div class="stat-value">{{ number_format($kpis['total_leads']) }}</div>
         </div>
-
-        <div style="background: rgba(10, 17, 40, 0.85); border: 1px solid var(--erp-border-dark); border-top: 2px solid var(--erp-white); padding: 20px; border-radius: 4px;">
-            <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); margin-bottom: 10px; text-transform: uppercase;">> Strike Team Active</div>
-            <div style="font-size: 1.8rem; font-weight: 800; font-family: 'Roboto Mono', monospace; color: var(--erp-white); line-height: 1;">
-                {{ str_pad($kpis['strike_capacity'], 2, '0', STR_PAD_LEFT) }} <span style="font-size: 0.8rem; color: var(--erp-muted);">OPs</span>
-            </div>
+        <div class="card">
+            <div class="stat-label">Staff logging time now</div>
+            <div class="stat-value">{{ number_format($kpis['strike_capacity']) }}</div>
         </div>
     </div>
 
-    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 30px; margin-bottom: 30px;">
-        
-        <div style="background: rgba(0,0,0,0.3); border: 1px dashed var(--erp-border-dark); border-radius: 4px; padding: 20px; display: flex; flex-direction: column;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <span style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: var(--erp-teal);">> JBS PRAXIS: YTD FIRM REVENUE vs BURN RATE</span>
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6" style="margin-bottom: 24px;">
+        <section class="card xl:col-span-2 flex flex-col">
+            <div class="card-header">
+                <h2 class="card-title">Revenue and staff time cost, {{ now()->year }} to date</h2>
             </div>
             <div style="flex: 1; position: relative; min-height: 300px;">
-                <canvas id="telemetryChart"></canvas>
+                <canvas id="telemetryChart" role="img" aria-label="Bar chart of revenue received and staff time cost by month this year"></canvas>
             </div>
-        </div>
+        </section>
 
-        <div style="background: rgba(10, 17, 40, 0.85); border: 1px solid var(--erp-border-dark); border-radius: 4px; padding: 25px;">
-            <div style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--erp-red); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--erp-border-dark); padding-bottom: 10px;">
-                <span>> CRITICAL AGEING (30+ DAYS)</span>
+        <section class="card">
+            <div class="card-header">
+                <h2 class="card-title">Invoices overdue by more than 30 days</h2>
             </div>
-            
-            <div style="display: flex; flex-direction: column; gap: 12px;">
+
+            <div class="flex flex-col">
                 @forelse($criticalAlerts as $alert)
-                    <div style="border-left: 2px solid var(--erp-red); padding-left: 10px;">
-                        <div style="font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: var(--erp-muted);">{{ $alert->invoice_number }} | {{ $alert->client_name }}</div>
-                        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 4px;">
-                            <div style="font-size: 0.9rem; font-weight: bold; color: var(--erp-white);">{{ $alert->currency }} {{ number_format($alert->total_amount, 2) }}</div>
-                            <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-red); background: rgba(255,51,102,0.1); padding: 2px 6px; border-radius: 2px;">
-                                {{ \Carbon\Carbon::parse($alert->due_date)->diffInDays(now()) }} DAYS OVERDUE
-                            </div>
+                    <div style="padding: 12px 0; border-top: 1px solid var(--color-line);">
+                        <div class="text-caption text-muted" style="font-variant-numeric: tabular-nums;">{{ $alert->invoice_number }} · {{ $alert->client_name }}</div>
+                        <div class="flex justify-between items-center gap-3" style="margin-top: 4px;">
+                            <div class="font-semibold text-ink" style="font-variant-numeric: tabular-nums;">{{ $alert->currency }} {{ number_format($alert->total_amount, 2) }}</div>
+                            <span class="pill pill-danger">{{ (int) \Carbon\Carbon::parse($alert->due_date)->diffInDays(now()) }} days overdue</span>
                         </div>
                     </div>
                 @empty
-                    <div style="color: var(--erp-muted); font-family: 'Roboto Mono', monospace; font-size: 0.75rem;">> NO CRITICAL OVERDUE INVOICES.</div>
+                    <div class="empty-state" style="padding: 24px 8px;">No invoices are more than 30 days overdue.</div>
                 @endforelse
             </div>
-        </div>
+        </section>
     </div>
 
-    <div style="background: rgba(10, 17, 40, 0.85); border: 1px solid var(--erp-border-dark); border-radius: 4px; padding: 25px;">
-        <div style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--erp-white); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--erp-border-dark); padding-bottom: 10px;">
-            <span>> RECENT INFILTRATIONS (LEADS)</span>
-            <a href="#" class="nav-item {{ request()->routeIs('hq.crm.*') ? 'active' : '' }}" style="color: var(--erp-teal); text-decoration: none; font-size: 0.75rem;">
-                [ GO TO INTELLIGENCE DESK ]
-            </a>
+    <section class="card" style="padding: 0;">
+        <div class="card-header" style="padding: 20px 24px 0;">
+            <h2 class="card-title">Newest leads</h2>
+            @can('crm.view')
+                <a href="{{ route('hq.crm.leads') }}" wire:navigate class="btn btn-ghost btn-sm">Go to leads <i data-lucide="arrow-right"></i></a>
+            @endcan
         </div>
-        
-        <table style="width: 100%; border-collapse: collapse; text-align: left;">
-            <thead>
-                <tr>
-                    <th style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); padding: 10px; border-bottom: 1px solid var(--erp-border-dark);">ENTERPRISE</th>
-                    <th style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); padding: 10px; border-bottom: 1px solid var(--erp-border-dark);">INDUSTRY</th>
-                    <th style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); padding: 10px; border-bottom: 1px solid var(--erp-border-dark);">SOURCE</th>
-                    <th style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); padding: 10px; border-bottom: 1px solid var(--erp-border-dark); text-align: right;">DATE ACQUIRED</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($recentLeads as $lead)
-                <tr style="transition: background 0.2s;" onmouseover="this.style.background='rgba(0, 229, 255, 0.03)'" onmouseout="this.style.background='transparent'">
-                    <td style="padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.02); font-size: 0.85rem; font-weight: bold; color: var(--erp-white);">{{ $lead->name }}</td>
-                    <td style="padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.02); font-size: 0.8rem; color: var(--erp-muted);">
-                        <span style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 2px; font-family: 'Roboto Mono', monospace; font-size: 0.7rem;">{{ $lead->industry ?? 'Unknown' }}</span>
-                    </td>
-                    <td style="padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.02); font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-muted);">{{ $lead->source ?? 'Direct' }}</td>
-                    <td style="padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.02); font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-teal); text-align: right;">{{ \Carbon\Carbon::parse($lead->created_at)->format('Y-m-d H:i') }}</td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="4" style="padding: 40px; text-align: center; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: var(--erp-muted); border-bottom: 1px dashed var(--erp-border-dark);">
-                        > NO RECENT LEADS DETECTED.
-                    </td>
-                </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
+
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Organisation</th>
+                        <th>Industry</th>
+                        <th>Source</th>
+                        <th style="text-align: right;">Added</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($recentLeads as $lead)
+                    <tr>
+                        <td class="font-semibold text-ink">{{ $lead->name }}</td>
+                        <td>{{ $lead->industry ?? 'Not given' }}</td>
+                        <td>{{ $lead->source ?? 'Direct' }}</td>
+                        <td style="text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap;">{{ \Carbon\Carbon::parse($lead->created_at)->format('j M Y, H:i') }}</td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="4">
+                            <div class="empty-state">
+                                <strong>No open leads</strong>
+                                New leads appear here when someone uses the cost of poor quality calculator or books a free audit.
+                            </div>
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </section>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
+
     @script
     <script>
         document.addEventListener('livewire:navigated', function () {
             const ctx = document.getElementById('telemetryChart');
             if (!ctx) return;
 
-            // FAILSAFE: Wait for Chart.js to finish downloading before executing
+            // Wait for Chart.js to finish downloading before drawing
             const waitForChart = setInterval(() => {
                 if (typeof Chart !== 'undefined') {
-                    clearInterval(waitForChart); // Stop checking once loaded
-                    
-                    // Prevent "Canvas is already in use" errors if you navigate back and forth
+                    clearInterval(waitForChart);
+
+                    // Prevent "Canvas is already in use" errors when navigating back and forth
                     if (window.telemetryChartInstance) {
                         window.telemetryChartInstance.destroy();
                     }
 
-                    Chart.defaults.color = '#8A9BB2';
-                    Chart.defaults.font.family = "'Roboto Mono', monospace";
-                    
+                    // Brand chart colours (docs/BRAND.md section 7): Petrol and Teal, labelled; Muted text; Line grid
+                    Chart.defaults.color = '#5E6679';
+                    Chart.defaults.font.family = "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', 'Segoe UI', Arial, sans-serif";
+
                     window.telemetryChartInstance = new Chart(ctx.getContext('2d'), {
                         type: 'bar',
                         data: {
-                            labels: $wire.chartLabels, // Use $wire to pull data directly
+                            labels: $wire.chartLabels,
                             datasets: [
                                 {
-                                    label: 'Cleared Revenue ($)',
+                                    label: 'Revenue received ($)',
                                     data: $wire.chartRevenue,
-                                    backgroundColor: 'rgba(0, 255, 102, 0.8)',
+                                    backgroundColor: '#044B6A',
                                     borderRadius: 2
                                 },
                                 {
-                                    label: 'Eng. Burn Rate ($)',
+                                    label: 'Staff time cost ($)',
                                     data: $wire.chartBurn,
-                                    backgroundColor: 'rgba(255, 51, 102, 0.8)',
+                                    backgroundColor: '#0C8B9B',
                                     borderRadius: 2
                                 }
                             ]
@@ -173,9 +161,9 @@
                             maintainAspectRatio: false,
                             plugins: { legend: { position: 'top', align: 'end' } },
                             scales: {
-                                y: { 
-                                    beginAtZero: true, 
-                                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                y: {
+                                    beginAtZero: true,
+                                    grid: { color: '#D8DEE6' },
                                     ticks: { callback: function(value) { return '$' + value / 1000 + 'k'; } }
                                 },
                                 x: { grid: { display: false } }
@@ -183,7 +171,7 @@
                         }
                     });
                 }
-            }, 50); // Checks every 50 milliseconds
+            }, 50);
         });
     </script>
     @endscript

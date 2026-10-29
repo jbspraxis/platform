@@ -115,7 +115,7 @@ class SignoffManager extends Component
         $this->validate([
             'draftProjectId' => 'required',
             'draftSignatoryEmail' => 'required|email'
-        ]);
+        ], [], ['draftProjectId' => 'project', 'draftSignatoryEmail' => 'signatory email']);
 
         $this->isGenerating = true;
 
@@ -178,16 +178,16 @@ class SignoffManager extends Component
                         'status' => 'Draft',
                         'created_at' => now()
                     ]);
-                    session()->flash('success', 'Signoff Synthesized. Draft is ready for dispatch.');
+                    session()->flash('success', 'Sign-off drafted. Copy its link and send it to the signatory.');
                     $this->draftProjectId = ''; $this->draftSignatoryEmail = '';
                 } else {
-                    session()->flash('error', 'AI returned invalid metric structure.');
+                    session()->flash('error', 'We couldn’t read the assistant’s draft. Draft the sign-off again.');
                 }
             } else {
-                session()->flash('error', 'AI Connection Failed.');
+                session()->flash('error', 'We couldn’t reach the assistant. Try again in a few minutes; if it keeps failing, ask an administrator to check the AI settings.');
             }
         } catch (\Exception $e) {
-            session()->flash('error', 'AI Timeout. Payload too large.');
+            session()->flash('error', 'The assistant took too long to answer. Try again in a few minutes.');
         }
 
         $this->isGenerating = false;
@@ -198,7 +198,7 @@ class SignoffManager extends Component
     {
         abort_unless(Auth::user()->can('kaizen.create'), 403);
 
-        $this->validate(['selectedSignoffForMarketing' => 'required']);
+        $this->validate(['selectedSignoffForMarketing' => 'required'], [], ['selectedSignoffForMarketing' => 'signed project']);
         $this->isGenerating = true;
 
         $signoff = DB::table('project_signoffs')
@@ -237,9 +237,9 @@ class SignoffManager extends Component
                 $this->generatedNarrative = $parsedData['narrative'] ?? '';
                 $this->generatedQuote = $parsedData['suggested_quote'] ?? '';
                 $this->generatedDallePrompt = $parsedData['dalle_prompt'] ?? '';
-                session()->flash('success', 'Marketing Payload Sanitized and Ready for Editing.');
+                session()->flash('success', 'Draft ready. Check and edit it, then save it as a draft.');
             }
-        } catch (\Exception $e) { session()->flash('error', 'AI Generation Failed.'); }
+        } catch (\Exception $e) { session()->flash('error', 'We couldn’t create the draft. Try again in a few minutes.'); }
 
         $this->isGenerating = false;
     }
@@ -281,7 +281,7 @@ class SignoffManager extends Component
         DB::table('project_signoffs')->where('id', $this->selectedSignoffForMarketing)->update(['is_pushed_to_kaizen' => 1]);
         $this->generatedTitle = ''; $this->generatedNarrative = ''; $this->generatedQuote = ''; $this->generatedDallePrompt = '';
         $this->loadLedgers();
-        session()->flash('success', 'Asset Committed to Public Database.');
+        session()->flash('success', 'Draft saved. It stays unpublished until someone publishes it.');
     }
 
     public function unfreezeSignoff($signoffId)
@@ -295,7 +295,7 @@ class SignoffManager extends Component
             DB::table('projects')->where('id', $signoff->project_id)->update(['status' => 'Active', 'updated_at' => now()]);
         });
         $this->loadLedgers();
-        session()->flash('success', 'L5 OVERRIDE: Battlespace Defrosted.');
+        session()->flash('success', 'Sign-off unfrozen. The project is active again and its sprint board is open.');
     }
 
     public function render() { return view('livewire.hq.operations.signoff-manager'); }

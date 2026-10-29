@@ -1,634 +1,626 @@
-<div style="min-height: 100vh; background-color: var(--erp-bg-main); color: var(--erp-white); font-family: 'Inter', sans-serif; display: flex; flex-direction: column;" x-data="{ showTechModal: false, showLedger: false }">
+<div x-data="{ showTechModal: false, showLedger: false }">
+    @php
+        // Display labels for stored values (docs/BRAND.md section 12); the stored values stay as they are.
+        $statusLabel = fn ($status) => match ($status) {
+            'Draft' => ['Draft', 'pill-neutral'],
+            'Pending Auth' => ['Awaiting signature', 'pill-warning'],
+            'Authorized', 'Converted' => ['Signed', 'pill-success'],
+            'Expired' => ['Expired', 'pill-danger'],
+            default => [$status ?: 'Draft', 'pill-neutral'],
+        };
+        $orgStatus = fn ($status) => match ($status) { 'Lead' => 'lead', 'Active Client' => 'client', 'Lost' => 'lost', default => strtolower((string) $status) };
+        $money = fn ($currency, $amount, $decimals = 2) => match ($currency) {
+            'NGN' => '₦' . number_format((float) $amount, $decimals),
+            'XAF', 'XOF' => number_format((float) $amount, $decimals) . ' FCFA',
+            default => trim($currency . ' ' . number_format((float) $amount, $decimals)),
+        };
+        $scheduleLabels = [
+            '40_30_30' => '40% at the start, 30% midway, 30% at handover',
+            '50_50' => '50% at the start, 50% at handover',
+            '20_20_40_20' => 'By phase: 20%, 20%, 40%, 20%',
+            '100' => '100% upfront (audit or retainer)',
+            'custom' => 'Custom (deposit only)',
+        ];
+        // Services in scope: stored values (proposals.archetype_id, also sent to the assistant) => labels
+        $serviceOptions = [
+            'Process Lean-Out (Six Sigma)' => 'Process improvement (Lean Six Sigma)',
+            'COPQ Diagnostics (PAF Matrix)' => 'Cost of poor quality diagnosis',
+            'Relational Data Vault Architecture' => 'Data consolidation into one source',
+            'Custom Enterprise Software / ERP' => 'Custom software or ERP build',
+            'Predictive Algorithmic Engine (AI)' => 'Forecasting and AI',
+            'Digital Poka-Yoke (Governance)' => 'Controls built into the system',
+            'ISO & Regulatory Gap Analysis' => 'ISO and regulatory gap analysis',
+            'Sovereign Cloud & DevOps Execution' => 'Local hosting and DevOps',
+            'Digital Escrow & Financial Routing' => 'Payment verification and money flows',
+            'Continuous Resilience (Kaizen SLA)' => 'Ongoing support and improvement (Kaizen)',
+        ];
+        $phaseTitles = ['Phase 1: Diagnosis and design', 'Phase 2: Build', 'Phase 3: Go-live', 'Phase 4: Testing and handover'];
+        $tabs = ['ledger' => 'All proposals', 'setup' => '1. Setup', 'ai_engine' => '2. Narrative and phases', 'preview' => '3. Review and sign'];
+    @endphp
 
     <style>
-        :root { --erp-bg-base: #03050A; --erp-bg-main: #0A1128; --erp-teal: #00E5FF; --erp-red: #FF3366; --erp-amber: #FFBD2E; --erp-success: #00FF66; --erp-muted: #8A9BB2; --erp-border-dark: rgba(255, 255, 255, 0.1); }
-        
-        .wizard-tabs { display: flex; background: var(--erp-bg-base); border-bottom: 1px solid var(--erp-border-dark); padding: 0 40px; }
-        .wizard-tab { padding: 20px 30px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: var(--erp-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: 0.3s; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
-        .wizard-tab:hover { color: var(--erp-white); background: rgba(0, 229, 255, 0.02); }
-        .wizard-tab.active { color: var(--erp-teal); border-bottom-color: var(--erp-teal); background: rgba(0, 229, 255, 0.05); }
-
-        .workspace-area { flex: 1; padding: 40px; overflow-y: auto; background: var(--erp-bg-main); }
-        
-        .section-box { background: rgba(10, 17, 40, 0.6); border: 1px solid var(--erp-border-dark); border-radius: 4px; padding: 30px; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-        .section-title { font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--erp-teal); margin-bottom: 20px; border-bottom: 1px dashed var(--erp-border-dark); padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-
-        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 20px; }
-        .form-group { display: flex; flex-direction: column; gap: 8px; }
-        .form-label { font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: var(--erp-muted); text-transform: uppercase; }
-        .form-input, .form-select { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); color: var(--erp-white); padding: 12px; font-family: 'Inter', sans-serif; font-size: 0.85rem; border-radius: 2px; outline: none; transition: 0.3s; }
-        .form-input:focus, .form-select:focus { border-color: var(--erp-teal); background: rgba(0,229,255,0.05); }
-        .form-select option { background: var(--erp-bg-base); }
-        .form-textarea { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); color: var(--erp-white); padding: 15px; font-family: 'Inter', sans-serif; font-size: 0.85rem; border-radius: 2px; outline: none; resize: vertical; min-height: 120px; line-height: 1.6; }
-        .form-textarea:focus { border-color: var(--erp-teal); }
-
-        .btn-action { background: var(--erp-teal); color: var(--erp-bg-main); font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: bold; padding: 12px 25px; cursor: pointer; transition: 0.3s; border: 1px solid var(--erp-teal); border-radius: 2px; display: inline-flex; align-items: center; gap: 8px; }
-        .btn-action:hover { background: transparent; color: var(--erp-teal); box-shadow: 0 0 15px rgba(0, 229, 255, 0.3); }
-        .btn-danger { background: rgba(255,51,102,0.1); color: var(--erp-red); border: 1px solid var(--erp-red); }
-        .btn-danger:hover { background: var(--erp-red); color: #fff; }
-
-        /* LINE ITEMS */
-        .line-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-        .line-table th { font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); text-align: left; padding: 10px; border-bottom: 1px solid var(--erp-border-dark); text-transform: uppercase; }
-        .line-table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.02); }
-        .line-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--erp-border-dark); color: var(--erp-white); font-family: 'Inter', sans-serif; font-size: 0.85rem; padding: 5px; outline: none; }
-        .line-input:focus { border-bottom-color: var(--erp-teal); }
-
-        /* TECH MODAL */
-        .glass-modal { position: fixed; inset: 0; background: rgba(3, 5, 10, 0.9); backdrop-filter: blur(10px); z-index: 99999; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .tech-modal-box { background: var(--erp-bg-base); border: 1px solid var(--erp-teal); border-radius: 4px; width: 100%; max-width: 1000px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,229,255,0.15); }
-        .tech-category { margin-bottom: 30px; }
-        .tech-category h4 { font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: var(--erp-teal); border-bottom: 1px dashed var(--erp-border-dark); padding-bottom: 5px; margin-bottom: 15px; }
-        .tech-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
-        .tech-checkbox { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
-        .tech-checkbox input { margin-top: 3px; accent-color: var(--erp-teal); width: 16px; height: 16px; }
-        .tech-info { display: flex; flex-direction: column; }
-        .tech-name { font-size: 0.85rem; color: var(--erp-white); font-weight: bold; }
-        .tech-desc { font-size: 0.65rem; color: var(--erp-muted); font-family: 'Roboto Mono', monospace; }
-
-        /* A4 PREVIEW */
-        .a4-wrapper { display: flex; justify-content: center; background: #050810; padding: 40px; overflow-y: auto; border: 1px solid var(--erp-border-dark); border-radius: 4px; margin-top: 20px; }
-        .a4-page { width: 210mm; min-height: 297mm; background-color: var(--erp-bg-main); background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h40v40H0V0zm20 20h20v20H20V20zM0 20h20v20H0V20z' fill='%23ffffff' fill-opacity='0.01' fill-rule='evenodd'/%3E%3C/svg%3E"); color: white; position: relative; padding: 50px 60px; box-shadow: 0 25px 50px -12px rgba(0, 229, 255, 0.15); border: 1px solid rgba(0, 229, 255, 0.05); flex-shrink: 0; }
-        
-        /* SIGNATURE CANVAS */
-        .sig-canvas-container { border: 1px dashed var(--erp-teal); background: #010308; border-radius: 4px; height: 200px; position: relative; margin-top: 10px; }
-        canvas#hqSignaturePad { width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
-        
-        /* OFFCANVAS STYLES & TRANSITIONS */
-        .offcanvas-backdrop { position: fixed; inset: 0; background: rgba(3, 5, 10, 0.8); backdrop-filter: blur(5px); z-index: 99998; }
-        .offcanvas-panel { position: fixed; top: 0; right: 0; bottom: 0; width: 100%; max-width: 500px; background: var(--erp-bg-main); border-left: 1px solid var(--erp-teal); z-index: 99999; display: flex; flex-direction: column; box-shadow: -20px 0 60px rgba(0,229,255,0.15); }
-        .slide-enter-active, .slide-leave-active { transition: transform 0.3s ease-in-out; }
-        .slide-enter-start, .slide-leave-end { transform: translateX(100%); }
-        .slide-enter-end, .slide-leave-start { transform: translateX(0); }
+        .pb-lines td { vertical-align: middle; }
+        .pb-lines .input { padding: 6px 8px; }
+        .pb-doc-wrap { margin-top: 24px; padding: 24px; background: var(--color-mist); border: 1px solid var(--color-line); border-radius: var(--radius-card); overflow-x: auto; }
+        .pb-doc { width: 210mm; max-width: 100%; min-height: 297mm; margin: 0 auto; padding: 48px 56px; background: var(--color-paper); border: 1px solid var(--color-line); color: var(--color-slate); font-size: 0.875rem; line-height: 1.375rem; }
+        .pb-doc h1 { font-family: var(--font-serif); font-weight: 500; font-size: 1.75rem; line-height: 2.25rem; color: var(--color-ink); margin: 0 0 24px; }
+        .pb-doc h2 { font-size: 1rem; line-height: 1.5rem; font-weight: 600; color: var(--color-ink); margin: 28px 0 8px; }
+        .pb-doc p { margin: 0; white-space: pre-wrap; }
+        .pb-doc .table th, .pb-doc .table td { padding: 8px 10px; }
+        .pb-sign { border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+        .pb-sign.is-signed { border-color: var(--color-success); background: var(--color-success-tint); }
+        .pb-sign dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: 0.8125rem; }
+        .pb-sign dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+        .pb-hash { font-size: 0.75rem; word-break: break-all; font-variant-numeric: tabular-nums; color: var(--color-muted); border-top: 1px solid var(--color-line); padding-top: 8px; }
+        .pb-sig-pad { position: relative; height: 200px; border: 1px solid var(--color-line-strong); border-radius: var(--radius-control); background: var(--color-paper); }
+        canvas#hqSignaturePad { width: 100%; height: 100%; cursor: crosshair; touch-action: none; display: block; }
+        .pb-panel-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(12, 20, 43, 0.4); }
+        .pb-panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 41; width: 100%; max-width: 480px; display: flex; flex-direction: column; background: var(--color-paper); border-left: 1px solid var(--color-line); box-shadow: var(--shadow-float); }
+        .pb-slide-enter { transition: transform var(--motion-standard) var(--ease-enter); }
+        .pb-slide-leave { transition: transform var(--motion-quick) var(--ease-exit); }
+        .pb-slide-out { transform: translateX(100%); }
+        .pb-slide-in { transform: translateX(0); }
+        @media (max-width: 768px) { .pb-doc { padding: 24px; } }
     </style>
 
-    <!-- TOP WIZARD NAVIGATION -->
-    <div class="wizard-tabs">
-        <div wire:click="switchTab('ledger')" class="wizard-tab {{ $activeTab === 'ledger' ? 'active' : '' }}">
-            <i data-lucide="database" style="width: 14px; height: 14px; display: inline-block; vertical-align: text-bottom;"></i> LEDGER VAULT
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Proposals</h1>
+            <p class="page-subtitle">Write a proposal, set the price and payment plan, then sign it and send the client the signing link.</p>
         </div>
+    </div>
+
+    {{-- Steps --}}
+    <div class="tabs" role="tablist" aria-label="Proposal steps">
+        <button type="button" role="tab" wire:click="switchTab('ledger')" class="tab {{ $activeTab === 'ledger' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'ledger' ? 'true' : 'false' }}">{{ $tabs['ledger'] }}</button>
         @if($proposalId)
-            <div wire:click="switchTab('setup')" class="wizard-tab {{ $activeTab === 'setup' ? 'active' : '' }}">1. PARAMETRIC SETUP</div>
-            <div wire:click="switchTab('ai_engine')" class="wizard-tab {{ $activeTab === 'ai_engine' ? 'active' : '' }}">2. AI & SPRINT ENGINE</div>
-            <div wire:click="switchTab('preview')" class="wizard-tab {{ $activeTab === 'preview' ? 'active' : '' }}">3. REVIEW & DISPATCH</div>
+            @foreach(['setup', 'ai_engine', 'preview'] as $tabKey)
+                <button type="button" role="tab" wire:click="switchTab('{{ $tabKey }}')" class="tab {{ $activeTab === $tabKey ? 'is-active' : '' }}" aria-selected="{{ $activeTab === $tabKey ? 'true' : 'false' }}">{{ $tabs[$tabKey] }}</button>
+            @endforeach
         @endif
     </div>
 
-    <!-- MAIN WORKSPACE -->
-    <div class="workspace-area">
-        
-        <!-- GLOBAL MESSAGES -->
-        @if(session()->has('success')) <div style="background: rgba(0,255,102,0.1); border: 1px solid #00FF66; color: #00FF66; padding: 15px; font-family: 'Roboto Mono'; font-size: 0.8rem; margin-bottom: 20px;">{{ session('success') }}</div> @endif
-        @if(session()->has('ai_success')) <div style="background: rgba(0,229,255,0.1); border: 1px solid #00E5FF; color: #00E5FF; padding: 15px; font-family: 'Roboto Mono'; font-size: 0.8rem; margin-bottom: 20px;">{{ session('ai_success') }}</div> @endif
-        @if(session()->has('error')) <div style="background: rgba(255,51,102,0.1); border: 1px solid #FF3366; color: #FF3366; padding: 15px; font-family: 'Roboto Mono'; font-size: 0.8rem; margin-bottom: 20px;">{{ session('error') }}</div> @endif
-        @if(session()->has('dispatch_success')) <div style="background: rgba(255,189,46,0.1); border: 1px solid #FFBD2E; color: #FFBD2E; padding: 15px; font-family: 'Roboto Mono'; font-size: 0.8rem; margin-bottom: 20px; font-weight: bold;">{{ session('dispatch_success') }}</div> @endif
+    {{-- Messages --}}
+    @if(session()->has('success')) <div class="alert alert-success" role="status" style="margin-bottom: 16px;"><i data-lucide="check-circle"></i><span>{{ session('success') }}</span></div> @endif
+    @if(session()->has('ai_success')) <div class="alert alert-info" role="status" style="margin-bottom: 16px;"><i data-lucide="info"></i><span>{{ session('ai_success') }}</span></div> @endif
+    @if(session()->has('error')) <div class="alert alert-danger" role="alert" style="margin-bottom: 16px;"><i data-lucide="circle-alert"></i><span>{{ session('error') }}</span></div> @endif
+    @if(session()->has('dispatch_success')) <div class="alert alert-success" role="status" style="margin-bottom: 16px;"><i data-lucide="check-circle"></i><span>{{ session('dispatch_success') }}</span></div> @endif
 
-        @if($isLocked)
-            <div style="background: rgba(255,51,102,0.1); border: 1px solid #FF3366; color: #FF3366; padding: 15px; font-family: 'Roboto Mono'; font-size: 0.85rem; margin-bottom: 20px; font-weight: bold; display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <i data-lucide="lock"></i> DOCUMENT CRYPTOGRAPHICALLY LOCKED. EDITS DISABLED.
-                </div>
-                @if($proposal->status === 'Pending Auth')
-                    <button wire:click="unlockProposal" style="background: var(--erp-red); color: #FFF; border: none; padding: 6px 12px; font-family: 'Roboto Mono'; font-size: 0.7rem; cursor: pointer; border-radius: 2px;" wire:loading.attr="disabled">
-                        <span wire:loading.remove wire:target="unlockProposal">REVOKE DISPATCH & UNLOCK</span>
-                        <span wire:loading wire:target="unlockProposal">REVOKING...</span>
-                    </button>
-                @endif
+    @if($isLocked && $activeTab !== 'ledger')
+        <div class="alert alert-warning" style="margin-bottom: 16px; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <div class="flex items-center gap-2">
+                <i data-lucide="lock"></i>
+                <span>This proposal is signed and locked, so it can't be edited.</span>
             </div>
-        @endif
+            @if($proposal->status === 'Pending Auth')
+                <button type="button" wire:click="unlockProposal" wire:confirm="Unlock this proposal? Your signature is removed and the proposal goes back to draft. You'll need to sign it again before you send it." class="btn btn-secondary btn-sm" wire:loading.attr="disabled" wire:target="unlockProposal">
+                    <span wire:loading.remove wire:target="unlockProposal">Unlock and edit</span>
+                    <span wire:loading wire:target="unlockProposal">Unlocking…</span>
+                </button>
+            @endif
+        </div>
+    @endif
 
-        <!-- ========================================== -->
-        <!-- TAB 0: LEDGER VAULT                        -->
-        <!-- ========================================== -->
-        @if($activeTab === 'ledger')
-            <div class="section-box">
-                <div class="section-title">
-                    <span>> INITIATE OR LOAD BLUEPRINT</span>
-                </div>
-                
-                <div style="display: flex; gap: 15px; max-width: 600px; margin-bottom: 40px;">
-                    <select wire:model="selectedLeadId" class="form-select">
-                        <option value="">-- SELECT TARGET ENTERPRISE --</option>
+    {{-- ========================= All proposals ========================= --}}
+    @if($activeTab === 'ledger')
+        <section class="card" style="margin-bottom: 24px;">
+            <h2 class="card-title" style="margin-bottom: 12px;">Start a proposal</h2>
+            <div class="flex flex-wrap items-end gap-3" style="max-width: 640px;">
+                <div class="field" style="flex: 1; min-width: 240px;">
+                    <label class="label" for="pb-lead">Organisation</label>
+                    <select id="pb-lead" wire:model="selectedLeadId" class="select">
+                        <option value="">Choose an organisation</option>
                         @foreach($availableLeads as $lead)
-                            <option value="{{ $lead->id }}">{{ $lead->name }} ({{ $lead->status }})</option>
+                            <option value="{{ $lead->id }}">{{ $lead->name }} ({{ $orgStatus($lead->status) }})</option>
                         @endforeach
                     </select>
-                    <button wire:click="initiateForLead" class="btn-action" style="white-space: nowrap;" wire:loading.attr="disabled">
-                        <span wire:loading.remove wire:target="initiateForLead"><i data-lucide="zap" style="width: 16px; height: 16px; display: inline-block; vertical-align: text-bottom;"></i> INITIATE DRAFT</span>
-                        <span wire:loading wire:target="initiateForLead">INITIALIZING...</span>
-                    </button>
                 </div>
+                <button type="button" wire:click="initiateForLead" class="btn btn-primary" wire:loading.attr="disabled" wire:target="initiateForLead">
+                    <span wire:loading.remove wire:target="initiateForLead" class="inline-flex items-center gap-2"><i data-lucide="plus"></i> Create draft</span>
+                    <span wire:loading wire:target="initiateForLead">Creating…</span>
+                </button>
+            </div>
+        </section>
 
-                <div class="section-title">> SECURED DEPLOYMENTS VAULT</div>
-                <table class="line-table" style="font-family: 'Inter', sans-serif;">
+        <section class="card" style="padding: 0;">
+            <div class="card-header" style="padding: 20px 24px 0;">
+                <h2 class="card-title">All proposals</h2>
+            </div>
+            <div class="table-wrap">
+                <table class="table">
                     <thead>
                         <tr>
-                            <th>SOW REF</th>
-                            <th>CLIENT</th>
-                            <th>DATE</th>
-                            <th>VALUE</th>
-                            <th>STATUS</th>
-                            <th style="text-align: right;">ACTION</th>
+                            <th>Reference</th>
+                            <th>Client</th>
+                            <th>Created</th>
+                            <th class="num" style="text-align: right;">Value</th>
+                            <th>Status</th>
+                            <th><span class="sr-only">Actions</span></th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($proposalsLedger as $prop)
+                            @php [$label, $pill] = $statusLabel($prop->status); @endphp
                             <tr>
-                                <td style="font-family: 'Roboto Mono', monospace; color: var(--erp-teal);">{{ $prop->proposal_ref }}</td>
-                                <td style="font-weight: bold;">{{ $prop->client_name }}</td>
-                                <td style="font-size: 0.75rem; color: var(--erp-muted);">{{ \Carbon\Carbon::parse($prop->created_at)->format('M d, Y') }}</td>
-                                <td style="font-family: 'Roboto Mono', monospace;">{{ $prop->currency }} {{ number_format($prop->total_value, 2) }}</td>
-                                <td>
-                                    @if(in_array($prop->status, ['Authorized', 'Converted'])) <span style="color: #00FF66; font-family: 'Roboto Mono'; font-size: 0.7rem; font-weight: bold;">SECURED</span>
-                                    @elseif($prop->status === 'Pending Auth') <span style="color: #FFBD2E; font-family: 'Roboto Mono'; font-size: 0.7rem; font-weight: bold;">PENDING</span>
-                                    @else <span style="color: var(--erp-muted); font-family: 'Roboto Mono'; font-size: 0.7rem; font-weight: bold;">DRAFT</span> @endif
-                                </td>
+                                <td style="font-variant-numeric: tabular-nums;" class="text-ink">{{ $prop->proposal_ref ?: 'No reference' }}</td>
+                                <td class="font-semibold text-ink">{{ $prop->client_name }}</td>
+                                <td style="font-variant-numeric: tabular-nums;">{{ \Carbon\Carbon::parse($prop->created_at)->format('j M Y') }}</td>
+                                <td class="num">{{ $money($prop->currency, $prop->total_value) }}</td>
+                                <td><span class="pill {{ $pill }}">{{ $label }}</span></td>
                                 <td style="text-align: right;">
-                                    <button wire:click="loadExistingProposal('{{ $prop->id }}')" class="btn-action" style="padding: 6px 12px; font-size: 0.65rem; background: transparent; border-color: var(--erp-muted); color: var(--erp-muted);">OPEN</button>
+                                    <button type="button" wire:click="loadExistingProposal('{{ $prop->id }}')" class="btn btn-secondary btn-sm">Open</button>
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" style="text-align: center; color: var(--erp-muted); padding: 30px;">NO SOWS IN VAULT</td></tr>
+                            <tr>
+                                <td colspan="6">
+                                    <div class="empty-state">
+                                        <strong>No proposals yet</strong>
+                                        Choose an organisation above and create a draft. Closing a free audit also drafts a proposal for you.
+                                    </div>
+                                </td>
+                            </tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
-        @endif
+        </section>
+    @endif
 
-        <!-- ========================================== -->
-        <!-- TAB 1: PARAMETRIC SETUP                    -->
-        <!-- ========================================== -->
-        @if($activeTab === 'setup' && $proposalId)
-            
-            <div class="section-box">
-                <div class="section-title"><span>> I. METADATA & CLEARANCES</span></div>
-                <div class="form-grid">
-                    <div class="form-group" style="grid-column: span 2;">
-                        <label class="form-label">DOCUMENT TITLE</label>
-                        <input type="text" wire:model.blur="title" class="form-input" {{ $isLocked ? 'disabled' : '' }}>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">PREPARED FOR (LOCKED)</label>
-                        <input type="text" class="form-input" value="{{ $organization->name ?? 'Unknown' }}" disabled style="opacity: 0.5; border-style: dashed;">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">TOKEN VALIDITY (DAYS)</label>
-                        <input type="number" wire:model.blur="validityDays" class="form-input" {{ $isLocked ? 'disabled' : '' }}>
-                    </div>
+    {{-- ========================= 1. Setup ========================= --}}
+    @if($activeTab === 'setup' && $proposalId)
+        <section class="card" style="margin-bottom: 24px;">
+            <h2 class="card-title" style="margin-bottom: 16px;">Document details</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="field md:col-span-2">
+                    <label class="label" for="pb-title">Title</label>
+                    <input id="pb-title" type="text" wire:model.blur="title" class="input" {{ $isLocked ? 'disabled' : '' }}>
+                </div>
+                <div class="field">
+                    <label class="label" for="pb-client">Prepared for</label>
+                    <input id="pb-client" type="text" class="input" value="{{ $organization->name ?? 'Unknown organisation' }}" disabled>
+                </div>
+                <div class="field">
+                    <label class="label" for="pb-validity">Valid for (days)</label>
+                    <input id="pb-validity" type="number" wire:model.blur="validityDays" class="input" {{ $isLocked ? 'disabled' : '' }}>
+                    <span class="help">The client's signing link stops working after this.</span>
                 </div>
             </div>
+        </section>
 
-            <div class="section-box">
-                <div class="section-title"><span>> II. COMMERCIAL MATRIX</span></div>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label class="form-label">CURRENCY</label>
-                        <select wire:model.live="currency" class="form-select" {{ $isLocked ? 'disabled' : '' }}>
-                            @foreach($exchangeRates as $rate)
-                                <option value="{{ $rate->currency_code }}">{{ $rate->currency_code }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">VAT RATE (%)</label>
-                        <input type="number" step="0.01" wire:model.blur="vatRate" class="form-input" {{ $isLocked ? 'disabled' : '' }}>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">PAYMENT SCHEDULE</label>
-                        <select wire:model.live="paymentSchedule" class="form-select" {{ $isLocked ? 'disabled' : '' }}>
-                            <option value="40_30_30">40% Mobilization | 30% Mid | 30% Handover</option>
-                            <option value="50_50">50% Mobilization | 50% Handover</option>
-                            <option value="20_20_40_20">20% Ph1 | 20% Ph2 | 40% Ph3 | 20% Ph4</option>
-                            <option value="100">100% Upfront (Audit/Retainer)</option>
-                            <option value="custom">Custom (Deposit Anchor Only)</option>
-                        </select>
-                    </div>
-                    @if($paymentSchedule === 'custom')
-                        <div class="form-group">
-                            <label class="form-label" style="color: var(--erp-amber);">INITIAL DEPOSIT (%)</label>
-                            <input type="number" step="0.01" wire:model.blur="customDepositPercent" class="form-input" style="border-color: var(--erp-amber);" {{ $isLocked ? 'disabled' : '' }}>
-                        </div>
-                    @endif
-                </div>
-
-                <div class="section-title" style="margin-top: 30px;">
-                    <span>> LINE ITEMS INJECTION</span>
-                    <select wire:change="addLineItem($event.target.value); $event.target.value='';" class="form-select" style="width: auto; padding: 4px 10px; font-size: 0.7rem; border-color: var(--erp-teal);" {{ $isLocked ? 'disabled' : '' }}>
-                        <option value="">+ ADD FROM MDM DICTIONARY...</option>
-                        @foreach($financialDictionary as $dict)
-                            <option value="{{ $dict->id }}">{{ $dict->item_code }} - {{ Str::limit($dict->description, 40) }}</option>
+        <section class="card" style="margin-bottom: 24px;">
+            <h2 class="card-title" style="margin-bottom: 16px;">Price and payment</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4" style="margin-bottom: 24px;">
+                <div class="field">
+                    <label class="label" for="pb-currency">Currency</label>
+                    <select id="pb-currency" wire:model.live="currency" class="select" {{ $isLocked ? 'disabled' : '' }}>
+                        @foreach($exchangeRates as $rate)
+                            <option value="{{ $rate->currency_code }}">{{ $rate->currency_code }}</option>
                         @endforeach
                     </select>
                 </div>
-                
-                <table class="line-table">
+                <div class="field">
+                    <label class="label" for="pb-vat">VAT rate (%)</label>
+                    <input id="pb-vat" type="number" step="0.01" wire:model.blur="vatRate" class="input" {{ $isLocked ? 'disabled' : '' }}>
+                </div>
+                <div class="field">
+                    <label class="label" for="pb-schedule">Payment plan</label>
+                    <select id="pb-schedule" wire:model.live="paymentSchedule" class="select" {{ $isLocked ? 'disabled' : '' }}>
+                        @foreach($scheduleLabels as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                @if($paymentSchedule === 'custom')
+                    <div class="field">
+                        <label class="label" for="pb-deposit">Deposit (%)</label>
+                        <input id="pb-deposit" type="number" step="0.01" wire:model.blur="customDepositPercent" class="input" {{ $isLocked ? 'disabled' : '' }}>
+                    </div>
+                @endif
+            </div>
+
+            <div class="card-header" style="flex-wrap: wrap;">
+                <h3 class="card-title">Line items</h3>
+                <select wire:change="addLineItem($event.target.value); $event.target.value='';" class="select" style="width: auto; max-width: 100%;" aria-label="Add a line from the financial dictionary" {{ $isLocked ? 'disabled' : '' }}>
+                    <option value="">Add from the financial dictionary</option>
+                    @foreach($financialDictionary as $dict)
+                        <option value="{{ $dict->id }}">{{ $dict->item_code }}: {{ Str::limit($dict->description, 40) }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="table-wrap">
+                <table class="table pb-lines">
                     <thead>
                         <tr>
-                            <th style="width: 15%;">CODE</th>
-                            <th style="width: 45%;">DESCRIPTION</th>
-                            <th style="width: 15%;">QTY/METRIC</th>
-                            <th style="width: 20%;">UNIT PRICE</th>
-                            <th style="width: 5%;"></th>
+                            <th style="width: 15%;">Code</th>
+                            <th style="width: 45%;">Description</th>
+                            <th style="width: 15%;">Quantity</th>
+                            <th style="width: 20%;" class="num">Unit price</th>
+                            <th style="width: 5%;"><span class="sr-only">Remove</span></th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($lineItems as $index => $item)
                             <tr>
-                                <td><input type="text" wire:model.blur="lineItems.{{ $index }}.code" class="line-input" {{ $isLocked ? 'disabled' : '' }}></td>
-                                <td><input type="text" wire:model.blur="lineItems.{{ $index }}.description" class="line-input" {{ $isLocked ? 'disabled' : '' }}></td>
-                                <td><input type="text" wire:model.blur="lineItems.{{ $index }}.quantity" class="line-input" {{ $isLocked ? 'disabled' : '' }}></td>
-                                <td><input type="number" step="0.01" wire:model.blur="lineItems.{{ $index }}.unit_price" wire:change="updateLine({{ $index }}, 'unit_price', $event.target.value)" class="line-input" {{ $isLocked ? 'disabled' : '' }}></td>
+                                <td><input type="text" wire:model.blur="lineItems.{{ $index }}.code" class="input" aria-label="Code" {{ $isLocked ? 'disabled' : '' }}></td>
+                                <td><input type="text" wire:model.blur="lineItems.{{ $index }}.description" class="input" aria-label="Description" {{ $isLocked ? 'disabled' : '' }}></td>
+                                <td><input type="text" wire:model.blur="lineItems.{{ $index }}.quantity" class="input" aria-label="Quantity" {{ $isLocked ? 'disabled' : '' }}></td>
+                                <td><input type="number" step="0.01" wire:model.blur="lineItems.{{ $index }}.unit_price" wire:change="updateLine({{ $index }}, 'unit_price', $event.target.value)" class="input" style="text-align: right; font-variant-numeric: tabular-nums;" aria-label="Unit price" {{ $isLocked ? 'disabled' : '' }}></td>
                                 <td>
-                                    <button wire:click="removeLineItem({{ $index }})" class="btn-action btn-danger" style="padding: 6px; font-size: 1rem;" {{ $isLocked ? 'disabled' : '' }}>×</button>
+                                    <button type="button" wire:click="removeLineItem({{ $index }})" class="btn btn-ghost btn-sm" aria-label="Remove line" title="Remove line" {{ $isLocked ? 'disabled' : '' }}><i data-lucide="trash-2"></i></button>
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--erp-muted); font-family: 'Roboto Mono', monospace;">NO FINANCIAL PARAMETERS INJECTED.</td></tr>
+                            <tr>
+                                <td colspan="5">
+                                    <div class="empty-state" style="padding: 24px;">No line items yet. Add one from the financial dictionary, or add a blank line.</div>
+                                </td>
+                            </tr>
                         @endforelse
                     </tbody>
                 </table>
-                <button wire:click="addLineItem()" class="btn-action" style="background: transparent; color: var(--erp-muted); border: 1px dashed var(--erp-muted); width: 100%; justify-content: center;" {{ $isLocked ? 'disabled' : '' }}>+ ADD CUSTOM BLANK ROW</button>
+            </div>
+            <button type="button" wire:click="addLineItem()" class="btn btn-secondary" style="margin-top: 12px;" {{ $isLocked ? 'disabled' : '' }}><i data-lucide="plus"></i> Add blank line</button>
 
-                <div style="text-align: right; margin-top: 20px; font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--erp-muted);">
-                    <div>SUBTOTAL: {{ $currency }} {{ number_format($subtotal, 2) }}</div>
-                    <div>VAT ({{ $vatRate }}%): {{ $currency }} {{ number_format($taxAmount, 2) }}</div>
-                    <div style="font-size: 1.2rem; color: var(--erp-teal); font-weight: bold; margin-top: 10px;">TOTAL: {{ $currency }} {{ number_format($grandTotal, 2) }}</div>
+            <dl class="text-small" style="display: grid; grid-template-columns: 1fr auto; gap: 4px 24px; margin: 20px 0 0 auto; max-width: 360px; font-variant-numeric: tabular-nums;">
+                <dt class="text-muted">Subtotal</dt><dd style="margin: 0; text-align: right;">{{ $money($currency, $subtotal) }}</dd>
+                <dt class="text-muted">VAT ({{ $vatRate }}%)</dt><dd style="margin: 0; text-align: right;">{{ $money($currency, $taxAmount) }}</dd>
+                <dt class="font-semibold text-ink" style="padding-top: 8px; border-top: 1px solid var(--color-line);">Total</dt>
+                <dd class="font-semibold text-ink" style="margin: 0; text-align: right; padding-top: 8px; border-top: 1px solid var(--color-line); font-size: 1.125rem;">{{ $money($currency, $grandTotal) }}</dd>
+            </dl>
+        </section>
+
+        <div class="flex justify-end">
+            <button type="button" wire:click="switchTab('ai_engine')" class="btn btn-primary">Continue to narrative <i data-lucide="arrow-right"></i></button>
+        </div>
+    @endif
+
+    {{-- ========================= 2. Narrative and phases ========================= --}}
+    @if($activeTab === 'ai_engine' && $proposalId)
+        <section class="card" style="margin-bottom: 24px;">
+            <div class="card-header" style="flex-wrap: wrap; align-items: flex-start;">
+                <div>
+                    <h2 class="card-title">Narrative</h2>
+                    <p class="help" style="margin: 4px 0 0;">Write it yourself, or let the assistant draft it. A new draft replaces the text below; you can restore the previous text afterwards.</p>
                 </div>
-            </div>
-            
-            <div style="display: flex; justify-content: flex-end;">
-                <button wire:click="switchTab('ai_engine')" class="btn-action">PROCEED TO NARRATIVE & SPRINTS ➔</button>
-            </div>
-        @endif
-
-        <!-- ========================================== -->
-        <!-- TAB 2: AI ENGINE & NARRATIVE               -->
-        <!-- ========================================== -->
-        @if($activeTab === 'ai_engine' && $proposalId)
-            
-            <div class="section-box" style="background: rgba(0, 229, 255, 0.02); border-color: var(--erp-teal);">
-                <div class="section-title">
-                    <span style="color: var(--erp-teal);">> AI HYBRID NARRATIVE GENERATOR</span>
-                    <div style="display: flex; gap: 10px;">
-                        @if($previousAiState)
-                            <button wire:click="revertAI" class="btn-action" style="background: transparent; border: 1px solid var(--erp-amber); color: var(--erp-amber); padding: 6px 12px; font-size: 0.7rem;">
-                                <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i> REVERT TO PREVIOUS
-                            </button>
-                        @endif
-                        <button wire:click="triggerAI" class="btn-action" style="padding: 6px 12px; font-size: 0.7rem;" {{ $isLocked ? 'disabled' : '' }} wire:loading.attr="disabled">
-                            <span wire:loading.remove wire:target="triggerAI"><i data-lucide="cpu" style="width: 14px; height: 14px;"></i> TRIGGER AI OVERWRITE</span>
-                            <span wire:loading wire:target="triggerAI">ANALYZING MATRIX...</span>
+                <div class="flex flex-wrap gap-2">
+                    @if($previousAiState)
+                        <button type="button" wire:click="revertAI" class="btn btn-secondary btn-sm">
+                            <i data-lucide="rotate-ccw"></i> Restore previous text
                         </button>
-                    </div>
-                </div>
-                
-                <div class="form-grid" style="grid-template-columns: 1fr 2fr;">
-                    <div class="form-group">
-                        <label class="form-label" style="color: var(--erp-teal);">TARGET ARCHETYPES (CTRL/CMD + CLICK TO MULTI-SELECT)</label>
-                        <select wire:model.blur="archetype" class="form-select" multiple style="height: 180px; border-color: var(--erp-teal);" {{ $isLocked ? 'disabled' : '' }}>
-                            <option value="Process Lean-Out (Six Sigma)">1. Process Lean-Out (Six Sigma Mapping)</option>
-                            <option value="COPQ Diagnostics (PAF Matrix)">2. COPQ Diagnostics (PAF Matrix)</option>
-                            <option value="Relational Data Vault Architecture">3. Relational Data Vault Architecture</option>
-                            <option value="Custom Enterprise Software / ERP">4. Custom Enterprise Software / ERP Build</option>
-                            <option value="Predictive Algorithmic Engine (AI)">5. Predictive Algorithmic Engine (AI Foresight)</option>
-                            <option value="Digital Poka-Yoke (Governance)">6. Digital Poka-Yoke (Code as Law/Governance)</option>
-                            <option value="ISO & Regulatory Gap Analysis">7. ISO & Regulatory Gap Analysis</option>
-                            <option value="Sovereign Cloud & DevOps Execution">8. Sovereign Cloud & DevOps Execution</option>
-                            <option value="Digital Escrow & Financial Routing">9. Digital Escrow & Financial Routing</option>
-                            <option value="Continuous Resilience (Kaizen SLA)">10. Continuous Resilience (Kaizen Handover)</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" style="display: flex; justify-content: space-between;">
-                            <span>TECH STACK CONSTRAINT</span>
-                            <button @click="showTechModal = true" style="background: transparent; border: none; color: var(--erp-teal); font-family: 'Roboto Mono'; font-size: 0.65rem; cursor: pointer; text-decoration: underline;" type="button">[ OPEN CATALOG ]</button>
-                        </label>
-                        
-                        <div style="background: rgba(0,0,0,0.5); padding: 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 2px; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-teal); height: 180px; overflow-y: auto;">
-                            @if(count($selectedTech) > 0)
-                                @php
-                                    // Flatten the catalog to retrieve names by ID
-                                    $flatTechDisplay = collect($techCatalog)->flatten(1);
-                                    $activeNamesDisplay = $flatTechDisplay->whereIn('id', $selectedTech)->pluck('tech_name');
-                                @endphp
-                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
-                                    @foreach($activeNamesDisplay as $name)
-                                        <div style="background: rgba(0, 229, 255, 0.05); border: 1px solid rgba(0, 229, 255, 0.15); padding: 6px; border-radius: 2px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ $name }}">
-                                            {{ $name }}
-                                        </div>
-                                    @endforeach
-                                </div>
-                            @else
-                                <div style="display: flex; height: 100%; align-items: center; justify-content: center; color: var(--erp-muted);">
-                                    No architectural constraints selected.
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-group" style="margin-bottom: 20px;">
-                    <label class="form-label">EXECUTIVE SUMMARY</label>
-                    <textarea wire:model.blur="aiExecutiveSummary" class="form-textarea" {{ $isLocked ? 'disabled' : '' }}></textarea>
-                </div>
-                
-                <div class="form-group" style="margin-bottom: 20px;">
-                    <label class="form-label">OPERATIONAL STRATEGY (TECHNICAL DIRECTIVE)</label>
-                    <textarea wire:model.blur="aiOperationalStrategy" class="form-textarea" style="min-height: 180px;" {{ $isLocked ? 'disabled' : '' }}></textarea>
-                </div>
-
-                <div class="form-group" style="margin-bottom: 20px;">
-                    <label class="form-label" style="color: var(--erp-amber);">BOUNDARIES & EXCLUSIONS</label>
-                    <textarea wire:model.blur="exclusions" class="form-textarea" style="border-color: rgba(255,189,46,0.3); min-height: 80px;" placeholder="List what is explicitly out of scope to protect the SLA..." {{ $isLocked ? 'disabled' : '' }}></textarea>
+                    @endif
+                    <button type="button" wire:click="triggerAI" class="btn btn-primary btn-sm" {{ $isLocked ? 'disabled' : '' }} wire:loading.attr="disabled" wire:target="triggerAI">
+                        <span wire:loading.remove wire:target="triggerAI" class="inline-flex items-center gap-2"><i data-lucide="sparkles"></i> Draft with the assistant</span>
+                        <span wire:loading wire:target="triggerAI">Drafting…</span>
+                    </button>
                 </div>
             </div>
 
-            <div class="section-box">
-                <div class="section-title"><span>> DEPLOYMENT SPRINTS (PHASES 1-4)</span></div>
-                
-                <div class="form-grid" style="grid-template-columns: 80px 1fr; align-items: start; margin-bottom: 15px;">
-                    <div class="form-group"><label class="form-label">WT(0-4)</label><input type="number" step="0.5" wire:model.blur="w1" class="form-input" style="text-align: center;" {{ $isLocked ? 'disabled' : '' }}></div>
-                    <div class="form-group"><label class="form-label text-erp-teal">PHASE 1: DIAGNOSTIC & BLUEPRINT</label><textarea wire:model.blur="p1Content" class="form-textarea" style="min-height: 80px;" {{ $isLocked ? 'disabled' : '' }}></textarea></div>
-                </div>
-                <div class="form-grid" style="grid-template-columns: 80px 1fr; align-items: start; margin-bottom: 15px;">
-                    <div class="form-group"><label class="form-label">WT(0-4)</label><input type="number" step="0.5" wire:model.blur="w2" class="form-input" style="text-align: center;" {{ $isLocked ? 'disabled' : '' }}></div>
-                    <div class="form-group"><label class="form-label text-erp-teal">PHASE 2: ARCHITECTURE BUILD</label><textarea wire:model.blur="p2Content" class="form-textarea" style="min-height: 80px;" {{ $isLocked ? 'disabled' : '' }}></textarea></div>
-                </div>
-                <div class="form-grid" style="grid-template-columns: 80px 1fr; align-items: start; margin-bottom: 15px;">
-                    <div class="form-group"><label class="form-label">WT(0-4)</label><input type="number" step="0.5" wire:model.blur="w3" class="form-input" style="text-align: center;" {{ $isLocked ? 'disabled' : '' }}></div>
-                    <div class="form-group"><label class="form-label text-erp-teal">PHASE 3: EXECUTION ENGINE</label><textarea wire:model.blur="p3Content" class="form-textarea" style="min-height: 80px;" {{ $isLocked ? 'disabled' : '' }}></textarea></div>
-                </div>
-                <div class="form-grid" style="grid-template-columns: 80px 1fr; align-items: start; margin-bottom: 15px;">
-                    <div class="form-group"><label class="form-label">WT(0-4)</label><input type="number" step="0.5" wire:model.blur="w4" class="form-input" style="text-align: center;" {{ $isLocked ? 'disabled' : '' }}></div>
-                    <div class="form-group"><label class="form-label text-erp-teal">PHASE 4: QA & HANDOVER</label><textarea wire:model.blur="p4Content" class="form-textarea" style="min-height: 80px;" {{ $isLocked ? 'disabled' : '' }}></textarea></div>
-                </div>
-            </div>
-
-            <div style="display: flex; justify-content: space-between;">
-                <button wire:click="switchTab('setup')" class="btn-action" style="background: transparent; color: var(--erp-white); border-color: var(--erp-border-dark);">BACK TO SETUP</button>
-                <button wire:click="switchTab('preview')" class="btn-action" wire:loading.attr="disabled">
-                    <span wire:loading.remove wire:target="switchTab('preview')">SAVE & COMPILE DOCUMENT ➔</span>
-                    <span wire:loading wire:target="switchTab('preview')">COMPILING MATRIX...</span>
-                </button>
-            </div>
-
-            <!-- ALPINE MODAL: TECH STACK -->
-            <div style="position: relative; z-index: 99999;" x-show="showTechModal" style="display: none;" wire:ignore.self>
-                <div class="offcanvas-backdrop" 
-                     x-show="showTechModal" 
-                     x-transition.opacity 
-                     @click="showTechModal = false"></div>
-                     
-                <div class="offcanvas-panel" 
-                     x-show="showTechModal" 
-                     x-transition:enter="slide-enter-active" 
-                     x-transition:enter-start="slide-enter-start" 
-                     x-transition:enter-end="slide-enter-end" 
-                     x-transition:leave="slide-leave-active" 
-                     x-transition:leave-start="slide-leave-start" 
-                     x-transition:leave-end="slide-leave-end">
-                    
-                    <div style="padding: 25px 30px; border-bottom: 1px solid var(--erp-border-dark); background: var(--erp-bg-base); display: flex; justify-content: space-between; align-items: center;">
-                        <h3 style="font-family: 'Roboto Mono', monospace; font-size: 1rem; color: var(--erp-teal); margin: 0;">> MDM ARCHITECTURE CATALOG</h3>
-                        <button @click="showTechModal = false" style="background: transparent; border: none; color: var(--erp-muted); font-size: 1.5rem; cursor: pointer;">&times;</button>
-                    </div>
-                    
-                    <div style="padding: 30px; overflow-y: auto; flex: 1;">
-                        @foreach($techCatalog as $category => $techs)
-                            <div class="tech-category">
-                                <h4>{{ $category }}</h4>
-                                <div class="tech-grid" style="grid-template-columns: 1fr;"> 
-                                    @foreach($techs as $tech)
-                                        <label class="tech-checkbox">
-                                            <input type="checkbox" wire:model.live="selectedTech" value="{{ $tech->id }}" {{ $isLocked ? 'disabled' : '' }}>
-                                            <div class="tech-info">
-                                                <span class="tech-name">{{ $tech->tech_name }}</span>
-                                                <span class="tech-desc" style="display: block; margin-top: 2px;">{{ $tech->description }}</span>
-                                            </div>
-                                        </label>
-                                    @endforeach
-                                </div>
-                            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4" style="margin-bottom: 20px;">
+                <div class="field">
+                    <label class="label" for="pb-archetype">Services in scope</label>
+                    <select id="pb-archetype" wire:model.blur="archetype" class="select" multiple style="height: 196px;" {{ $isLocked ? 'disabled' : '' }}>
+                        @foreach($serviceOptions as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
                         @endforeach
-                    </div>
-                    
-                    <div style="padding: 20px 30px; border-top: 1px solid var(--erp-border-dark); background: var(--erp-bg-base); text-align: right;">
-                        <button @click="showTechModal = false" class="btn-action">CONFIRM SELECTION</button>
-                    </div>
+                    </select>
+                    <span class="help">Hold Ctrl (Cmd on a Mac) to choose more than one.</span>
                 </div>
-            </div>
-        @endif
-
-        <!-- ========================================== -->
-        <!-- TAB 3: PREVIEW & DISPATCH (CRYPTOGRAPHY)   -->
-        <!-- ========================================== -->
-        @if($activeTab === 'preview' && $proposalId)
-            
-            @if(!$isLocked)
-                <div class="section-box" style="background: rgba(255, 189, 46, 0.05); border-color: var(--erp-amber); text-align: center;">
-                    <i data-lucide="fingerprint" style="width: 48px; height: 48px; color: var(--erp-amber); margin: 0 auto 15px auto;"></i>
-                    <h3 style="font-family: 'Montserrat'; font-size: 1.5rem; color: var(--erp-white); margin-bottom: 10px; text-transform: uppercase;">HQ ORIGINATOR AUTHORIZATION</h3>
-                    <p style="font-size: 0.85rem; color: var(--erp-muted); max-width: 600px; margin: 0 auto 20px auto;">Review the A4 document below. If correct, provide your cryptographic signature to secure the SHA-256 hash. This prevents tampering prior to client signature.</p>
-                    
-                    <form id="hq-sign-form" style="max-width: 500px; margin: 0 auto; text-align: left;">
-                        <input type="text" wire:model.defer="hqSignerName" class="form-input" style="text-align: center; font-weight: bold; letter-spacing: 1px;" placeholder="Level 4/5 Originator Name" required>
-                        <div class="sig-canvas-container" wire:ignore>
-                            <span style="position: absolute; top: 10px; left: 10px; font-family: 'Roboto Mono'; font-size: 0.65rem; color: var(--erp-amber);">DRAW SIGNATURE:</span>
-                            <button type="button" onclick="clearHqCanvas()" style="position: absolute; top: 10px; right: 10px; background: transparent; border: none; color: var(--erp-muted); font-size: 0.65rem; font-family: 'Roboto Mono'; cursor: pointer; z-index: 10;">CLEAR</button>
-                            <canvas id="hqSignaturePad"></canvas>
-                        </div>
-                        <button type="button" onclick="submitHqSignature()" class="btn-action" style="width: 100%; justify-content: center; background: var(--erp-amber); color: #000; border-color: var(--erp-amber); margin-top: 10px;" wire:loading.attr="disabled">
-                            <span wire:loading.remove wire:target="compileAndSecure">LOCK DOCUMENT & GENERATE MAGIC LINK</span>
-                            <span wire:loading wire:target="compileAndSecure">ENCRYPTING...</span>
-                        </button>
-                    </form>
-                </div>
-            @else
-                <div class="section-box" style="background: rgba(0, 255, 102, 0.05); border-color: #00FF66; text-align: center;">
-                    <i data-lucide="check-circle" style="width: 48px; height: 48px; color: #00FF66; margin: 0 auto 15px auto;"></i>
-                    <h3 style="font-family: 'Montserrat'; font-size: 1.5rem; color: var(--erp-white); margin-bottom: 10px; text-transform: uppercase;">DOCUMENT SECURED & READY FOR DISPATCH</h3>
-                    <p style="font-size: 0.85rem; color: var(--erp-muted); margin-bottom: 20px;">The Cryptographic Hash has been sealed. Dispatch this Magic Link to the client's executive team.</p>
-                    
-                    <input type="text" readonly value="{{ $magicLinkUrl }}" class="form-input" style="text-align: center; color: var(--erp-teal); font-family: 'Roboto Mono'; font-size: 1.1rem; max-width: 700px; margin: 0 auto 20px auto; display: block;" id="magicLinkField">
-                    
-                    <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
-                        <button onclick="navigator.clipboard.writeText(document.getElementById('magicLinkField').value); alert('Link Copied to Clipboard!');" class="btn-action" style="background: transparent; border-color: var(--erp-muted); color: var(--erp-white);">
-                            <i data-lucide="copy" style="width: 16px; height: 16px;"></i> COPY LINK
-                        </button>
-                        
-                        <a href="mailto:{{ $organization->email ?? '' }}?subject=Secure Statement of Work - JBS Praxis&body=Please review and authorize the attached architectural proposal: {{ $magicLinkUrl }}" target="_blank" class="btn-action" style="background: var(--erp-teal); border-color: var(--erp-teal); color: #000; text-decoration: none;">
-                            <i data-lucide="mail" style="width: 16px; height: 16px;"></i> EMAIL CLIENT
-                        </a>
-
-                        <a href="https://wa.me/?text={{ urlencode('Secure SOW Link from JBS Praxis: ' . $magicLinkUrl) }}" target="_blank" class="btn-action" style="background: #25D366; border-color: #25D366; color: #FFF; text-decoration: none;">
-                            <i data-lucide="message-circle" style="width: 16px; height: 16px;"></i> WHATSAPP
-                        </a>
+                <div class="field lg:col-span-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="label">Technology</span>
+                        <button type="button" @click="showTechModal = true" class="btn btn-ghost btn-sm">Choose technology</button>
                     </div>
-                </div>
-            @endif
-
-            <!-- THE A4 RENDER (Mirrors the Client Gateway output) -->
-            <div class="a4-wrapper">
-                <div class="a4-page" id="renderPdfTarget">
-                    <div class="doc-watermark" style="top: 40px; right: -30px; font-family: 'Roboto Mono', monospace; font-size: 8rem; color: rgba(255,255,255,0.015); font-weight: 900; pointer-events: none; transform: rotate(-90deg); transform-origin: top right; position: absolute; letter-spacing: -2px;">SOW.BINDING</div>
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; position: relative; z-index: 10;">
-                        <div style="display: flex; items-center: center; gap: 15px;">
-                            <div style="width: 40px; height: 40px; background: var(--erp-teal); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-family: 'Montserrat'; font-weight: 900; color: var(--erp-main); font-size: 1.2rem;">P</div>
-                            <div>
-                                <div style="font-family: 'Montserrat'; font-weight: 900; letter-spacing: 2px; font-size: 1rem; color: #FFF;">JBS PRAXIS</div>
-                                <div style="font-family: 'Roboto Mono', monospace; font-size: 0.6rem; color: var(--erp-teal); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px;">Enterprise Architecture</div>
-                            </div>
-                        </div>
-                        <div style="text-align: right; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted);">
-                            <div style="margin-bottom: 4px;">REF: <span style="color: #FFF; font-weight: bold;">{{ $proposal->proposal_ref ?? 'DRAFT' }}</span></div>
-                            <div>DATE: <span style="color: #FFF;">{{ \Carbon\Carbon::parse($proposal->updated_at ?? now())->format('F j, Y') }}</span></div>
-                        </div>
-                    </div>
-
-                    <div style="position: relative; z-index: 10;">
-                        <h1 style="font-family: 'Montserrat'; font-size: 1.8rem; font-weight: 900; color: #FFF; text-transform: uppercase; border-bottom: 2px solid var(--erp-teal); padding-bottom: 15px; margin-bottom: 30px; letter-spacing: -0.5px;">{{ $title }}</h1>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 30px; background: rgba(255,255,255,0.02); padding: 20px; border: 1px solid rgba(255,255,255,0.05); font-family: 'Roboto Mono', monospace; font-size: 0.7rem;">
-                            <div><span style="color: var(--erp-muted);">CLIENT:</span> <span style="color: #FFF; font-weight: bold;">{{ strtoupper($organization->name ?? 'UNKNOWN') }}</span></div>
-                            <div><span style="color: var(--erp-muted);">CURRENCY:</span> <span style="color: var(--erp-teal); font-weight: bold;">{{ $currency }}</span></div>
-                            <div><span style="color: var(--erp-muted);">VALIDITY:</span> <span style="color: #FFF; font-weight: bold;">{{ $validityDays }} DAYS</span></div>
-                            <div><span style="color: var(--erp-muted);">PAYMENT PLAN:</span> <span style="color: #FFF; font-weight: bold;">{{ str_replace('_', '/', $paymentSchedule) }}</span></div>
-                        </div>
-
-                        <!-- EXECUTIVE SUMMARY -->
-                        <h2 style="font-family: 'Montserrat'; font-size: 0.9rem; font-weight: 900; color: var(--erp-teal); margin-bottom: 10px; text-transform: uppercase;">I. EXECUTIVE SUMMARY</h2>
-                        <p style="font-size: 0.8rem; color: #B0B8C4; line-height: 1.6; margin-bottom: 25px; white-space: pre-wrap; text-align: justify;">{{ $aiExecutiveSummary ?: 'Pending AI Generation...' }}</p>
-
-                        <!-- OPERATIONAL STRATEGY -->
-                        <h2 style="font-family: 'Montserrat'; font-size: 0.9rem; font-weight: 900; color: var(--erp-teal); margin-bottom: 10px; text-transform: uppercase;">II. OPERATIONAL STRATEGY</h2>
-                        <p style="font-size: 0.8rem; color: #B0B8C4; line-height: 1.6; margin-bottom: 20px; white-space: pre-wrap; text-align: justify;">{{ $aiOperationalStrategy ?: 'Pending AI Generation...' }}</p>
-
-                        <!-- TECH STACK PRINT OUT -->
+                    <div style="height: 196px; overflow-y: auto; padding: 12px; border: 1px solid var(--color-line); border-radius: var(--radius-control); background: var(--color-mist);">
                         @if(count($selectedTech) > 0)
-                            <div style="background: rgba(0,229,255,0.02); border-left: 2px solid var(--erp-teal); padding: 15px; margin-bottom: 25px; font-family: 'Roboto Mono', monospace; font-size: 0.65rem;">
-                                <strong style="color: var(--erp-teal); display: block; margin-bottom: 10px; text-transform: uppercase;">> ARCHITECTURE & COMPLIANCE STACK:</strong>
-                                <ul style="list-style-type: none; padding: 0; margin: 0; color: #E2E8F0; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
-                                    @php
-                                        // Flatten and match tech names for the preview
-                                        $flatTech = collect($techCatalog)->flatten(1);
-                                        $activeNames = $flatTech->whereIn('id', $selectedTech)->pluck('tech_name');
-                                    @endphp
-                                    @foreach($activeNames as $name)
-                                        <li>- {{ $name }}</li>
-                                    @endforeach
-                                </ul>
-                            </div>
-                        @endif
-
-                        <!-- COMMERCIALS -->
-                        <h2 style="font-family: 'Montserrat'; font-size: 0.9rem; font-weight: 900; color: var(--erp-teal); margin-bottom: 10px; text-transform: uppercase;">III. COMMERCIAL BLUEPRINT</h2>
-                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; font-family: 'Roboto Mono', monospace; font-size: 0.7rem;">
-                            <thead>
-                                <tr style="background: rgba(0, 229, 255, 0.1); color: var(--erp-teal);">
-                                    <th style="padding: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: left;">CODE</th>
-                                    <th style="padding: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: left;">DESCRIPTION</th>
-                                    <th style="padding: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center;">QTY</th>
-                                    <th style="padding: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: right;">TOTAL</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($lineItems as $line)
-                                    <tr>
-                                        <td style="padding: 10px; border: 1px solid rgba(255,255,255,0.05); color: #FFF; font-weight: bold;">{{ $line['code'] }}</td>
-                                        <td style="padding: 10px; border: 1px solid rgba(255,255,255,0.05); color: var(--erp-muted);">{{ $line['description'] }}</td>
-                                        <td style="padding: 10px; border: 1px solid rgba(255,255,255,0.05); color: #FFF; text-align: center;">{{ $line['quantity'] }}</td>
-                                        <td style="padding: 10px; border: 1px solid rgba(255,255,255,0.05); color: #FFF; text-align: right;">{{ number_format($line['total_price'], 2) }}</td>
-                                    </tr>
+                            @php
+                                // Flatten the catalog to retrieve names by ID
+                                $flatTechDisplay = collect($techCatalog)->flatten(1);
+                                $activeNamesDisplay = $flatTechDisplay->whereIn('id', $selectedTech)->pluck('tech_name');
+                            @endphp
+                            <div class="flex flex-wrap gap-2">
+                                @foreach($activeNamesDisplay as $name)
+                                    <span class="pill pill-info" title="{{ $name }}">{{ $name }}</span>
                                 @endforeach
-                            </tbody>
-                        </table>
-
-                        <div style="text-align: right; font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-muted); margin-bottom: 40px;">
-                            <div style="margin-bottom: 5px;">SUBTOTAL: {{ $currency }} {{ number_format($subtotal, 2) }}</div>
-                            <div style="margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">TAX ({{ $vatRate }}%): {{ $currency }} {{ number_format($taxAmount, 2) }}</div>
-                            <div style="font-size: 1.1rem; font-weight: bold; color: var(--erp-teal);">TOTAL: {{ $currency }} {{ number_format($grandTotal, 2) }}</div>
-                        </div>
-
-                        <!-- EXCLUSIONS -->
-                        @if($exclusions)
-                            <h2 style="font-family: 'Montserrat'; font-size: 0.9rem; font-weight: 900; color: var(--erp-red); margin-bottom: 10px; text-transform: uppercase;">IV. BOUNDARIES & EXCLUSIONS</h2>
-                            <p style="font-size: 0.75rem; color: #FF8A8A; line-height: 1.6; margin-bottom: 30px; white-space: pre-wrap;">{{ $exclusions }}</p>
+                            </div>
+                        @else
+                            <div class="flex items-center justify-center text-small text-muted" style="height: 100%;">No technology chosen yet.</div>
                         @endif
-
-                        <!-- DUAL SIGNATURE BLOCK -->
-                        <h2 style="font-family: 'Montserrat'; font-size: 0.9rem; font-weight: 900; color: var(--erp-teal); margin-bottom: 15px; text-transform: uppercase;">{{ $exclusions ? 'V.' : 'IV.' }} EXECUTIVE AUTHORIZATION</h2>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 20px;">
-                            
-                            <!-- PRAXIS STAMP (HQ) -->
-                            <div style="border: 1px solid {{ $isLocked ? 'rgba(0, 229, 255, 0.4)' : 'rgba(255,255,255,0.1)' }}; background: {{ $isLocked ? 'rgba(0, 229, 255, 0.02)' : 'rgba(0,0,0,0.2)' }}; padding: 25px; display: flex; flex-direction: column;">
-                                <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: bold; margin-bottom: 15px; border-bottom: 1px dashed rgba(255,255,255,0.2); padding-bottom: 10px; color: {{ $isLocked ? 'var(--erp-teal)' : 'var(--erp-muted)' }}; text-align: center;">
-                                    {{ $isLocked ? '✓ ORIGINATOR SECURED' : 'AWAITING HQ BINDING' }}
-                                </div>
-                                @if($isLocked)
-                                    <div style="height: 60px; margin-bottom: 10px; display: flex; justify-content: center;">
-                                        <img src="{{ $proposal->hq_signature_b64 }}" style="max-height: 100%; object-fit: contain;">
-                                    </div>
-                                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #FFF; margin-bottom: 5px; display: flex; justify-content: space-between;"><span>DISPATCHER:</span><span>{{ strtoupper($proposal->hq_signer_name) }}</span></div>
-                                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #FFF; margin-bottom: 5px; display: flex; justify-content: space-between;"><span>TIMESTAMP:</span><span>{{ \Carbon\Carbon::parse($proposal->hq_signed_at)->format('Y-m-d H:i:s') }}</span></div>
-                                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #FFF; margin-bottom: 5px; display: flex; justify-content: space-between;"><span>NODE IP:</span><span>{{ $proposal->hq_ip_address }}</span></div>
-                                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.55rem; color: var(--erp-teal); font-weight: bold; word-break: break-all; margin-top: 10px; border-top: 1px dashed rgba(0,229,255,0.3); padding-top: 10px; text-align: center;">
-                                        {{ $proposal->hq_signature_hash }}
-                                    </div>
-                                @else
-                                    <div style="flex: 1; display: flex; align-items: center; justify-content: center; color: var(--erp-muted); font-size: 0.7rem; font-family: 'Roboto Mono';">Sign form above to bind.</div>
-                                @endif
-                            </div>
-
-                            <!-- CLIENT STAMP -->
-                            <div style="border: 1px solid {{ ($isLocked && $proposal->status === 'Converted') ? '#00FF66' : 'rgba(255,255,255,0.1)' }}; background: {{ ($isLocked && $proposal->status === 'Converted') ? 'rgba(0, 255, 102, 0.05)' : 'rgba(0,0,0,0.2)' }}; padding: 25px; display: flex; flex-direction: column;">
-                                <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: bold; margin-bottom: 15px; border-bottom: 1px dashed rgba(255,255,255,0.2); padding-bottom: 10px; color: {{ ($isLocked && $proposal->status === 'Converted') ? '#00FF66' : 'var(--erp-muted)' }}; text-align: center;">
-                                    {{ ($isLocked && $proposal->status === 'Converted') ? '✓ COUNTER-SIGNED' : 'AWAITING CLIENT BINDING' }}
-                                </div>
-                                @if($isLocked && $proposal->status === 'Converted')
-                                    <div style="height: 60px; margin-bottom: 10px; display: flex; justify-content: center;">
-                                        <img src="{{ $proposal->client_signature_b64 ?? '' }}" style="max-height: 100%; object-fit: contain;">
-                                    </div>
-                                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #FFF; margin-bottom: 5px; display: flex; justify-content: space-between;"><span>SIGNATORY:</span><span>{{ strtoupper($proposal->signed_by_name) }}</span></div>
-                                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #FFF; margin-bottom: 5px; display: flex; justify-content: space-between;"><span>TIMESTAMP:</span><span>{{ \Carbon\Carbon::parse($proposal->signed_at)->format('Y-m-d H:i:s') }}</span></div>
-                                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.55rem; color: #00FF66; font-weight: bold; word-break: break-all; margin-top: 10px; border-top: 1px dashed rgba(0,255,102,0.3); padding-top: 10px; text-align: center;">
-                                        {{ $proposal->client_signature_hash ?? 'HASH_PENDING' }}
-                                    </div>
-                                @else
-                                    <div style="flex: 1; display: flex; align-items: center; justify-content: center; color: var(--erp-muted); font-size: 0.7rem; font-family: 'Roboto Mono'; text-align: center;">Awaiting authorization via Magic Link terminal.</div>
-                                @endif
-                            </div>
-                        </div>
-                        
-                        <!-- QR CODE GENERATION -->
-                        @if($isLocked)
-                            <div style="margin-top: 30px; padding: 20px; border: 1px dashed rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); display: flex; gap: 20px; align-items: center;">
-                                @php
-                                    $baseUrl = str(route('portal.verify.contract', ['hash' => 'HASH']))->beforeLast('/HASH')->toString();
-                                    $qrData = "URL:{$baseUrl}/{$proposal->hq_signature_hash} | ORG:{$proposal->hq_signature_hash}";
-                                @endphp
-                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{ urlencode($qrData) }}&color=00E5FF&bgcolor=03050A" style="width: 80px; height: 80px; border: 2px solid var(--erp-teal); padding: 4px; background: #03050A;">
-                                <div style="font-family: 'Roboto Mono', monospace;">
-                                    <div style="font-size: 1rem; font-weight: bold; color: var(--erp-white); letter-spacing: 2px;">JBS PRAXIS HQ</div>
-                                    <div style="font-size: 0.7rem; color: #00FF66; margin-bottom: 5px;">✓ SYSTEM VERIFIED & SECURED</div>
-                                    <div style="font-size: 0.6rem; color: var(--erp-muted);">Scan cryptographic matrix to verify origin immutability on Praxis servers.</div>
-                                </div>
-                            </div>
-                        @endif
-
                     </div>
                 </div>
             </div>
+
+            <div class="flex flex-col gap-4">
+                <div class="field">
+                    <label class="label" for="pb-summary">Executive summary</label>
+                    <textarea id="pb-summary" wire:model.blur="aiExecutiveSummary" class="textarea" style="min-height: 140px;" {{ $isLocked ? 'disabled' : '' }}></textarea>
+                </div>
+                <div class="field">
+                    <label class="label" for="pb-strategy">How we will do the work</label>
+                    <textarea id="pb-strategy" wire:model.blur="aiOperationalStrategy" class="textarea" style="min-height: 180px;" {{ $isLocked ? 'disabled' : '' }}></textarea>
+                </div>
+                <div class="field">
+                    <label class="label" for="pb-exclusions">What is not included</label>
+                    <textarea id="pb-exclusions" wire:model.blur="exclusions" class="textarea" style="min-height: 96px;" placeholder="e.g. Data entry of old records; cloud hosting fees" {{ $isLocked ? 'disabled' : '' }}></textarea>
+                </div>
+            </div>
+        </section>
+
+        <section class="card" style="margin-bottom: 24px;">
+            <h2 class="card-title">Phases</h2>
+            <p class="help" style="margin: 4px 0 16px;">The weight (0 to 4) sets each phase's share of the timeline.</p>
+
+            @foreach([1, 2, 3, 4] as $n)
+                <div class="grid gap-4" style="grid-template-columns: 96px 1fr; align-items: start; margin-bottom: 16px;">
+                    <div class="field">
+                        <label class="label" for="pb-w{{ $n }}">Weight</label>
+                        <input id="pb-w{{ $n }}" type="number" step="0.5" wire:model.blur="w{{ $n }}" class="input" style="text-align: center; font-variant-numeric: tabular-nums;" {{ $isLocked ? 'disabled' : '' }}>
+                    </div>
+                    <div class="field">
+                        <label class="label" for="pb-p{{ $n }}">{{ $phaseTitles[$n - 1] }}</label>
+                        <textarea id="pb-p{{ $n }}" wire:model.blur="p{{ $n }}Content" class="textarea" style="min-height: 80px;" {{ $isLocked ? 'disabled' : '' }}></textarea>
+                    </div>
+                </div>
+            @endforeach
+        </section>
+
+        <div class="flex flex-wrap justify-between gap-3">
+            <button type="button" wire:click="switchTab('setup')" class="btn btn-secondary"><i data-lucide="arrow-left"></i> Back to setup</button>
+            <button type="button" wire:click="switchTab('preview')" class="btn btn-primary" wire:loading.attr="disabled" wire:target="switchTab('preview')">
+                <span wire:loading.remove wire:target="switchTab('preview')" class="inline-flex items-center gap-2">Save and review <i data-lucide="arrow-right"></i></span>
+                <span wire:loading wire:target="switchTab('preview')">Saving…</span>
+            </button>
+        </div>
+
+        {{-- Technology catalogue (slide-over) --}}
+        <div x-show="showTechModal" style="display: none;" wire:ignore.self>
+            <div class="pb-panel-backdrop" x-show="showTechModal" x-transition.opacity @click="showTechModal = false"></div>
+
+            <aside class="pb-panel" role="dialog" aria-modal="true" aria-labelledby="pb-tech-title"
+                 x-show="showTechModal"
+                 x-transition:enter="pb-slide-enter"
+                 x-transition:enter-start="pb-slide-out"
+                 x-transition:enter-end="pb-slide-in"
+                 x-transition:leave="pb-slide-leave"
+                 x-transition:leave-start="pb-slide-in"
+                 x-transition:leave-end="pb-slide-out">
+
+                <div class="flex items-center justify-between gap-4" style="padding: 20px 24px; border-bottom: 1px solid var(--color-line);">
+                    <h3 id="pb-tech-title" class="section-title" style="margin: 0;">Technology catalogue</h3>
+                    <button type="button" @click="showTechModal = false" class="btn btn-ghost btn-sm" aria-label="Close"><i data-lucide="x"></i></button>
+                </div>
+
+                <div style="padding: 24px; overflow-y: auto; flex: 1;">
+                    @foreach($techCatalog as $category => $techs)
+                        <fieldset style="border: 0; padding: 0; margin: 0 0 24px;">
+                            <legend class="card-title" style="margin-bottom: 12px;">{{ $category }}</legend>
+                            <div class="flex flex-col gap-3">
+                                @foreach($techs as $tech)
+                                    <label class="flex items-start gap-3" style="cursor: pointer;">
+                                        <input type="checkbox" wire:model.live="selectedTech" value="{{ $tech->id }}" style="margin-top: 3px;" {{ $isLocked ? 'disabled' : '' }}>
+                                        <span>
+                                            <span class="block font-semibold text-ink text-small">{{ $tech->tech_name }}</span>
+                                            <span class="block text-caption text-muted">{{ $tech->description }}</span>
+                                        </span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </fieldset>
+                    @endforeach
+                </div>
+
+                <div style="padding: 16px 24px; border-top: 1px solid var(--color-line); text-align: right;">
+                    <button type="button" @click="showTechModal = false" class="btn btn-primary">Done</button>
+                </div>
+            </aside>
+        </div>
+    @endif
+
+    {{-- ========================= 3. Review and sign ========================= --}}
+    @if($activeTab === 'preview' && $proposalId)
+        @if(!$isLocked)
+            <section class="card">
+                <div class="flex items-start gap-3" style="margin-bottom: 16px;">
+                    <i data-lucide="pen-tool" style="width: 24px; height: 24px; color: var(--color-deep-teal);"></i>
+                    <div>
+                        <h2 class="card-title">Sign and lock the proposal</h2>
+                        <p class="text-small text-muted" style="margin: 4px 0 0; max-width: 45rem;">Check the document below. When it is right, sign it to lock it. We record a SHA-256 fingerprint of the signed proposal, so any change before the client signs can be detected.</p>
+                    </div>
+                </div>
+
+                <form id="hq-sign-form" class="flex flex-col gap-4" style="max-width: 520px;" onsubmit="return false;">
+                    <div class="field">
+                        <label class="label" for="pb-signer">Your name</label>
+                        <input id="pb-signer" type="text" wire:model.defer="hqSignerName" class="input" required autocomplete="name">
+                        @error('hqSignerName') <span class="field-error">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="field">
+                        <div class="flex items-center justify-between">
+                            <span class="label">Your signature</span>
+                            <button type="button" onclick="clearHqCanvas()" class="btn btn-ghost btn-sm">Clear</button>
+                        </div>
+                        <div class="pb-sig-pad" wire:ignore>
+                            <canvas id="hqSignaturePad" aria-label="Signature pad: draw your signature"></canvas>
+                        </div>
+                        @error('hqSignatureBase64') <span class="field-error">Draw your signature in the box, then sign again.</span> @enderror
+                    </div>
+                    <div>
+                        <button type="button" onclick="submitHqSignature()" class="btn btn-primary" wire:loading.attr="disabled" wire:target="compileAndSecure">
+                            <span wire:loading.remove wire:target="compileAndSecure" class="inline-flex items-center gap-2"><i data-lucide="lock"></i> Sign and lock</span>
+                            <span wire:loading wire:target="compileAndSecure">Signing…</span>
+                        </button>
+                    </div>
+                </form>
+            </section>
+        @else
+            <section class="card">
+                <div class="flex items-start gap-3" style="margin-bottom: 16px;">
+                    <i data-lucide="check-circle" style="width: 24px; height: 24px; color: var(--color-success);"></i>
+                    <div>
+                        <h2 class="card-title">Ready to send</h2>
+                        <p class="text-small text-muted" style="margin: 4px 0 0;">The proposal is signed and locked. Send the client this link to review and sign it.</p>
+                    </div>
+                </div>
+
+                <div class="field" style="max-width: 720px; margin-bottom: 16px;">
+                    <label class="label" for="magicLinkField">Signing link</label>
+                    <input type="text" readonly value="{{ $magicLinkUrl }}" class="input" id="magicLinkField" style="font-variant-numeric: tabular-nums;">
+                </div>
+
+                @php
+                    $mailSubject = 'Your proposal from JBS Praxis is ready for signature';
+                    $mailBody = "Hello,\n\nYour proposal is ready. You can review and sign it here:\n" . $magicLinkUrl . "\n\nKind regards,\nThe JBS Praxis team";
+                @endphp
+                <div class="flex flex-wrap gap-3">
+                    <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('magicLinkField').value); alert('Link copied.');" class="btn btn-secondary">
+                        <i data-lucide="copy"></i> Copy link
+                    </button>
+                    <a href="mailto:{{ $organization->email ?? '' }}?subject={{ rawurlencode($mailSubject) }}&body={{ rawurlencode($mailBody) }}" target="_blank" class="btn btn-primary">
+                        <i data-lucide="mail"></i> Email the client
+                    </a>
+                    <a href="https://wa.me/?text={{ urlencode('Your proposal from JBS Praxis is ready. You can review and sign it here: ' . $magicLinkUrl) }}" target="_blank" rel="noopener" class="btn btn-secondary">
+                        <i data-lucide="message-circle"></i> Send on WhatsApp
+                    </a>
+                </div>
+            </section>
         @endif
 
-    </div>
+        {{-- The document as the client sees it --}}
+        <div class="pb-doc-wrap">
+            <article class="pb-doc" id="renderPdfTarget">
+                <header class="flex justify-between items-start gap-6" style="padding-bottom: 20px; margin-bottom: 32px; border-bottom: 1px solid var(--color-line);">
+                    <img src="/assets/img/logo/jbs-praxis-horizontal-colour.svg" alt="JBS Praxis" style="height: 32px; width: auto;">
+                    <dl style="display: grid; grid-template-columns: auto auto; gap: 2px 12px; margin: 0; font-size: 0.8125rem; text-align: right; font-variant-numeric: tabular-nums;">
+                        <dt class="text-muted">Reference</dt><dd style="margin: 0;" class="text-ink font-semibold">{{ $proposal->proposal_ref ?? 'Draft' }}</dd>
+                        <dt class="text-muted">Date</dt><dd style="margin: 0;" class="text-ink">{{ \Carbon\Carbon::parse($proposal->updated_at ?? now())->format('j F Y') }}</dd>
+                    </dl>
+                </header>
 
-    <!-- JAVASCRIPT LOGIC -->
+                <h1>{{ $title }}</h1>
+
+                <dl style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 24px; margin: 0 0 8px; padding: 16px; background: var(--color-mist); border-radius: var(--radius-card); font-size: 0.8125rem;">
+                    <div><dt class="text-muted">Client</dt><dd style="margin: 0;" class="text-ink font-semibold">{{ $organization->name ?? 'Unknown organisation' }}</dd></div>
+                    <div><dt class="text-muted">Currency</dt><dd style="margin: 0;" class="text-ink font-semibold">{{ $currency }}</dd></div>
+                    <div><dt class="text-muted">Valid for</dt><dd style="margin: 0;" class="text-ink font-semibold">{{ $validityDays }} days</dd></div>
+                    <div><dt class="text-muted">Payment plan</dt><dd style="margin: 0;" class="text-ink font-semibold">{{ $scheduleLabels[$paymentSchedule] ?? str_replace('_', '/', $paymentSchedule) }}</dd></div>
+                </dl>
+
+                <h2>Executive summary</h2>
+                <p>{{ $aiExecutiveSummary ?: 'Not written yet.' }}</p>
+
+                <h2>How we will do the work</h2>
+                <p>{{ $aiOperationalStrategy ?: 'Not written yet.' }}</p>
+
+                @if(count($selectedTech) > 0)
+                    <h2>Technology</h2>
+                    @php
+                        // Flatten and match tech names for the preview
+                        $flatTech = collect($techCatalog)->flatten(1);
+                        $activeNames = $flatTech->whereIn('id', $selectedTech)->pluck('tech_name');
+                    @endphp
+                    <ul style="margin: 0; padding-left: 20px; columns: 2; column-gap: 24px;">
+                        @foreach($activeNames as $name)
+                            <li>{{ $name }}</li>
+                        @endforeach
+                    </ul>
+                @endif
+
+                <h2>Price</h2>
+                <table class="table" style="font-size: 0.8125rem;">
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Description</th>
+                            <th style="text-align: center;">Quantity</th>
+                            <th class="num" style="text-align: right;">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($lineItems as $line)
+                            <tr>
+                                <td class="text-ink" style="font-variant-numeric: tabular-nums;">{{ $line['code'] }}</td>
+                                <td>{{ $line['description'] }}</td>
+                                <td style="text-align: center;">{{ $line['quantity'] }}</td>
+                                <td class="num text-ink">{{ number_format((float) $line['total_price'], 2) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+
+                <dl style="display: grid; grid-template-columns: 1fr auto; gap: 4px 24px; margin: 12px 0 0 auto; max-width: 320px; font-size: 0.8125rem; font-variant-numeric: tabular-nums;">
+                    <dt class="text-muted">Subtotal</dt><dd style="margin: 0; text-align: right;">{{ $money($currency, $subtotal) }}</dd>
+                    <dt class="text-muted">VAT ({{ $vatRate }}%)</dt><dd style="margin: 0; text-align: right;">{{ $money($currency, $taxAmount) }}</dd>
+                    <dt class="text-ink font-semibold" style="padding-top: 6px; border-top: 1px solid var(--color-line);">Total</dt>
+                    <dd class="text-ink font-semibold" style="margin: 0; text-align: right; padding-top: 6px; border-top: 1px solid var(--color-line);">{{ $money($currency, $grandTotal) }}</dd>
+                </dl>
+
+                @if($exclusions)
+                    <h2>What is not included</h2>
+                    <p>{{ $exclusions }}</p>
+                @endif
+
+                <h2>Signatures</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {{-- JBS Praxis --}}
+                    <div class="pb-sign {{ $isLocked ? 'is-signed' : '' }}">
+                        <div class="font-semibold text-ink">{{ $isLocked ? 'Signed for JBS Praxis' : 'Not signed by JBS Praxis yet' }}</div>
+                        @if($isLocked)
+                            <div style="height: 60px; display: flex; justify-content: center;">
+                                <img src="{{ $proposal->hq_signature_b64 }}" alt="Signature of {{ $proposal->hq_signer_name }}" style="max-height: 100%; object-fit: contain;">
+                            </div>
+                            <dl>
+                                <dt class="text-muted">Signed by</dt><dd>{{ $proposal->hq_signer_name }}</dd>
+                                <dt class="text-muted">Signed on</dt><dd>{{ \Carbon\Carbon::parse($proposal->hq_signed_at)->format('j M Y, H:i') }}</dd>
+                                <dt class="text-muted">IP address</dt><dd>{{ $proposal->hq_ip_address }}</dd>
+                            </dl>
+                            <div class="pb-hash">Document fingerprint (SHA-256): {{ $proposal->hq_signature_hash }}</div>
+                        @else
+                            <div class="text-caption text-muted">Sign above to lock the proposal.</div>
+                        @endif
+                    </div>
+
+                    {{-- Client --}}
+                    @php $clientSigned = $isLocked && $proposal->status === 'Converted'; @endphp
+                    <div class="pb-sign {{ $clientSigned ? 'is-signed' : '' }}">
+                        <div class="font-semibold text-ink">{{ $clientSigned ? 'Signed by the client' : 'Not signed by the client yet' }}</div>
+                        @if($clientSigned)
+                            <div style="height: 60px; display: flex; justify-content: center;">
+                                <img src="{{ $proposal->client_signature_b64 ?? '' }}" alt="Signature of {{ $proposal->signed_by_name }}" style="max-height: 100%; object-fit: contain;">
+                            </div>
+                            <dl>
+                                <dt class="text-muted">Signatory</dt><dd>{{ $proposal->signed_by_name }}</dd>
+                                <dt class="text-muted">Signed on</dt><dd>{{ \Carbon\Carbon::parse($proposal->signed_at)->format('j M Y, H:i') }}</dd>
+                            </dl>
+                            <div class="pb-hash">Document fingerprint (SHA-256): {{ $proposal->client_signature_hash ?? 'Not recorded' }}</div>
+                        @else
+                            <div class="text-caption text-muted">The client signs through the signing link.</div>
+                        @endif
+                    </div>
+                </div>
+
+                @if($isLocked)
+                    @php
+                        $baseUrl = str(route('portal.verify.contract', ['hash' => 'HASH']))->beforeLast('/HASH')->toString();
+                        $qrData = "URL:{$baseUrl}/{$proposal->hq_signature_hash} | ORG:{$proposal->hq_signature_hash}";
+                    @endphp
+                    <div class="flex items-center gap-4" style="margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--color-line);">
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{ urlencode($qrData) }}&color=0C142B&bgcolor=FFFFFF" alt="QR code to check this proposal" style="width: 80px; height: 80px; border: 1px solid var(--color-line); padding: 4px; background: #fff;">
+                        <div>
+                            <div class="font-semibold text-ink">Signed in JBS Praxis HQ</div>
+                            <div class="text-caption text-muted">Scan the code to check this proposal against the copy held by JBS Praxis.</div>
+                        </div>
+                    </div>
+                @endif
+            </article>
+        </div>
+    @endif
+
     <script>
-        document.addEventListener('livewire:navigated', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); initHqSignature(); });
-        document.addEventListener('DOMContentLoaded', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); initHqSignature(); });
+        document.addEventListener('livewire:navigated', () => { initHqSignature(); });
+        document.addEventListener('DOMContentLoaded', () => { initHqSignature(); });
 
-        // NEW: Wakes up the canvas specifically when Tab 3 is opened
+        // Sets up the signature pad when the review step opens
         window.addEventListener('initialize-canvas', () => {
             setTimeout(() => {
                 initHqSignature();
@@ -641,12 +633,12 @@
             hqCanvas = document.getElementById('hqSignaturePad');
             if(!hqCanvas) return;
             hqCtx = hqCanvas.getContext('2d');
-            
+
             // Resize canvas accurately
             hqCanvas.width = hqCanvas.parentElement.offsetWidth;
             hqCanvas.height = hqCanvas.parentElement.offsetHeight;
-            
-            hqCtx.lineWidth = 2; hqCtx.lineCap = 'round'; hqCtx.strokeStyle = '#FFBD2E'; // Amber ink for HQ
+
+            hqCtx.lineWidth = 2; hqCtx.lineCap = 'round'; hqCtx.strokeStyle = '#0C142B'; // Ink
 
             const startPos = (e) => { isHqDrawing = true; draw(e); };
             const finishPos = () => { isHqDrawing = false; hqCtx.beginPath(); };
@@ -668,21 +660,21 @@
 
         function submitHqSignature() {
             if(!hqCanvas) {
-                alert("System Error: Canvas not initialized. Please refresh.");
+                alert('The signature pad did not load. Reload the page and try again.');
                 return;
             }
-            
+
             const dataUrl = hqCanvas.toDataURL('image/png');
-            const blank = document.createElement('canvas'); 
-            blank.width = hqCanvas.width; 
+            const blank = document.createElement('canvas');
+            blank.width = hqCanvas.width;
             blank.height = hqCanvas.height;
-            
-            if(dataUrl === blank.toDataURL()) { 
-                alert("SYSTEM HALT: Please draw your signature to secure the payload."); 
-                return; 
+
+            if(dataUrl === blank.toDataURL()) {
+                alert('Draw your signature in the box, then sign again.');
+                return;
             }
-            
-            // Inject Base64 to Livewire and fire transaction
+
+            // Send the signature to Livewire and sign
             @this.set('hqSignatureBase64', dataUrl);
             @this.call('compileAndSecure');
         }

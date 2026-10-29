@@ -41,7 +41,7 @@ class TimeAttendance extends Component
 
     /**
      * Loads the already calculated variables from the ledger for viewing.
-     * Architect Fix: Uses LEFT JOIN from mdm_employees to prevent the "Ghost Roster" bug.
+     * Uses a LEFT JOIN from mdm_employees so staff without variables still appear.
      */
     public function loadData()
     {
@@ -91,7 +91,7 @@ class TimeAttendance extends Component
     }
 
     /**
-     * Triggers the heavy-lifting service class we built in Phase 5 to parse raw clock logs.
+     * Runs the attendance calculation service over the month's clock-in records.
      */
     public function runAggregationEngine()
     {
@@ -102,14 +102,15 @@ class TimeAttendance extends Component
             // Call the static engine
             TimeAggregationEngine::aggregateMonth($this->targetMonth, $this->targetYear, $this->targetRegion);
             
-            $this->successMessage = "Time & Attendance logs have been successfully parsed, and exact overtime/deductions have been injected into the payroll ledger.";
+            $this->successMessage = "Attendance for " . Carbon::create($this->targetYear, $this->targetMonth, 1)->format('F Y') . " calculated from the clock-in records. Overtime and absences are saved for that month's payroll.";
             $this->showSuccessModal = true;
             
             // Reload the grid with the fresh data
             $this->loadData();
 
         } catch (Exception $e) {
-            session()->flash('error', "Aggregation Engine Failed: " . $e->getMessage());
+            report($e);
+            session()->flash('error', "We couldn't calculate attendance, so nothing was changed. Try again, and if it still fails, ask an administrator to check the error log.");
         }
     }
 

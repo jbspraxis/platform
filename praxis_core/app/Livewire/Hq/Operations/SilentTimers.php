@@ -219,14 +219,14 @@ class SilentTimers extends Component
             
             DB::table('notifications')->insert([
                 'id' => (string) Str::uuid(), 'user_id' => $request->user_id,
-                'title' => 'TIME CORRECTION APPROVED', 
-                'message' => $penaltyFlag ? "Your time request was approved, but a margin penalty was applied due to excessive manual corrections this month." : "Your time request was approved.",
+                'title' => 'Time correction approved',
+                'message' => $penaltyFlag ? "Your time correction was approved. It is costed at a reduced rate because you have made 5 or more corrections this month." : "Your time correction was approved and the time is added to the task.",
                 'type' => 'Financial', 'created_at' => now()
             ]);
         });
 
         $this->loadAllData();
-        session()->flash('success', 'Time Correction Approved & Ledger Updated.');
+        session()->flash('success', 'Correction approved. The time is added to the task.');
     }
 
     public function rejectCorrection($requestId)
@@ -239,14 +239,14 @@ class SilentTimers extends Component
             'reviewed_at' => now()
         ]);
         $this->loadAllData();
-        session()->flash('error', 'Time Correction Rejected. Time is lost.');
+        session()->flash('success', 'Correction rejected. The requested time is not added.');
     }
 
     // --- 6. GOD MODE INJECTION (timesheets.approve + payroll.approve: Owner and Partner by default) ---
     public function executeGodMode()
     {
         if (! Auth::user()->can('timesheets.approve') || ! Auth::user()->can('payroll.approve')) {
-            session()->flash('error', 'L5 CLEARANCE REQUIRED.');
+            session()->flash('error', 'You don’t have permission to add time manually. Ask an administrator to change your role.');
             return;
         }
 
@@ -255,6 +255,9 @@ class SilentTimers extends Component
             'godModeTaskId' => 'required',
             'godModeStartTime' => 'required|date',
             'godModeEndTime' => 'required|date|after:godModeStartTime',
+        ], [], [
+            'godModeUserId' => 'staff member', 'godModeTaskId' => 'task',
+            'godModeStartTime' => 'start', 'godModeEndTime' => 'end',
         ]);
 
         DB::transaction(function () {
@@ -286,7 +289,7 @@ class SilentTimers extends Component
                 'time_log_id' => $logId,
                 'requested_start_time' => $start,
                 'requested_end_time' => $end,
-                'reason_for_correction' => 'SYSTEM OVERRIDE: INJECTED BY SUPER ADMIN',
+                'reason_for_correction' => 'Manual time entry by an approver',
                 'status' => 'Approved',
                 'is_god_mode' => 1,
                 'reviewed_by' => Auth::id(),
@@ -298,7 +301,7 @@ class SilentTimers extends Component
         $this->godModeUserId = ''; $this->godModeTaskId = ''; $this->godModeStartTime = ''; $this->godModeEndTime = '';
         
         $this->loadAllData();
-        session()->flash('success', 'GOD MODE EXECUTED: Time forcefully injected into the General Ledger.');
+        session()->flash('success', 'Time added. The entry is approved and shows in the time log.');
     }
 
     public function render()

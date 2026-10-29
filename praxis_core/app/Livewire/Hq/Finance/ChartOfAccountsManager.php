@@ -27,7 +27,7 @@ class ChartOfAccountsManager extends Component
 
     public function loadAccounts()
     {
-        // Fetch and group all accounts by Type for the Frontend Matrix
+        // Fetch and group all accounts by type for the screen
         // Simple string sorting works perfectly for "1100" and "1100-0001"
         $rawAccounts = DB::table('chart_of_accounts')->orderBy('account_code', 'asc')->get();
         $this->accounts = collect($rawAccounts)->groupBy('account_type')->toArray();
@@ -77,10 +77,11 @@ class ChartOfAccountsManager extends Component
                     'created_at' => now()
                 ]);
 
-                session()->flash('success', '> SUB-LEDGER PROVISIONED SUCCESSFULLY: [' . $newCode . ']');
+                session()->flash('success', 'Account ' . $newCode . ' created.');
             });
         } catch (Exception $e) {
-            session()->flash('error', '> SECURE LEDGER ERROR: ' . $e->getMessage());
+            report($e);
+            session()->flash('error', "We couldn't create the account. Try again, and if it still fails, ask an administrator to check the error log.");
         }
 
         $this->reset(['account_name', 'parent_account_id', 'showModal']);
@@ -134,7 +135,7 @@ class ChartOfAccountsManager extends Component
         
         if ($acc) {
             if ($acc->is_system_locked) {
-                session()->flash('error', '> SYSTEM OVERRIDE DENIED. MASTER IFRS ACCOUNTS ARE IMMUTABLE.');
+                session()->flash('error', "This account is built into the system, so it can't be deactivated.");
                 return;
             }
 
@@ -146,8 +147,8 @@ class ChartOfAccountsManager extends Component
     }
 
     /**
-     * THE AUTOMATED LISTENER (Static Method)
-     * This will be called globally from ProposalGateway when an SOW is signed.
+     * Creates a client's receivable account (static).
+     * Called from ProposalGateway when a statement of work is signed.
      */
     public static function provisionClientAccounts($clientId, $clientName)
     {
@@ -174,7 +175,7 @@ class ChartOfAccountsManager extends Component
                     $newCode = $parentAR->account_code . '-0001';
                 }
 
-                // Provision the immutable client ledger
+                // Create the client's locked receivable account
                 DB::table('chart_of_accounts')->insert([
                     'account_code' => $newCode,
                     'account_name' => 'A/R - ' . strtoupper($clientName),

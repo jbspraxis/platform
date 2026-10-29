@@ -4,11 +4,13 @@ namespace App\Livewire\Hq\Mdm;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
 #[Layout('components.layouts.hq')]
+#[Title('Remittance accounts')]
 class RemittanceAccounts extends Component
 {
     public $accounts = [];
@@ -81,12 +83,12 @@ class RemittanceAccounts extends Component
                         ]);
                     }
                     
-                    $this->successMessage = "Treasury account and linked ledger updated securely.";
+                    $this->successMessage = "Remittance account updated. Its account name in the chart of accounts was updated too.";
                 } else {
                     // Check for exact duplicate reference
                     $exists = DB::table('mdm_remittance_accounts')->where('account_reference', $this->account_reference)->exists();
                     if ($exists) {
-                        throw new Exception('This account reference/wallet already exists in the ledger.');
+                        throw new Exception('That account number or wallet address is already registered. Edit the existing account in the list instead.');
                     }
 
                     // --- ACCOUNTING AUTOMATION: Create the Sub-Account ---
@@ -102,7 +104,7 @@ class RemittanceAccounts extends Component
                     
                     // B. Fetch Parent ID
                     $parentAccount = DB::table('chart_of_accounts')->where('account_code', $parentCode)->first();
-                    if (!$parentAccount) throw new Exception("Critical Error: Master Parent Account {$parentCode} missing.");
+                    if (!$parentAccount) throw new Exception("We couldn't add the account because parent account {$parentCode} is missing from the chart of accounts. Add it in Chart of accounts, then try again.");
 
                     // C. Auto-Generate the next logical Account Code (e.g., if 1011 exists, make 1012)
                     $latestChild = DB::table('chart_of_accounts')
@@ -129,7 +131,7 @@ class RemittanceAccounts extends Component
                     $data['created_at'] = now();
                     DB::table('mdm_remittance_accounts')->insert($data);
                     
-                    $this->successMessage = "New treasury node registered and sub-account [{$newCode}] created.";
+                    $this->successMessage = "Remittance account added, with account {$newCode} in the chart of accounts.";
                 }
             });
 

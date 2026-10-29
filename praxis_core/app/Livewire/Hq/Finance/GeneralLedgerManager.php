@@ -77,6 +77,9 @@ class GeneralLedgerManager extends Component
         $this->validate([
             'reversalEntryId' => 'required|exists:journal_entries,id',
             'reversalReason' => 'required|string|min:10'
+        ], [], [
+            'reversalEntryId' => 'journal entry',
+            'reversalReason' => 'reason',
         ]);
 
         try {
@@ -84,7 +87,7 @@ class GeneralLedgerManager extends Component
                 $originalEntry = DB::table('journal_entries')->where('id', $this->reversalEntryId)->first();
                 
                 if ($originalEntry->is_reversal) {
-                    throw new \Exception("IFRS Violation: Cannot reverse an entry that is already a reversal.");
+                    throw new \DomainException("This entry has already been reversed, or is itself a reversal, so it can't be reversed again.");
                 }
 
                 $originalLines = DB::table('journal_lines')->where('journal_entry_id', $this->reversalEntryId)->get();
@@ -97,7 +100,7 @@ class GeneralLedgerManager extends Component
                     'id' => $newEntryId,
                     'reference_number' => $ref,
                     'entry_date' => now()->toDateString(),
-                    'description' => "REVERSAL of {$originalEntry->reference_number}: " . $this->reversalReason,
+                    'description' => "Reversal of {$originalEntry->reference_number}: " . $this->reversalReason,
                     'source_module' => 'Manual Reversal',
                     'source_id' => $originalEntry->id,
                     'region_code' => $originalEntry->region_code,
@@ -112,7 +115,7 @@ class GeneralLedgerManager extends Component
                     DB::table('journal_lines')->insert([
                         'journal_entry_id' => $newEntryId,
                         'account_id' => $line->account_id,
-                        'memo' => "Reversing: " . ($line->memo ?? 'Original Entry'),
+                        'memo' => "Reversing: " . ($line->memo ?? 'original entry'),
                         'debit_amount' => $line->credit_amount,   // SWAP
                         'credit_amount' => $line->debit_amount,   // SWAP
                         'created_at' => now()
@@ -122,7 +125,7 @@ class GeneralLedgerManager extends Component
                 // 3. Mark original as reversed to lock it from future tampering
                 DB::table('journal_entries')->where('id', $this->reversalEntryId)->update(['is_reversal' => 1]);
 
-                // 4. Immutable Audit Log
+                // 4. Audit log
                 DB::table('system_audit_logs')->insert([
                     'user_id' => Auth::check() ? Auth::id() : null, 
                     'action' => 'IFRS_REVERSING_ENTRY_POSTED',
@@ -135,16 +138,19 @@ class GeneralLedgerManager extends Component
 
             $this->showReversalModal = false;
             $this->loadLedger();
-            session()->flash('success', '> IFRS REVERSING ENTRY EXECUTED SUCCESSFULLY.');
+            session()->flash('success', 'Reversing entry posted. The original entry is now marked as reversed.');
 
+        } catch (\DomainException $e) {
+            session()->flash('error', $e->getMessage());
         } catch (\Exception $e) {
-            session()->flash('error', '> REVERSAL FAILED: ' . $e->getMessage());
+            report($e);
+            session()->flash('error', "We couldn't post the reversing entry, so nothing was changed. Try again, and if it still fails, ask an administrator to check the error log.");
         }
     }
 
     /* ====================================================================================
-       THE IFRS AUTOMATION ENGINE (STATIC API)
-       Call these methods from anywhere in your application to record a flawless double-entry.
+       IFRS posting helpers (static API)
+       Call these from anywhere in the application to record a balanced double entry.
        ==================================================================================== */
 
     /**
@@ -164,7 +170,7 @@ class GeneralLedgerManager extends Component
         // Fallback to strict code match
         $account = DB::table('chart_of_accounts')->where('account_code', $code)->first();
         if (!$account) {
-            throw new \Exception("CRITICAL ERROR: Ledger Account [{$code}] does not exist in Chart of Accounts.");
+            throw new \Exception("Account {$code} isn't in the chart of accounts. Add it in Chart of accounts, then try again.");
         }
         return $account->id;
     }
@@ -184,7 +190,7 @@ class GeneralLedgerManager extends Component
         
         // Strict Validation: Debits must equal Credits to the penny.
         if (abs($totalDebit - $totalCredit) > 0.01) {
-            throw new \Exception("IFRS SETTLEMENT REJECTED: Debits ({$totalDebit}) do not equal Credits ({$totalCredit}).");
+            throw new \Exception("The entry doesn't balance: debits total {$totalDebit} and credits total {$totalCredit}. Nothing was posted.");
         }
 
         $entryId = (string) Str::uuid();
@@ -234,19 +240,19 @@ class GeneralLedgerManager extends Component
 
         self::postDoubleEntry(
             'JRN-INV-' . $invoice->invoice_number, 
-            "Accrual of Invoice {$invoice->invoice_number} for {$org->name}", 
+            "Accrual of invoice {$invoice->invoice_number} for {$org->name}", 
             'Invoicing', 
             $invoiceId, 
             $invoice->region_code ?? 'GLOBAL',
             [
-                ['account_id' => $arAccount, 'memo' => 'Accounts Receivable Accrual', 'debit' => $invoice->total_amount, 'credit' => 0.00],
-                ['account_id' => $revenueAccount, 'memo' => 'Deferred Service Revenue', 'debit' => 0.00, 'credit' => $invoice->amount_due],
-                ['account_id' => $vatAccount, 'memo' => 'VAT Payable Accrual', 'debit' => 0.00, 'credit' => $invoice->vat_amount],
+                ['account_id' => $arAccount, 'memo' => 'Accounts receivable accrual', 'debit' => $invoice->total_amount, 'credit' => 0.00],
+                ['account_id' => $revenueAccount, 'memo' => 'Deferred service revenue', 'debit' => 0.00, 'credit' => $invoice->amount_due],
+                ['account_id' => $vatAccount, 'memo' => 'VAT payable accrual', 'debit' => 0.00, 'credit' => $invoice->vat_amount],
             ]
         );
     }
 
-    // 1b. CASH RECEIPT (client payment verified in Escrow Verification)
+    // 1b. CASH RECEIPT (client payment verified in Payment verification)
     // Dr bank (cash received), WHT receivable (tax the client withheld) and bank fees (small
     // shortfall written off); Cr the client's receivable, and any excess to client overpayments.
     // Revenue was deferred when the invoice was issued: the net-of-VAT share now settled is earned.
@@ -295,7 +301,7 @@ class GeneralLedgerManager extends Component
 
         self::postDoubleEntry(
             $prefix . substr($transactionId, 0, 8),
-            "Receipt for Invoice {$invoice->invoice_number} ({$tx->method}, ref {$tx->tx_hash_or_ref})",
+            "Receipt for invoice {$invoice->invoice_number} ({$tx->method}, ref {$tx->tx_hash_or_ref})",
             'Receipts',
             $transactionId,
             $invoice->region_code ?? 'GLOBAL',
@@ -303,7 +309,7 @@ class GeneralLedgerManager extends Component
                 ['account_id' => $cashAccount, 'memo' => 'Client payment received', 'debit' => $cash, 'credit' => 0.00],
                 ['account_id' => self::getAccountId('1300'), 'memo' => 'WHT withheld by client', 'debit' => $wht, 'credit' => 0.00],
                 ['account_id' => self::getAccountId('6950'), 'memo' => 'Shortfall written off (bank/network fees)', 'debit' => $writeOff, 'credit' => 0.00],
-                ['account_id' => $arAccount, 'memo' => 'Accounts Receivable settled', 'debit' => 0.00, 'credit' => $toAr],
+                ['account_id' => $arAccount, 'memo' => 'Accounts receivable settled', 'debit' => 0.00, 'credit' => $toAr],
                 ['account_id' => self::getAccountId('2500'), 'memo' => 'Client overpayment held', 'debit' => 0.00, 'credit' => $overpaid],
                 ['account_id' => self::getAccountId('2100'), 'memo' => 'Deferred revenue released', 'debit' => $earned, 'credit' => 0.00],
                 ['account_id' => $revenueAccount, 'memo' => 'Service revenue earned', 'debit' => 0.00, 'credit' => $earned],
@@ -326,13 +332,13 @@ class GeneralLedgerManager extends Component
 
         self::postDoubleEntry(
             'JRN-EXP-' . $request->reference, 
-            "Expense Execution: {$request->purpose}", 
+            "Cash request: {$request->purpose}", 
             'Treasury', 
             $requestId, 
             'GLOBAL',
             [
-                ['account_id' => $expenseAccountId, 'memo' => $dictItem->description ?? 'Operational Expense', 'debit' => $request->amount_requested, 'credit' => 0.00],
-                ['account_id' => $cashAccountId, 'memo' => 'Cash Disbursed', 'debit' => 0.00, 'credit' => $request->amount_requested]
+                ['account_id' => $expenseAccountId, 'memo' => $dictItem->description ?? 'Operating expense', 'debit' => $request->amount_requested, 'credit' => 0.00],
+                ['account_id' => $cashAccountId, 'memo' => 'Cash paid out', 'debit' => 0.00, 'credit' => $request->amount_requested]
             ]
         );
     }
@@ -348,14 +354,14 @@ class GeneralLedgerManager extends Component
 
         self::postDoubleEntry(
             'JRN-PAY-' . $run->reference_number, 
-            "Human Capital Payroll Disbursed - " . date('F Y', strtotime($run->pay_period_end)), 
+            "Payroll paid for " . date('F Y', strtotime($run->pay_period_end)), 
             'Payroll', 
             $payrollRunId, 
             $run->region_code,
             [
-                ['account_id' => $salaryExpAccount, 'memo' => 'Gross Payroll Expense', 'debit' => $run->total_gross, 'credit' => 0.00],
-                ['account_id' => $payeAccount, 'memo' => 'Total Tax/Statutory Withheld', 'debit' => 0.00, 'credit' => $run->total_deductions],
-                ['account_id' => $cashAccount, 'memo' => 'Net Cash Paid to Talent', 'debit' => 0.00, 'credit' => $run->total_net]
+                ['account_id' => $salaryExpAccount, 'memo' => 'Gross payroll expense', 'debit' => $run->total_gross, 'credit' => 0.00],
+                ['account_id' => $payeAccount, 'memo' => 'Tax and statutory deductions withheld', 'debit' => 0.00, 'credit' => $run->total_deductions],
+                ['account_id' => $cashAccount, 'memo' => 'Net pay to staff', 'debit' => 0.00, 'credit' => $run->total_net]
             ]
         );
     }

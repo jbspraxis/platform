@@ -1,303 +1,252 @@
 <div>
-    <style>
-        /* --- GLOBAL CYBER STYLES --- */
-        :root {
-            --erp-bg-base: #010308;
-            --erp-bg-main: #0A1128;
-            --erp-border-dark: rgba(255,255,255,0.1);
-            --erp-teal: #00E5FF;
-            --erp-muted: #8A9BB2;
-            --erp-white: #FFFFFF;
-            --erp-yellow: #FFBD2E;
-            --erp-red: #FF3366;
-            --erp-green: #00FF66;
-        }
-
-        .cyber-input, .cyber-select {
-            width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);
-            color: var(--erp-white); padding: 12px 15px; font-family: 'Roboto Mono', monospace;
-            font-size: 0.85rem; border-radius: 2px; transition: 0.3s; outline: none;
-        }
-        .cyber-input:focus, .cyber-select:focus { border-color: var(--erp-teal); background: rgba(0, 229, 255, 0.05); box-shadow: 0 0 10px rgba(0,229,255,0.1); }
-        
-        .cyber-select {
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2300E5FF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-            background-repeat: no-repeat; background-position: right 12px center;
-        }
-        .cyber-select option { background-color: var(--erp-bg-main); color: var(--erp-white); padding: 10px; }
-
-        .btn-action {
-            background: transparent; border: 1px solid var(--erp-teal); color: var(--erp-teal);
-            padding: 12px 20px; font-family: 'Roboto Mono', monospace; font-size: 0.85rem; font-weight: bold;
-            cursor: pointer; transition: 0.3s; border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-        }
-        .btn-action:hover:not(:disabled) { background: var(--erp-teal); color: var(--erp-bg-main); box-shadow: 0 0 15px rgba(0, 229, 255, 0.4); }
-        .btn-action:disabled { border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.2); cursor: not-allowed; }
-
-        .nav-pill {
-            padding: 8px 20px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; border-radius: 2px; 
-            cursor: pointer; transition: 0.3s; border: 1px solid transparent; background: transparent; color: var(--erp-muted);
-        }
-        .nav-pill.active { background: rgba(0, 229, 255, 0.1); border-color: var(--erp-teal); color: var(--erp-teal); font-weight: bold; }
-        .nav-pill:not(.active):hover { background: rgba(255,255,255,0.05); color: var(--erp-white); }
-        
-        .validation-error { color: var(--erp-red); font-family: 'Roboto Mono', monospace; font-size: 0.65rem; margin-top: 5px; display: block; }
-
-        /* Modals & Loaders */
-        .glass-overlay { position: fixed; inset: 0; background: rgba(3, 5, 10, 0.85); backdrop-filter: blur(8px); z-index: 9990; display: flex; align-items: center; justify-content: center; }
-        .success-box { background: var(--erp-bg-main); border: 1px solid var(--erp-green); border-top: 4px solid var(--erp-green); border-radius: 4px; padding: 40px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.9); z-index: 9999; max-width: 450px; width: 90%; }
-        .spinner { border: 3px solid rgba(0, 229, 255, 0.1); border-top: 3px solid var(--erp-teal); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        /* Sub-panel for Org Creation */
-        .sub-panel-org {
-            background: rgba(255, 189, 46, 0.03); border: 1px dashed rgba(255, 189, 46, 0.4); 
-            border-radius: 4px; padding: 20px; margin-top: 15px; position: relative;
-            animation: slideDown 0.3s ease-out forwards;
-        }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-    </style>
-
     @if($showSuccessModal)
-        <div class="glass-overlay">
-            <div class="success-box">
-                <div style="font-size: 3rem; margin-bottom: 10px; text-shadow: 0 0 20px rgba(0,255,102,0.4);">✅</div>
-                <h2 style="font-family: 'Montserrat', sans-serif; color: var(--erp-green); margin-bottom: 10px; letter-spacing: 1px;">IDENTITY ESTABLISHED</h2>
-                <p style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--erp-muted); margin-bottom: 25px; line-height: 1.6;">{{ $successMessage }}</p>
-                <button wire:click="closeSuccessModal" class="btn-action" style="width: 100%; background: var(--erp-green); color: var(--erp-bg-main); border-color: var(--erp-green);">ACKNOWLEDGE & CLOSE</button>
+        <div class="modal-backdrop">
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="account-saved-title">
+                <h2 id="account-saved-title" class="modal-title">Done</h2>
+                <p class="muted">{{ $successMessage }}</p>
+                <div class="modal-actions">
+                    <button type="button" wire:click="closeSuccessModal" class="btn btn-primary">Close</button>
+                </div>
             </div>
         </div>
     @endif
 
-    @if(session()->has('error'))
-        <div style="background: rgba(255,51,102,0.08); border: 1px solid var(--erp-red); color: var(--erp-red); font-family: 'Roboto Mono', monospace; font-size: 0.75rem; padding: 10px 14px; margin-bottom: 20px; border-radius: 2px;">{{ session('error') }}</div>
-    @endif
-
-    <div style="margin-bottom: 30px; border-bottom: 1px solid var(--erp-border-dark); padding-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-end;">
+    <div class="page-header">
         <div>
-            <h1 style="font-family: 'Montserrat', sans-serif; font-size: 1.2rem; color: var(--erp-white); letter-spacing: 1px;">SYSTEM USER DIRECTORY</h1>
-            <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-muted);">IDENTITY & ACCESS MATRIX</p>
-        </div>
-        <div style="display: flex; gap: 10px;">
-            @if($canCreate)
-            <button wire:click="setTab('CREATE')" class="nav-pill {{ $activeTab === 'CREATE' ? 'active' : '' }}"><i data-lucide="user-plus" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> INIT USER</button>
-            @endif
-            <button wire:click="setTab('INTERNAL')" class="nav-pill {{ $activeTab === 'INTERNAL' ? 'active' : '' }}">JBS COMMAND</button>
-            <button wire:click="setTab('CLIENTS')" class="nav-pill {{ $activeTab === 'CLIENTS' ? 'active' : '' }}">CLIENT OS</button>
+            <h1 class="page-title">Accounts</h1>
+            <p class="page-subtitle">Invite staff and Client Portal users, change their roles, and suspend or restore their access.</p>
         </div>
     </div>
 
-    <div style="display: grid; grid-template-columns: {{ $activeTab === 'CREATE' ? 'minmax(600px, 800px)' : '1fr' }}; gap: 30px; justify-content: center;">
-        
-        @if($activeTab === 'CREATE')
-            <div style="background: rgba(10, 17, 40, 0.6); border: 1px solid var(--erp-border-dark); border-radius: 4px; padding: 35px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
-                
-                <div style="font-family: 'Roboto Mono', monospace; font-size: 0.9rem; color: var(--erp-white); margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px;">
-                    <span><i data-lucide="terminal" style="color: var(--erp-teal);"></i> > {{ $editMode ? 'MODIFY OPERATOR RECORD' : 'GENERATE NEW CRYPTOGRAPHIC IDENTITY' }}</span>
-                    @if($editMode) 
-                        <button wire:click="resetForm" style="background: rgba(255,51,102,0.1); color: var(--erp-red); padding: 3px 8px; font-size: 0.6rem; border-radius: 2px; border: 1px solid var(--erp-red); cursor: pointer;">CANCEL EDIT</button> 
-                    @endif
-                </div>
+    @if(session()->has('error'))
+        <div class="alert alert-danger mb-6" role="alert">
+            <i data-lucide="circle-alert"></i>
+            <span>{{ session('error') }}</span>
+        </div>
+    @endif
 
-                <form wire:submit.prevent="saveUser">
-                    
-                    <h3 style="font-family: 'Montserrat', sans-serif; font-size: 0.75rem; color: var(--erp-muted); margin-bottom: 15px; letter-spacing: 1px; text-transform: uppercase;">1. Operator Identity</h3>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                        <div>
-                            <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); margin-bottom: 6px;">First Name *</label>
-                            <input type="text" wire:model="first_name" required class="cyber-input" placeholder="Operator First Name">
-                            @error('first_name') <span class="validation-error">{{ $message }}</span> @enderror
+    <div class="tabs" role="tablist">
+        @if($canCreate)
+            <button type="button" role="tab" wire:click="setTab('CREATE')" class="tab {{ $activeTab === 'CREATE' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'CREATE' ? 'true' : 'false' }}">
+                {{ $editMode ? 'Edit account' : 'Add an account' }}
+            </button>
+        @endif
+        <button type="button" role="tab" wire:click="setTab('INTERNAL')" class="tab {{ $activeTab === 'INTERNAL' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'INTERNAL' ? 'true' : 'false' }}">Staff accounts</button>
+        <button type="button" role="tab" wire:click="setTab('CLIENTS')" class="tab {{ $activeTab === 'CLIENTS' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'CLIENTS' ? 'true' : 'false' }}">Client Portal accounts</button>
+    </div>
+
+    @if($activeTab === 'CREATE')
+        <div class="card" style="max-width: 800px;">
+
+            <div class="card-header">
+                <h2 class="card-title">{{ $editMode ? 'Edit account' : 'Add an account' }}</h2>
+                @if($editMode)
+                    <button type="button" wire:click="resetForm" class="btn btn-ghost btn-sm">Cancel</button>
+                @endif
+            </div>
+            @unless($editMode)
+                <p class="help" style="margin: -8px 0 16px;">We'll email the person an invitation to choose a password. Staff sign in to HQ; clients sign in to the Client Portal.</p>
+            @endunless
+
+            <form wire:submit.prevent="saveUser" class="flex flex-col gap-6">
+
+                <section class="flex flex-col gap-4" aria-labelledby="acc-person-heading">
+                    <h3 id="acc-person-heading" class="label" style="font-weight: 600; margin: 0;">Person</h3>
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="field">
+                            <label class="label" for="acc-first">First name</label>
+                            <input id="acc-first" type="text" wire:model="first_name" required class="input" autocomplete="off">
+                            @error('first_name') <span class="field-error">{{ $message }}</span> @enderror
                         </div>
-                        <div>
-                            <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); margin-bottom: 6px;">Last Name *</label>
-                            <input type="text" wire:model="last_name" required class="cyber-input" placeholder="Operator Last Name">
-                            @error('last_name') <span class="validation-error">{{ $message }}</span> @enderror
+                        <div class="field">
+                            <label class="label" for="acc-last">Last name</label>
+                            <input id="acc-last" type="text" wire:model="last_name" required class="input" autocomplete="off">
+                            @error('last_name') <span class="field-error">{{ $message }}</span> @enderror
                         </div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 30px;">
-                        <div>
-                            <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); margin-bottom: 6px;">Secure Email *</label>
-                            <input type="email" wire:model="email" required class="cyber-input" placeholder="comm@domain.com">
-                            @error('email') <span class="validation-error">{{ $message }}</span> @enderror
+                    <div class="grid gap-4 sm:grid-cols-3">
+                        <div class="field">
+                            <label class="label" for="acc-email">Email address</label>
+                            <input id="acc-email" type="email" wire:model="email" required class="input" placeholder="e.g. name@example.com" autocomplete="off">
+                            @error('email') <span class="field-error">{{ $message }}</span> @enderror
                         </div>
-                        <div>
-                            <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); margin-bottom: 6px;">Comms (Phone)</label>
-                            <input type="text" wire:model="phone" class="cyber-input" placeholder="+---">
+                        <div class="field">
+                            <label class="label" for="acc-phone">Phone (optional)</label>
+                            <input id="acc-phone" type="text" wire:model="phone" class="input" placeholder="e.g. +234 800 000 0000">
                         </div>
-                        <div>
-                            <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); margin-bottom: 6px;">Job Title</label>
-                            <input type="text" wire:model="job_title" class="cyber-input" placeholder="Designation">
+                        <div class="field">
+                            <label class="label" for="acc-job">Job title (optional)</label>
+                            <input id="acc-job" type="text" wire:model="job_title" class="input">
                         </div>
                     </div>
+                </section>
 
-                    <h3 style="font-family: 'Montserrat', sans-serif; font-size: 0.75rem; color: var(--erp-muted); margin-bottom: 15px; letter-spacing: 1px; text-transform: uppercase;">2. Access & Command Structure</h3>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                        
-                        <div>
+                <section class="flex flex-col gap-4" style="border-top: 1px solid var(--color-line); padding-top: 20px;" aria-labelledby="acc-access-heading">
+                    <h3 id="acc-access-heading" class="label" style="font-weight: 600; margin: 0;">Organisation and role</h3>
+                    <div class="grid gap-4 sm:grid-cols-2">
+
+                        <div class="field">
+                            <label class="label" for="acc-org">Organisation</label>
+                            <select id="acc-org" wire:model.live="organization_id" required class="select">
+                                <option value="">Choose an organisation</option>
+                                <option value="NEW">Add a new client organisation</option>
+                                <optgroup label="Organisations">
+                                    @foreach($organizations as $org)
+                                        <option value="{{ $org->id }}">{{ $org->name }}{{ $org->id === $jbsOrgId ? ' (staff)' : '' }}</option>
+                                    @endforeach
+                                </optgroup>
+                            </select>
+                            <span class="help">Choose JBS Praxis for a staff account. Any other organisation makes a Client Portal account.</span>
+                            @error('organization_id') <span class="field-error">{{ $message }}</span> @enderror
+                        </div>
+
+                        <div class="field">
                             @if($editingIsClient || $this->isClientForm())
                                 {{-- One portal role; the organisation's first account is its primary account and always Client Admin --}}
-                                <label for="client-role" style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-teal); margin-bottom: 6px; font-weight: bold;">Portal Role</label>
-                                <select id="client-role" wire:model="client_role_id" class="cyber-select" style="border-color: rgba(0, 229, 255, 0.4);">
+                                <label for="client-role" class="label">Client Portal role</label>
+                                <select id="client-role" wire:model="client_role_id" class="select" aria-describedby="client-role-help">
                                     <option value="">Client Member (default)</option>
                                     @foreach($clientRoles as $role)
                                         <option value="{{ $role->id }}">{{ $role->name }}</option>
                                     @endforeach
                                 </select>
-                                <div style="font-size: 0.7rem; color: var(--erp-muted); margin-top: 6px;">The organisation's first account becomes its primary account and is always Client Admin.</div>
+                                <span id="client-role-help" class="help">The organisation's first account becomes its primary contact and always has the Client Admin role.</span>
                             @else
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-teal); margin-bottom: 6px; font-weight: bold;">Staff Roles * <span style="color: var(--erp-muted); font-weight: normal;">(one or more; permissions add up)</span></label>
-                                <div style="display: grid; gap: 6px; padding: 10px 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(0, 229, 255, 0.4); border-radius: 2px;">
+                                <span class="label" id="staff-roles-label">Staff roles</span>
+                                <div role="group" aria-labelledby="staff-roles-label" class="flex flex-col gap-2" style="padding: 12px; border: 1px solid var(--color-line-strong); border-radius: var(--radius-control);">
                                     @foreach($staffRoles as $role)
-                                        <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--erp-white); cursor: pointer;">
-                                            <input type="checkbox" wire:model="role_ids" value="{{ $role->id }}" style="accent-color: #00E5FF;">
-                                            {{ $role->name }}
-                                            @if($role->is_protected) <span style="font-size: 0.6rem; color: var(--erp-yellow);">PROTECTED</span> @endif
+                                        <label class="flex items-center gap-2" style="cursor: pointer; font-size: 0.875rem;">
+                                            <input type="checkbox" wire:model="role_ids" value="{{ $role->id }}" class="checkbox">
+                                            <span class="text-ink">{{ $role->name }}</span>
+                                            @if($role->is_protected) <span class="help">(only an owner can give this role)</span> @endif
                                         </label>
                                     @endforeach
                                 </div>
-                                @error('role_ids') <span class="validation-error">{{ $message }}</span> @enderror
+                                <span class="help">Choose one or more. A person with several roles can do everything those roles allow.</span>
+                                @error('role_ids') <span class="field-error">{{ $message }}</span> @enderror
                             @endif
-                        </div>
-
-                        <div>
-                            <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-yellow); margin-bottom: 6px; font-weight: bold;">Organization Assignment *</label>
-                            <select wire:model.live="organization_id" required class="cyber-select" style="border-color: rgba(255, 189, 46, 0.4);">
-                                <option value="">-- SELECT ORGANIZATION --</option>
-                                <option value="NEW" style="color: var(--erp-yellow); font-weight: bold;">[+] INITIATE NEW ORGANIZATION</option>
-                                <optgroup label="Existing Matrix" style="color: var(--erp-muted);">
-                                    @foreach($organizations as $org)
-                                        <option value="{{ $org->id }}">{{ $org->name }} {{ $org->id === $jbsOrgId ? '(Internal)' : '' }}</option>
-                                    @endforeach
-                                </optgroup>
-                            </select>
-                            @error('organization_id') <span class="validation-error">{{ $message }}</span> @enderror
                         </div>
 
                     </div>
 
                     @if($organization_id === 'NEW')
-                        <div class="sub-panel-org">
-                            <div style="font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: var(--erp-yellow); margin-bottom: 15px; font-weight: bold;">
-                                <i data-lucide="building" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> NEW ORGANIZATION CREATION PORTAL
+                        <div class="callout">
+                            <div class="flex items-center gap-2 text-ink" style="font-weight: 600; margin-bottom: 12px;">
+                                <i data-lucide="building-2" style="width: 18px; height: 18px;"></i> New client organisation
                             </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                                <div>
-                                    <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); margin-bottom: 6px;">Organization Name *</label>
-                                    <input type="text" wire:model="new_org_name" required class="cyber-input" style="border-color: rgba(255, 189, 46, 0.3);">
-                                    @error('new_org_name') <span class="validation-error">{{ $message }}</span> @enderror
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <div class="field">
+                                    <label class="label" for="acc-new-org">Organisation name</label>
+                                    <input id="acc-new-org" type="text" wire:model="new_org_name" required class="input">
+                                    @error('new_org_name') <span class="field-error">{{ $message }}</span> @enderror
                                 </div>
-                                <div>
-                                    <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); margin-bottom: 6px;">Industry *</label>
-                                    <input type="text" wire:model="new_org_industry" required class="cyber-input" style="border-color: rgba(255, 189, 46, 0.3);" placeholder="e.g. Fintech, Logistics">
-                                    @error('new_org_industry') <span class="validation-error">{{ $message }}</span> @enderror
+                                <div class="field">
+                                    <label class="label" for="acc-new-industry">Industry</label>
+                                    <input id="acc-new-industry" type="text" wire:model="new_org_industry" required class="input" placeholder="e.g. Fintech, logistics">
+                                    @error('new_org_industry') <span class="field-error">{{ $message }}</span> @enderror
                                 </div>
                             </div>
                         </div>
                     @endif
+                </section>
 
-                    <div style="margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px; text-align: right;">
-                        <button type="submit" wire:loading.attr="disabled" class="btn-action">
-                            <span wire:loading.remove wire:target="saveUser"><i data-lucide="key" style="width: 14px; height: 14px;"></i> [ {{ $editMode ? 'UPDATE OPERATOR RECORD' : 'TRANSMIT ZERO-KNOWLEDGE INIT' }} ]</span>
-                            <span wire:loading wire:target="saveUser"><div class="spinner" style="width: 16px; height: 16px; border-width: 2px;"></div> {{ $editMode ? 'ENCRYPTING...' : 'GENERATING KEYS...' }}</span>
-                        </button>
-                    </div>
-
-                </form>
-            </div>
-
-        @else
-            <div style="background: rgba(10, 17, 40, 0.6); border: 1px solid var(--erp-border-dark); border-radius: 4px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); overflow-x: auto;">
-                
-                <div style="padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--erp-teal);">> {{ $activeTab === 'INTERNAL' ? 'JBS COMMAND OS' : 'CLIENT DISTRIBUTED OS' }}</span>
-                    <span style="color: var(--erp-muted); font-size: 0.75rem; font-family: 'Roboto Mono', monospace;">Total Records: {{ count($users) }}</span>
+                <div class="flex justify-end" style="border-top: 1px solid var(--color-line); padding-top: 20px;">
+                    <button type="submit" wire:loading.attr="disabled" class="btn btn-primary">
+                        <span wire:loading.remove wire:target="saveUser" class="flex items-center gap-2">
+                            <i data-lucide="{{ $editMode ? 'save' : 'send' }}"></i> {{ $editMode ? 'Save changes' : 'Send invitation' }}
+                        </span>
+                        <span wire:loading wire:target="saveUser">{{ $editMode ? 'Saving…' : 'Sending invitation…' }}</span>
+                    </button>
                 </div>
 
-                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            </form>
+        </div>
+
+    @else
+        <div class="card" style="padding: 0; overflow: hidden;">
+
+            <div class="card-header" style="padding: 16px 20px 0;">
+                <h2 class="card-title">{{ $activeTab === 'INTERNAL' ? 'Staff accounts' : 'Client Portal accounts' }}</h2>
+                <span class="help" style="font-variant-numeric: tabular-nums;">{{ count($users) }} {{ count($users) == 1 ? 'account' : 'accounts' }}</span>
+            </div>
+
+            <div class="table-wrap">
+                <table class="table">
                     <thead>
                         <tr>
-                            <th style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); text-transform: uppercase;">Operator / Identity</th>
-                            <th style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); text-transform: uppercase;">Organization Link</th>
-                            <th style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); text-transform: uppercase;">Clearance Role</th>
-                            <th style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: center; text-transform: uppercase;">Sys Status</th>
-                            <th style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: center; text-transform: uppercase;">Command</th>
+                            <th style="min-width: 220px;">Name and email</th>
+                            <th style="min-width: 160px;">Organisation</th>
+                            <th style="min-width: 160px;">Role</th>
+                            <th>Status</th>
+                            <th style="min-width: 280px;"><span class="sr-only">Actions</span></th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($users as $user)
-                            <tr style="transition: background 0.2s;" onmouseover="this.style.background='rgba(0, 229, 255, 0.03)'" onmouseout="this.style.background='transparent'">
-                                
-                                <td style="padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.02);">
-                                    <div style="font-family: 'Roboto Mono', monospace; font-weight: bold; font-size: 0.85rem; color: var(--erp-white);">{{ $user->first_name }} {{ $user->last_name }}</div>
-                                    <div style="font-size: 0.7rem; color: var(--erp-teal); margin-top: 2px;">{{ $user->email }}</div>
+                            <tr>
+                                <td>
+                                    <div class="text-ink" style="font-weight: 600;">{{ $user->first_name }} {{ $user->last_name }}</div>
+                                    <div class="help" style="margin-top: 2px;">{{ $user->email }}</div>
                                 </td>
 
-                                <td style="padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.02);">
-                                    <div style="font-size: 0.75rem; color: var(--erp-white); font-weight: 500;">{{ $user->org_name ?? 'ORPHANED' }}</div>
+                                <td>
+                                    <div class="text-ink">{{ $user->org_name ?? 'No organisation' }}</div>
                                     @if($user->org_id === $jbsOrgId)
-                                        <span style="display: inline-block; background: rgba(0, 229, 255, 0.1); border: 1px solid rgba(0, 229, 255, 0.3); padding: 2px 6px; border-radius: 2px; font-size: 0.6rem; font-family: 'Roboto Mono', monospace; color: var(--erp-teal); margin-top: 4px;">HOST_NODE</span>
+                                        <span class="pill pill-info" style="margin-top: 4px;">Staff</span>
                                     @else
-                                        <span style="display: inline-block; background: rgba(255, 189, 46, 0.1); border: 1px solid rgba(255, 189, 46, 0.3); padding: 2px 6px; border-radius: 2px; font-size: 0.6rem; font-family: 'Roboto Mono', monospace; color: var(--erp-yellow); margin-top: 4px;">CLIENT_NODE</span>
+                                        <span class="pill pill-neutral" style="margin-top: 4px;">Client</span>
                                     @endif
                                 </td>
 
-                                <td style="padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.02);">
-                                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: var(--erp-muted);">
-                                        <span style="color: var(--erp-white); font-weight: bold;">{{ $user->role_name ?: 'No role' }}</span>
-                                    </div>
-                                </td>
+                                <td class="text-ink">{{ $user->role_name ?: 'No role' }}</td>
 
-                                <td style="padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.02); text-align: center;">
+                                <td>
                                     @if($user->lifecycle_stage === 'Onboarding')
-                                        <span style="color: var(--erp-yellow); background: rgba(255,189,46,0.1); font-size: 0.6rem; font-family: 'Roboto Mono', monospace; border: 1px solid var(--erp-yellow); padding: 3px 8px; border-radius: 50px; font-weight: bold;">INIT_PENDING</span>
+                                        <span class="pill pill-warning">Invited</span>
                                     @elseif($user->status === 'Active')
-                                        <span style="color: var(--erp-green); background: rgba(0,255,102,0.1); font-size: 0.6rem; font-family: 'Roboto Mono', monospace; border: 1px solid var(--erp-green); padding: 3px 8px; border-radius: 50px; font-weight: bold;">ACTIVE</span>
+                                        <span class="pill pill-success">Active</span>
                                     @else
-                                        <span style="color: var(--erp-red); background: rgba(255,51,102,0.1); font-size: 0.6rem; font-family: 'Roboto Mono', monospace; border: 1px solid var(--erp-red); padding: 3px 8px; border-radius: 50px; font-weight: bold;">SUSPENDED</span>
+                                        <span class="pill pill-danger">Suspended</span>
                                     @endif
                                 </td>
 
-                                <td style="padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.02); text-align: center;">
-    
+                                <td style="white-space: nowrap; text-align: right;">
                                 @if($canEdit)
                                     @if($user->lifecycle_stage === 'Onboarding')
-                                        <button wire:click="resendInvitation('{{ $user->id }}')" style="background: transparent; border: 1px solid #00E5FF; color: #00E5FF; padding: 4px 10px; font-size: 0.65rem; font-family: 'Roboto Mono', monospace; font-weight: bold; border-radius: 2px; cursor: pointer; transition: 0.3s; margin-right: 5px;" onmouseover="this.style.background='#00E5FF'; this.style.color='#0A1128';" onmouseout="this.style.background='transparent'; this.style.color='#00E5FF';">
-                                            RESEND INIT
-                                        </button>
+                                        <button type="button" wire:click="resendInvitation('{{ $user->id }}')" class="btn btn-ghost btn-sm">Resend invitation</button>
                                     @endif
-                                
-                                    <button wire:click="editUser('{{ $user->id }}')" style="background: transparent; border: 1px solid #FFBD2E; color: #FFBD2E; padding: 4px 10px; font-size: 0.65rem; font-family: 'Roboto Mono', monospace; font-weight: bold; border-radius: 2px; cursor: pointer; transition: 0.3s; margin-right: 5px;" onmouseover="this.style.background='#FFBD2E'; this.style.color='#0A1128';" onmouseout="this.style.background='transparent'; this.style.color='#FFBD2E';">
-                                        EDIT
-                                    </button>
-                                
-                                    <button wire:click="toggleUserStatus('{{ $user->id }}', '{{ $user->status }}')" style="background: transparent; border: 1px solid {{ $user->status === 'Active' ? 'var(--erp-red)' : 'var(--erp-green)' }}; color: {{ $user->status === 'Active' ? 'var(--erp-red)' : 'var(--erp-green)' }}; padding: 4px 10px; font-size: 0.65rem; font-family: 'Roboto Mono', monospace; font-weight: bold; border-radius: 2px; cursor: pointer; transition: 0.3s;" onmouseover="this.style.background='{{ $user->status === 'Active' ? 'var(--erp-red)' : 'var(--erp-green)' }}'; this.style.color='#0A1128';" onmouseout="this.style.background='transparent'; this.style.color='{{ $user->status === 'Active' ? 'var(--erp-red)' : 'var(--erp-green)' }}';">
-                                        {{ $user->status === 'Active' ? 'REVOKE' : 'RESTORE' }}
-                                    </button>
+
+                                    <button type="button" wire:click="editUser('{{ $user->id }}')" class="btn btn-ghost btn-sm">Edit</button>
+
+                                    @if($user->status === 'Active')
+                                        <button type="button" wire:click="toggleUserStatus('{{ $user->id }}', '{{ $user->status }}')"
+                                                wire:confirm="Suspend access for {{ $user->first_name }} {{ $user->last_name }}? They will be signed out and can't sign in until you restore access."
+                                                class="btn btn-ghost btn-sm" style="color: var(--color-danger);">Suspend access</button>
+                                    @else
+                                        <button type="button" wire:click="toggleUserStatus('{{ $user->id }}', '{{ $user->status }}')" class="btn btn-ghost btn-sm">Restore access</button>
+                                    @endif
                                 @endif
-                                
                                 </td>
 
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" style="padding: 60px; text-align: center; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: var(--erp-muted);">
-                                    > NO OPERATORS FOUND IN THIS LEDGER SECTOR.
+                                <td colspan="5">
+                                    <div class="empty-state">
+                                        <strong>No {{ $activeTab === 'INTERNAL' ? 'staff' : 'Client Portal' }} accounts yet</strong>
+                                        @if($canCreate)
+                                            Accounts appear here once you send an invitation from Add an account.
+                                        @else
+                                            Accounts appear here once someone with permission to invite people adds them.
+                                        @endif
+                                    </div>
                                 </td>
                             </tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
-        @endif
-    </div>
-
-    <script>
-        document.addEventListener('livewire:navigated', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); });
-        document.addEventListener('DOMContentLoaded', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); });
-        document.addEventListener('livewire:initialized', () => {
-            Livewire.hook('morph.updated', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); });
-        });
-    </script>
+        </div>
+    @endif
 </div>

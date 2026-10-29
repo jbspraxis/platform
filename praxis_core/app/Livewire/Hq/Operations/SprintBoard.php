@@ -14,8 +14,14 @@ use App\Support\Access;
 #[Layout('components.layouts.hq')]
 class SprintBoard extends Component
 {
+    // Set in mount after the access check; the browser must not switch the board to another project
+    #[Locked]
     public $projectId;
+    #[Locked]
     public $project;
+
+    // Task statuses a card can be dropped into (database values)
+    private const COLUMNS = ['To-Do', 'In-Progress', 'QA_Review', 'Failed', 'Done'];
 
     // What this user may do here (set in mount, see config/access.php)
     #[Locked]
@@ -41,10 +47,15 @@ class SprintBoard extends Component
     {
         $this->canMoveOwn = Auth::user()->can('projects.edit');
         $this->canMoveAny = Auth::user()->can('projects.approve');
-        $this->projectId = $id;
-        $this->project = DB::table('projects')->where('id', $id)->first();
+        $project = DB::table('projects')->where('id', $id)->first();
+        if (!$project) abort(404);
 
-        if (!$this->project) abort(404);
+        // Same rule as the sprint boards list: managers and auditors see every board,
+        // everyone else only the boards of projects where they have an assigned task
+        abort_unless(self::maySeeBoard($id), 403, 'You don’t have permission to open this sprint board. Ask a project lead to assign you a task on this project, or an administrator to change your role.');
+
+        $this->projectId = $id;
+        $this->project = $project;
 
         $this->sprints = DB::table('sprints')->where('project_id', $this->projectId)->orderBy('start_date', 'asc')->get()->toArray();
         
@@ -53,6 +64,32 @@ class SprintBoard extends Component
         $this->activeSprintId = $activeSprint ? $activeSprint->id : null;
 
         $this->loadBoardData();
+    }
+
+    /** The sprint boards list (SprintBoardDirectory) shows a board to the same people */
+    public static function maySeeBoard($projectId): bool
+    {
+        $user = Auth::user();
+        if ($user->can('projects.approve') || $user->can('projects.export')) {
+            return true;
+        }
+
+        return DB::table('tasks')
+            ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
+            ->where('project_phases.project_id', $projectId)
+            ->where('tasks.assigned_to', Auth::id())
+            ->exists();
+    }
+
+    /** A task on this board's project, or null (task ids come from the browser) */
+    private function boardTask($taskId)
+    {
+        return DB::table('tasks')
+            ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
+            ->where('project_phases.project_id', $this->projectId)
+            ->where('tasks.id', $taskId)
+            ->select('tasks.*')
+            ->first();
     }
 
     public function switchSprint($sprintId)
@@ -126,6 +163,9 @@ class SprintBoard extends Component
     {
         abort_unless(Auth::user()->can('projects.edit'), 403);
 
+        // Only a task on this board
+        if (! $this->boardTask($taskId)) return;
+
         // Only an unassigned task, unless the user may move anyone's task
         $updated = DB::table('tasks')->where('id', $taskId)
             ->when(! Auth::user()->can('projects.approve'), fn ($q) => $q->whereNull('assigned_to'))
@@ -134,20 +174,21 @@ class SprintBoard extends Component
                 'updated_at' => now()
             ]);
 
-        if ($updated) $this->logAudit('TASK_CHECKOUT', "Engineer checked out Task ID: {$taskId}");
+        if ($updated) $this->logAudit('TASK_CHECKOUT', "Staff member assigned task {$taskId} to themselves");
         $this->loadBoardData();
     }
 
     // --- KANBAN DRAG & DROP + SILENT TIMER LOGIC ---
     public function updateTaskStatus($taskId, $newStatus)
     {
-        $task = DB::table('tasks')->where('id', $taskId)->first();
-        if (!$task || $task->status === $newStatus) return;
+        // Only a task on this board, and only into one of the board's columns
+        $task = $this->boardTask($taskId);
+        if (!$task || $task->status === $newStatus || ! in_array($newStatus, self::COLUMNS, true)) return;
 
         // Security Gate: own tasks need projects.edit; someone else's (or unassigned) need projects.approve
         $isOwn = $task->assigned_to === Auth::id();
         if (! Auth::user()->can($isOwn ? 'projects.edit' : 'projects.approve')) {
-            session()->flash('error', 'ACCESS DENIED: You cannot alter a Battlespace assigned to another engineer.');
+            session()->flash('error', 'You can only move tasks assigned to you. Ask a project lead to move this one.');
             return;
         }
 
@@ -158,7 +199,7 @@ class SprintBoard extends Component
             // 1. The 5-Hour Client QA SLA (Rule 6)
             if ($newStatus === 'QA_Review') {
                 $updateData['qa_sla_expires_at'] = now()->addHours(5);
-                $this->notifyAdmins("Task '{$task->title}' moved to QA. 5-Hour SLA clock initiated.");
+                $this->notifyAdmins("‘{$task->title}’ is ready for QA review. Review it within 5 hours.");
             }
 
             // 2. Clear SLA if pulled out of QA
@@ -229,7 +270,7 @@ class SprintBoard extends Component
         foreach(Access::staffWith('qa.approve') as $adminId) {
             $inserts[] = [
                 'id' => (string) Str::uuid(), 'user_id' => $adminId,
-                'title' => 'QA SLA TRIGGERED', 'message' => $message,
+                'title' => 'Task ready for QA review', 'message' => $message,
                 'type' => 'Project', 'created_at' => now()
             ];
         }
@@ -279,7 +320,7 @@ class SprintBoard extends Component
         }
 
         $this->loadBoardData();
-        session()->flash('error', 'SYSTEM IDLE DETECTED: You failed the 45-minute presence check. All active timers paused and tasks reverted to To-Do.');
+        session()->flash('error', 'We paused your timers because the 45-minute check wasn’t answered. Your tasks in progress are back in To do; move one into In progress to start again.');
     }
 
     public function render()

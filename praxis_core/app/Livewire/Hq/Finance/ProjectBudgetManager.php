@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Finance;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -11,11 +12,16 @@ use Illuminate\Support\Str;
 #[Layout('components.layouts.hq')]
 class ProjectBudgetManager extends Component
 {
+    // Loaded on the server only; the browser must not change them
+    #[Locked]
     public $allProjects = [];
     public $activeProjectId = '';
+    #[Locked]
     public $activeProject = null;
 
+    #[Locked]
     public $budgetLines = [];
+    #[Locked]
     public $metrics = [
         'total_budget' => 0,
         'total_allocated' => 0,
@@ -108,6 +114,12 @@ class ProjectBudgetManager extends Component
             'sweepFromId' => 'required|string|exists:project_budgets,id',
             'sweepToId' => 'required|string|different:sweepFromId|exists:project_budgets,id',
             'sweepAmount' => 'required|numeric|min:0.01'
+        ], [
+            'sweepToId.different' => 'Choose a different line to move the budget to.',
+        ], [
+            'sweepFromId' => 'line to move from',
+            'sweepToId' => 'line to move to',
+            'sweepAmount' => 'amount',
         ]);
 
         try {
@@ -115,12 +127,12 @@ class ProjectBudgetManager extends Component
                 $fromLine = DB::table('project_budgets')->where('id', $this->sweepFromId)->first();
                 $toLine = DB::table('project_budgets')->where('id', $this->sweepToId)->first();
 
-                // 1. SECURITY LOCK: Prevent Cross-Project Sweeping
+                // 1. Both lines must belong to the selected project
                 if ($fromLine->project_id !== $this->activeProject->id || $toLine->project_id !== $this->activeProject->id) {
-                    throw new \Exception("SECURITY VIOLATION: Budget lines do not belong to the active project workspace.");
+                    throw new \DomainException("Both budget lines must belong to the selected project. Refresh the page and try again.");
                 }
 
-                // 2. ACCRUAL LOCK: Calculate real availability to prevent over-sweeping locked funds
+                // 2. Only money that is neither spent nor held by open cash requests can move
                 $accrued = DB::table('cash_requests')
                     ->where('project_id', $this->activeProject->id)
                     ->where('financial_dictionary_id', $fromLine->dict_id)
@@ -131,19 +143,19 @@ class ProjectBudgetManager extends Component
                 $sweepAmountFloat = (float) $this->sweepAmount;
 
                 if ($sweepAmountFloat > $available) {
-                    throw new \Exception("Insufficient available funds. Funds may be locked in pending Cash Requests.");
+                    throw new \DomainException("That's more than the line has available. Money already spent or held by open cash requests can't be moved.");
                 }
 
-                // 3. EXECUTE SWEEP
+                // 3. Move the budget
                 DB::table('project_budgets')->where('id', $this->sweepFromId)->decrement('total_allocated', $sweepAmountFloat);
                 DB::table('project_budgets')->where('id', $this->sweepToId)->increment('total_allocated', $sweepAmountFloat);
                 
-                // 4. IMMUTABLE AUDIT LOG (Safe Null handling for UUID Foreign Keys)
+                // 4. Audit log (null user for system actions, to respect UUID foreign keys)
                 DB::table('system_audit_logs')->insert([
                     // Assuming id is auto-increment or UUID, ensure it's handled. If UUID: 'id' => str()->uuid(),
                     'user_id' => Auth::check() ? Auth::id() : null, // Use null instead of 'SYSTEM' to respect UUID FKs
                     'action' => 'BUDGET_SWEEP_EXECUTED',
-                    'description' => "Swept {$this->activeProject->currency} {$sweepAmountFloat} from [{$fromLine->description}] to [{$toLine->description}] on Project [{$this->activeProject->name}]",
+                    'description' => "Moved {$this->activeProject->currency} {$sweepAmountFloat} of budget from {$fromLine->description} to {$toLine->description} on project {$this->activeProject->title}",
                     'target_table' => 'project_budgets',
                     'ip_address' => request()->ip(),
                     'created_at' => now()
@@ -152,10 +164,13 @@ class ProjectBudgetManager extends Component
 
             $this->showSweepModal = false;
             $this->loadBudgetData();
-            session()->flash('success', '> CAPITAL SWEEP SUCCESSFUL. MATRIX REBALANCED.');
+            session()->flash('success', 'Budget moved. The line totals below are updated.');
 
+        } catch (\DomainException $e) {
+            session()->flash('error', "We couldn't move the budget. " . $e->getMessage());
         } catch (\Exception $e) {
-            session()->flash('error', '> SWEEP REJECTED: ' . $e->getMessage());
+            report($e);
+            session()->flash('error', "We couldn't move the budget, so nothing was changed. Try again, and if it still fails, ask an administrator to check the error log.");
         }
     }
 

@@ -1,127 +1,92 @@
-<div style="position: relative; overflow-y: auto; min-height: 100vh;">
-    <style>
-        .split-layout { display: grid; grid-template-columns: 1fr 1.5fr; gap: 30px; align-items: start; }
-        .pane { background: rgba(10, 17, 40, 0.6); border: 1px solid var(--erp-border-dark); padding: 30px; border-radius: 4px; max-height: 80vh; overflow-y: auto; }
-        
-        /* Custom Scrollbar for Panes */
-        .pane::-webkit-scrollbar { width: 6px; }
-        .pane::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-        .pane::-webkit-scrollbar-thumb { background: var(--erp-teal); border-radius: 3px; }
-
-        .btn-action { background: transparent; border: 1px solid var(--erp-border-dark); color: var(--erp-white); padding: 6px 12px; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; cursor: pointer; border-radius: 2px; transition: 0.3s; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
-        .btn-action:hover { border-color: var(--erp-teal); color: var(--erp-teal); }
-        
-        .btn-ai { background: rgba(212, 175, 55, 0.1); color: var(--erp-gold); border: 1px solid var(--erp-gold); padding: 15px; font-family: 'Roboto Mono', monospace; font-size: 0.9rem; font-weight: bold; cursor: pointer; transition: 0.3s; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 20px; }
-        .btn-ai:hover:not(:disabled) { background: var(--erp-gold); color: var(--erp-bg-main); box-shadow: 0 0 15px rgba(212,175,55,0.4); }
-        .btn-ai:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        .btn-primary { background: var(--erp-teal); color: var(--erp-bg-main); border: 1px solid var(--erp-teal); padding: 15px; font-family: 'Roboto Mono', monospace; font-size: 0.9rem; font-weight: bold; cursor: pointer; transition: 0.3s; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 20px; }
-        .btn-primary:hover { background: var(--erp-white); box-shadow: 0 0 15px rgba(0,229,255,0.4); }
-
-        .cyber-textarea { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--erp-border-dark); color: var(--erp-white); padding: 15px; font-family: 'Inter', sans-serif; font-size: 0.85rem; border-radius: 2px; outline: none; transition: 0.3s; line-height: 1.6; resize: vertical; }
-        .cyber-textarea:focus { border-color: var(--erp-teal); background: rgba(0,229,255,0.02); }
-        
-        .cyber-input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--erp-border-dark); color: var(--erp-white); padding: 8px 12px; font-family: 'Inter', sans-serif; font-size: 0.85rem; border-radius: 2px; outline: none; transition: 0.3s; }
-        .cyber-input:focus { border-color: var(--erp-teal); }
-
-        .sprint-block { border: 1px solid var(--erp-border-dark); margin-bottom: 20px; background: rgba(0,0,0,0.2); }
-        .sprint-header { background: rgba(255,255,255,0.05); padding: 10px 15px; font-family: 'Montserrat', sans-serif; font-weight: bold; color: var(--erp-teal); border-bottom: 1px solid var(--erp-border-dark); font-size: 0.9rem; display: flex; justify-content: space-between; }
-        
-        .task-row { padding: 15px; border-bottom: 1px dashed rgba(255,255,255,0.05); display: flex; gap: 15px; align-items: flex-start; transition: 0.3s; }
-        .task-row:hover { background: rgba(0,229,255,0.02); }
-        .task-row:last-child { border-bottom: none; }
-
-        .fibonacci-box { background: rgba(0,0,0,0.5); border: 1px solid var(--erp-teal); color: var(--erp-teal); width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-family: 'Roboto Mono', monospace; font-size: 1.2rem; font-weight: bold; flex-shrink: 0; text-align: center; }
-        
-        .form-label { font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); text-transform: uppercase; margin-bottom: 5px; display: block; }
-    </style>
-
-    <div style="margin-bottom: 25px; border-bottom: 1px solid var(--erp-border-dark); padding-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+<div>
+    <div class="page-header">
         <div>
-            <h1 style="font-family: 'Montserrat', sans-serif; font-size: 1.3rem; color: var(--erp-white); letter-spacing: 1px;">AI SCRUM MASTER STAGING</h1>
-            <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-gold); margin-top: 5px;">[ PROJECT: {{ strtoupper($project->title) }} ]</p>
+            <h1 class="page-title">Plan sprints</h1>
+            <p class="page-subtitle">{{ $project->title }}. Draft a sprint backlog from the scope of work, check it, then save it to the project’s sprint board.</p>
         </div>
-        <a href="{{ route('hq.ops.deployments') }}" class="btn-action" wire:navigate>
-            <i data-lucide="arrow-left" style="width: 14px; height: 14px;"></i> RETURN TO MATRIX
+        <a href="{{ route('hq.ops.deployments') }}" class="btn btn-secondary" wire:navigate>
+            <i data-lucide="arrow-left"></i> All projects
         </a>
     </div>
 
     @if (session()->has('success'))
-        <div style="background: rgba(0,255,102,0.1); border: 1px solid #00FF66; color: #00FF66; padding: 10px 15px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; margin-bottom: 15px;">> {{ session('success') }}</div>
+        <div class="alert alert-success mb-4" role="status"><i data-lucide="check-circle"></i> <span>{{ session('success') }}</span></div>
     @endif
     @if (session()->has('error'))
-        <div style="background: rgba(255,51,102,0.1); border: 1px solid var(--erp-red); color: var(--erp-red); padding: 10px 15px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; margin-bottom: 15px;">> {{ session('error') }}</div>
+        <div class="alert alert-danger mb-4" role="alert"><i data-lucide="circle-alert"></i> <span>{{ session('error') }}</span></div>
     @endif
 
-    <div class="split-layout">
-        
-        <div class="pane">
-            <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: var(--erp-teal); margin-bottom: 15px; border-bottom: 1px dashed var(--erp-border-dark); padding-bottom: 10px;">> SCOPE OF WORK CONTEXT</div>
-            
-            <p style="font-size: 0.8rem; color: var(--erp-muted); margin-bottom: 15px; line-height: 1.5;">
-                The AI will read the text below to engineer the backlog. You may edit this text to remove irrelevant information or add specific technical requirements before generating.
-            </p>
+    <div class="grid items-start gap-6 lg:grid-cols-[2fr_3fr]">
 
-            <textarea wire:model="sowContext" class="cyber-textarea" style="min-height: 400px;"></textarea>
+        <div class="card">
+            <h2 class="card-title mb-2">Scope of work</h2>
+            <p class="help mb-4">The JBS Praxis assistant reads this text to draft sprints and tasks. Remove anything that isn’t scope, or add requirements, before you draft the backlog.</p>
 
-            <button wire:click="generateScrumBacklog" class="btn-ai" wire:loading.attr="disabled" wire:target="generateScrumBacklog">
-                <span wire:loading.remove wire:target="generateScrumBacklog">
-                    <i data-lucide="cpu" style="width: 18px; height: 18px;"></i> ENGINEER BATTLESPACE
+            <div class="field">
+                <label for="sow-context" class="label">Scope of work</label>
+                <textarea id="sow-context" wire:model="sowContext" class="textarea min-h-[400px]"></textarea>
+                @error('sowContext') <span class="field-error">{{ $message }}</span> @enderror
+            </div>
+
+            <button type="button" wire:click="generateScrumBacklog" class="btn btn-primary mt-4 w-full" wire:loading.attr="disabled" wire:target="generateScrumBacklog">
+                <span wire:loading.remove wire:target="generateScrumBacklog" class="inline-flex items-center gap-2">
+                    <i data-lucide="sparkles"></i> Draft backlog
                 </span>
-                <span wire:loading wire:target="generateScrumBacklog">
-                    <i data-lucide="loader" class="animate-spin" style="width: 18px; height: 18px; display: inline-block;"></i> PARSING LOGIC...
-                </span>
+                <span wire:loading wire:target="generateScrumBacklog">Drafting the backlog…</span>
             </button>
         </div>
 
-        <div class="pane">
-            <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: var(--erp-teal); margin-bottom: 15px; border-bottom: 1px dashed var(--erp-border-dark); padding-bottom: 10px;">> GENERATED BACKLOG (HUMAN REVIEW)</div>
+        <div class="card">
+            <h2 class="card-title mb-4">Backlog for review</h2>
 
             @if(empty($generatedBacklog))
-                <div style="border: 1px dashed var(--erp-border-dark); padding: 60px 20px; text-align: center; color: var(--erp-muted); font-family: 'Roboto Mono', monospace; font-size: 0.85rem; background: rgba(0,0,0,0.2);">
-                    <i data-lucide="layout-template" style="width: 48px; height: 48px; color: var(--erp-border-dark); margin: 0 auto 15px auto;"></i><br>
-                    AWAITING AI ENGINEERING.<br>
-                    <span style="font-size: 0.65rem; color: #555;">(Generated Sprints and Tasks will appear here for editing)</span>
+                <div class="empty-state rounded-lg border border-dashed border-line">
+                    <i data-lucide="layout-template" class="mx-auto mb-3 h-8 w-8 text-muted"></i>
+                    <strong>No draft yet</strong>
+                    Draft the backlog from the scope of work. Its sprints and tasks appear here for you to check and edit before you save them.
                 </div>
             @else
-                
-                <div style="margin-bottom: 15px; font-size: 0.8rem; color: var(--erp-gold); font-family: 'Roboto Mono', monospace;">
-                    > WARNING: Review all Fibonacci Points and Acceptance Criteria. Edit fields directly before committing.
-                </div>
+                <div class="alert alert-warning mb-4"><i data-lucide="triangle-alert"></i> <span>Check every story point estimate and the acceptance criteria. Edit anything here before you save the backlog.</span></div>
 
                 @foreach($generatedBacklog as $sIndex => $sprint)
-                    <div class="sprint-block">
-                        <div class="sprint-header">
-                            <span><input type="text" wire:model="generatedBacklog.{{ $sIndex }}.sprint_title" class="cyber-input" style="width: 300px; padding: 4px 8px; border-color: transparent; background: transparent; color: var(--erp-teal); font-weight: bold; font-family: 'Montserrat', sans-serif;"></span>
-                            <span style="font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: var(--erp-muted);">{{ count($sprint['tasks']) }} TASKS</span>
+                    <div class="mb-4 overflow-hidden rounded-lg border border-line">
+                        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-mist px-4 py-3">
+                            <div class="field min-w-[200px] flex-1">
+                                <label for="sprint-{{ $sIndex }}" class="sr-only">Sprint name</label>
+                                <input id="sprint-{{ $sIndex }}" type="text" wire:model="generatedBacklog.{{ $sIndex }}.sprint_title" class="input font-semibold">
+                            </div>
+                            <span class="help">{{ count($sprint['tasks']) }} {{ count($sprint['tasks']) === 1 ? 'task' : 'tasks' }}</span>
                         </div>
 
                         @foreach($sprint['tasks'] as $tIndex => $task)
-                            <div class="task-row">
-                                <div>
-                                    <label class="form-label">PTS</label>
-                                    <input type="number" wire:model="generatedBacklog.{{ $sIndex }}.tasks.{{ $tIndex }}.story_points" class="fibonacci-box cyber-input" style="padding: 0; outline: none;">
+                            <div class="flex flex-wrap items-start gap-4 border-b border-line px-4 py-4 last:border-b-0">
+                                <div class="field w-20">
+                                    <label for="pts-{{ $sIndex }}-{{ $tIndex }}" class="label">Points</label>
+                                    <input id="pts-{{ $sIndex }}-{{ $tIndex }}" type="number" wire:model="generatedBacklog.{{ $sIndex }}.tasks.{{ $tIndex }}.story_points" class="input num text-center">
                                 </div>
-                                
-                                <div style="flex: 1;">
-                                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                                        <div style="flex: 1;">
-                                            <label class="form-label">PHASE</label>
-                                            <input type="text" wire:model="generatedBacklog.{{ $sIndex }}.tasks.{{ $tIndex }}.phase_title" class="cyber-input" style="padding: 6px 10px; font-size: 0.75rem; color: var(--erp-gold);">
+
+                                <div class="min-w-[240px] flex-1">
+                                    <div class="mb-3 grid gap-3 sm:grid-cols-[1fr_2fr]">
+                                        <div class="field">
+                                            <label for="phase-{{ $sIndex }}-{{ $tIndex }}" class="label">Phase</label>
+                                            <input id="phase-{{ $sIndex }}-{{ $tIndex }}" type="text" wire:model="generatedBacklog.{{ $sIndex }}.tasks.{{ $tIndex }}.phase_title" class="input">
                                         </div>
-                                        <div style="flex: 2;">
-                                            <label class="form-label">TASK TITLE</label>
-                                            <input type="text" wire:model="generatedBacklog.{{ $sIndex }}.tasks.{{ $tIndex }}.title" class="cyber-input" style="padding: 6px 10px; font-size: 0.8rem; font-weight: bold;">
+                                        <div class="field">
+                                            <label for="task-{{ $sIndex }}-{{ $tIndex }}" class="label">Task</label>
+                                            <input id="task-{{ $sIndex }}-{{ $tIndex }}" type="text" wire:model="generatedBacklog.{{ $sIndex }}.tasks.{{ $tIndex }}.title" class="input font-medium">
                                         </div>
                                     </div>
 
-                                    <label class="form-label">ACCEPTANCE CRITERIA (HTML UL/LI)</label>
-                                    <textarea wire:model="generatedBacklog.{{ $sIndex }}.tasks.{{ $tIndex }}.description" class="cyber-textarea" style="min-height: 80px; padding: 10px; font-family: 'Roboto Mono', monospace; font-size: 0.75rem;"></textarea>
+                                    <div class="field">
+                                        <label for="criteria-{{ $sIndex }}-{{ $tIndex }}" class="label">Acceptance criteria</label>
+                                        <textarea id="criteria-{{ $sIndex }}-{{ $tIndex }}" wire:model="generatedBacklog.{{ $sIndex }}.tasks.{{ $tIndex }}.description" class="textarea min-h-[80px] text-caption"></textarea>
+                                        <span class="help">A list in HTML (ul and li tags).</span>
+                                    </div>
                                 </div>
 
-                                <div style="padding-top: 20px;">
-                                    <button wire:click="removeTask({{ $sIndex }}, {{ $tIndex }})" style="background: transparent; border: none; color: var(--erp-red); cursor: pointer; opacity: 0.5; transition: 0.3s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'" title="Remove Task">
-                                        <i data-lucide="trash-2" style="width: 18px; height: 18px;"></i>
+                                <div class="pt-6">
+                                    <button type="button" wire:click="removeTask({{ $sIndex }}, {{ $tIndex }})" class="btn btn-ghost btn-sm text-danger" title="Remove task" aria-label="Remove task">
+                                        <i data-lucide="trash-2"></i>
                                     </button>
                                 </div>
                             </div>
@@ -129,18 +94,14 @@
                     </div>
                 @endforeach
 
-                <button wire:click="commitBacklogToDatabase" class="btn-primary" wire:loading.attr="disabled" wire:target="commitBacklogToDatabase">
-                    <span wire:loading.remove wire:target="commitBacklogToDatabase">
-                        <i data-lucide="database" style="width: 18px; height: 18px;"></i> COMMIT BATTLESPACE TO DATABASE
+                <button type="button" wire:click="commitBacklogToDatabase" class="btn btn-primary mt-2 w-full" wire:loading.attr="disabled" wire:target="commitBacklogToDatabase">
+                    <span wire:loading.remove wire:target="commitBacklogToDatabase" class="inline-flex items-center gap-2">
+                        <i data-lucide="save"></i> Save backlog
                     </span>
-                    <span wire:loading wire:target="commitBacklogToDatabase">
-                        ENCRYPTING & SAVING MATRICES...
-                    </span>
+                    <span wire:loading wire:target="commitBacklogToDatabase">Saving the backlog…</span>
                 </button>
             @endif
         </div>
 
     </div>
-
-    <script> document.addEventListener('livewire:navigated', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); }); </script>
 </div>

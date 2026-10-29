@@ -25,7 +25,7 @@ class LoginTerminal extends Component
     public $recoveryMessage = '';
 
     /**
-     * Toggles the HUD between Login and Recovery modes.
+     * Switches the card between sign-in and the password reset request.
      */
     public function toggleView($mode)
     {
@@ -36,14 +36,14 @@ class LoginTerminal extends Component
     }
 
     /**
-     * The primary authentication engine.
+     * Signs a staff member in.
      */
     public function authenticate()
     {
         $this->validate([
             'email' => 'required|email',
             'password' => 'required'
-        ]);
+        ], $this->fieldMessages());
 
         if ($this->tooManyLoginAttempts('hq', 'auth')) {
             return;
@@ -63,7 +63,7 @@ class LoginTerminal extends Component
                 session()->regenerateToken();
                 
                 // Throw the specific error that triggers the redirect button in the UI
-                $this->addError('client_redirect', 'UNAUTHORIZED NODE: Client clearance detected. Please route through the Client Portal.');
+                $this->addError('client_redirect', 'This sign-in is for JBS Praxis staff. Clients sign in to the Client Portal.');
                 return;
             }
             // ==========================================
@@ -88,15 +88,15 @@ class LoginTerminal extends Component
 
         // Brute force is handled by the rate limit above (5 tries per email and IP per 15 minutes)
         $this->recordFailedLogin('hq');
-        $this->addError('auth', '> ERR: CREDENTIALS REJECTED OR CLEARANCE REVOKED.');
+        $this->addError('auth', "That email address and password don't match. Check them and try again.");
     }
 
     /**
-     * Generates a Zero-Knowledge recovery token.
+     * Records a password reset request (the reset email is not built yet, see the TODO below).
      */
     public function initiateRecovery()
     {
-        $this->validate(['email' => 'required|email']);
+        $this->validate(['email' => 'required|email'], $this->fieldMessages());
 
         $user = DB::table('users')->where('email', $this->email)->first();
 
@@ -113,8 +113,19 @@ class LoginTerminal extends Component
             // Mail::to($user->email)->send(new \App\Mail\HqKeyRecovery($user->first_name, $token));
         }
 
-        // Universal success message prevents bad actors from enumerating valid internal emails
-        $this->recoveryMessage = '> RECOVERY TRANSMISSION SENT. If this node is registered, check your comms channel for the secure link.';
+        // The same message whether or not the address has an account, so nobody can test which emails exist.
+        // No email is sent yet, so the message says so plainly instead of promising a link.
+        $this->recoveryMessage = "Thank you. Password reset by email isn't available yet, so ask an administrator to reset your password.";
+    }
+
+    /** Plain validation messages (docs/BRAND.md section 12). */
+    protected function fieldMessages(): array
+    {
+        return [
+            'email.required' => 'Enter your email address.',
+            'email.email' => 'Enter an email address in the format name@example.com.',
+            'password.required' => 'Enter your password.',
+        ];
     }
 
     public function render()

@@ -71,6 +71,15 @@ class MarketingSync extends Component
     public $decryptedPassword = '';
     public $credentialHistory = [];
 
+    // Field names in validation messages (sentence case, docs/BRAND.md section 12)
+    protected $validationAttributes = [
+        'campName' => 'campaign name', 'platform' => 'ad platform', 'targetUrl' => 'landing page', 'startDate' => 'start date',
+        'budgetAmount' => 'budget', 'creativeFile' => 'creative file', 'creativeLink' => 'link to the file',
+        'rejectionReason' => 'reason for returning it', 'externalCampaignId' => 'campaign ID',
+        'assetPlatform' => 'platform', 'assetName' => 'account name', 'loginIdentifier' => 'login', 'assetPassword' => 'password',
+        'newPassword' => 'new password',
+    ];
+
     public function mount()
     {
         $this->canApprove = Auth::user()->can('marketing.approve');
@@ -171,8 +180,8 @@ class MarketingSync extends Component
                 DB::table('notifications')->insert([
                     'id' => (string) Str::uuid(),
                     'user_id' => $adminId,
-                    'title' => 'BUDGET APPROVAL REQUIRED',
-                    'message' => "Marketing requested $" . number_format($this->budgetAmount, 2) . " for '{$this->campName}'.",
+                    'title' => 'Campaign budget to approve',
+                    'message' => (Auth::user()->name ?? 'Marketing') . " requested $" . number_format($this->budgetAmount, 2) . " for the campaign '{$this->campName}'. Review it in Marketing.",
                     'type' => 'Financial',
                     'link_url' => route('hq.marketing.campaigns', [], false),
                     'created_at' => now()
@@ -183,7 +192,7 @@ class MarketingSync extends Component
         $this->reset(['campName', 'startDate', 'endDate', 'budgetAmount', 'creativeFile', 'creativeLink', 'remarks', 'targetLeads', 'targetOpportunities', 'targetWon']);
         $this->showCreateModal = false;
         $this->loadData();
-        session()->flash('success', 'Campaign Draft Submitted for Command Approval.');
+        session()->flash('success', 'Campaign budget sent for approval.');
     }
 
     public function openReviewModal($id)
@@ -220,9 +229,9 @@ class MarketingSync extends Component
                 'financial_dictionary_id' => $mdmId,
                 'amount_requested' => $this->selectedCampaign->budget_amount,
                 'currency' => 'USD',
-                'purpose' => "Ad Spend Budget: " . $this->selectedCampaign->name . " [" . $this->selectedCampaign->platform . "]",
+                'purpose' => "Ad spend budget: " . $this->selectedCampaign->name . " (" . $this->selectedCampaign->platform . ")",
                 'disbursement_method' => 'Bank Transfer',
-                'disbursement_details' => 'Transfer to Praxis Corporate Digital Card',
+                'disbursement_details' => 'Transfer to the JBS Praxis company card',
                 'requester_signature' => 'SYSTEM_AUTO_SPAWN',
                 'requester_ip' => request()->ip(),
                 'requester_hash' => hash('sha256', $ref . now()),
@@ -242,14 +251,14 @@ class MarketingSync extends Component
             // Notify Agency
             DB::table('notifications')->insert([
                 'id' => (string) Str::uuid(), 'user_id' => $this->selectedCampaign->created_by,
-                'title' => 'CAMPAIGN APPROVED', 'message' => "Budget secured for {$this->selectedCampaign->name}. Proceed to launch.",
+                'title' => 'Campaign approved', 'message' => "The budget for {$this->selectedCampaign->name} is approved. Launch the campaign, then link its campaign ID in Marketing.",
                 'type' => 'System', 'created_at' => now()
             ]);
         });
 
         $this->showReviewModal = false;
         $this->loadData();
-        session()->flash('success', 'Campaign Approved. Treasury Cash Request Auto-Generated.');
+        session()->flash('success', 'Campaign approved. A cash request for its budget was created in Finance.');
     }
 
     public function rejectCampaign()
@@ -266,7 +275,7 @@ class MarketingSync extends Component
 
         $this->showReviewModal = false;
         $this->loadData();
-        session()->flash('warning', 'Campaign kicked back for revision.');
+        session()->flash('warning', 'Campaign returned for changes. The requester can see your reason.');
     }
     
     public function openActivateModal($id)
@@ -293,7 +302,7 @@ class MarketingSync extends Component
 
         $this->showActivateModal = false;
         $this->loadData();
-        session()->flash('success', 'Campaign Linked. Telemetry Cron Job will now track spend.');
+        session()->flash('success', 'Campaign linked. Its spend will now be tracked from the ad platform.');
     }
 
     // ========================================================================
@@ -343,7 +352,7 @@ class MarketingSync extends Component
         $this->showAssetModal = false;
         $this->reset(['assetPlatform', 'assetType', 'assetName', 'assetUrl', 'assetStatus', 'loginIdentifier', 'assetPassword', 'adminProfileLink']);
         $this->loadData();
-        session()->flash('success', 'Asset secured. Credentials encrypted in vault.');
+        session()->flash('success', 'Account added. Its password is stored encrypted.');
     }
 
     public function openCredentialModal($id)
@@ -355,7 +364,7 @@ class MarketingSync extends Component
             try {
                 $this->decryptedPassword = Crypt::decryptString($this->selectedAsset->encrypted_password);
             } catch (\Exception $e) {
-                $this->decryptedPassword = 'ERROR_DECRYPTING';
+                $this->decryptedPassword = "This password couldn't be decrypted. Set a new one.";
             }
             
             $this->credentialHistory = json_decode(json_encode(
@@ -395,11 +404,11 @@ class MarketingSync extends Component
 
             $this->logSystemAudit('CREDENTIAL_UPDATED', "Password changed for asset: {$this->selectedAsset->account_name}");
 
-            // Alert whoever holds the credential vault (marketing.delete)
+            // Alert the staff who can see account passwords (marketing.delete)
             foreach (Access::staffWith('marketing.delete') as $adminId) {
                 DB::table('notifications')->insert([
                     'id' => (string) Str::uuid(), 'user_id' => $adminId,
-                    'title' => 'ASSET SECURITY ALERT', 
+                    'title' => 'Account password changed', 
                     'message' => (Auth::user()->name ?? 'Agency') . " updated the password for {$this->selectedAsset->platform} ({$this->selectedAsset->account_name}).",
                     'type' => 'System', 'created_at' => now()
                 ]);
@@ -407,7 +416,7 @@ class MarketingSync extends Component
         });
 
         $this->showCredentialModal = false;
-        session()->flash('success', 'Asset password updated and encrypted successfully.');
+        session()->flash('success', 'Password changed. The new password is stored encrypted.');
     }
 
     private function logSystemAudit($action, $description)

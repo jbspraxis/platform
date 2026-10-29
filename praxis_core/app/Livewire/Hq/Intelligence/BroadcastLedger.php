@@ -46,6 +46,9 @@ class BroadcastLedger extends Component
     public $sentLogs = [];
     public $failedLogs = [];
 
+    // Field names in validation messages (sentence case, docs/BRAND.md section 12)
+    protected $validationAttributes = ['subject' => 'subject', 'rawBody' => 'draft', 'enhancedBody' => 'email text', 'selectedTone' => 'tone'];
+
     public function mount()
     {
         $this->loadFilterOptions();
@@ -60,7 +63,7 @@ class BroadcastLedger extends Component
         $this->loadLedgerData();
     }
 
-    // --- 1. THE QUERY ENGINE & TARGET ACQUISITION ---
+    // --- 1. RECIPIENT FILTERS ---
     public function updated($propertyName)
     {
         // Re-calculate and auto-select targets when filters change
@@ -143,7 +146,8 @@ class BroadcastLedger extends Component
 
         if ($activeSending) {
             $this->activeLock = true;
-            $this->lockEta = \Carbon\Carbon::parse($activeSending->estimated_completion_time)->format('h:i A (WAT)');
+            // Stored in the app's time zone (UTC); shown in Lagos time
+            $this->lockEta = \Carbon\Carbon::parse($activeSending->estimated_completion_time)->timezone('Africa/Lagos')->format('H:i') . ' WAT';
         } else {
             $this->activeLock = false;
             $this->lockEta = null;
@@ -159,7 +163,7 @@ class BroadcastLedger extends Component
     public function enhanceWithGemini()
     {
         if (! Auth::user()->can('broadcasts.create')) {
-            session()->flash('error', 'ACCESS DENIED: Composing broadcasts is not in your role.');
+            session()->flash('error', "You don't have permission to write broadcasts. Ask an administrator to change your role.");
             return;
         }
 
@@ -189,33 +193,34 @@ class BroadcastLedger extends Component
             if ($response->successful()) {
                 $rawText = $response->json('candidates.0.content.parts.0.text');
                 $this->enhancedBody = preg_replace('/```(?:html)?\n?|\n?```/', '', $rawText);
-                session()->flash('success', 'Draft enhanced by Gemini AI.');
+                session()->flash('success', 'Draft rewritten. Read the email text and edit it before you send it.');
             } else {
-                session()->flash('error', 'API Error: ' . $response->body());
+                logger()->warning('Broadcast rewrite failed', ['status' => $response->status()]);
+                session()->flash('error', "We couldn't rewrite the draft because the writing assistant returned an error. Try again in a minute, or write the email text yourself.");
             }
         } catch (\Exception $e) {
-            session()->flash('error', 'AI Processing Timeout.');
+            session()->flash('error', "The writing assistant didn't reply in time. Try again in a minute, or write the email text yourself.");
         }
     }
 
-    // --- 4. SECURE DISPATCH & NOTIFICATIONS ---
+    // --- 4. SEND AND NOTIFY ---
     public function dispatchCampaign()
     {
         // Sending to clients authorises the broadcast
         if (! Auth::user()->can('broadcasts.approve')) {
-            session()->flash('error', 'ACCESS DENIED: Dispatching broadcasts is not in your role.');
+            session()->flash('error', "You don't have permission to send broadcasts. Ask an administrator to change your role.");
             return;
         }
 
         $this->checkSystemLock();
         
         if ($this->activeLock) {
-            session()->flash('error', 'SYSTEM LOCKED: A broadcast is currently utilizing the SMTP port.');
+            session()->flash('error', "Another broadcast is still sending. You can send this one after about {$this->lockEta}.");
             return;
         }
 
         if (count($this->selectedTargets) === 0) {
-            session()->flash('error', 'Dispatch Aborted: Zero targets selected.');
+            session()->flash('error', 'Choose at least one recipient, then send the broadcast.');
             return;
         }
 
@@ -270,8 +275,8 @@ class BroadcastLedger extends Component
                 $notificationInserts[] = [
                     'id' => (string) Str::uuid(),
                     'user_id' => $adminId,
-                    'title' => 'INTELLIGENCE BROADCAST DISPATCHED',
-                    'message' => "Campaign '{$this->subject}' successfully queued for {$finalCount} selected targets. ETA to completion: {$totalMinutes} minutes.",
+                    'title' => 'Broadcast sending',
+                    'message' => "'{$this->subject}' is queued for {$finalCount} recipients. Sending should finish in about {$totalMinutes} minutes. Follow it in Broadcasts.",
                     'link_url' => route('hq.crm.broadcast', [], false),
                     'type' => 'System',
                     'is_read' => 0,
@@ -284,18 +289,19 @@ class BroadcastLedger extends Component
             }
 
             $this->activeLock = true;
-            $this->lockEta = $eta->format('h:i A (WAT)');
+            $this->lockEta = $eta->copy()->timezone('Africa/Lagos')->format('H:i') . ' WAT';
         });
 
         // Reset UI & Navigate to Queued Tab
+        $sentCount = count($this->selectedTargets);
         $this->reset(['subject', 'rawBody', 'enhancedBody']);
         $this->activeTab = 'queued';
         $this->loadLedgerData();
         
-        session()->flash('success', "DISPATCH INITIATED. Port Locked until {$this->lockEta}. Management notified.");
+        session()->flash('success', "Broadcast queued for {$sentCount} recipients. Sending should finish at about {$this->lockEta}; new broadcasts can be sent after that. Staff who approve broadcasts have been notified.");
     }
 
-    // --- 5. LEDGER HYDRATION ---
+    // --- 5. QUEUED, SENT AND FAILED LISTS ---
     private function loadLedgerData()
     {
         $this->campaigns = DB::table('broadcast_campaigns')->orderBy('created_at', 'desc')->get()->toArray();

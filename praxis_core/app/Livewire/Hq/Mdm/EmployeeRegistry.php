@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Mdm;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Services\Payroll\CameroonTaxCalculator;
@@ -12,6 +13,7 @@ use Exception;
 use Illuminate\Support\Str;
 
 #[Layout('components.layouts.hq')]
+#[Title('Staff directory')]
 class EmployeeRegistry extends Component
 {
     // --- DATAGRID STATE ---
@@ -267,7 +269,10 @@ class EmployeeRegistry extends Component
         $this->total_gross = round($estimatedGross, 2);
         $this->autoSplitCompensation();
         
-        session()->flash('gross_up_success', "Exact Net Target Achieved! Iterations: {$iterations}. Final Gross Required: {$this->currency} " . number_format($this->total_gross, 2));
+        $basis = in_array($this->tax_region, ['CM', 'NG'], true) && $config
+            ? 'using the current tax rules for this country'
+            : 'assuming 20% deductions, because HQ has no tax rules for this country';
+        session()->flash('gross_up_success', "Gross pay needed: {$this->currency} " . number_format($this->total_gross, 2) . " a month, {$basis}. Check the split below before you save.");
     }
 
     public function generateEmployeeCode()
@@ -393,13 +398,14 @@ class EmployeeRegistry extends Component
                 }
             });
 
-            $this->successMessage = "Personnel profile and SCD compensation ledger successfully " . ($this->editMode ? 'updated.' : 'integrated.');
+            $this->successMessage = ($this->editMode ? 'Staff record updated.' : 'Staff record added.') . ' If the pay changed, the new pay applies from today and the previous pay is kept in the history.';
             $this->showSuccessModal = true;
             $this->loadEmployees();
             $this->loadAvailableUsers(); 
 
         } catch (Exception $e) {
-            session()->flash('error', "Ledger Error: " . $e->getMessage());
+            report($e);
+            session()->flash('error', "We couldn't save the staff record, and nothing was changed. Check the details and try again.");
         }
     }
 

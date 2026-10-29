@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Operations;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
@@ -14,7 +15,10 @@ use App\Support\Access;
 #[Layout('components.layouts.hq')]
 class ScrumMaster extends Component
 {
+    // Set in mount; the browser must not point the backlog at another project
+    #[Locked]
     public $projectId;
+    #[Locked]
     public $project;
 
     // Staging Data
@@ -26,7 +30,7 @@ class ScrumMaster extends Component
     {
         // Strict Access Control: this screen only builds backlogs (sprints, phases, tasks), so projects.create
         if (! Auth::user()->can('projects.create')) {
-            abort(403, 'UNAUTHORIZED: Strategic clearance required to engineer project backlogs.');
+            abort(403, 'You don’t have permission to plan sprints. Ask an administrator to change your role.');
         }
 
         $this->projectId = $id;
@@ -49,12 +53,12 @@ class ScrumMaster extends Component
         if ($proposal) {
             $narrative = DB::table('proposal_ai_narratives')->where('proposal_id', $proposal->id)->first();
             
-            $this->sowContext = "EXECUTIVE SUMMARY:\n" . ($proposal->executive_summary ?? 'N/A') . "\n\n";
+            $this->sowContext = "Executive summary:\n" . ($proposal->executive_summary ?? 'Not provided') . "\n\n";
             if ($narrative) {
-                $this->sowContext .= "OPERATIONAL STRATEGY:\n" . ($narrative->ai_operational_strategy ?? 'N/A');
+                $this->sowContext .= "Operational strategy:\n" . ($narrative->ai_operational_strategy ?? 'Not provided');
             }
         } else {
-            $this->sowContext = "No linked proposal found. Please manually type the Scope of Work here for the AI Scrum Master to parse.";
+            $this->sowContext = "No approved proposal is linked to this client. Type or paste the scope of work here, then draft the backlog.";
         }
     }
 
@@ -64,7 +68,7 @@ class ScrumMaster extends Component
 
         $this->validate([
             'sowContext' => 'required|string|min:50'
-        ]);
+        ], [], ['sowContext' => 'scope of work']);
 
         $this->isGenerating = true;
 
@@ -108,15 +112,15 @@ class ScrumMaster extends Component
 
                 if (json_last_error() === JSON_ERROR_NONE && is_array($parsedData)) {
                     $this->generatedBacklog = $parsedData;
-                    session()->flash('success', 'AI Scrum Master successfully engineered the Battlespace.');
+                    session()->flash('success', 'Backlog drafted. Check the sprints and tasks, then save the backlog.');
                 } else {
-                    session()->flash('error', 'AI returned an invalid matrix structure. Please try again.');
+                    session()->flash('error', 'We couldn’t read the assistant’s draft. Draft the backlog again.');
                 }
             } else {
-                session()->flash('error', 'AI Connection Failed. Ensure API keys are active.');
+                session()->flash('error', 'We couldn’t reach the assistant. Try again in a few minutes; if it keeps failing, ask an administrator to check the AI settings.');
             }
         } catch (\Exception $e) {
-            session()->flash('error', 'AI Processing Timeout. The SOW may be too large.');
+            session()->flash('error', 'The assistant took too long to answer. Shorten the scope of work and try again.');
         }
 
         $this->isGenerating = false;
@@ -134,7 +138,7 @@ class ScrumMaster extends Component
         abort_unless(Auth::user()->can('projects.create'), 403);
 
         if (empty($this->generatedBacklog)) {
-            session()->flash('error', 'No staging data to commit.');
+            session()->flash('error', 'There is no draft to save. Draft the backlog first.');
             return;
         }
 
@@ -164,7 +168,7 @@ class ScrumMaster extends Component
                 // 2. Loop Tasks in Sprint
                 foreach ($sprintData['tasks'] as $taskData) {
                     
-                    $phaseTitle = $taskData['phase_title'] ?? 'General Phase';
+                    $phaseTitle = $taskData['phase_title'] ?? 'General phase';
                     
                     // Generate Phase dynamically if it doesn't exist in our map
                     if (!isset($phaseMap[$phaseTitle])) {
@@ -214,23 +218,23 @@ class ScrumMaster extends Component
             DB::table('system_audit_logs')->insert([
                 'user_id' => Auth::id(),
                 'action' => 'BACKLOG_ENGINEERED',
-                'description' => "AI Scrum Master committed backlog for Project: {$this->project->title}",
+                'description' => "Sprint backlog saved for project: {$this->project->title}",
                 'ip_address' => request()->ip(),
                 'created_at' => now()
             ]);
             
-            // Notification to Strike Team that a new board is live
+            // Notify the delivery team that a new board is ready
             foreach(Access::staffWith('projects.edit') as $memberId) {
                 DB::table('notifications')->insert([
                     'id' => (string) Str::uuid(), 'user_id' => $memberId,
-                    'title' => 'NEW BATTLESPACE ENGINEERED', 
-                    'message' => "The backlog for '{$this->project->title}' has been staged. Await task assignments.",
+                    'title' => 'Sprint backlog ready',
+                    'message' => "The backlog for ‘{$this->project->title}’ is saved. Tasks can now be assigned on its sprint board.",
                     'type' => 'Project', 'created_at' => now()
                 ]);
             }
         });
 
-        session()->flash('success', 'BATTLESPACE LOCKED: All Sprints, Phases, and Tasks have been committed to the Operations Matrix.');
+        session()->flash('success', 'Backlog saved. The sprints, phases and tasks are now on the project’s sprint board.');
         return $this->redirect(route('hq.ops.deployments'), navigate: true);
     }
 

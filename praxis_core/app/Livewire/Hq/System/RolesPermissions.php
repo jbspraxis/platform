@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -23,6 +24,7 @@ use Livewire\Component;
  *   because every client organisation's primary account relies on it.
  */
 #[Layout('components.layouts.hq')]
+#[Title('Roles and permissions')]
 class RolesPermissions extends Component
 {
     #[Locked]

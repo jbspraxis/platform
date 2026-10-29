@@ -15,7 +15,7 @@ class ExecutiveBiDashboard extends Component
     public $endDate;
     public $regionFilter = 'ALL';
 
-    // Master Telemetry Arrays
+    // Figures shown on the overview
     public $kpis = [];
     public $pnl = [];
     public $cashFlow = [];
@@ -252,8 +252,8 @@ class ExecutiveBiDashboard extends Component
     {
         abort_unless(Auth::user()->can('finance.export'), 403);
 
-        // Phase 16 PDF Engine Placeholder
-        session()->flash('success', '> PDF ENGINE HOOK PENDING (PHASE 16). Statements calculated successfully.');
+        // Statement downloads are not built yet (planned PDF export)
+        session()->flash('success', "Statement downloads aren't available yet. The figures on this page are up to date for the dates you chose.");
     }
 
     public function render()

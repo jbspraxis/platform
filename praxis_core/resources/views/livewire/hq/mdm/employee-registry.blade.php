@@ -1,230 +1,202 @@
 <div>
     <style>
-        /* --- GLOBAL CYBER STYLES --- */
-        .cyber-input, .cyber-select {
-            width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);
-            color: #FFFFFF; padding: 10px 12px; font-family: 'Roboto Mono', monospace;
-            font-size: 0.8rem; border-radius: 2px; transition: 0.3s;
-        }
-        .cyber-input:focus, .cyber-select:focus { border-color: #00E5FF; outline: none; background: rgba(0, 229, 255, 0.05); }
-        .cyber-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2300E5FF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
-        .cyber-select option { background-color: #0A1128; color: #FFF; }
-        
-        .locked-input { width: 100%; background: rgba(0,0,0,0.5); border: 1px dashed rgba(255,255,255,0.2); color: #00E5FF; padding: 10px 12px; font-family: 'Roboto Mono', monospace; font-size: 0.85rem; font-weight: bold; border-radius: 2px; cursor: not-allowed; }
-        
-        .btn-action { background: transparent; border: 1px solid #00E5FF; color: #00E5FF; padding: 10px 20px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: bold; cursor: pointer; transition: 0.3s; border-radius: 2px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-        .btn-action:hover:not(:disabled) { background: #00E5FF; color: #0A1128; box-shadow: 0 0 15px rgba(0, 229, 255, 0.4); }
-        .btn-action:disabled { border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.2); cursor: not-allowed; }
-        .btn-warning { border-color: #FFBD2E; color: #FFBD2E; }
-        .btn-warning:hover:not(:disabled) { background: #FFBD2E; color: #0A1128; box-shadow: 0 0 15px rgba(255, 189, 46, 0.4); }
-
-        /* --- WIZARD PROGRESS BAR --- */
-        .wizard-tracker { display: flex; justify-content: space-between; margin-bottom: 25px; position: relative; }
-        .wizard-tracker::before { content: ''; position: absolute; top: 12px; left: 0; right: 0; height: 2px; background: rgba(255,255,255,0.1); z-index: 1; }
-        .wizard-step { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 8px; width: 33%; }
-        .step-circle { width: 26px; height: 26px; border-radius: 50%; background: #0A1128; border: 2px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; font-weight: bold; color: #8A9BB2; transition: 0.3s; }
-        .step-label { font-family: 'Montserrat', sans-serif; font-size: 0.65rem; color: #8A9BB2; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; transition: 0.3s; text-align: center; }
-        
-        .wizard-step.active .step-circle { border-color: #00E5FF; background: rgba(0, 229, 255, 0.2); color: #00E5FF; box-shadow: 0 0 10px rgba(0, 229, 255, 0.4); }
-        .wizard-step.active .step-label { color: #00E5FF; }
-        .wizard-step.completed .step-circle { border-color: #00FF66; background: #00FF66; color: #0A1128; }
-        .wizard-step.completed .step-label { color: #00FF66; }
-
-        /* --- POKA-YOKE CALCULATOR PANEL --- */
-        .calc-panel { background: rgba(0, 229, 255, 0.05); border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 4px; padding: 15px; margin-bottom: 20px; }
-        .calc-header { font-family: 'Montserrat', sans-serif; font-size: 0.75rem; font-weight: bold; color: #00E5FF; display: flex; align-items: center; gap: 8px; margin-bottom: 15px; border-bottom: 1px dashed rgba(0, 229, 255, 0.3); padding-bottom: 8px; }
-
-        /* --- TOGGLE SWITCH (BIK) --- */
-        .cyber-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: #8A9BB2; margin-bottom: 10px; }
-        .cyber-toggle input { display: none; }
-        .toggle-box { width: 36px; height: 18px; background: rgba(255,255,255,0.1); border-radius: 10px; position: relative; transition: 0.3s; border: 1px solid rgba(255,255,255,0.2); }
-        .toggle-box::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; background: #8A9BB2; border-radius: 50%; transition: 0.3s; }
-        .cyber-toggle input:checked + .toggle-box { background: rgba(0, 255, 102, 0.2); border-color: #00FF66; }
-        .cyber-toggle input:checked + .toggle-box::after { left: 20px; background: #00FF66; box-shadow: 0 0 5px #00FF66; }
-        .cyber-toggle input:checked ~ .toggle-label { color: #00FF66; font-weight: bold; }
-
-        /* Modals & Loaders */
-        .glass-overlay { position: fixed; inset: 0; background: rgba(3, 5, 10, 0.85); backdrop-filter: blur(8px); z-index: 9990; display: flex; align-items: center; justify-content: center; }
-        .success-box { background: #0A1128; border: 1px solid #00FF66; border-top: 4px solid #00FF66; border-radius: 4px; padding: 40px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.8); z-index: 9999; max-width: 420px; width: 90%; }
-        .spinner { border: 3px solid rgba(0, 229, 255, 0.1); border-top: 3px solid #00E5FF; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        .nav-pill { padding: 8px 20px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; border-radius: 2px; cursor: pointer; transition: 0.3s; border: 1px solid transparent; background: transparent; color: #8A9BB2; }
-        .nav-pill.active { background: rgba(0, 229, 255, 0.1); border-color: #00E5FF; color: #00E5FF; font-weight: bold; }
-        .nav-pill:not(.active):hover { background: rgba(255,255,255,0.05); color: #FFF; }
-        .validation-error { color: #FF3366; font-family: 'Roboto Mono', monospace; font-size: 0.6rem; margin-top: 4px; display: block; }
+        /* Three-step progress for the staff record form */
+        .steps { display: flex; gap: 8px; margin: 0 0 24px; padding: 0; list-style: none; counter-reset: step; }
+        .steps li { flex: 1; display: flex; flex-direction: column; gap: 6px; font-size: 0.8125rem; line-height: 1.125rem; color: var(--color-muted); }
+        .steps li::before { content: ""; display: block; height: 4px; border-radius: 2px; background: var(--color-line); }
+        .steps li.is-current { color: var(--color-ink); font-weight: 600; }
+        .steps li.is-current::before { background: var(--color-deep-teal); }
+        .steps li.is-done::before { background: var(--color-teal); }
     </style>
 
+    @php
+        $regionLabels = ['GLOBAL' => 'Global', 'CM' => 'Cameroon', 'NG' => 'Nigeria', 'KE' => 'Kenya'];
+        $steps = [1 => 'Person and role', 2 => 'Tax and social security', 3 => 'Pay and bank details'];
+    @endphp
+
     @if($showSuccessModal)
-        <div class="glass-overlay">
-            <div class="success-box">
-                <div style="font-size: 3rem; margin-bottom: 10px; text-shadow: 0 0 20px rgba(0,255,102,0.4);">✅</div>
-                <h2 style="font-family: 'Montserrat', sans-serif; color: #00FF66; margin-bottom: 10px; letter-spacing: 1px;">PERSONNEL INTEGRATED</h2>
-                <p style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: #8A9BB2; margin-bottom: 25px; line-height: 1.5;">{{ $successMessage }}</p>
-                <button wire:click="closeSuccessModal" class="btn-action" style="width: 100%; background: #00FF66; color: #0A1128; border-color: #00FF66;">ACKNOWLEDGE & CLOSE</button>
+        <div class="modal-backdrop">
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="staff-saved-title">
+                <h2 id="staff-saved-title" class="modal-title">Staff record saved</h2>
+                <p class="muted">{{ $successMessage }}</p>
+                <div class="modal-actions">
+                    <button type="button" wire:click="closeSuccessModal" class="btn btn-primary">Close</button>
+                </div>
             </div>
         </div>
     @endif
 
-    <div style="margin-bottom: 30px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-end;">
+    <div class="page-header">
         <div>
-            <h1 style="font-family: 'Montserrat', sans-serif; font-size: 1.2rem; color: #FFF; letter-spacing: 1px;">EMPLOYEE REGISTRY</h1>
-            <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #8A9BB2;">HUMAN CAPITAL MDM & PAYROLL MATRIX</p>
-        </div>
-        <div style="display: flex; gap: 10px;">
-            <button wire:click="setTab('ALL')" class="nav-pill {{ $activeTab === 'ALL' ? 'active' : '' }}">GLOBAL HQ</button>
-            <button wire:click="setTab('CM')" class="nav-pill {{ $activeTab === 'CM' ? 'active' : '' }}">CAMEROON</button>
-            <button wire:click="setTab('NG')" class="nav-pill {{ $activeTab === 'NG' ? 'active' : '' }}">NIGERIA</button>
-            <button wire:click="setTab('KE')" class="nav-pill {{ $activeTab === 'KE' ? 'active' : '' }}">KENYA</button>
+            <h1 class="page-title">Staff directory</h1>
+            <p class="page-subtitle">Each staff member's role, tax and social security numbers, and pay. Payroll uses these records.</p>
         </div>
     </div>
 
-    <div style="display: grid; grid-template-columns: 450px 1fr; gap: 30px; align-items: start;">
-        
-        <div style="background: rgba(10, 17, 40, 0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 25px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
-            
-            <div style="font-family: 'Roboto Mono', monospace; font-size: 0.9rem; color: #FFF; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center;">
-                <span>> {{ $editMode ? 'MODIFY' : 'REGISTER' }} PERSONNEL</span>
-                @if($editMode) <button wire:click="resetForm" style="background: rgba(255,51,102,0.1); color: #FF3366; padding: 3px 8px; font-size: 0.6rem; border-radius: 2px; border: 1px solid #FF3366; cursor: pointer;">CANCEL EDIT</button> @endif
+    <div class="tabs" role="tablist" aria-label="Country">
+        @foreach(['ALL' => 'All countries', 'CM' => 'Cameroon', 'NG' => 'Nigeria', 'KE' => 'Kenya'] as $tabKey => $tabLabel)
+            <button type="button" role="tab" wire:click="setTab('{{ $tabKey }}')" class="tab {{ $activeTab === $tabKey ? 'is-active' : '' }}" aria-selected="{{ $activeTab === $tabKey ? 'true' : 'false' }}">{{ $tabLabel }}</button>
+        @endforeach
+    </div>
+
+    @if (session()->has('error'))
+        <div class="alert alert-danger mb-6" role="alert">
+            <i data-lucide="circle-alert"></i>
+            <span>{{ session('error') }}</span>
+        </div>
+    @endif
+
+    <div class="grid grid-cols-1 items-start gap-6 xl:grid-cols-[400px_minmax(0,1fr)]">
+
+        <div class="card">
+
+            <div class="card-header">
+                <h2 class="card-title">{{ $editMode ? 'Edit staff record' : 'Add a staff member' }}</h2>
+                @if($editMode) <button type="button" wire:click="resetForm" class="btn btn-ghost btn-sm">Cancel</button> @endif
             </div>
 
-            <div class="wizard-tracker">
-                <div class="wizard-step {{ $currentStep === 1 ? 'active' : ($currentStep > 1 ? 'completed' : '') }}">
-                    <div class="step-circle">1</div>
-                    <div class="step-label">Identity<br>& Org Chart</div>
-                </div>
-                <div class="wizard-step {{ $currentStep === 2 ? 'active' : ($currentStep > 2 ? 'completed' : '') }}">
-                    <div class="step-circle">2</div>
-                    <div class="step-label">Statutory<br>Compliance</div>
-                </div>
-                <div class="wizard-step {{ $currentStep === 3 ? 'active' : '' }}">
-                    <div class="step-circle">3</div>
-                    <div class="step-label">Treasury &<br>Compensation</div>
-                </div>
-            </div>
+            <ol class="steps" aria-label="Steps">
+                @foreach($steps as $n => $stepLabel)
+                    <li class="{{ $currentStep === $n ? 'is-current' : ($currentStep > $n ? 'is-done' : '') }}" @if($currentStep === $n) aria-current="step" @endif>
+                        <span>{{ $n }}. {{ $stepLabel }}</span>
+                    </li>
+                @endforeach
+            </ol>
 
             @if ($errors->any())
-                <div style="background: rgba(255,51,102,0.1); border-left: 2px solid #FF3366; padding: 10px; margin-bottom: 20px;">
-                    <ul style="color: #FF3366; font-size: 0.7rem; font-family: 'Roboto Mono', monospace; margin: 0; padding-left: 15px;">
-                        @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
-                    </ul>
+                <div class="alert alert-danger" role="alert" style="margin-bottom: 16px;">
+                    <i data-lucide="circle-alert"></i>
+                    <div>
+                        <strong>Some details need attention.</strong>
+                        <ul class="mt-1 list-disc pl-5">
+                            @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
+                        </ul>
+                    </div>
                 </div>
             @endif
 
             <form wire:submit.prevent="saveEmployee">
-                
+
                 @if($currentStep === 1)
-                    <div style="display: flex; flex-direction: column; gap: 15px;">
-                        <div>
-                            <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 4px;">System User Link *</label>
-                            <select wire:model="user_id" required class="cyber-select" {{ $editMode ? 'disabled' : '' }}>
-                                <option value="">-- Select Active User --</option>
+                    <div class="flex flex-col gap-4">
+                        <div class="field">
+                            <label class="label" for="emp-user">HQ account</label>
+                            <select id="emp-user" wire:model="user_id" required class="select" {{ $editMode ? 'disabled' : '' }} aria-describedby="emp-user-help">
+                                <option value="">Choose an account</option>
                                 @foreach($availableUsers as $user)
                                     <option value="{{ $user->id }}">{{ $user->first_name }} {{ $user->last_name }} ({{ $user->email }})</option>
                                 @endforeach
                             </select>
-                            @error('user_id') <span class="validation-error">{{ $message }}</span> @enderror
+                            <span id="emp-user-help" class="help">Only active JBS Praxis accounts without a staff record are listed.</span>
+                            @error('user_id') <span class="field-error">{{ $message }}</span> @enderror
                         </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                            <div>
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 4px;">Employee Code</label>
-                                <input type="text" wire:model="employee_code" readonly class="locked-input">
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <div class="field">
+                                <label class="label" for="emp-code">Staff number</label>
+                                <input id="emp-code" type="text" wire:model="employee_code" readonly class="input" style="background: var(--color-mist); font-variant-numeric: tabular-nums; cursor: not-allowed;">
                             </div>
-                            <div>
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 4px;">Hire Date *</label>
-                                <input type="date" wire:model="hire_date" required class="cyber-input">
-                                @error('hire_date') <span class="validation-error">{{ $message }}</span> @enderror
+                            <div class="field">
+                                <label class="label" for="emp-hire">Start date</label>
+                                <input id="emp-hire" type="date" wire:model="hire_date" required class="input">
+                                @error('hire_date') <span class="field-error">{{ $message }}</span> @enderror
                             </div>
                         </div>
-                        <div>
-                            <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 4px;">Job Classification / Grade *</label>
-                            <input type="text" wire:model="job_classification" required class="cyber-input" placeholder="e.g. Senior Dev - Level 3">
-                            @error('job_classification') <span class="validation-error">{{ $message }}</span> @enderror
+                        <div class="field">
+                            <label class="label" for="emp-job">Job title and grade</label>
+                            <input id="emp-job" type="text" wire:model="job_classification" required class="input" placeholder="e.g. Senior developer, level 3">
+                            @error('job_classification') <span class="field-error">{{ $message }}</span> @enderror
                         </div>
-                        <div>
-                            <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 4px;">Direct Line Manager</label>
-                            <select wire:model="line_manager_id" class="cyber-select">
-                                <option value="">-- No Direct Report (C-Level) --</option>
+                        <div class="field">
+                            <label class="label" for="emp-manager">Line manager (optional)</label>
+                            <select id="emp-manager" wire:model="line_manager_id" class="select">
+                                <option value="">No line manager</option>
                                 @foreach($allManagers as $mgr)
                                     <option value="{{ $mgr->id }}">{{ $mgr->first_name }} {{ $mgr->last_name }}</option>
                                 @endforeach
                             </select>
                         </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                            <div>
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 4px;">Marital Status</label>
-                                <select wire:model="marital_status" required class="cyber-select">
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <div class="field">
+                                <label class="label" for="emp-marital">Marital status</label>
+                                <select id="emp-marital" wire:model="marital_status" required class="select">
                                     <option value="Single">Single</option><option value="Married">Married</option><option value="Divorced">Divorced</option><option value="Widowed">Widowed</option>
                                 </select>
                             </div>
-                            <div>
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 4px;">Dependent Children</label>
-                                <input type="number" wire:model="dependents_count" required min="0" class="cyber-input">
+                            <div class="field">
+                                <label class="label" for="emp-dependents">Dependent children</label>
+                                <input id="emp-dependents" type="number" wire:model="dependents_count" required min="0" class="input" style="font-variant-numeric: tabular-nums;">
+                                @error('dependents_count') <span class="field-error">{{ $message }}</span> @enderror
                             </div>
                         </div>
                     </div>
                 @endif
 
                 @if($currentStep === 2)
-                    <div style="display: flex; flex-direction: column; gap: 15px;">
-                        <div style="background: rgba(255,189,46,0.05); border: 1px solid rgba(255,189,46,0.3); padding: 15px; border-radius: 4px;">
-                            <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; font-weight: bold; color: #FFBD2E; margin-bottom: 8px;">JURISDICTION & TAX REGION *</label>
-                            <select wire:model.live="tax_region" required class="cyber-select" style="border-color: #FFBD2E;">
-                                <option value="GLOBAL">Global / Expatriate (No Local Tax Assumed)</option>
-                                <option value="CM">Cameroon (OHADA / CGI Compliance)</option>
-                                <option value="NG">Nigeria (PITA / PRA Compliance)</option>
-                                <option value="KE">Kenya (KRA Compliance)</option>
+                    <div class="flex flex-col gap-4">
+                        <div class="field">
+                            <label class="label" for="emp-region">Country for tax and payroll</label>
+                            <select id="emp-region" wire:model.live="tax_region" required class="select">
+                                <option value="GLOBAL">Global or expatriate (no local tax)</option>
+                                <option value="CM">Cameroon (CGI)</option>
+                                <option value="NG">Nigeria (personal income tax and pensions)</option>
+                                <option value="KE">Kenya (KRA)</option>
                             </select>
+                            @error('tax_region') <span class="field-error">{{ $message }}</span> @enderror
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                            <div>
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 4px;">Tax ID (TIN / NIU)</label>
-                                <input type="text" wire:model="tin_number" class="cyber-input" placeholder="Required for Tax Clearance">
+                        <p class="help" style="margin: 0;">You can save without these numbers, but the staff list shows the record as incomplete until they are added.</p>
+
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <div class="field">
+                                <label class="label" for="emp-tin">Tax ID (TIN or NIU)</label>
+                                <input id="emp-tin" type="text" wire:model="tin_number" class="input">
                             </div>
-                            <div>
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 4px;">National ID / Passport</label>
-                                <input type="text" wire:model="national_id" class="cyber-input">
+                            <div class="field">
+                                <label class="label" for="emp-national-id">National ID or passport number</label>
+                                <input id="emp-national-id" type="text" wire:model="national_id" class="input">
                             </div>
                         </div>
 
                         @if($tax_region === 'CM')
-                            <div>
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #00E5FF; margin-bottom: 4px;">CNPS Number (Social Security)</label>
-                                <input type="text" wire:model="social_security_number" class="cyber-input" style="border-color: rgba(0,229,255,0.3);">
+                            <div class="field">
+                                <label class="label" for="emp-cnps">CNPS number (social security)</label>
+                                <input id="emp-cnps" type="text" wire:model="social_security_number" class="input">
                             </div>
                         @elseif($tax_region === 'NG')
-                            <div style="border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 15px;">
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #00FF66; margin-bottom: 4px;">State of Residence (PAYE Routing) *</label>
-                                <input type="text" wire:model="state_of_residence" class="cyber-input" placeholder="e.g. Lagos, FCT Abuja">
+                            <hr class="divider" style="margin: 0;">
+                            <div class="field">
+                                <label class="label" for="emp-state">State of residence</label>
+                                <input id="emp-state" type="text" wire:model="state_of_residence" class="input" placeholder="e.g. Lagos" aria-describedby="emp-state-help">
+                                <span id="emp-state-help" class="help">PAYE tax is paid to this state.</span>
                             </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                                <div>
-                                    <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #00FF66; margin-bottom: 4px;">PFA Name *</label>
-                                    <input type="text" wire:model="pfa_name" class="cyber-input" placeholder="e.g. Stanbic IBTC">
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <div class="field">
+                                    <label class="label" for="emp-pfa">Pension fund administrator</label>
+                                    <input id="emp-pfa" type="text" wire:model="pfa_name" class="input">
                                 </div>
-                                <div>
-                                    <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #00FF66; margin-bottom: 4px;">RSA PIN *</label>
-                                    <input type="text" wire:model="rsa_number" class="cyber-input">
+                                <div class="field">
+                                    <label class="label" for="emp-rsa">RSA PIN</label>
+                                    <input id="emp-rsa" type="text" wire:model="rsa_number" class="input">
                                 </div>
                             </div>
-                            <div>
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #00FF66; margin-bottom: 4px;">NHF Number</label>
-                                <input type="text" wire:model="nhf_number" class="cyber-input">
+                            <div class="field">
+                                <label class="label" for="emp-nhf">NHF number</label>
+                                <input id="emp-nhf" type="text" wire:model="nhf_number" class="input">
                             </div>
                         @elseif($tax_region === 'KE')
-                            <div style="border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 15px;">
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #FF3366; margin-bottom: 4px;">KRA PIN *</label>
-                                <input type="text" wire:model="kra_pin" class="cyber-input" style="border-color: rgba(255, 51, 102, 0.4);">
+                            <hr class="divider" style="margin: 0;">
+                            <div class="field">
+                                <label class="label" for="emp-kra">KRA PIN</label>
+                                <input id="emp-kra" type="text" wire:model="kra_pin" class="input">
                             </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                                <div>
-                                    <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #FF3366; margin-bottom: 4px;">NSSF Number *</label>
-                                    <input type="text" wire:model="nssf_number" class="cyber-input" style="border-color: rgba(255, 51, 102, 0.4);">
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <div class="field">
+                                    <label class="label" for="emp-nssf">NSSF number</label>
+                                    <input id="emp-nssf" type="text" wire:model="nssf_number" class="input">
                                 </div>
-                                <div>
-                                    <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #FF3366; margin-bottom: 4px;">NHIF Number *</label>
-                                    <input type="text" wire:model="nhif_number" class="cyber-input" style="border-color: rgba(255, 51, 102, 0.4);">
+                                <div class="field">
+                                    <label class="label" for="emp-nhif">NHIF number</label>
+                                    <input id="emp-nhif" type="text" wire:model="nhif_number" class="input">
                                 </div>
                             </div>
                         @endif
@@ -232,119 +204,117 @@
                 @endif
 
                 @if($currentStep === 3)
-                    <div style="display: flex; flex-direction: column; gap: 15px;">
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-                            <div>
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 4px;">Frequency</label>
-                                <select wire:model="pay_frequency" class="cyber-select"><option value="Monthly">Monthly</option></select>
+                    <div class="flex flex-col gap-4">
+
+                        <div class="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                            <div class="field">
+                                <label class="label" for="emp-frequency">Pay frequency</label>
+                                <select id="emp-frequency" wire:model="pay_frequency" class="select"><option value="Monthly">Monthly</option></select>
                             </div>
-                            <div>
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 4px;">Currency</label>
-                                <select wire:model="currency" class="cyber-select">
+                            <div class="field">
+                                <label class="label" for="emp-currency">Currency</label>
+                                <select id="emp-currency" wire:model="currency" class="select">
                                     <option value="USD">USD</option>
                                     <option value="XAF">XAF</option>
                                     <option value="NGN">NGN</option>
                                     <option value="KES">KES</option>
                                 </select>
                             </div>
-                            <div>
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 4px;">Method</label>
-                                <select wire:model="payment_method" class="cyber-select"><option value="Bank Transfer">Bank</option><option value="Crypto">Crypto</option></select>
+                            <div class="field">
+                                <label class="label" for="emp-method">Payment method</label>
+                                <select id="emp-method" wire:model="payment_method" class="select"><option value="Bank Transfer">Bank transfer</option><option value="Crypto">Crypto</option></select>
                             </div>
                         </div>
 
-                        <div class="calc-panel">
-                            <div class="calc-header">
-                                <i data-lucide="cpu" style="width: 14px; height: 14px;"></i> POKA-YOKE ALGORITHMIC ENGINE (V2.0)
+                        <div class="callout flex flex-col gap-4">
+                            <div class="flex items-center gap-2 text-ink" style="font-weight: 600;">
+                                <i data-lucide="calculator" style="width: 18px; height: 18px;"></i> Pay calculator
                             </div>
-                            
+
                             @if(session()->has('gross_up_success'))
-                                <div style="color: #00FF66; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; margin-bottom: 10px; font-weight: bold;">
-                                    ✓ {{ session('gross_up_success') }}
+                                <div class="alert alert-success" role="status" style="margin: 0;">
+                                    <i data-lucide="circle-check"></i>
+                                    <span>{{ session('gross_up_success') }}</span>
                                 </div>
                             @endif
 
-                            <div style="display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; margin-bottom: 15px;">
-                                <div>
-                                    <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.6rem; color: #00E5FF; margin-bottom: 4px;">1. Net-to-Gross Estimator (Target Net)</label>
-                                    <input type="number" step="0.01" wire:model="target_net_pay" class="cyber-input" style="border-color: rgba(0,229,255,0.4);" placeholder="Enter desired take-home pay...">
+                            <div class="grid items-end gap-3 sm:grid-cols-[1fr_auto] xl:grid-cols-1">
+                                <div class="field">
+                                    <label class="label" for="emp-target-net">Net pay wanted, a month (optional)</label>
+                                    <input id="emp-target-net" type="number" step="0.01" wire:model="target_net_pay" class="input" style="font-variant-numeric: tabular-nums;">
                                 </div>
-                                <button type="button" wire:click="estimateGrossFromNet" class="btn-action" style="padding: 10px 15px;">
-                                    <span wire:loading.remove wire:target="estimateGrossFromNet">GROSS UP</span>
-                                    <div wire:loading wire:target="estimateGrossFromNet" class="spinner" style="width: 16px; height: 16px; border-width: 2px;"></div>
+                                <button type="button" wire:click="estimateGrossFromNet" class="btn btn-secondary">
+                                    <span wire:loading.remove wire:target="estimateGrossFromNet">Work out gross pay</span>
+                                    <span wire:loading wire:target="estimateGrossFromNet">Working it out…</span>
                                 </button>
                             </div>
 
-                            <div style="display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 15px;">
-                                <div>
-                                    <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #FFF; font-weight: bold; margin-bottom: 4px;">2. Total Gross Compensation *</label>
-                                    <input type="number" step="0.01" wire:model="total_gross" class="cyber-input" style="font-size: 1.1rem; color: #FFF; font-weight: bold;" required>
-                                    @error('total_gross') <span class="validation-error" style="color:#FF3366; font-size: 0.6rem;">{{ $message }}</span> @enderror
+                            <div class="grid items-end gap-3 sm:grid-cols-[1fr_auto] xl:grid-cols-1" style="border-top: 1px solid var(--color-line); padding-top: 16px;">
+                                <div class="field">
+                                    <label class="label" for="emp-total-gross">Total gross pay, a month</label>
+                                    <input id="emp-total-gross" type="number" step="0.01" wire:model="total_gross" class="input" style="font-variant-numeric: tabular-nums; font-weight: 600;" required>
+                                    @error('total_gross') <span class="field-error">{{ $message }}</span> @enderror
                                 </div>
-                                <button type="button" wire:click="autoSplitCompensation" class="btn-action btn-warning" style="padding: 10px 15px;">
-                                    <span wire:loading.remove wire:target="autoSplitCompensation">APPLY LEGAL SPLIT</span>
-                                    <div wire:loading wire:target="autoSplitCompensation" class="spinner" style="width: 16px; height: 16px; border-width: 2px; border-top-color: #FFBD2E;"></div>
+                                <button type="button" wire:click="autoSplitCompensation" class="btn btn-secondary">
+                                    <span wire:loading.remove wire:target="autoSplitCompensation">Split into salary and allowances</span>
+                                    <span wire:loading wire:target="autoSplitCompensation">Splitting…</span>
                                 </button>
                             </div>
+                            <span class="help" style="color: var(--color-slate);">The split follows the usual shares for the country: in Nigeria 50% salary, 30% housing and 20% transport; in Cameroon 70%, 15% and 15%.</span>
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
-                            <div>
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 4px;">Basic Salary *</label>
-                                <input type="number" step="0.01" wire:model="base_salary" class="cyber-input" style="color: #00FF66;" required>
-                                @error('base_salary') <span class="validation-error" style="color:#FF3366; font-size: 0.6rem;">{{ $message }}</span> @enderror
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <div class="field">
+                                <label class="label" for="emp-base">Basic salary</label>
+                                <input id="emp-base" type="number" step="0.01" wire:model="base_salary" class="input" style="font-variant-numeric: tabular-nums;" required>
+                                @error('base_salary') <span class="field-error">{{ $message }}</span> @enderror
                             </div>
-                            <div>
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 4px;">Housing Allowance</label>
-                                <input type="number" step="0.01" wire:model="allowance_housing" class="cyber-input">
+                            <div class="field">
+                                <label class="label" for="emp-housing">Housing allowance</label>
+                                <input id="emp-housing" type="number" step="0.01" wire:model="allowance_housing" class="input" style="font-variant-numeric: tabular-nums;">
                             </div>
-                            <div>
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 4px;">Transport Allowance</label>
-                                <input type="number" step="0.01" wire:model="allowance_transport" class="cyber-input">
+                            <div class="field">
+                                <label class="label" for="emp-transport">Transport allowance</label>
+                                <input id="emp-transport" type="number" step="0.01" wire:model="allowance_transport" class="input" style="font-variant-numeric: tabular-nums;">
                             </div>
-                            <div>
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 4px;">Utility Allowance</label>
-                                <input type="number" step="0.01" wire:model="allowance_utility" class="cyber-input">
+                            <div class="field">
+                                <label class="label" for="emp-utility">Utility allowance</label>
+                                <input id="emp-utility" type="number" step="0.01" wire:model="allowance_utility" class="input" style="font-variant-numeric: tabular-nums;">
                             </div>
                         </div>
 
-                        <div style="background: rgba(255,255,255,0.02); padding: 15px; border-radius: 4px;">
-                            <label style="display: block; font-family: 'Montserrat', sans-serif; font-size: 0.75rem; font-weight: bold; color: #FFF; margin-bottom: 10px;">Benefits In Kind (BIK) Triggers</label>
-                            
-                            <label class="cyber-toggle">
-                                <input type="checkbox" wire:model="bik_housing_provided">
-                                <div class="toggle-box"></div>
-                                <span class="toggle-label">Company Housing Provided (Triggers +15% CGI Base)</span>
+                        <fieldset class="flex flex-col gap-3" style="border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; margin: 0;">
+                            <legend class="label" style="padding: 0 4px;">Benefits in kind</legend>
+                            <label class="flex items-start gap-2" style="cursor: pointer;">
+                                <input type="checkbox" wire:model="bik_housing_provided" class="checkbox" style="margin-top: 3px;">
+                                <span>Company housing <span class="help">(adds 15% to the CGI taxable base)</span></span>
                             </label>
-                            <label class="cyber-toggle">
-                                <input type="checkbox" wire:model="bik_vehicle_provided">
-                                <div class="toggle-box"></div>
-                                <span class="toggle-label">Company Vehicle Provided (Triggers +10% CGI Base)</span>
+                            <label class="flex items-start gap-2" style="cursor: pointer;">
+                                <input type="checkbox" wire:model="bik_vehicle_provided" class="checkbox" style="margin-top: 3px;">
+                                <span>Company vehicle <span class="help">(adds 10% to the CGI taxable base)</span></span>
                             </label>
-                            <label class="cyber-toggle">
-                                <input type="checkbox" wire:model="bik_domestic_staff">
-                                <div class="toggle-box"></div>
-                                <span class="toggle-label">Domestic Staff Provided (Triggers +5% CGI Base)</span>
+                            <label class="flex items-start gap-2" style="cursor: pointer;">
+                                <input type="checkbox" wire:model="bik_domestic_staff" class="checkbox" style="margin-top: 3px;">
+                                <span>Domestic staff <span class="help">(adds 5% to the CGI taxable base)</span></span>
                             </label>
-                        </div>
+                        </fieldset>
 
                     </div>
                 @endif
 
-                <div style="display: flex; justify-content: space-between; margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
-                    <button type="button" wire:click="prevStep" class="btn-action" style="border-color: #8A9BB2; color: #8A9BB2; visibility: {{ $currentStep > 1 ? 'visible' : 'hidden' }};">
-                        <i data-lucide="arrow-left" style="width: 14px; height: 14px;"></i> BACK
+                <div class="flex items-center justify-between gap-3" style="margin-top: 24px; border-top: 1px solid var(--color-line); padding-top: 16px;">
+                    <button type="button" wire:click="prevStep" class="btn btn-secondary" style="visibility: {{ $currentStep > 1 ? 'visible' : 'hidden' }};">
+                        <i data-lucide="arrow-left"></i> Back
                     </button>
-                    
+
                     @if($currentStep < 3)
-                        <button type="button" wire:click="nextStep" class="btn-action" style="background: rgba(0, 229, 255, 0.1);">
-                            NEXT STEP <i data-lucide="arrow-right" style="width: 14px; height: 14px;"></i>
+                        <button type="button" wire:click="nextStep" class="btn btn-primary">
+                            Next <i data-lucide="arrow-right"></i>
                         </button>
                     @else
-                        <button type="submit" wire:loading.attr="disabled" class="btn-action" style="background: #00FF66; color: #0A1128; border-color: #00FF66;">
-                            <span wire:loading.remove wire:target="saveEmployee"><i data-lucide="save" style="width: 14px; height: 14px;"></i> COMMIT TO LEDGER</span>
-                            <span wire:loading wire:target="saveEmployee">ENCRYPTING...</span>
+                        <button type="submit" wire:loading.attr="disabled" class="btn btn-primary">
+                            <span wire:loading.remove wire:target="saveEmployee">{{ $editMode ? 'Save changes' : 'Add staff member' }}</span>
+                            <span wire:loading wire:target="saveEmployee">Saving…</span>
                         </button>
                     @endif
                 </div>
@@ -352,77 +322,88 @@
             </form>
         </div>
 
-        <div style="background: rgba(10, 17, 40, 0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); overflow-x: auto; max-height: 85vh;">
-            <table style="width: 100%; border-collapse: collapse; text-align: left;">
-                <thead>
-                    <tr>
-                        <th style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); text-transform: uppercase;">Personnel & Role</th>
-                        <th style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); text-transform: uppercase;">Tax & Compliance</th>
-                        <th style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: right; text-transform: uppercase;">Total Gross</th>
-                        <th style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); text-align: center; text-transform: uppercase;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($employees as $emp)
-                        @php 
-                            $empTotalGross = $emp->base_salary + $emp->allowance_housing + $emp->allowance_transport + $emp->allowance_utility;
-                            // Compliance Warnings (Includes Phase 13 Kenya Checks)
-                            $missingIds = [];
-                            if ($emp->tax_region === 'NG' && (!$emp->pfa_name || !$emp->rsa_number)) $missingIds[] = 'PRA Details Missing';
-                            if ($emp->tax_region === 'CM' && !$emp->social_security_number) $missingIds[] = 'CNPS Missing';
-                            if ($emp->tax_region === 'KE' && (!$emp->kra_pin || !$emp->nssf_number || !$emp->nhif_number)) $missingIds[] = 'KRA/NSSF/NHIF Missing';
-                        @endphp
-                        <tr style="transition: background 0.2s;" onmouseover="this.style.background='rgba(0, 229, 255, 0.03)'" onmouseout="this.style.background='transparent'">
-                            
-                            <td style="padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.02);">
-                                <div style="font-family: 'Roboto Mono', monospace; font-weight: bold; font-size: 0.85rem; color: #FFF;">{{ $emp->first_name }} {{ $emp->last_name }}</div>
-                                <div style="font-size: 0.7rem; color: #00E5FF; margin-top: 2px;">{{ $emp->job_classification }}</div>
-                                @if($emp->manager_first)
-                                    <div style="font-size: 0.6rem; color: #8A9BB2; margin-top: 4px; font-family: 'Roboto Mono', monospace;"><i data-lucide="corner-down-right" style="width: 10px; height: 10px; display: inline-block; opacity: 0.5;"></i> Reports to: {{ $emp->manager_first }} {{ $emp->manager_last }}</div>
-                                @endif
-                            </td>
-                            
-                            <td style="padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.02);">
-                                <span style="display: inline-block; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 2px; font-size: 0.65rem; font-family: 'Roboto Mono', monospace; color: {{ $emp->tax_region === 'NG' ? '#00FF66' : ($emp->tax_region === 'CM' ? '#00E5FF' : ($emp->tax_region === 'KE' ? '#FF3366' : '#FFBD2E')) }}; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 4px;">{{ $emp->tax_region }} REGIME</span>
-                                
-                                @if(!empty($missingIds))
-                                    @foreach($missingIds as $warning)
-                                        <div style="font-size: 0.6rem; color: #FF3366; font-family: 'Roboto Mono', monospace; margin-top: 2px;">⚠️ {{ $warning }}</div>
-                                    @endforeach
-                                @else
-                                    <div style="font-size: 0.6rem; color: #8A9BB2; font-family: 'Roboto Mono', monospace; margin-top: 2px;">✓ IDs Verified</div>
-                                @endif
-                            </td>
-                            
-                            <td style="padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.02); text-align: right;">
-                                <div style="font-size: 0.95rem; font-weight: bold; color: #FFF; font-family: 'Roboto Mono', monospace;">{{ number_format($empTotalGross, 2) }} <span style="font-size: 0.7rem; color: #00E5FF;">{{ $emp->currency }}</span></div>
-                                <div style="font-size: 0.6rem; color: #8A9BB2; margin-top: 2px; font-family: 'Roboto Mono', monospace;">BASE: {{ number_format($emp->base_salary, 0) }} | ALLW: {{ number_format($empTotalGross - $emp->base_salary, 0) }}</div>
-                            </td>
-                            
-                            <td style="padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.02); text-align: center; vertical-align: middle;">
-                                <button wire:click="editEmployee('{{ $emp->id }}')" style="background: transparent; border: none; color: #FFBD2E; cursor: pointer; font-size: 0.75rem; font-weight: bold; margin-right: 10px;">EDIT</button>
-                                <button wire:click="toggleStatus('{{ $emp->id }}', {{ $emp->is_active }})" style="background: transparent; border: none; color: {{ $emp->is_active ? '#FF3366' : '#00FF66' }}; cursor: pointer; font-size: 0.75rem; font-weight: bold;">
-                                    {{ $emp->is_active ? 'HALT' : 'REHIRE' }}
-                                </button>
-                            </td>
-                        </tr>
-                    @empty
+        <div class="card" style="padding: 0; overflow: hidden;">
+            <div class="table-wrap" style="max-height: 85vh; overflow-y: auto;">
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td colspan="4" style="text-align: center; padding: 60px; color: #8A9BB2; font-family: 'Roboto Mono', monospace; font-size: 0.8rem;">
-                                > NO PERSONNEL FOUND IN REGISTRY FOR THIS JURISDICTION.
-                            </td>
+                            <th style="min-width: 180px;">Staff member and role</th>
+                            <th style="min-width: 170px;">Tax and social security</th>
+                            <th class="num" style="min-width: 150px;">Gross pay a month</th>
+                            <th>Status</th>
+                            <th><span class="sr-only">Actions</span></th>
                         </tr>
-                    @endforelse
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @forelse($employees as $emp)
+                            @php
+                                $empTotalGross = $emp->base_salary + $emp->allowance_housing + $emp->allowance_transport + $emp->allowance_utility;
+                                // Numbers payroll needs for each country
+                                $missingIds = [];
+                                if ($emp->tax_region === 'NG' && (!$emp->pfa_name || !$emp->rsa_number)) $missingIds[] = 'Pension details missing';
+                                if ($emp->tax_region === 'CM' && !$emp->social_security_number) $missingIds[] = 'CNPS number missing';
+                                if ($emp->tax_region === 'KE' && (!$emp->kra_pin || !$emp->nssf_number || !$emp->nhif_number)) $missingIds[] = 'KRA, NSSF or NHIF number missing';
+                            @endphp
+                            <tr>
+                                <td>
+                                    <div class="text-ink" style="font-weight: 600;">{{ $emp->first_name }} {{ $emp->last_name }}</div>
+                                    <div style="margin-top: 2px;">{{ $emp->job_classification }}</div>
+                                    @if($emp->manager_first)
+                                        <div class="help" style="margin-top: 4px;">Reports to {{ $emp->manager_first }} {{ $emp->manager_last }}</div>
+                                    @endif
+                                </td>
+
+                                <td>
+                                    <span class="pill pill-neutral">{{ $regionLabels[$emp->tax_region] ?? $emp->tax_region }}</span>
+                                    @if(!empty($missingIds))
+                                        @foreach($missingIds as $warning)
+                                            <div class="flex items-center gap-1" style="margin-top: 6px; font-size: 0.8125rem; color: var(--color-warning);">
+                                                <i data-lucide="triangle-alert" style="width: 14px; height: 14px;"></i> {{ $warning }}
+                                            </div>
+                                        @endforeach
+                                    @else
+                                        <div class="help" style="margin-top: 6px;">Numbers recorded</div>
+                                    @endif
+                                </td>
+
+                                <td class="num">
+                                    <div class="text-ink" style="font-weight: 600;">{{ number_format($empTotalGross, 2) }} <span class="help">{{ $emp->currency }}</span></div>
+                                    <div class="help" style="margin-top: 2px;">Salary {{ number_format($emp->base_salary, 0) }} · allowances {{ number_format($empTotalGross - $emp->base_salary, 0) }}</div>
+                                </td>
+
+                                <td>
+                                    @if($emp->is_active)
+                                        <span class="pill pill-success">Active</span>
+                                    @else
+                                        <span class="pill pill-neutral">Left</span>
+                                        @if(!empty($emp->termination_date))
+                                            <div class="help" style="margin-top: 4px; white-space: nowrap;">{{ \Carbon\Carbon::parse($emp->termination_date)->format('j M Y') }}</div>
+                                        @endif
+                                    @endif
+                                </td>
+
+                                <td>
+                                    <div class="flex flex-col items-end gap-1">
+                                        <button type="button" wire:click="editEmployee('{{ $emp->id }}')" class="btn btn-ghost btn-sm">Edit</button>
+                                        <button type="button" wire:click="toggleStatus('{{ $emp->id }}', {{ $emp->is_active }})" class="btn btn-ghost btn-sm" @if($emp->is_active) style="color: var(--color-danger);" @endif>
+                                            {{ $emp->is_active ? 'Mark as left' : 'Reinstate' }}
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5">
+                                    <div class="empty-state">
+                                        <strong>No staff records{{ $activeTab !== 'ALL' ? ' in ' . ($regionLabels[$activeTab] ?? $activeTab) : '' }} yet</strong>
+                                        Add a staff member with the form. They need an active HQ account first, which you create in Settings and access.
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-
-    <script>
-        document.addEventListener('livewire:navigated', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); });
-        document.addEventListener('DOMContentLoaded', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); });
-        document.addEventListener('livewire:initialized', () => {
-            Livewire.hook('morph.updated', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); });
-        });
-    </script>
 </div>

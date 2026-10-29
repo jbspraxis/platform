@@ -39,7 +39,7 @@ class CashRequestSubmitter extends Component
     public $crypto_network = 'TRC20';
     public $crypto_address = '';
     
-    // Cryptographic & File State
+    // Signature & file state
     public $requester_signature = null; 
     public $showSuccessModal = false;
     public $generatedReference = '';
@@ -92,13 +92,19 @@ class CashRequestSubmitter extends Component
 
         $final_details = '';
         if ($this->disbursement_method === 'Bank Transfer') {
-            $this->validate(['payee_bank' => 'required', 'payee_account_name' => 'required', 'payee_account_number' => 'required']);
+            $this->validate(['payee_bank' => 'required', 'payee_account_name' => 'required', 'payee_account_number' => 'required'], [], [
+                'payee_bank' => 'bank name', 'payee_account_name' => 'account name', 'payee_account_number' => 'account number',
+            ]);
             $final_details = "Bank: {$this->payee_bank} | Name: {$this->payee_account_name} | Acct: {$this->payee_account_number}";
         } elseif ($this->disbursement_method === 'Mobile Money') {
-            $this->validate(['momo_provider' => 'required', 'momo_name' => 'required', 'momo_phone' => 'required']);
+            $this->validate(['momo_provider' => 'required', 'momo_name' => 'required', 'momo_phone' => 'required'], [], [
+                'momo_provider' => 'provider', 'momo_name' => 'name on the account', 'momo_phone' => 'phone number',
+            ]);
             $final_details = "Provider: {$this->momo_provider} | Name: {$this->momo_name} | Phone: {$this->momo_phone}";
         } elseif ($this->disbursement_method === 'Crypto Wallet') {
-            $this->validate(['crypto_network' => 'required', 'crypto_address' => 'required']);
+            $this->validate(['crypto_network' => 'required', 'crypto_address' => 'required'], [], [
+                'crypto_network' => 'network', 'crypto_address' => 'wallet address',
+            ]);
             $final_details = "Network: {$this->crypto_network} | Address: {$this->crypto_address}";
         } else {
             $final_details = "Physical Cash - HQ Delivery";
@@ -109,6 +115,11 @@ class CashRequestSubmitter extends Component
             'amount_requested' => 'required|numeric|min:0.01',
             'purpose' => 'required|string|max:1000',
             'requester_signature' => 'required|string'
+        ], [
+            'requester_signature.required' => 'Sign in the signature box, then send the request again.',
+        ], [
+            'financial_dictionary_id' => 'expense item',
+            'amount_requested' => 'amount',
         ]);
 
         $userId = Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c';
@@ -148,8 +159,8 @@ class CashRequestSubmitter extends Component
         $adminIds = Access::staffWith('expenses.approve');
         foreach ($adminIds as $adminId) {
             DB::table('notifications')->insert([
-                'id' => Str::uuid()->toString(), 'user_id' => $adminId, 'type' => 'Financial', 'title' => 'CAPITAL REQUISITION',
-                'message' => "New request {$this->generatedReference} requires Super Admin seal.", 'link_url' => route('hq.finance.manager'), 'is_read' => 0, 'created_at' => now(),
+                'id' => Str::uuid()->toString(), 'user_id' => $adminId, 'type' => 'Financial', 'title' => 'Cash request to approve',
+                'message' => "Cash request {$this->generatedReference} needs approval. Review it in Cash request approvals.", 'link_url' => route('hq.finance.manager'), 'is_read' => 0, 'created_at' => now(),
             ]);
         }
 
@@ -179,14 +190,14 @@ class CashRequestSubmitter extends Component
         $adminIds = Access::staffWith('expenses.approve');
         foreach ($adminIds as $adminId) {
             DB::table('notifications')->insert([
-                'id' => Str::uuid()->toString(), 'user_id' => $adminId, 'type' => 'Financial', 'title' => 'RECEIPT UPLOADED',
-                'message' => "Receipt uploaded for {$req->reference}. Ready for Audit Clearance.", 'link_url' => route('hq.finance.manager'), 'is_read' => 0, 'created_at' => now(),
+                'id' => Str::uuid()->toString(), 'user_id' => $adminId, 'type' => 'Financial', 'title' => 'Receipt uploaded',
+                'message' => "A receipt was uploaded for cash request {$req->reference}. Check it and close the request in Cash request approvals.", 'link_url' => route('hq.finance.manager'), 'is_read' => 0, 'created_at' => now(),
             ]);
         }
 
         $this->receipt_file = null;
         $this->loadMyRequests();
-        session()->flash('message-'.$requestId, 'Receipt uploaded successfully. Awaiting Super Admin Clearance.');
+        session()->flash('message-'.$requestId, 'Receipt uploaded. Finance will check it and close the request.');
     }
 
     public function closeSuccessModal()

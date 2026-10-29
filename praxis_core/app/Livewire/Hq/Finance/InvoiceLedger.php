@@ -108,7 +108,7 @@ class InvoiceLedger extends Component
         $project = DB::table('projects')->where('id', $this->new_project_id)->first();
         $org = DB::table('organizations')->where('id', $project->organization_id)->first();
         
-        // 1. HARDENED TAX LOGIC: Attempt to match tax jurisdiction to client country
+        // 1. Tax: match the tax jurisdiction to the client's country
         $taxData = DB::table('mdm_tax_compliance')
             ->where('is_active', 1)
             ->where(function($query) use ($org) {
@@ -128,7 +128,7 @@ class InvoiceLedger extends Component
         $vatAmount = $this->new_amount_due * $vatRate;
         $totalAmount = $this->new_amount_due + $vatAmount;
 
-        // 2. HARDENED DUE DATE LOGIC: Properly handle "Receipt" vs "Net X"
+        // 2. Due date: handle "Receipt" and "Net X" terms
         if (stripos(strtolower($this->new_payment_terms), 'receipt') !== false) {
             $days = 0;
         } else {
@@ -192,21 +192,45 @@ class InvoiceLedger extends Component
         $this->showCreateModal = false;
         $this->reset(['new_project_id', 'new_phase_id', 'new_amount_due', 'new_description']);
         $this->loadInvoices();
-        session()->flash('success', '> INVOICE GENERATED AND DISPATCHED TO CLIENT OS.');
+        session()->flash('success', "Invoice {$invNumber} created for " . ($org->name ?? 'the client') . '.');
     }
 
     public function cancelInvoice($invoiceId)
     {
         abort_unless(Auth::user()->can('finance.delete'), 403);
 
-        DB::table('invoices')->where('id', $invoiceId)->update([
-            'status' => 'Cancelled',
-            'updated_by' => Auth::id(),
-            'updated_at' => now()
-        ]);
+        // Only an invoice that is neither paid nor already cancelled can be cancelled
+        $invoice = DB::table('invoices')->where('id', $invoiceId)->first();
+        if (! $invoice) {
+            session()->flash('error', "We couldn't find that invoice. Refresh the page and try again.");
+            $this->loadInvoices();
+            return;
+        }
+        if (in_array($invoice->status, ['Paid', 'Cancelled'], true)) {
+            session()->flash('error', $invoice->status === 'Paid'
+                ? "Invoice {$invoice->invoice_number} is paid, so it can't be cancelled."
+                : "Invoice {$invoice->invoice_number} is already cancelled.");
+            $this->loadInvoices();
+            return;
+        }
+
+        $updated = DB::table('invoices')
+            ->where('id', $invoiceId)
+            ->whereNotIn('status', ['Paid', 'Cancelled'])
+            ->update([
+                'status' => 'Cancelled',
+                'updated_by' => Auth::id(),
+                'updated_at' => now()
+            ]);
+
+        if (! $updated) {
+            session()->flash('error', "Invoice {$invoice->invoice_number} changed while you were working, so it wasn't cancelled. Check its status and try again.");
+            $this->loadInvoices();
+            return;
+        }
 
         DB::table('system_audit_logs')->insert([
-            // 4. HARDENED AUDIT LOG: Safe null UUID handling
+            // Safe null UUID handling
             'user_id' => Auth::check() ? Auth::id() : null, 
             'action' => 'INVOICE_CANCELLED',
             'target_table' => 'invoices',
@@ -216,13 +240,14 @@ class InvoiceLedger extends Component
         ]);
 
         $this->loadInvoices();
-        session()->flash('success', '> INVOICE CANCELLED. LEDGER NEUTRALIZED.');
+        session()->flash('success', "Invoice {$invoice->invoice_number} cancelled.");
     }
 
     /**
-     * THE 10-DAY GUILLOTINE EXECUTOR
-     * In production, this runs via Laravel Scheduler daily.
-     * Here, it can be manually triggered by staff with finance.approve to audit the ledger.
+     * Overdue check: marks unpaid invoices past their due date as overdue,
+     * which puts the client's portal access for that project on hold.
+     * In production this runs daily via the Laravel scheduler; staff with
+     * finance.approve can also run it from the Invoices screen.
      */
     public function enforceGuillotineProtocol()
     {
@@ -234,13 +259,13 @@ class InvoiceLedger extends Component
             ->get();
 
         if ($expiredInvoices->isEmpty()) {
-            session()->flash('success', '> GUILLOTINE AUDIT COMPLETE. NO DELINQUENT ACCOUNTS DETECTED.');
+            session()->flash('success', 'No unpaid invoices are past their due date. Nothing was changed.');
             return;
         }
 
         DB::transaction(function () use ($expiredInvoices) {
             foreach ($expiredInvoices as $invoice) {
-                // 1. Drop the Guillotine
+                // 1. Mark the invoice overdue
                 DB::table('invoices')->where('id', $invoice->id)->update([
                     'status' => 'Overdue',
                     'updated_at' => now()
@@ -253,18 +278,18 @@ class InvoiceLedger extends Component
                 foreach($admins as $adminId) {
                     $notifications[] = [
                         'id' => (string) Str::uuid(), 'user_id' => $adminId,
-                        'title' => 'GUILLOTINE DROPPED: DELINQUENT ACCOUNT', 
-                        'message' => "Invoice {$invoice->invoice_number} is overdue. Client OS has been automatically locked. Awaiting manual order to halt engineering deployment.", 
+                        'title' => 'Invoice overdue', 
+                        'message' => "Invoice {$invoice->invoice_number} is past its due date. The client's portal access for this project is on hold until it is paid. Decide whether work on the project should pause.", 
                         'type' => 'System', 'created_at' => now()
                     ];
                 }
                 if(!empty($notifications)) DB::table('notifications')->insert($notifications);
 
-                // 3. Immutable Audit Trail (Hardened UUID)
+                // 3. Audit trail (safe null UUID)
                 DB::table('system_audit_logs')->insert([
                     'user_id' => Auth::check() ? Auth::id() : null, // Prevent 'SYSTEM_CRON' crash
                     'action' => 'GUILLOTINE_PROTOCOL_ENGAGED',
-                    'description' => "Invoice {$invoice->invoice_number} expired. Financial Lockout engaged on Client OS.",
+                    'description' => "Invoice {$invoice->invoice_number} is past its due date and was marked overdue. Client Portal access for the project is on hold.",
                     'target_table' => 'invoices',
                     'target_id' => $invoice->id,
                     'created_at' => now()
@@ -273,7 +298,8 @@ class InvoiceLedger extends Component
         });
 
         $this->loadInvoices();
-        session()->flash('error', '> GUILLOTINE PROTOCOL ENGAGED. ' . $expiredInvoices->count() . ' ACCOUNT(S) LOCKED.');
+        $count = $expiredInvoices->count();
+        session()->flash('error', $count . ($count === 1 ? ' invoice was' : ' invoices were') . " marked overdue. Client Portal access for those projects is on hold until they're paid.");
     }
     public function render()
     {

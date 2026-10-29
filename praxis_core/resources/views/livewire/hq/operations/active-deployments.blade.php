@@ -1,397 +1,342 @@
-<div x-data="{ openCreateDrawer: false }" style="position: relative; min-height: 100vh; padding-bottom: 50px;">
-    <style>
-        /* Base Praxis Typography & Elements */
-        .nav-pill { padding: 8px 20px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; border-radius: 2px; cursor: pointer; transition: 0.3s; border: 1px solid var(--erp-border-dark); background: transparent; color: var(--erp-muted); }
-        .nav-pill.active { background: rgba(0, 229, 255, 0.1); border-color: var(--erp-teal); color: var(--erp-teal); font-weight: bold; }
-        .nav-pill:not(.active):hover { background: rgba(255,255,255,0.05); color: var(--erp-white); }
-        
-        .cyber-input, .cyber-select, .cyber-textarea { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--erp-border-dark); color: var(--erp-white); padding: 10px 12px; font-family: 'Inter', sans-serif; font-size: 0.85rem; border-radius: 2px; outline: none; transition: 0.3s; }
-        .cyber-input:focus, .cyber-select:focus, .cyber-textarea:focus { border-color: var(--erp-teal); background: rgba(0,229,255,0.02); }
-        .cyber-select option { background-color: var(--erp-bg-main); color: var(--erp-white); }
-        .form-label { font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: var(--erp-muted); text-transform: uppercase; margin-bottom: 5px; display: block; }
+<div x-data="{ openCreateDrawer: false }">
+    @php
+        // Stored project statuses (database values) and what people read
+        $statusLabels = ['Active' => 'Active', 'Scoping' => 'Scoping', 'Locked' => 'On hold', 'Completed' => 'Completed', 'Cancelled' => 'Cancelled'];
+        $statusPills = ['Active' => 'pill-info', 'Scoping' => 'pill-neutral', 'Locked' => 'pill-warning', 'Completed' => 'pill-success', 'Cancelled' => 'pill-neutral'];
+        // The sprint board opens for managers and auditors, and for people with a task on the project (SprintBoard::maySeeBoard)
+        $canOpenAnyBoard = auth()->user()->can('projects.approve') || auth()->user()->can('projects.export') || ! $canSeeAll;
+    @endphp
 
-        .btn-action { background: transparent; border: 1px solid var(--erp-border-dark); color: var(--erp-white); padding: 8px 15px; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; cursor: pointer; border-radius: 2px; transition: 0.3s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-        .btn-action:hover { border-color: var(--erp-teal); color: var(--erp-teal); background: rgba(0,229,255,0.05); }
-        .btn-primary { background: var(--erp-teal); color: var(--erp-bg-main); border: 1px solid var(--erp-teal); padding: 12px 25px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: bold; cursor: pointer; transition: 0.3s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
-        .btn-primary:hover:not(:disabled) { background: var(--erp-white); box-shadow: 0 0 15px rgba(0,229,255,0.4); }
-        .btn-danger { color: var(--erp-red); border-color: var(--erp-red); }
-        .btn-danger:hover { background: rgba(255,51,102,0.1); color: var(--erp-red); border-color: var(--erp-red); }
-
-        /* Metrics & Matrix Cards */
-        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px; }
-        .metric-card { background: rgba(10, 17, 40, 0.6); border: 1px solid var(--erp-border-dark); padding: 20px; border-left: 2px solid var(--erp-teal); }
-        .metric-title { font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); text-transform: uppercase; margin-bottom: 5px; }
-        .metric-val { font-family: 'Roboto Mono', monospace; font-size: 1.5rem; color: var(--erp-white); font-weight: bold; }
-
-        .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
-        .project-card { background: rgba(10, 17, 40, 0.6); border: 1px solid var(--erp-border-dark); border-radius: 4px; padding: 25px; display: flex; flex-direction: column; transition: 0.3s; position: relative; overflow: hidden; }
-        .project-card:hover { border-color: var(--erp-teal); box-shadow: 0 10px 30px rgba(0,0,0,0.5); transform: translateY(-2px); }
-        
-        .card-locked { border-top: 3px solid var(--erp-red); }
-        .card-warning { border-top: 3px solid #FFBD2E; }
-        .card-active { border-top: 3px solid var(--erp-teal); }
-
-        .client-name { font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: var(--erp-teal); text-transform: uppercase; margin-bottom: 5px; letter-spacing: 1px; }
-        .project-title { font-family: 'Montserrat', sans-serif; font-size: 1.1rem; color: var(--erp-white); font-weight: bold; margin-bottom: 15px; line-height: 1.3; }
-
-        .status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 2px; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; font-weight: bold; text-transform: uppercase; border: 1px solid transparent; }
-        .pill-active { background: rgba(0, 229, 255, 0.1); color: var(--erp-teal); border-color: var(--erp-teal); }
-        .pill-locked { background: rgba(255, 51, 102, 0.1); color: var(--erp-red); border-color: var(--erp-red); animation: pulse-red 2s infinite; }
-        .pill-warning { background: rgba(255, 189, 46, 0.1); color: #FFBD2E; border-color: #FFBD2E; }
-        .pill-scoping { background: rgba(138, 155, 178, 0.1); color: #8A9BB2; border-color: #8A9BB2; }
-        .pill-completed { background: rgba(0, 255, 102, 0.1); color: #00FF66; border-color: #00FF66; }
-
-        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(255, 51, 102, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(255, 51, 102, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 51, 102, 0); } }
-
-        .ring-container { position: relative; width: 60px; height: 60px; display: flex; justify-content: center; align-items: center; flex-shrink: 0; }
-        .progress-ring { transform: rotate(-90deg); }
-        .progress-ring__circle { transition: stroke-dashoffset 0.5s ease-in-out; }
-        .ring-text { position: absolute; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: bold; color: var(--erp-white); }
-
-        .stats-row { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 2px; margin-top: 15px; border: 1px solid rgba(255,255,255,0.05); }
-        .stat-block { display: flex; flex-direction: column; }
-        .stat-label { font-family: 'Roboto Mono', monospace; font-size: 0.6rem; color: var(--erp-muted); margin-bottom: 2px; }
-        .stat-value { font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--erp-white); font-weight: bold; }
-
-        /* Bloomberg Table */
-        .bloomberg-table { width: 100%; border-collapse: collapse; text-align: left; }
-        .bloomberg-table th { font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); padding: 15px; border-bottom: 1px solid var(--erp-teal); text-transform: uppercase; background: rgba(0,229,255,0.05); position: sticky; top: 0; z-index: 10; }
-        .bloomberg-table td { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.02); vertical-align: middle; font-size: 0.85rem; color: #E2E8F0; }
-        .bloomberg-table tr:hover td { background: rgba(0, 229, 255, 0.03); }
-
-        /* Off-Canvas Drawer */
-        .drawer-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(3px); z-index: 999; display: none; }
-        .drawer-panel { position: fixed; top: 0; right: -500px; width: 100%; max-width: 500px; height: 100%; background: #0A1128; border-left: 1px solid var(--erp-teal); box-shadow: -10px 0 30px rgba(0,0,0,0.8); z-index: 1000; transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1); overflow-y: auto; display: flex; flex-direction: column; }
-        
-        [x-cloak] { display: none !important; }
-    </style>
-
-    <!-- HEADER & TABS -->
-    <div style="margin-bottom: 25px; border-bottom: 1px solid var(--erp-border-dark); padding-bottom: 15px;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 15px;">
-            <div>
-                <h1 style="font-family: 'Montserrat', sans-serif; font-size: 1.3rem; color: var(--erp-white); letter-spacing: 1px;">DEPLOYMENT ARCHITECTURE</h1>
-                <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-teal); margin-top: 5px;">[ OPERATIONS MATRIX & MASTER LEDGER ]</p>
-            </div>
-            <div style="display: flex; gap: 10px; align-items: center;">
-                @if($activeTab === 'matrix')
-                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); display: flex; align-items: center; gap: 5px; margin-right: 15px;">
-                        <span style="display: inline-block; width: 6px; height: 6px; background: #00FF66; border-radius: 50%; box-shadow: 0 0 5px #00FF66; animation: pulse-red 2s infinite;"></span>
-                        LIVE RADAR (POLLING 30s)
-                    </div>
-                @endif
-                <button wire:click="switchTab('matrix')" class="nav-pill {{ $activeTab === 'matrix' ? 'active' : '' }}">LIVE MATRIX</button>
-                <button wire:click="switchTab('ledger')" class="nav-pill {{ $activeTab === 'ledger' ? 'active' : '' }}">MASTER LEDGER</button>
-            </div>
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">All projects</h1>
+            <p class="page-subtitle">{{ $canSeeAll ? 'Progress on every active project, and the full list of projects.' : 'Progress on the projects you have tasks on.' }}</p>
         </div>
-
-        <!-- GLOBAL ACTIONS & FILTERS -->
-        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(10, 17, 40, 0.6); padding: 15px; border: 1px solid var(--erp-border-dark); border-radius: 4px;">
-            <div style="display: flex; gap: 15px; flex: 1;">
-                <input type="text" wire:model.live.debounce.300ms="searchQuery" class="cyber-input" style="max-width: 250px;" placeholder="Search projects or clients...">
-                
-                <select wire:model.live="filterStatus" class="cyber-select" style="max-width: 200px;">
-                    <option value="">-- ANY STATUS --</option>
-                    @if($activeTab === 'ledger')
-                        <option value="Scoping">Scoping</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Cancelled">Cancelled</option>
-                    @endif
-                    <option value="Active">Active</option>
-                    <option value="Financially Locked">Guillotine Locked</option>
-                </select>
-
-                @if($canSeeMoney && $activeTab === 'matrix')
-                    <select wire:model.live="filterHealth" class="cyber-select" style="max-width: 200px;">
-                        <option value="">-- ALL FINANCIAL HEALTH --</option>
-                        <option value="Healthy">Healthy Margins</option>
-                        <option value="Bleeding">Bleeding (Margin Alert)</option>
-                    </select>
-                @endif
-
-                @if($canSeeAll && $activeTab === 'matrix')
-                    <select wire:model.live="filterAssignee" class="cyber-select" style="max-width: 200px;">
-                        <option value="">-- ALL PERSONNEL --</option>
-                        @foreach($availableAssignees as $user)
-                            <option value="{{ $user->id }}">{{ $user->first_name }} {{ $user->last_name }}</option>
-                        @endforeach
-                    </select>
-                @endif
-            </div>
-
-            <div style="display: flex; gap: 10px;">
-                @if($canExport)
-                    <button wire:click="exportCsv" class="btn-action">
-                        <i data-lucide="download" style="width: 14px; height: 14px;"></i> EXPORT CSV
-                    </button>
-                @endif
-
-                @if($canCreate)
-                    <button @click="openCreateDrawer = true" class="btn-action" style="background: rgba(0, 229, 255, 0.1); border-color: var(--erp-teal); color: var(--erp-teal); font-weight: bold;">
-                        <i data-lucide="plus-square" style="width: 14px; height: 14px;"></i> INITIALIZE DEPLOYMENT
-                    </button>
-                @endif
-            </div>
+        <div class="flex flex-wrap gap-3">
+            @if($canExport)
+                <button type="button" wire:click="exportCsv" class="btn btn-secondary">
+                    <i data-lucide="download"></i> Export CSV
+                </button>
+            @endif
+            @if($canCreate)
+                <button type="button" @click="openCreateDrawer = true" class="btn btn-primary">
+                    <i data-lucide="plus"></i> Create project
+                </button>
+            @endif
         </div>
     </div>
 
+    <div class="tabs" role="tablist">
+        <button type="button" role="tab" wire:click="switchTab('matrix')" class="tab {{ $activeTab === 'matrix' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'matrix' ? 'true' : 'false' }}">Active projects</button>
+        <button type="button" role="tab" wire:click="switchTab('ledger')" class="tab {{ $activeTab === 'ledger' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'ledger' ? 'true' : 'false' }}">Full list</button>
+    </div>
+
+    <!-- Search and filters -->
+    <div class="card mb-6 flex flex-wrap items-end gap-4 py-4">
+        <div class="field min-w-[200px] flex-1">
+            <label for="project-search" class="label">Search</label>
+            <input id="project-search" type="search" wire:model.live.debounce.300ms="searchQuery" class="input" placeholder="Project or client name">
+        </div>
+
+        <div class="field min-w-[180px]">
+            <label for="project-status" class="label">Status</label>
+            <select id="project-status" wire:model.live="filterStatus" class="select">
+                <option value="">Any status</option>
+                @if($activeTab === 'ledger')
+                    <option value="Scoping">Scoping</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Cancelled">Cancelled</option>
+                @endif
+                <option value="Active">Active</option>
+                <option value="Financially Locked">On hold</option>
+            </select>
+        </div>
+
+        @if($canSeeMoney && $activeTab === 'matrix')
+            <div class="field min-w-[200px]">
+                <label for="project-health" class="label">Budget</label>
+                <select id="project-health" wire:model.live="filterHealth" class="select">
+                    <option value="">Any budget position</option>
+                    <option value="Healthy">On budget</option>
+                    <option value="Bleeding">Spending ahead of progress</option>
+                </select>
+            </div>
+        @endif
+
+        @if($canSeeAll && $activeTab === 'matrix')
+            <div class="field min-w-[180px]">
+                <label for="project-assignee" class="label">Assigned to</label>
+                <select id="project-assignee" wire:model.live="filterAssignee" class="select">
+                    <option value="">Everyone</option>
+                    @foreach($availableAssignees as $user)
+                        <option value="{{ $user->id }}">{{ $user->first_name }} {{ $user->last_name }}</option>
+                    @endforeach
+                </select>
+            </div>
+        @endif
+    </div>
+
     @if (session()->has('success'))
-        <div style="background: rgba(0,255,102,0.1); border: 1px solid #00FF66; color: #00FF66; padding: 10px 15px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; margin-bottom: 15px;">> {{ session('success') }}</div>
+        <div class="alert alert-success mb-4" role="status"><i data-lucide="check-circle"></i> <span>{{ session('success') }}</span></div>
     @endif
     @if (session()->has('error'))
-        <div style="background: rgba(255,51,102,0.1); border: 1px solid var(--erp-red); color: var(--erp-red); padding: 10px 15px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; margin-bottom: 15px;">> {{ session('error') }}</div>
+        <div class="alert alert-danger mb-4" role="alert"><i data-lucide="circle-alert"></i> <span>{{ session('error') }}</span></div>
     @endif
 
-    <!-- TAB 1: LIVE MATRIX -->
+    <!-- Tab 1: active projects -->
     @if($activeTab === 'matrix')
         <div wire:poll.30s="loadData">
-            <!-- KPIs -->
-            <div class="metrics-grid" style="grid-template-columns: repeat({{ $canSeeMoney ? '4' : '2' }}, 1fr);">
-                <div class="metric-card">
-                    <div class="metric-title">ACTIVE FIRM DEPLOYMENTS</div>
-                    <div class="metric-val" style="color: var(--erp-teal);">{{ $kpiActiveDeployments }}</div>
+            <div class="mb-6 grid gap-4 sm:grid-cols-2 {{ $canSeeMoney ? 'xl:grid-cols-4' : '' }}">
+                <div class="card">
+                    <div class="stat-label">Active projects</div>
+                    <div class="stat-value">{{ $kpiActiveDeployments }}</div>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-title">GLOBAL SPRINT VELOCITY (7D)</div>
-                    <div class="metric-val">{{ $kpiSprintVelocity }} <span style="font-size: 0.8rem; color: var(--erp-muted);">PTS</span></div>
+                <div class="card">
+                    <div class="stat-label">Story points done in the last 7 days</div>
+                    <div class="stat-value">{{ $kpiSprintVelocity }} <span class="text-small font-normal text-muted">points</span></div>
                 </div>
-                
+
                 @if($canSeeMoney)
-                    <div class="metric-card" style="{{ $kpiCapitalAtRisk > 0 ? 'border-left-color: #FFBD2E;' : '' }}">
-                        <div class="metric-title">PENDING CAPITAL AT RISK</div>
-                        <div class="metric-val" style="color: {{ $kpiCapitalAtRisk > 0 ? '#FFBD2E' : '#00FF66' }};">${{ number_format($kpiCapitalAtRisk, 2) }}</div>
+                    <div class="card">
+                        <div class="stat-label">Unpaid invoices on active projects</div>
+                        <div class="stat-value {{ $kpiCapitalAtRisk > 0 ? 'text-warning' : '' }}">${{ number_format($kpiCapitalAtRisk, 2) }}</div>
                     </div>
-                    <div class="metric-card" style="{{ $kpiBleedingProjects > 0 ? 'border-left-color: var(--erp-red);' : '' }}">
-                        <div class="metric-title">BLEEDING PROJECTS (MARGIN ALERT)</div>
-                        <div class="metric-val" style="color: {{ $kpiBleedingProjects > 0 ? 'var(--erp-red)' : '#00FF66' }};">{{ $kpiBleedingProjects }}</div>
+                    <div class="card">
+                        <div class="stat-label">Projects spending ahead of progress</div>
+                        <div class="stat-value {{ $kpiBleedingProjects > 0 ? 'text-danger' : '' }}">{{ $kpiBleedingProjects }}</div>
                     </div>
                 @endif
             </div>
+            <p class="help mb-4">Updates every 30 seconds.</p>
 
-            <!-- Matrix Grid -->
-            <div class="project-grid">
+            <div class="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
                 @forelse($matrixProjects as $p)
                     @php
-                        $cardClass = 'card-active';
-                        if ($p['is_financially_locked']) $cardClass = 'card-locked';
-                        elseif ($p['needs_midpoint_funds']) $cardClass = 'card-warning';
-
                         $circumference = 150.79;
                         $offset = $circumference - ($p['progress_percent'] / 100) * $circumference;
-                        $ringColor = $p['progress_percent'] == 100 ? '#00FF66' : 'var(--erp-teal)';
+                        $ringColor = $p['progress_percent'] == 100 ? 'var(--color-success)' : 'var(--color-teal)';
                     @endphp
 
-                    <div class="project-card {{ $cardClass }}">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                            <div style="flex: 1; padding-right: 15px;">
-                                <div class="client-name">> {{ $p['client_name'] }}</div>
-                                <div class="project-title">{{ $p['title'] }}</div>
-                                
-                                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    <div class="card flex flex-col">
+                        <div class="mb-4 flex items-start justify-between gap-4">
+                            <div class="min-w-0 flex-1">
+                                <div class="text-caption text-muted">{{ $p['client_name'] }}</div>
+                                <div class="mt-1 mb-3 font-semibold text-ink">{{ $p['title'] }}</div>
+
+                                <div class="flex flex-wrap gap-2">
                                     @if($p['is_financially_locked'])
-                                        <span class="status-pill pill-locked"><i data-lucide="lock" style="width: 10px; height: 10px;"></i> GUILLOTINE LOCKED</span>
+                                        <span class="pill pill-danger">On hold: unpaid invoice</span>
                                     @else
-                                        <span class="status-pill pill-active"><i data-lucide="activity" style="width: 10px; height: 10px;"></i> ACTIVE</span>
+                                        <span class="pill pill-info">Active</span>
                                     @endif
 
                                     @if($p['needs_midpoint_funds'] && !$p['is_financially_locked'])
-                                        <span class="status-pill pill-warning"><i data-lucide="alert-triangle" style="width: 10px; height: 10px;"></i> AWAITING FUNDS</span>
+                                        <span class="pill pill-warning">Invoice unpaid</span>
+                                    @endif
+
+                                    @if($p['is_bleeding'])
+                                        <span class="pill pill-danger">Spending ahead of progress</span>
                                     @endif
                                 </div>
                             </div>
 
-                            <div class="ring-container">
-                                <svg class="progress-ring" width="60" height="60">
-                                    <circle stroke="rgba(255,255,255,0.05)" stroke-width="4" fill="transparent" r="24" cx="30" cy="30"/>
-                                    <circle class="progress-ring__circle" stroke="{{ $ringColor }}" stroke-width="4" stroke-linecap="round" fill="transparent" r="24" cx="30" cy="30" style="stroke-dasharray: {{ $circumference }}; stroke-dashoffset: {{ $offset }};"/>
+                            <div class="relative grid h-[60px] w-[60px] shrink-0 place-items-center" role="img" aria-label="{{ $p['progress_percent'] }}% of story points done">
+                                <svg width="60" height="60" class="-rotate-90">
+                                    <circle stroke="var(--color-line)" stroke-width="4" fill="transparent" r="24" cx="30" cy="30"/>
+                                    <circle stroke="{{ $ringColor }}" stroke-width="4" stroke-linecap="round" fill="transparent" r="24" cx="30" cy="30" style="stroke-dasharray: {{ $circumference }}; stroke-dashoffset: {{ $offset }};"/>
                                 </svg>
-                                <div class="ring-text">{{ $p['progress_percent'] }}%</div>
+                                <span class="absolute text-caption font-semibold text-ink num">{{ $p['progress_percent'] }}%</span>
                             </div>
                         </div>
 
-                        <div class="stats-row">
-                            <div class="stat-block">
-                                <span class="stat-label">STORY POINTS</span>
-                                <span class="stat-value" style="color: var(--erp-teal);">{{ $p['completed_points'] }} / {{ $p['total_points'] }}</span>
+                        <div class="flex flex-wrap justify-between gap-4 rounded-lg bg-mist px-4 py-3">
+                            <div>
+                                <div class="stat-label">Story points done</div>
+                                <div class="text-small font-semibold text-ink num text-left">{{ $p['completed_points'] }} of {{ $p['total_points'] }}</div>
                             </div>
                             @if($canSeeMoney)
-                                <div class="stat-block" style="text-align: right;">
-                                    <span class="stat-label">BUDGET BURN</span>
-                                    <span class="stat-value" style="color: {{ $p['is_bleeding'] ? 'var(--erp-red)' : ($p['burn_percent'] > $p['progress_percent'] ? '#FFBD2E' : '#00FF66') }};">
+                                <div class="text-right">
+                                    <div class="stat-label">Budget used</div>
+                                    <div class="text-small font-semibold num {{ $p['is_bleeding'] ? 'text-danger' : ($p['burn_percent'] > $p['progress_percent'] ? 'text-warning' : 'text-success') }}">
                                         {{ $p['burn_percent'] }}% (${{ number_format($p['spent_amount'], 0) }})
-                                    </span>
+                                    </div>
                                 </div>
                             @endif
                         </div>
 
-                        <div style="margin-top: auto; padding-top: 15px;">
+                        <div class="mt-auto flex flex-col gap-2 pt-4">
                             @if($canCreate)
-                                <a href="{{ route('hq.ops.scrum', $p['id']) }}" class="btn-action" style="width: 100%; text-decoration: none; margin-bottom: 10px;">
-                                    <i data-lucide="terminal" style="width: 14px; height: 14px;"></i> SCRUM MASTER
+                                <a href="{{ route('hq.ops.scrum', $p['id']) }}" class="btn btn-secondary w-full">
+                                    <i data-lucide="list-checks"></i> Plan sprints
                                 </a>
                             @endif
 
-                            <a href="{{ route('hq.ops.board', $p['id']) }}" class="btn-action" style="width: 100%; text-decoration: none; margin-bottom: {{ $canLock ? '10px' : '0' }};">
-                                <i data-lucide="layout-dashboard" style="width: 14px; height: 14px;"></i> SPRINT BOARD
-                            </a>
+                            @if($canOpenAnyBoard)
+                                <a href="{{ route('hq.ops.board', $p['id']) }}" class="btn btn-secondary w-full">
+                                    <i data-lucide="layout-dashboard"></i> Open sprint board
+                                </a>
+                            @endif
 
                             @if($canLock)
                                 @if($p['is_financially_locked'])
-                                    <button wire:click="toggleFinancialLock('{{ $p['id'] }}')" class="btn-action" style="width: 100%; color: #00FF66; border-color: #00FF66;">
-                                        <i data-lucide="unlock" style="width: 14px; height: 14px;"></i> L5 OVERRIDE: UNLOCK
+                                    <button type="button" wire:click="toggleFinancialLock('{{ $p['id'] }}')" class="btn btn-secondary w-full">
+                                        <i data-lucide="unlock"></i> Release hold
                                     </button>
                                 @else
-                                    <button wire:click="toggleFinancialLock('{{ $p['id'] }}')" class="btn-action btn-danger" style="width: 100%;">
-                                        <i data-lucide="lock" style="width: 14px; height: 14px;"></i> L5: ENFORCE LOCK
+                                    <button type="button" wire:click="toggleFinancialLock('{{ $p['id'] }}')" class="btn btn-ghost w-full text-danger">
+                                        <i data-lucide="lock"></i> Put on hold
                                     </button>
                                 @endif
                             @endif
                         </div>
                     </div>
                 @empty
-                    <div style="grid-column: 1 / -1; background: rgba(0,0,0,0.4); border: 1px dashed var(--erp-border-dark); padding: 60px; text-align: center; color: var(--erp-muted); font-family: 'Roboto Mono', monospace;">
-                        NO ACTIVE DEPLOYMENTS DETECTED MATCHING QUERY.
+                    <div class="card empty-state md:col-span-2 2xl:col-span-3">
+                        <strong>No active projects to show</strong>
+                        {{ $canSeeAll ? 'Active projects appear here with their progress. Clear the search or filters, or create a project.' : 'A project appears here once a task on it is assigned to you.' }}
                     </div>
                 @endforelse
             </div>
         </div>
     @endif
 
-    <!-- TAB 2: MASTER LEDGER -->
+    <!-- Tab 2: full list -->
     @if($activeTab === 'ledger')
-        <div style="background: rgba(10, 17, 40, 0.6); border: 1px solid var(--erp-border-dark); border-radius: 4px; padding: 25px; overflow-x: auto;">
-            <table class="bloomberg-table">
-                <thead>
-                    <tr>
-                        <th>Status</th>
-                        <th>Client Enterprise</th>
-                        <th>Project Title</th>
-                        <th>Guillotine</th>
-                        <th>Total Budget</th>
-                        <th>Timeline</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($ledgerProjects as $p)
+        <div class="card p-0">
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td>
-                                @if($p['status'] === 'Active') <span class="status-pill pill-active">ACTIVE</span>
-                                @elseif($p['status'] === 'Scoping') <span class="status-pill pill-scoping">SCOPING</span>
-                                @elseif($p['status'] === 'Completed') <span class="status-pill pill-completed">COMPLETED</span>
-                                @elseif($p['status'] === 'Locked') <span class="status-pill pill-locked">LOCKED</span>
-                                @else <span class="status-pill" style="border-color: var(--erp-muted);">{{ strtoupper($p['status']) }}</span>
-                                @endif
-                            </td>
-                            <td style="font-family: 'Roboto Mono', monospace; color: var(--erp-teal);">{{ $p['client_name'] }}</td>
-                            <td style="font-weight: bold;">{{ $p['title'] }}</td>
-                            <td>
-                                @if($p['is_financially_locked']) <span style="color: var(--erp-red); font-family: monospace; font-size: 0.75rem;">ENGAGED</span>
-                                @else <span style="color: var(--erp-muted); font-family: monospace; font-size: 0.75rem;">DISENGAGED</span>
-                                @endif
-                            </td>
-                            <td style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem;">
-                                @if($canSeeMoney)
-                                    {{ number_format($p['total_budget'], 2) }} <span style="color: var(--erp-muted);">{{ $p['currency'] }}</span>
-                                @else
-                                    <span style="color: var(--erp-muted);">[ CLASSIFIED ]</span>
-                                @endif
-                            </td>
-                            <td style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #B0B8C4;">
-                                {{ $p['start_date'] ?? 'TBD' }} <br> <span style="color: var(--erp-muted);">to</span> {{ $p['target_end_date'] ?? 'TBD' }}
-                            </td>
-                            <td style="display: flex; flex-direction: column; gap: 5px;">
-                                @if($canCreate)
-                                    <a href="{{ route('hq.ops.scrum', $p['id']) }}" class="btn-action" style="padding: 4px 8px; font-size: 0.65rem;">
-                                        SCRUM MASTER
-                                    </a>
-                                @endif
-                                <a href="{{ route('hq.ops.boards.directory', ['project' => $p['id']]) }}" class="btn-action" style="padding: 4px 8px; font-size: 0.65rem;">
-                                    SPRINT BOARD
-                                </a>
-                            </td>
+                            <th>Status</th>
+                            <th>Client</th>
+                            <th>Project</th>
+                            <th>Hold</th>
+                            <th class="num">Budget</th>
+                            <th>Dates</th>
+                            <th><span class="sr-only">Actions</span></th>
                         </tr>
-                    @empty
-                        <tr>
-                            <td colspan="7" style="text-align: center; padding: 40px; color: var(--erp-muted); font-family: 'Roboto Mono', monospace;">NO PROJECTS DETECTED IN THE MASTER LEDGER.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @forelse($ledgerProjects as $p)
+                            <tr>
+                                <td><span class="pill {{ $statusPills[$p['status']] ?? 'pill-neutral' }}">{{ $statusLabels[$p['status']] ?? $p['status'] }}</span></td>
+                                <td>{{ $p['client_name'] }}</td>
+                                <td class="font-medium text-ink">{{ $p['title'] }}</td>
+                                <td>
+                                    @if($p['is_financially_locked'])
+                                        <span class="pill pill-danger">On hold</span>
+                                    @else
+                                        <span class="muted">No</span>
+                                    @endif
+                                </td>
+                                <td class="num">
+                                    @if($canSeeMoney)
+                                        {{ number_format($p['total_budget'], 2) }} <span class="muted">{{ $p['currency'] }}</span>
+                                    @else
+                                        <span class="muted" title="Shown to people with finance access">Not shown</span>
+                                    @endif
+                                </td>
+                                <td class="whitespace-nowrap">
+                                    <span class="num text-left">{{ $p['start_date'] ? \Carbon\Carbon::parse($p['start_date'])->format('j M Y') : 'Not set' }}</span>
+                                    <span class="muted">to</span>
+                                    <span class="num text-left">{{ $p['target_end_date'] ? \Carbon\Carbon::parse($p['target_end_date'])->format('j M Y') : 'Not set' }}</span>
+                                </td>
+                                <td>
+                                    <div class="flex flex-wrap justify-end gap-2">
+                                        @if($canCreate)
+                                            <a href="{{ route('hq.ops.scrum', $p['id']) }}" class="btn btn-secondary btn-sm">Plan sprints</a>
+                                        @endif
+                                        <a href="{{ route('hq.ops.boards.directory', ['project' => $p['id']]) }}" class="btn btn-secondary btn-sm">Sprint boards</a>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="7">
+                                    <div class="empty-state">
+                                        <strong>No projects to show</strong>
+                                        {{ $canCreate ? 'Projects appear here once they are created. Clear the search or filters, or create a project.' : 'Projects you have tasks on appear here.' }}
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
         </div>
     @endif
 
-    <!-- OFF-CANVAS DRAWER: PROJECT CREATION -->
-    <div x-cloak x-show="openCreateDrawer" class="drawer-overlay" style="display: none;" @click="openCreateDrawer = false" x-transition.opacity></div>
-    
-    <div class="drawer-panel" :style="openCreateDrawer ? 'right: 0;' : 'right: -500px;'">
-        <div style="padding: 25px; border-bottom: 1px solid var(--erp-border-dark); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3);">
+    <!-- Create project panel -->
+    <div x-cloak x-show="openCreateDrawer" class="fixed inset-0 z-40 bg-ink/50" style="display: none;" @click="openCreateDrawer = false" x-transition.opacity></div>
+
+    <div class="fixed inset-y-0 right-0 z-50 flex w-full max-w-[480px] flex-col bg-paper transition-transform duration-300"
+         style="box-shadow: var(--shadow-float);"
+         :class="openCreateDrawer ? 'translate-x-0' : 'translate-x-full'"
+         x-cloak role="dialog" aria-modal="true" aria-labelledby="create-project-title">
+        <div class="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
             <div>
-                <h3 style="font-family: 'Montserrat', sans-serif; font-size: 1.1rem; color: var(--erp-teal); margin: 0;">INITIALIZE DEPLOYMENT</h3>
-                <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); margin-top: 5px;">ESTABLISH NEW PROJECT PARAMETERS</div>
+                <h2 id="create-project-title" class="text-section font-semibold text-ink">Create project</h2>
+                <p class="help mt-1">Set up the project. You can plan its sprints next.</p>
             </div>
-            <button @click="openCreateDrawer = false" style="background: transparent; border: none; color: var(--erp-muted); cursor: pointer;"><i data-lucide="x"></i></button>
+            <button type="button" @click="openCreateDrawer = false" class="btn btn-ghost btn-sm" aria-label="Close"><i data-lucide="x"></i></button>
         </div>
 
-        <div style="padding: 25px; flex: 1; overflow-y: auto;">
-            <div style="margin-bottom: 20px;">
-                <label class="form-label">Client Enterprise</label>
-                <select wire:model="newOrgId" class="cyber-select">
-                    <option value="">-- Select Organization --</option>
+        <div class="flex flex-1 flex-col gap-5 overflow-y-auto px-6 py-6">
+            <div class="field">
+                <label for="new-org" class="label">Client</label>
+                <select id="new-org" wire:model="newOrgId" class="select">
+                    <option value="">Choose a client</option>
                     @foreach($availableOrganizations as $org)
                         <option value="{{ $org->id }}">{{ $org->name }}</option>
                     @endforeach
                 </select>
-                @error('newOrgId') <span style="color: var(--erp-red); font-size: 0.7rem; font-family: monospace;">{{ $message }}</span> @enderror
+                @error('newOrgId') <span class="field-error">{{ $message }}</span> @enderror
             </div>
 
-            <div style="margin-bottom: 20px;">
-                <label class="form-label">Project Title</label>
-                <input type="text" wire:model="newTitle" class="cyber-input" placeholder="e.g., Q3 Cloud Migration Matrix">
-                @error('newTitle') <span style="color: var(--erp-red); font-size: 0.7rem; font-family: monospace;">{{ $message }}</span> @enderror
+            <div class="field">
+                <label for="new-title" class="label">Project name</label>
+                <input id="new-title" type="text" wire:model="newTitle" class="input" placeholder="e.g. Finance system rollout">
+                @error('newTitle') <span class="field-error">{{ $message }}</span> @enderror
             </div>
 
-            <div style="margin-bottom: 20px;">
-                <label class="form-label">Initial Status</label>
-                <select wire:model="newStatus" class="cyber-select">
-                    <option value="Scoping">Scoping (Pre-Contract)</option>
-                    <option value="Active">Active (Live Operations)</option>
+            <div class="field">
+                <label for="new-status" class="label">Status</label>
+                <select id="new-status" wire:model="newStatus" class="select">
+                    <option value="Scoping">Scoping (before the contract is signed)</option>
+                    <option value="Active">Active (work under way)</option>
                 </select>
-                @error('newStatus') <span style="color: var(--erp-red); font-size: 0.7rem; font-family: monospace;">{{ $message }}</span> @enderror
+                @error('newStatus') <span class="field-error">{{ $message }}</span> @enderror
             </div>
 
-            <div style="margin-bottom: 20px;">
-                <label class="form-label">Total Allocated Budget (USD)</label>
-                <input type="number" wire:model="newBudget" class="cyber-input" placeholder="0.00" step="1000">
-                @error('newBudget') <span style="color: var(--erp-red); font-size: 0.7rem; font-family: monospace;">{{ $message }}</span> @enderror
+            <div class="field">
+                <label for="new-budget" class="label">Budget (USD)</label>
+                <input id="new-budget" type="number" wire:model="newBudget" class="input num text-left" placeholder="0.00" step="1000">
+                @error('newBudget') <span class="field-error">{{ $message }}</span> @enderror
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-                <div>
-                    <label class="form-label">Start Date</label>
-                    <input type="date" wire:model="newStartDate" class="cyber-input">
-                    @error('newStartDate') <span style="color: var(--erp-red); font-size: 0.7rem; font-family: monospace;">{{ $message }}</span> @enderror
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div class="field">
+                    <label for="new-start" class="label">Start date (optional)</label>
+                    <input id="new-start" type="date" wire:model="newStartDate" class="input">
+                    @error('newStartDate') <span class="field-error">{{ $message }}</span> @enderror
                 </div>
-                <div>
-                    <label class="form-label">Target End Date</label>
-                    <input type="date" wire:model="newEndDate" class="cyber-input">
-                    @error('newEndDate') <span style="color: var(--erp-red); font-size: 0.7rem; font-family: monospace;">{{ $message }}</span> @enderror
+                <div class="field">
+                    <label for="new-end" class="label">Planned end date (optional)</label>
+                    <input id="new-end" type="date" wire:model="newEndDate" class="input">
+                    @error('newEndDate') <span class="field-error">{{ $message }}</span> @enderror
                 </div>
             </div>
 
-            <div style="margin-bottom: 25px;">
-                <label class="form-label">Scope Description</label>
-                <textarea wire:model="newDescription" class="cyber-textarea" style="min-height: 100px;" placeholder="Brief overview of deployment objectives..."></textarea>
+            <div class="field">
+                <label for="new-description" class="label">Scope (optional)</label>
+                <textarea id="new-description" wire:model="newDescription" class="textarea" placeholder="What the project covers and what it delivers"></textarea>
             </div>
+        </div>
 
-            <button wire:click="createProject" class="btn-primary" @click="setTimeout(() => { if(!$wire.errors.length) openCreateDrawer = false; }, 500)">
-                <i data-lucide="hard-drive" style="width: 16px; height: 16px;"></i> ESTABLISH DEPLOYMENT
+        <div class="border-t border-line px-6 py-4">
+            <button type="button" wire:click="createProject" class="btn btn-primary w-full" @click="setTimeout(() => { if(!$wire.errors.length) openCreateDrawer = false; }, 500)">
+                Create project
             </button>
         </div>
     </div>
-
-    <script> 
-        document.addEventListener('livewire:navigated', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); }); 
-        document.addEventListener('DOMContentLoaded', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); });
-    </script>
 </div>
