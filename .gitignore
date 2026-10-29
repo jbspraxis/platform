@@ -21,3 +21,5 @@ praxis_core/bootstrap/cache/*.php
 _downloads/
 _ref/
 _hotfix/
+_pr1/
+_pr1b/
