@@ -13,6 +13,7 @@ return [
     'code_expiry' => "Ce code est valable :minutes minutes. Ne le communiquez à personne\u{00A0}: JBS Praxis ne vous le demandera jamais.",
     'unsubscribe' => 'Se désabonner de JBS Praxis Insights',
     'confidential' => "Confidentiel\u{00A0}: préparé pour :company.",
+    'date_format' => 'dddd Do MMMM YYYY', // jeudi 5 novembre 2026, dimanche 1er novembre 2026
     'reason_contact' => 'Vous recevez ce message parce que vous avez contacté JBS Praxis via jbspraxis.com.',
     'reason_client' => 'Vous recevez ce message parce que votre organisation travaille avec JBS Praxis.',
     'reason_internal' => 'Envoyé par jbspraxis.com à l’équipe JBS Praxis.',

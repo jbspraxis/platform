@@ -10,6 +10,7 @@ return [
     'client_preheader' => 'Choisissez un mot de passe pour retrouver vos projets, propositions et factures.',
     'client_intro' => 'Nous avons préparé le portail client JBS Praxis de votre organisation. Choisissez un mot de passe pour vous connecter et retrouver vos projets, propositions et factures au même endroit.',
     'client_reason' => 'Vous recevez ce message parce que votre organisation travaille avec JBS Praxis.',
+    'client_signed' => 'Merci d’avoir signé la proposition du projet :project. La facture d’acompte correspondante est disponible dans votre portail client.',
     'button' => 'Configurer votre compte',
     'not_expected' => "Si vous n’attendiez pas cet e-mail, vous pouvez l’ignorer\u{00A0}: aucun accès n’est ouvert tant qu’aucun mot de passe n’a été choisi.",
 ];

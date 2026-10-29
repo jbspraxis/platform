@@ -36,13 +36,15 @@ class EmailSamples extends Command
         }
 
         $index = [];
-        foreach ($this->mailClasses() as $class) {
+        foreach ($this->mailClasses($only) as $class) {
             foreach (array_keys($class::samples()) as $name) {
                 $slug = class_basename($class) . '-' . $name;
                 if ($only !== '' && !str_contains(strtolower($slug), $only)) {
                     continue;
                 }
-                foreach ($locales as $locale) {
+                // English-only emails stay English; a sample named "...-en" or "...-fr" exists in that language only
+                $sampleLocales = preg_match('/-(en|fr)$/', $name, $m) ? [$m[1]] : $class::locales();
+                foreach (array_intersect($locales, $sampleLocales) as $locale) {
                     $mail = $class::samples()[$name]->locale($locale); // a fresh instance each time
                     if ($send) {
                         Mail::to($send)->send($mail);
@@ -66,11 +68,17 @@ class EmailSamples extends Command
         return self::SUCCESS;
     }
 
-    /** @return list<class-string<BrandedMail>> */
-    private function mailClasses(): array
+    /**
+     * When --only names a class, only that file is loaded, so a broken mail class elsewhere can't stop the preview.
+     *
+     * @return list<class-string<BrandedMail>>
+     */
+    private function mailClasses(string $only = ''): array
     {
+        $files = File::files(app_path('Mail'));
+        $named = array_filter($files, fn ($f) => $only !== '' && str_contains(strtolower($f->getFilenameWithoutExtension()), $only));
         $classes = [];
-        foreach (File::files(app_path('Mail')) as $file) {
+        foreach ($named ?: $files as $file) {
             $class = 'App\\Mail\\' . $file->getFilenameWithoutExtension();
             if (class_exists($class) && is_subclass_of($class, BrandedMail::class) && !(new \ReflectionClass($class))->isAbstract()) {
                 $classes[] = $class;

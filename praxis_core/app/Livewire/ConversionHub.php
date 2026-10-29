@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\CopqReportMail;
 use App\Support\Access;
+use App\Support\MailLocale;
 
 class ConversionHub extends Component
 {
@@ -117,6 +118,7 @@ class ConversionHub extends Component
                 'tech_reality' => $tool, 'turnover_bracket' => $turnover,
                 'status' => 'Lead', 'pipeline_stage' => 'Lead Captured',
                 'is_duplicate_suspect' => $existingOrg ? 1 : 0,
+                'preferred_language' => strtoupper(MailLocale::forVisitor()), // later emails from HQ follow the page language
                 'created_at' => now(), 'updated_at' => now(),
             ]);
         }
@@ -255,7 +257,10 @@ class ConversionHub extends Component
 
         if ($assessment && $assessment->corporate_email) {
             try {
-                Mail::to($assessment->corporate_email)->send(new CopqReportMail($assessment));
+                // The visitor is on the calculator now: the language of the page they used (the form asks for no preference)
+                Mail::to($assessment->corporate_email)
+                    ->locale(MailLocale::forVisitor())
+                    ->send(new CopqReportMail($assessment));
                 return true;
             } catch (\Exception $e) {
                 // The page shows a "could not send" message; the report link still works

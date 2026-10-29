@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\System;
 
 use App\Models\User;
 use App\Support\Access;
+use App\Support\MailLocale;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
@@ -238,7 +239,8 @@ class RoleManagement extends Component
                     DB::table($table)->insert($record);
 
                     // Dispatch Invitation Email
-                    Mail::to($this->email)->send(new \App\Mail\UserInvitation($this->first_name, $invitationToken, $isClient));
+                    Mail::to($this->email)->locale($this->invitationLocale($isClient, $finalOrgId))
+                        ->send(new \App\Mail\UserInvitation($this->first_name, $invitationToken, $isClient));
 
                     $this->successMessage = "User generated and cryptographic invitation transmitted successfully.";
                 }
@@ -341,6 +343,14 @@ class RoleManagement extends Component
             ->distinct()->count('users.id');
     }
 
+    /** Invitation language: staff get English; a client gets their organisation's preferred language (else English). */
+    private function invitationLocale(bool $isClient, $organizationId): string
+    {
+        return MailLocale::forRecipient($isClient
+            ? DB::table('organizations')->where('id', $organizationId)->value('preferred_language')
+            : null);
+    }
+
     /** Finds an account on either side: [row, isClient]. */
     private function findAccount($id): array
     {
@@ -391,7 +401,8 @@ class RoleManagement extends Component
             ]);
 
             // Transmit the email
-            Mail::to($user->email)->send(new \App\Mail\UserInvitation($user->first_name, $token, $isClient));
+            Mail::to($user->email)->locale($this->invitationLocale($isClient, $user->organization_id))
+                ->send(new \App\Mail\UserInvitation($user->first_name, $token, $isClient));
 
             $this->successMessage = "Zero-Knowledge Init re-transmitted to " . strtoupper($user->first_name) . ".";
             $this->showSuccessModal = true;

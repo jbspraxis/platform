@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Mail\UserInvitation;
 use App\Models\User;
 use App\Support\Access;
+use App\Support\MailLocale;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -89,7 +90,7 @@ class InviteOwner extends Command
 
         $invitation = new UserInvitation($firstName, $token, false);
         try {
-            Mail::to($email)->send($invitation);
+            Mail::to($email)->locale(MailLocale::forRecipient(null))->send($invitation);
         } catch (\Throwable $e) {
             $this->error('The account is ready, but the email could not be sent: ' . $e->getMessage());
             $this->line('Fix the MAIL_* settings and run this command again (it sends a fresh link), or use --show-link.');

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Mail\SystemAlert;
 use App\Support\Monitor\ErrorMonitor;
 use Closure;
 use Illuminate\Http\Request;
@@ -38,12 +39,11 @@ class MonitorWatchdog
             }
             $to = config('services.monitor.alert_email');
             if ($to) {
-                Mail::raw(
-                    "The scheduled jobs on jbspraxis.com have not run since {$beat} (UTC).\n\n"
-                    . "Without them: no error alerts, no exchange-rate sync, no QA auto-approval.\n\n"
-                    . "Check cPanel → Cron Jobs for: * * * * * /usr/local/bin/ea-php83 /home/smartqaq/praxis_core/artisan schedule:run\n",
-                    fn ($m) => $m->to($to)->subject('[Alert] Scheduler stopped on jbspraxis.com')
-                );
+                // A team alert: English, whatever language the visitor's page was in
+                Mail::to($to)->locale('en')->send(SystemAlert::schedulerStopped(
+                    (string) $beat,
+                    '* * * * * /usr/local/bin/ea-php83 /home/smartqaq/praxis_core/artisan schedule:run'
+                ));
             }
         } catch (\Throwable $e) {
             // never break a visitor's request

@@ -2,6 +2,7 @@
 
 namespace App\Support\Monitor;
 
+use App\Mail\SystemAlert;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -26,16 +27,12 @@ class MonitorAlerts
             return 0;
         }
 
-        $body = "New errors on jbspraxis.com:\n\n";
+        $errors = [];
         foreach ($groups as $g) {
-            $body .= '- ' . self::line($g) . "\n";
-            if ($hint = ErrorMonitor::explain($g)) {
-                $body .= "  {$hint}\n";
-            }
+            $errors[] = ['summary' => self::line($g), 'hint' => ErrorMonitor::explain($g)];
         }
-        $body .= "\nOpen HQ → System Health → Errors and use \"Copy for AI\" to get a fix:\n" . route('hq.system.health') . "\n";
 
-        if (self::send('New error' . ($groups->count() > 1 ? 's' : '') . ' on jbspraxis.com', $body)) {
+        if (self::send(SystemAlert::newErrors($errors))) {
             DB::table('monitor_error_groups')->whereIn('id', $groups->pluck('id'))->update(['alerted_at' => now()]);
             return $groups->count();
         }
@@ -58,7 +55,7 @@ class MonitorAlerts
             if ($last && Carbon::parse($last)->gt(now()->subHours(6))) {
                 continue;
             }
-            if (self::allowed() && self::send("Health check failing: {$check['label']}", "{$check['label']}: {$check['detail']}\n\n" . ($check['fix'] ? "What to do: {$check['fix']}\n\n" : '') . route('hq.system.health') . "\n")) {
+            if (self::allowed() && self::send(SystemAlert::checkFailing($check['label'], $check['detail'], $check['fix']))) {
                 ErrorMonitor::setState($key, now()->toDateTimeString());
                 $sent++;
             }
@@ -76,24 +73,21 @@ class MonitorAlerts
         ErrorMonitor::setState($key, now()->toDateTimeString());
 
         $checks = HealthChecks::all();
-        $body = 'jbspraxis.com, ' . $lagos->format('l j F Y') . "\n\nHEALTH\n";
-        foreach ($checks as $c) {
-            $body .= str_pad(strtoupper($c['state']), 8) . "{$c['label']}: {$c['detail']}\n";
-        }
-
         $top = DB::table('monitor_error_groups')->where('last_seen_at', '>=', now()->subDay())->whereIn('status', ['new', 'investigating'])
             ->orderByDesc('occurrences')->limit(10)->get();
-        $body .= "\nOPEN ERRORS SEEN IN THE LAST 24 HOURS\n";
-        $body .= $top->isEmpty() ? "None.\n" : $top->map(fn ($g) => '- ' . self::line($g))->implode("\n") . "\n";
-        $body .= "\n" . route('hq.system.health') . "\n";
 
-        return self::send('Daily health report: ' . strtoupper(HealthChecks::worst($checks)) . ' | jbspraxis.com', $body, false);
+        return self::send(SystemAlert::dailyReport(
+            HealthChecks::worst($checks),
+            $lagos->toDateString(),
+            array_map(fn ($c) => ['label' => $c['label'], 'state' => $c['state'], 'detail' => $c['detail']], $checks),
+            $top->map(fn ($g) => self::line($g))->all(),
+        ));
     }
 
     private static function line(object $g): string
     {
         $where = $g->file ? " ({$g->file}" . ($g->line ? ":{$g->line}" : '') . ')' : '';
-        return '[' . strtoupper($g->level) . '] ' . ($g->exception_class ? class_basename($g->exception_class) . ': ' : '')
+        return '[' . strtolower($g->level) . '] ' . ($g->exception_class ? class_basename($g->exception_class) . ': ' : '')
             . mb_substr(trim($g->message), 0, 180) . $where . " ×{$g->occurrences}";
     }
 
@@ -108,14 +102,15 @@ class MonitorAlerts
         return true;
     }
 
-    private static function send(string $subject, string $body, bool $isAlert = true): bool
+    /** Team alerts are English only. A failure is logged, never thrown: monitoring must not break what it watches. */
+    private static function send(SystemAlert $mail): bool
     {
         $to = config('services.monitor.alert_email');
         if (!$to) {
             return false;
         }
         try {
-            Mail::raw($body, fn ($m) => $m->to($to)->subject(($isAlert ? '[Alert] ' : '') . $subject));
+            Mail::to($to)->locale('en')->send($mail);
             return true;
         } catch (\Throwable $e) {
             Log::warning('Monitor: alert email failed', ['message' => $e->getMessage()]);

@@ -33,10 +33,11 @@ final class MailText
         $t = preg_replace('~<br\s*/?>~i', "\n", $t);
         $t = preg_replace('~<li\b[^>]*>~i', "\n- ", $t);
         $t = preg_replace('~</(p|h[1-6]|blockquote|ul|ol)>~i', "\n\n", $t);
-        $t = preg_replace('~</(tr|div|li)>~i', "\n", $t);
+        $t = preg_replace('~</(tr|div)>~i', "\n", $t);
+        $t = preg_replace('~</li>~i', '', $t); // <li> already starts its own line
         $t = strip_tags($t);
         $t = html_entity_decode($t, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $t = preg_replace("~[ \t]*\x{1F}[ \t]*~u", $colon, $t);
+        $t = preg_replace("~[ \t]*\x{1F}\s*~u", $colon, $t); // label and value on one line
 
         // Spacer cells leave lines of no-break spaces; trim those too
         $lines = array_map(fn ($l) => preg_replace('~^[\s\x{00A0}]+|[\s\x{00A0}]+$~u', '', preg_replace('~[ \t]+~', ' ', $l)), explode("\n", $t));

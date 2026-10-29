@@ -29,6 +29,12 @@ abstract class BrandedMail extends Mailable
      */
     abstract public static function samples(): array;
 
+    /** The languages this email is written in. Internal team alerts are English only. */
+    public static function locales(): array
+    {
+        return ['en', 'fr'];
+    }
+
     public function envelope(): Envelope
     {
         return new Envelope(

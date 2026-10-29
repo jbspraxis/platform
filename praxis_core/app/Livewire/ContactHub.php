@@ -3,9 +3,12 @@
 namespace App\Livewire;
 
 use Livewire\Component;
+use App\Mail\EnquiryAlert;
+use App\Mail\EnquiryReceived;
 use App\Models\Organization;
 use App\Models\User;
 use App\Support\Access;
+use App\Support\MailLocale;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -39,6 +42,12 @@ class ContactHub extends Component
 
     // UI State
     public $isSuccess = false;
+
+    public function mount()
+    {
+        // The language field starts on the page language (it is hidden in quick mode), so a French visitor gets French email
+        $this->language = app()->getLocale() === 'fr' ? 'Français (FR)' : 'English (EN)';
+    }
 
     public function toggleMode()
     {
@@ -190,15 +199,10 @@ class ContactHub extends Component
         $team = config('services.leads.alert_email');
 
         try {
-            Mail::raw(
-                "Hello {$firstName},\n\n"
-                . "Thank you for contacting JBS Praxis. We have received your message and a member of our team will get back to you shortly.\n\n"
-                . "If you would like to choose a time now, book a free audit & demo here:\n" . route('schedule') . "\n\n"
-                . "JBS Praxis\ninfo@jbspraxis.com\n" . route('home'),
-                function ($m) use ($visitor) {
-                    $m->to($visitor)->subject('We have received your message | JBS Praxis');
-                }
-            );
+            // In the language the visitor chose on the form, else the language of the page
+            Mail::to($visitor)
+                ->locale(MailLocale::forVisitor($this->language))
+                ->send(new EnquiryReceived($firstName));
         } catch (\Throwable $e) {
             Log::error('Contact form: confirmation email failed', ['message' => $e->getMessage()]);
         }
@@ -208,30 +212,23 @@ class ContactHub extends Component
         }
 
         $finalBottleneck = $this->bottleneck === 'other' ? $this->otherBottleneck : $this->bottleneck;
-        $lines = [
-            'Name' => $this->fullName,
-            'Email' => $visitor,
-            'Job title' => $this->title,
-            'Phone' => trim(($this->countryCode ?? '') . ' ' . ($this->phone ?? '')),
-            'Company' => $this->companyName,
-            'City' => $this->city,
-            'Language' => $this->language,
-            'Budget' => $this->budget,
-            'Stage' => $this->isDiagnosticMode ? $this->stage : null,
-            'Main bottleneck' => $this->isDiagnosticMode ? $finalBottleneck : null,
-            'Current systems' => $this->isDiagnosticMode ? $this->techReality : null,
-            'Governance' => $this->isDiagnosticMode ? $this->govStatus : null,
+        $details = [
+            'job_title' => $this->title,
+            'phone' => filled($this->phone) ? trim(($this->countryCode ?? '') . ' ' . $this->phone) : null,
+            'city' => $this->city,
+            'language' => $this->language,
+            'budget' => $this->budget,
+            'stage' => $this->isDiagnosticMode ? $this->stage : null,
+            'bottleneck' => $this->isDiagnosticMode ? $finalBottleneck : null,
+            'systems' => $this->isDiagnosticMode ? $this->techReality : null,
+            'governance' => $this->isDiagnosticMode ? $this->govStatus : null,
         ];
-        $body = "New enquiry from the jbspraxis.com contact form.\n\n";
-        foreach ($lines as $label => $value) {
-            if (filled($value)) $body .= "{$label}: {$value}\n";
-        }
-        $body .= "\nMessage:\n{$this->message}\n\nReply directly to this email to answer the visitor.";
 
         try {
-            Mail::raw($body, function ($m) use ($team, $visitor) {
-                $m->to($team)->replyTo($visitor)->subject('New website enquiry: ' . trim($this->companyName));
-            });
+            // Team alert: English, replies go to the visitor
+            Mail::to($team)
+                ->locale('en')
+                ->send(new EnquiryAlert($this->fullName, $visitor, trim($this->companyName), $this->message, $details));
         } catch (\Throwable $e) {
             Log::error('Contact form: team alert email failed', ['message' => $e->getMessage()]);
         }

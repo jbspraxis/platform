@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\MeetingApprovedMail;
 // use App\Mail\CopqReportMail; // Commented out for now until logic is finalized
+use App\Support\MailLocale;
 
 #[Layout('components.layouts.hq')]
 class LiveConsultation extends Component
@@ -74,6 +75,16 @@ class LiveConsultation extends Component
             return;
         }
 
+        // A link pasted without https:// would be a dead button in the client's confirmation
+        $meetingLink = trim($meetingLink);
+        if (!preg_match('~^https?://~i', $meetingLink)) {
+            $meetingLink = 'https://' . ltrim($meetingLink, '/');
+        }
+        if (!filter_var($meetingLink, FILTER_VALIDATE_URL)) {
+            session()->flash('error', 'Enter the full meeting link, for example https://meet.google.com/abc-defg-hij.');
+            return;
+        }
+
         DB::table('appointments')->where('id', $appointmentId)->update([
             'status' => 'Scheduled',
             'meeting_link' => trim($meetingLink),
@@ -85,8 +96,10 @@ class LiveConsultation extends Component
         $appt = DB::table('appointments')->where('id', $appointmentId)->first();
         $org = DB::table('organizations')->where('id', $appt->organization_id)->first();
         
+        // The person who booked first (website bookings store them in created_by), then the latest report contact, then the primary contact
+        $bookerEmail = $appt->created_by ? DB::table('client_users')->where('id', $appt->created_by)->whereNull('deleted_at')->value('email') : null;
         $copq = DB::table('copq_assessments')->where('organization_id', $org->id)->orderBy('created_at', 'desc')->first();
-        $clientEmail = $copq ? $copq->corporate_email : null;
+        $clientEmail = $bookerEmail ?: ($copq ? $copq->corporate_email : null);
 
         if (!$clientEmail) {
             $user = DB::table('client_users')->where('organization_id', $org->id)->whereNull('deleted_at')->orderByDesc('is_primary_client')->first();
@@ -95,7 +108,11 @@ class LiveConsultation extends Component
 
         if ($clientEmail) {
             try {
-                Mail::to($clientEmail)->send(new MeetingApprovedMail($appt, $org->name, trim($meetingLink)));
+                // Greet the contact by first name when they have a record; the organisation's stored language, else English
+                $firstName = DB::table('client_users')->where('email', $clientEmail)->value('first_name');
+                Mail::to($clientEmail)
+                    ->locale(MailLocale::forRecipient($org->preferred_language ?? null))
+                    ->send(new MeetingApprovedMail($appt, $org->name, trim($meetingLink), $firstName));
                 session()->flash('success', 'Consultation Approved & Link Dispatched to Client.');
             } catch (\Exception $e) {
                 session()->flash('error', 'Consultation Approved, but SMTP Email Dispatch failed.');
@@ -306,7 +323,10 @@ class LiveConsultation extends Component
         }
 
         try {
-            Mail::to($this->copqData->corporate_email)->send(new CopqReportMail($this->copqData));
+            // Re-sent from HQ: the organisation's stored language, else English
+            Mail::to($this->copqData->corporate_email)
+                ->locale(MailLocale::forRecipient($this->leadData->preferred_language ?? null))
+                ->send(new CopqReportMail($this->copqData, true));
             session()->flash('success', 'COPQ Dossier transmitted to client inbox.');
         } catch (\Exception $e) {
             session()->flash('error', 'Transmission failed: SMTP Configuration required.');

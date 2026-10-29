@@ -2,7 +2,10 @@
 
 namespace App\Livewire;
 
+use App\Mail\AuditRequestAlert;
+use App\Mail\AuditRequested;
 use App\Support\Access;
+use App\Support\MailLocale;
 use Livewire\Component;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -190,6 +193,7 @@ class ScheduleConsultation extends Component
                     'status' => 'Lead',
                     'pipeline_stage' => 'Lead Captured',
                     'is_duplicate_suspect' => $existingOrg ? 1 : 0,
+                    'preferred_language' => strtoupper(MailLocale::forVisitor()), // later emails from HQ follow the page language
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -218,6 +222,8 @@ class ScheduleConsultation extends Component
                 ]);
             }
 
+            $bookerId = $existingUser->id ?? $userId;
+
             // 2. Combine Date and Time (stored as the Lagos wall-clock time shown to the visitor)
             $startDateTime = Carbon::parse($this->selectedDate . ' ' . $this->selectedTime);
             $endDateTime = $startDateTime->copy()->addMinutes(60); // 1 hour block
@@ -231,6 +237,7 @@ class ScheduleConsultation extends Component
                 'start_time' => $startDateTime,
                 'end_time' => $endDateTime,
                 'status' => 'Requested',
+                'created_by' => $bookerId, // the contact who booked (HQ-created appointments hold a staff id)
                 'created_at' => now(),
                 'updated_at' => now()
             ]);
@@ -272,19 +279,12 @@ class ScheduleConsultation extends Component
     {
         $firstName = explode(' ', trim($this->fullName), 2)[0];
         $visitor = strtolower(trim($this->email));
-        $when = $start->format('l j F Y') . ' at ' . $start->format('H:i') . ' (Lagos time, WAT)';
 
         try {
-            Mail::raw(
-                "Hello {$firstName},\n\n"
-                . "Thank you for booking a free audit & demo with JBS Praxis.\n\n"
-                . "Requested time: {$when}\nTopic: {$focus}\n\n"
-                . "Our team will confirm the meeting and send you the call details by email shortly.\n\n"
-                . "JBS Praxis\ninfo@jbspraxis.com\n" . route('home'),
-                function ($m) use ($visitor) {
-                    $m->to($visitor)->subject('Your audit & demo request | JBS Praxis');
-                }
-            );
+            // In the language of the page the visitor booked from
+            Mail::to($visitor)
+                ->locale(MailLocale::forVisitor())
+                ->send(new AuditRequested($firstName, $focus, $start));
         } catch (\Throwable $e) {
             Log::error('Booking: confirmation email failed', ['message' => $e->getMessage()]);
         }
@@ -295,15 +295,10 @@ class ScheduleConsultation extends Component
         }
 
         try {
-            Mail::raw(
-                "New audit & demo request from jbspraxis.com.\n\n"
-                . "Name: {$this->fullName}\nJob title: {$this->title}\nEmail: {$visitor}\nPhone: {$this->phone}\n"
-                . "Company: {$this->enterpriseName}\nTopic: {$focus}\nRequested: {$when}\n\n"
-                . "Approve it in HQ: " . route('hq.crm.consult'),
-                function ($m) use ($team, $visitor) {
-                    $m->to($team)->replyTo($visitor)->subject('New demo request: ' . trim($this->enterpriseName));
-                }
-            );
+            // Team alert: English, replies go to the visitor
+            Mail::to($team)
+                ->locale('en')
+                ->send(new AuditRequestAlert($this->fullName, $this->title, $visitor, $this->phone, trim($this->enterpriseName), $focus, $start));
         } catch (\Throwable $e) {
             Log::error('Booking: team alert email failed', ['message' => $e->getMessage()]);
         }

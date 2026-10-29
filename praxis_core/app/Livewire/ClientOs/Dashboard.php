@@ -8,6 +8,8 @@ use Livewire\Attributes\Locked;
 use Livewire\WithFileUploads;
 use App\Support\People;
 use App\Support\Access;
+use App\Support\MailLocale;
+use App\Mail\TeamMemberInvitation;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -664,23 +666,23 @@ class Dashboard extends Component
 
             $roleId = $this->inviteRoleId ?: DB::table('roles')->where('audience', 'client')->where('slug', 'client-member')->value('id');
             if (!$roleId || !$this->mayAssignRole($roleId)) {
-                session()->flash('team_error', '> ERR: You cannot give that role.'); return;
+                session()->flash('team_error', 'You don’t have permission to give that role. Choose another role.'); return;
             }
 
             if (!empty($this->inviteProjectId) && !$this->ownsProject($this->inviteProjectId)) {
-                session()->flash('team_error', '> ERR: Unknown project.'); return;
+                session()->flash('team_error', 'We couldn’t find that project. Choose a project from the list.'); return;
             }
 
             $portalAccounts = DB::table('client_users')->where('organization_id', $this->organization->id)
                 ->whereIn('lifecycle_stage', ['Onboarding', 'Active'])->whereNull('deleted_at')->count();
             if ($portalAccounts >= 3) {
-                session()->flash('team_error', '> ERR: MAXIMUM NODE CAPACITY (3) REACHED.'); return;
+                session()->flash('team_error', 'You can’t invite anyone else: your organisation already has the maximum of 3 Client Portal accounts.'); return;
             }
 
             $primaryDomain = substr(strrchr($this->user->email, "@"), 1);
             $inviteDomain = substr(strrchr($this->inviteEmail, "@"), 1);
             if (strtolower($primaryDomain) !== strtolower($inviteDomain)) {
-                session()->flash('team_error', '> SECURITY BREACH: DOMAIN MUST MATCH @' . strtoupper($primaryDomain)); return;
+                session()->flash('team_error', 'Use an email address ending in @' . strtolower($primaryDomain) . '. Team members must use your organisation’s email domain.'); return;
             }
 
             $token = Str::random(60);
@@ -694,28 +696,21 @@ class Dashboard extends Component
                 'source' => 'invite', 'created_at' => now(), 'updated_at' => now()
             ]);
 
-            $setupUrl = route('client.setup', ['token' => $token]);
-            $orgName = e($this->organization->name);
-            $inviteName = e($this->inviteFirstName);
+            // The invitation email: in the organisation's preferred language (else English)
+            $invitedEmail = $this->inviteEmail;
+            Mail::to($invitedEmail)
+                ->locale(MailLocale::forRecipient($this->organization->preferred_language ?? null))
+                ->send(new TeamMemberInvitation(
+                    $this->inviteFirstName,
+                    $this->inviteLastName,
+                    trim($this->user->first_name . ' ' . $this->user->last_name),
+                    $this->organization->name,
+                    $token
+                ));
 
-            // ACTUALLY DISPATCH THE EMAIL
-            Mail::html(
-                "<div style='font-family: sans-serif; color: #333;'>
-                    <h2 style='color: #00E5FF; background: #0A1128; padding: 15px;'>JBS Praxis: Node Provisioned</h2>
-                    <p>Hello {$inviteName},</p>
-                    <p>You have been granted executive access to the <strong>{$orgName}</strong> deployment matrix.</p>
-                    <p>Click the secure link below to verify your cryptographic signature and set your password:</p>
-                    <p><a href='{$setupUrl}' style='display: inline-block; background: #00E5FF; color: #000; padding: 10px 20px; text-decoration: none; font-weight: bold;'>INITIALIZE SECURE LINK</a></p>
-                    <p style='font-size: 12px; color: #888;'><em>Link expires in 48 hours.</em></p>
-                </div>", 
-                function ($message) {
-                    $message->to($this->inviteEmail)->subject('[URGENT] JBS Praxis OS: Node Provisioning Instructions');
-                }
-            );
-
-            $this->reset(['inviteFirstName', 'inviteLastName', 'inviteEmail', 'inviteProjectId']); 
+            $this->reset(['inviteFirstName', 'inviteLastName', 'inviteEmail', 'inviteProjectId']);
             $this->loadTeamCommand();
-            session()->flash('team_success', '> NODE PROVISIONED. ENCRYPTED EMAIL DISPATCHED TO TARGET.');
+            session()->flash('team_success', "Invitation sent to {$invitedEmail}.");
 
         } catch (\Illuminate\Validation\ValidationException $e) {
             // Livewire will catch this and display it via the frontend @errors block
@@ -723,7 +718,7 @@ class Dashboard extends Component
         } catch (\Exception $e) {
             // Catch DB constraint errors (like UUID mismatches) so it doesn't fail silently
             Log::error('Client team invite failed', ['organization_id' => $this->organization->id, 'message' => $e->getMessage()]);
-            session()->flash('team_error', '> ERR: The invitation could not be completed. Please contact JBS Praxis.');
+            session()->flash('team_error', 'We couldn’t complete the invitation. Contact JBS Praxis for help.');
         }
     }
 

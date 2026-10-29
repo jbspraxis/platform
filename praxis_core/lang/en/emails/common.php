@@ -13,6 +13,7 @@ return [
     'code_expiry' => 'This code works for :minutes minutes. Never share it: JBS Praxis will never ask you for it.',
     'unsubscribe' => 'Unsubscribe from JBS Praxis Insights',
     'confidential' => 'Confidential: prepared for :company.',
+    'date_format' => 'dddd D MMMM YYYY', // Carbon isoFormat: Thursday 5 November 2026
     'reason_contact' => 'You are receiving this because you contacted JBS Praxis through jbspraxis.com.',
     'reason_client' => 'You are receiving this because your organisation works with JBS Praxis.',
     'reason_internal' => 'Sent by jbspraxis.com to the JBS Praxis team.',

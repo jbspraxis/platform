@@ -2,7 +2,10 @@
 
 namespace App\Livewire\Portal;
 
+use App\Mail\SigningCode;
+use App\Mail\UserInvitation;
 use App\Support\Access;
+use App\Support\MailLocale;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\DB;
@@ -91,12 +94,14 @@ class ProposalGateway extends Component
             'updated_at' => now()
         ]);
 
-        // Dispatch Email
+        // Email the signing code: the organisation's preferred language, else the page language
+        $orgLanguage = DB::table('organizations')->where('id', $proposal->organization_id)->value('preferred_language');
+        // The signer is on the page now: a language they picked on the site wins over the stored preference
+        $locale = session()->has('locale') ? MailLocale::forVisitor() : MailLocale::forRecipient($orgLanguage);
         try {
-            Mail::raw("JBS Praxis Command Matrix\n\nYour OTP for cryptographic SOW authorization is: {$otp}\n\nThis code expires in 10 minutes. Do not share this code.", function ($message) {
-                $message->to($this->signerEmail)->subject('JBS PRAXIS: Cryptographic Authorization OTP');
-            });
-        } catch (\Exception $e) { 
+            Mail::to($this->signerEmail)->locale($locale)
+                ->send(new SigningCode($otp, SigningCode::PROPOSAL, $proposal->title ?: $proposal->proposal_ref, $vectorPerson->first_name));
+        } catch (\Exception $e) {
             // Fallback for local testing so you can read the OTP in your log file
             Log::info("Praxis Auth OTP for {$this->signerEmail}: {$otp}");
         }
@@ -293,12 +298,15 @@ class ProposalGateway extends Component
                 ]);
                 
                 $setupUrl = route('client.setup', ['token' => $invitationToken]);
-                try {
-                    Mail::raw("JBS Praxis OS Initialization.\n\nYour SOW is cryptographically secured. Initialize your key to access your Executive Dashboard and Invoice #001:\n\n{$setupUrl}", function ($message) use ($clientUser) {
-                        $message->to($clientUser->email)->subject('JBS PRAXIS: Action Required - Initialize Node');
-                    });
-                } catch (\Exception $e) { 
-                    Log::info("Praxis Setup URL for {$clientUser->email}: {$setupUrl}");
+                // Only contacts who have never set a password get the setup email; a returning client already has access
+                if ($clientUser->password === null) {
+                    try {
+                        $locale = session()->has('locale') ? MailLocale::forVisitor() : MailLocale::forRecipient($organization->preferred_language ?? null);
+                        Mail::to($clientUser->email)->locale($locale)
+                            ->send(new UserInvitation($clientUser->first_name, $invitationToken, true, $proposal->title ?: $proposal->proposal_ref));
+                    } catch (\Exception $e) {
+                        Log::info("Praxis Setup URL for {$clientUser->email}: {$setupUrl}");
+                    }
                 }
             }
         });

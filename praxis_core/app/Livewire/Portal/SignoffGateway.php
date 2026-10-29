@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Portal;
 
+use App\Mail\SigningCode;
 use App\Support\Access;
+use App\Support\MailLocale;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
@@ -114,11 +116,13 @@ class SignoffGateway extends Component
 
         $email = $this->signoff->signatory_email;
 
+        // A language the signatory picked on the site wins, else the organisation's stored preference
+        $language = DB::table('projects')->join('organizations', 'projects.organization_id', '=', 'organizations.id')
+            ->where('projects.id', $this->signoff->project_id)->value('organizations.preferred_language');
+
         try {
-            Mail::raw("Your highly secure Authorization Code for the JBS Praxis Project Handover is: {$otp}\n\nThis code expires strictly in 10 minutes. Do not share this code.", function ($message) use ($email) {
-                $message->to($email)
-                        ->subject('JBS PRAXIS: Secure Signoff Authorization Code');
-            });
+            Mail::to($email)->locale(session()->has('locale') ? MailLocale::forVisitor() : MailLocale::forRecipient($language))
+                ->send(new SigningCode($otp, SigningCode::HANDOVER, $this->signoff->project_title));
             session()->flash('success', "SECURE OTP DISPATCHED TO: {$email}");
         } catch (\Exception $e) {
             Log::error('Signoff OTP email failed', ['signoff_id' => $this->signoff->id, 'message' => $e->getMessage()]);

@@ -168,13 +168,16 @@ class BroadcastLedger extends Component
             'selectedTone' => 'required|string'
         ]);
 
-        $prompt = "You are the Lead Partner at JBS Praxis. Rewrite the following email draft using a strictly '{$this->selectedTone}' tone. 
-        CRITICAL RULES:
-        1. Keep it Human, EXTREMELY CONCISE, HIGHLY CORPORATE and punchy. Maximum 2 to 3 short paragraphs.
-        2. Format the output in clean, modern HTML (only use <p>, <strong>, <ul> tags). Do not include standard <html> or <body> tags.
-        3. Use these exact literal variables where appropriate: {{ first_name }}, {{ company_name }}, {{ industry }}, {{ pipeline_stage }}.
-        
-        Raw Draft: {$this->rawBody}";
+        // Brand voice for client emails: docs/BRAND.md sections 4 and 13. The email layout adds the sign-off.
+        $prompt = "You write emails for JBS Praxis, a consulting and engineering firm in Lagos and Douala. Rewrite the draft below in a '{$this->selectedTone}' tone that stays plain, precise, warm and measured.
+        RULES:
+        1. Write in the draft's language: British English, or French (courant soigné, vouvoiement).
+        2. Two or three short paragraphs, short sentences, sentence case. No exclamation marks, no hype (revolutionary, cutting-edge, seamless, robust, unlock, leverage, elite), no guaranteed outcomes.
+        3. Output HTML using only <p>, <strong>, <ul> and <li>. No <html> or <body> tags.
+        4. Open with 'Hello {{ first_name }},' in English or 'Bonjour,' in French. Do not add a sign-off or signature: the email adds one.
+        5. You may use {{ company_name }} and {{ industry }}.
+
+        Draft: {$this->rawBody}";
 
         try {
             $apiKey = config('services.gemini.api_key');

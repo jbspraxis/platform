@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\IntelligenceBroadcast;
+use App\Support\MailLocale;
 
 class ProcessBroadcastQueue extends Command
 {
@@ -39,24 +40,28 @@ class ProcessBroadcastQueue extends Command
                 }
                 $org = DB::table('organizations')->where('id', $user->organization_id)->first();
 
-                // 2. Parse Dynamic Variables (Regex makes it immune to AI spacing errors)
-                $body = $campaign->body_html;
-                $body = preg_replace('/\{\{\s*first_name\s*\}\}/i', $user->first_name ?? 'Executive', $body);
-                $body = preg_replace('/\{\{\s*company_name\s*\}\}/i', $org->name ?? 'your enterprise', $body);
-                $body = preg_replace('/\{\{\s*industry\s*\}\}/i', $org->industry ?? 'your sector', $body);
-                $body = preg_replace('/\{\{\s*pipeline_stage\s*\}\}/i', $org->pipeline_stage ?? '', $body);
+                // The frame (sign-off, footer) follows the campaign's language; campaigns have no language field yet, so English
+                $locale = MailLocale::forRecipient($campaign->language ?? null);
 
-                // 3. Inject the 1x1 Tracking Pixel & Unsubscribe Link
+                // 2. Parse Dynamic Variables (Regex makes it immune to AI spacing errors)
+                // Contact data comes from public forms: escape it, and never treat it as a regex replacement pattern.
+                // "Hello {{ first_name }}," becomes "Hello Ada," or "Hello,"; French never greets by first name alone.
+                $first = trim((string) ($user->first_name ?? ''));
+                $body = preg_replace('/\s*\{\{\s*first_name\s*\}\}/i', ($locale === 'fr' || $first === '') ? '' : ' ' . e($first), $campaign->body_html);
+                $vars = [
+                    'company_name' => filled($org->name ?? null) ? $org->name : __('emails.broadcast.fallback_company', [], $locale),
+                    'industry' => filled($org->industry ?? null) ? $org->industry : __('emails.broadcast.fallback_industry', [], $locale),
+                    'pipeline_stage' => '', // an internal CRM stage never reaches a client
+                ];
+                $body = preg_replace_callback('/\{\{\s*(company_name|industry|pipeline_stage)\s*\}\}/i', fn ($m) => e($vars[strtolower($m[1])]), $body);
+
+                // 3. The 1x1 tracking pixel and the unsubscribe link: the mailable puts the pixel at the end of the body
+                //    and the link in the footer and the List-Unsubscribe header
                 $pixelUrl = route('tracking.open', ['campaign_id' => $campaign->id, 'user_id' => $user->id]);
                 $unsubUrl = route('tracking.unsubscribe', ['user_id' => $user->id]);
-                
-                $trackingHtml = '<img src="'.$pixelUrl.'" width="1" height="1" style="display:none;" alt="" />';
-                $unsubHtml = '<br><br><div style="font-size: 11px; color: #888888; border-top: 1px solid #eeeeee; padding-top: 10px;">To stop receiving strategic updates from the Intelligence Desk, <a href="'.$unsubUrl.'" style="color: #00E5FF;">click here to unsubscribe</a>.</div>';
 
-                $finalBody = $body . $trackingHtml . $unsubHtml;
-
-                // 4. Send the Email
-                Mail::to($user->email)->send(new IntelligenceBroadcast($campaign->subject, $finalBody));
+                // 4. Send the Email, in the recipient's language
+                Mail::to($user->email)->locale($locale)->send(new IntelligenceBroadcast($campaign->subject, $body, $unsubUrl, $pixelUrl));
 
                 // 5. Mark as Sent
                 DB::table('broadcast_logs')->where('id', $log->id)->update([
@@ -74,7 +79,9 @@ class ProcessBroadcastQueue extends Command
                     'error_message' => substr($e->getMessage(), 0, 250),
                     'updated_at' => now()
                 ]);
-                DB::table('broadcast_campaigns')->where('id', $campaign->id)->increment('failed_count');
+                if (isset($campaign) && $campaign) {
+                    DB::table('broadcast_campaigns')->where('id', $campaign->id)->increment('failed_count');
+                }
             }
         }
     }

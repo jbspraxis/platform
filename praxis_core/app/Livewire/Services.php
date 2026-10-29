@@ -6,6 +6,7 @@ use Livewire\Component;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\PraxisFrameworkDispatch;
+use App\Support\MailLocale;
 
 class Services extends Component
 {
@@ -44,8 +45,10 @@ class Services extends Component
         \Illuminate\Support\Facades\RateLimiter::hit($rateKey, 3600);
 
         try {
-            // Send the actual email to the address they provided
-            Mail::to($this->email)->send(new PraxisFrameworkDispatch());
+            // Send the method PDF to the address they provided, in the language of the page they used
+            Mail::to($this->email)
+                ->locale(MailLocale::forVisitor())
+                ->send(new PraxisFrameworkDispatch());
 
             // Trigger the UI success text
             $this->emailSent = true;

@@ -10,6 +10,7 @@ return [
     'client_preheader' => 'Choose a password to see your projects, proposals and invoices.',
     'client_intro' => 'We have set up your organisation’s JBS Praxis Client Portal. Choose a password to sign in and see your projects, proposals and invoices in one place.',
     'client_reason' => 'You are receiving this because your organisation works with JBS Praxis.',
+    'client_signed' => 'Thank you for signing the proposal for :project. The deposit invoice is ready in your Client Portal.',
     'button' => 'Set up your account',
     'not_expected' => 'If you weren’t expecting this email, you can ignore it. Nothing is active until a password is chosen.',
 ];
