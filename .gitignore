@@ -29,3 +29,7 @@ _mon/
 praxis_core/.env.localmysql
 praxis_core/database/seeders/private/
 _s6
+
+# Brand book build scratch
+brand/build/_render/
+brand/build/__pycache__/
