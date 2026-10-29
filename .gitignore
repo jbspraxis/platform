@@ -20,3 +20,4 @@ praxis_core/bootstrap/cache/*.php
 *.sql.gz
 _downloads/
 _ref/
+_hotfix/
