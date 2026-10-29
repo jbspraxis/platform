@@ -101,13 +101,15 @@
                     <option value="Financially Locked">Guillotine Locked</option>
                 </select>
 
-                @if($userClearance >= 4 && $activeTab === 'matrix')
+                @if($canSeeMoney && $activeTab === 'matrix')
                     <select wire:model.live="filterHealth" class="cyber-select" style="max-width: 200px;">
                         <option value="">-- ALL FINANCIAL HEALTH --</option>
                         <option value="Healthy">Healthy Margins</option>
                         <option value="Bleeding">Bleeding (Margin Alert)</option>
                     </select>
+                @endif
 
+                @if($canSeeAll && $activeTab === 'matrix')
                     <select wire:model.live="filterAssignee" class="cyber-select" style="max-width: 200px;">
                         <option value="">-- ALL PERSONNEL --</option>
                         @foreach($availableAssignees as $user)
@@ -118,11 +120,13 @@
             </div>
 
             <div style="display: flex; gap: 10px;">
-                <button wire:click="exportCsv" class="btn-action">
-                    <i data-lucide="download" style="width: 14px; height: 14px;"></i> EXPORT CSV
-                </button>
-                
-                @if($userClearance >= 4)
+                @if($canExport)
+                    <button wire:click="exportCsv" class="btn-action">
+                        <i data-lucide="download" style="width: 14px; height: 14px;"></i> EXPORT CSV
+                    </button>
+                @endif
+
+                @if($canCreate)
                     <button @click="openCreateDrawer = true" class="btn-action" style="background: rgba(0, 229, 255, 0.1); border-color: var(--erp-teal); color: var(--erp-teal); font-weight: bold;">
                         <i data-lucide="plus-square" style="width: 14px; height: 14px;"></i> INITIALIZE DEPLOYMENT
                     </button>
@@ -142,7 +146,7 @@
     @if($activeTab === 'matrix')
         <div wire:poll.30s="loadData">
             <!-- KPIs -->
-            <div class="metrics-grid" style="grid-template-columns: repeat({{ $userClearance >= 4 ? '4' : '2' }}, 1fr);">
+            <div class="metrics-grid" style="grid-template-columns: repeat({{ $canSeeMoney ? '4' : '2' }}, 1fr);">
                 <div class="metric-card">
                     <div class="metric-title">ACTIVE FIRM DEPLOYMENTS</div>
                     <div class="metric-val" style="color: var(--erp-teal);">{{ $kpiActiveDeployments }}</div>
@@ -152,7 +156,7 @@
                     <div class="metric-val">{{ $kpiSprintVelocity }} <span style="font-size: 0.8rem; color: var(--erp-muted);">PTS</span></div>
                 </div>
                 
-                @if($userClearance >= 4)
+                @if($canSeeMoney)
                     <div class="metric-card" style="{{ $kpiCapitalAtRisk > 0 ? 'border-left-color: #FFBD2E;' : '' }}">
                         <div class="metric-title">PENDING CAPITAL AT RISK</div>
                         <div class="metric-val" style="color: {{ $kpiCapitalAtRisk > 0 ? '#FFBD2E' : '#00FF66' }};">${{ number_format($kpiCapitalAtRisk, 2) }}</div>
@@ -210,7 +214,7 @@
                                 <span class="stat-label">STORY POINTS</span>
                                 <span class="stat-value" style="color: var(--erp-teal);">{{ $p['completed_points'] }} / {{ $p['total_points'] }}</span>
                             </div>
-                            @if($userClearance >= 4)
+                            @if($canSeeMoney)
                                 <div class="stat-block" style="text-align: right;">
                                     <span class="stat-label">BUDGET BURN</span>
                                     <span class="stat-value" style="color: {{ $p['is_bleeding'] ? 'var(--erp-red)' : ($p['burn_percent'] > $p['progress_percent'] ? '#FFBD2E' : '#00FF66') }};">
@@ -221,15 +225,17 @@
                         </div>
 
                         <div style="margin-top: auto; padding-top: 15px;">
-                            <a href="{{ route('hq.ops.scrum', $p['id']) }}" class="btn-action" style="width: 100%; text-decoration: none; margin-bottom: 10px;">
-                                <i data-lucide="terminal" style="width: 14px; height: 14px;"></i> SCRUM MASTER
-                            </a>
-                            
-                            <a href="{{ route('hq.ops.board', $p['id']) }}" class="btn-action" style="width: 100%; text-decoration: none; margin-bottom: {{ $userClearance >= 5 ? '10px' : '0' }};">
+                            @if($canCreate)
+                                <a href="{{ route('hq.ops.scrum', $p['id']) }}" class="btn-action" style="width: 100%; text-decoration: none; margin-bottom: 10px;">
+                                    <i data-lucide="terminal" style="width: 14px; height: 14px;"></i> SCRUM MASTER
+                                </a>
+                            @endif
+
+                            <a href="{{ route('hq.ops.board', $p['id']) }}" class="btn-action" style="width: 100%; text-decoration: none; margin-bottom: {{ $canLock ? '10px' : '0' }};">
                                 <i data-lucide="layout-dashboard" style="width: 14px; height: 14px;"></i> SPRINT BOARD
                             </a>
 
-                            @if($userClearance >= 5)
+                            @if($canLock)
                                 @if($p['is_financially_locked'])
                                     <button wire:click="toggleFinancialLock('{{ $p['id'] }}')" class="btn-action" style="width: 100%; color: #00FF66; border-color: #00FF66;">
                                         <i data-lucide="unlock" style="width: 14px; height: 14px;"></i> L5 OVERRIDE: UNLOCK
@@ -285,7 +291,7 @@
                                 @endif
                             </td>
                             <td style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem;">
-                                @if($userClearance >= 4)
+                                @if($canSeeMoney)
                                     {{ number_format($p['total_budget'], 2) }} <span style="color: var(--erp-muted);">{{ $p['currency'] }}</span>
                                 @else
                                     <span style="color: var(--erp-muted);">[ CLASSIFIED ]</span>
@@ -295,9 +301,11 @@
                                 {{ $p['start_date'] ?? 'TBD' }} <br> <span style="color: var(--erp-muted);">to</span> {{ $p['target_end_date'] ?? 'TBD' }}
                             </td>
                             <td style="display: flex; flex-direction: column; gap: 5px;">
-                                <a href="{{ route('hq.ops.scrum', $p['id']) }}" class="btn-action" style="padding: 4px 8px; font-size: 0.65rem;">
-                                    SCRUM MASTER
-                                </a>
+                                @if($canCreate)
+                                    <a href="{{ route('hq.ops.scrum', $p['id']) }}" class="btn-action" style="padding: 4px 8px; font-size: 0.65rem;">
+                                        SCRUM MASTER
+                                    </a>
+                                @endif
                                 <a href="{{ route('hq.ops.boards.directory', ['project' => $p['id']]) }}" class="btn-action" style="padding: 4px 8px; font-size: 0.65rem;">
                                     SPRINT BOARD
                                 </a>

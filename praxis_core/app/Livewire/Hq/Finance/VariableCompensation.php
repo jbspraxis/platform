@@ -5,6 +5,7 @@ namespace App\Livewire\Hq\Finance;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use Exception;
@@ -119,6 +120,8 @@ class VariableCompensation extends Component
 
     public function saveVariables()
     {
+        abort_unless(Auth::user()->can('payroll.edit'), 403);
+
         $periodString = Carbon::create($this->targetYear, $this->targetMonth, 1)->toDateString();
 
         try {
@@ -162,6 +165,6 @@ class VariableCompensation extends Component
 
     public function render()
     {
-        return view('livewire.hq.finance.payroll-variables-manager');
+        return view('livewire.hq.finance.variable-compensation');
     }
 }

@@ -5,6 +5,7 @@ namespace App\Livewire\Hq\Finance;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Exception;
 
 #[Layout('components.layouts.hq')]
@@ -53,6 +54,8 @@ class ChartOfAccountsManager extends Component
 
     public function saveAccount()
     {
+        abort_unless(Auth::user()->can('finance.create'), 403);
+
         $this->validate([
             'account_name' => 'required|string|max:150',
             'account_type' => 'required|string',
@@ -125,6 +128,8 @@ class ChartOfAccountsManager extends Component
 
     public function toggleStatus($id)
     {
+        abort_unless(Auth::user()->can('finance.edit'), 403);
+
         $acc = DB::table('chart_of_accounts')->where('id', $id)->first();
         
         if ($acc) {

@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Mdm;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 #[Layout('components.layouts.hq')]
@@ -106,6 +107,9 @@ class CopqMatrices extends Component
 
     public function saveIndustry()
     {
+        // The route needs mdm.view; adding or changing a matrix row needs mdm.create / mdm.edit
+        abort_unless(Auth::user()->can(($this->indEditMode && $this->indId) ? 'mdm.edit' : 'mdm.create'), 403);
+
         $this->validate([
             'industry_name' => 'required|string|max:100',
             'error_floor' => 'required|numeric|min:0.1',
@@ -165,6 +169,8 @@ class CopqMatrices extends Component
 
     public function saveArchitecture()
     {
+        abort_unless(Auth::user()->can(($this->archEditMode && $this->archId) ? 'mdm.edit' : 'mdm.create'), 403);
+
         $this->validate([
             'tech_key' => 'required|string|max:50', 'display_name' => 'required|string|max:150',
             'symptom_title' => 'required|string|max:150', 'intervention_strategy' => 'required|string',
@@ -214,6 +220,8 @@ class CopqMatrices extends Component
 
     public function saveBottleneck()
     {
+        abort_unless(Auth::user()->can(($this->bnEditMode && $this->bnId) ? 'mdm.edit' : 'mdm.create'), 403);
+
         $this->validate([
             'bottleneck_name' => 'required|string|max:100', 'appraisal_multiplier' => 'required|numeric|min:0.1',
             'failure_multiplier' => 'required|numeric|min:0.1', 'opportunity_multiplier' => 'required|numeric|min:0.1',

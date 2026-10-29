@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Mdm;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Services\Payroll\CameroonTaxCalculator;
 use App\Services\Payroll\NigeriaTaxCalculator;
@@ -277,6 +278,9 @@ class EmployeeRegistry extends Component
 
     public function saveEmployee()
     {
+        // People records belong to HR: the route needs hr.view; adding or changing one needs hr.create / hr.edit
+        abort_unless(Auth::user()->can(($this->editMode && $this->recordId) ? 'hr.edit' : 'hr.create'), 403);
+
         if (!$this->editMode) $this->generateEmployeeCode();
 
         $this->validate([
@@ -440,6 +444,8 @@ class EmployeeRegistry extends Component
 
     public function toggleStatus($id, $currentStatus)
     {
+        abort_unless(Auth::user()->can('hr.edit'), 403);
+
         $newStatus = !$currentStatus;
         $updateData = ['is_active' => $newStatus, 'updated_at' => now()];
         if (!$newStatus) $updateData['termination_date'] = date('Y-m-d');

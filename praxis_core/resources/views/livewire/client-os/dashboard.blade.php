@@ -363,27 +363,37 @@
 
         <div class="desktop-only" style="display: flex; height: 100%; align-items: center;">
             <div class="os-nav">
+                @if(($can['projects.view'] ?? false))
                 <button wire:click="switchTab('overview')" class="os-nav-btn {{ $activeTab === 'overview' ? 'active' : '' }} {{ $financialLockout ? 'locked' : '' }}">
                     <i data-lucide="layout-dashboard" style="width: 18px; height: 18px;"></i>
                     <span class="nav-label">OVERVIEW</span>
                 </button>
+                @endif
+                @if(($can['projects.view'] ?? false))
                 <button wire:click="switchTab('sprints')" class="os-nav-btn {{ $activeTab === 'sprints' ? 'active' : '' }} {{ $financialLockout ? 'locked' : '' }}">
                     <i data-lucide="git-merge" style="width: 18px; height: 18px;"></i>
                     <span class="nav-label">SPRINTS</span>
                 </button>
+                @endif
+                @if(($can['qa.view'] ?? false))
                 <button wire:click="switchTab('qa_hub')" class="os-nav-btn {{ $activeTab === 'qa_hub' ? 'active' : '' }} {{ $financialLockout ? 'locked' : '' }}">
                     <i data-lucide="shield-alert" style="width: 18px; height: 18px;"></i>
                     <span class="nav-label">QA HUB</span>
                 </button>
+                @endif
+                @if(($can['billing.view'] ?? false))
                 <button wire:click="switchTab('financials')" class="os-nav-btn {{ $activeTab === 'financials' ? 'active' : '' }}" style="{{ $financialLockout ? 'color: var(--brand-secondary);' : '' }}">
                     <i data-lucide="credit-card" style="width: 18px; height: 18px;"></i>
                     <span class="nav-label">FINANCIALS</span>
                 </button>
+                @endif
+                @if(($can['documents.view'] ?? false))
                 <button wire:click="switchTab('vault')" class="os-nav-btn {{ $activeTab === 'vault' ? 'active' : '' }} {{ $financialLockout ? 'locked' : '' }}">
                     <i data-lucide="folder-lock" style="width: 18px; height: 18px;"></i>
                     <span class="nav-label">VAULT</span>
                 </button>
-                @if(Auth::user()->is_primary_client)
+                @endif
+                @if(($can['team.view'] ?? false))
                     <button wire:click="switchTab('team')" class="os-nav-btn {{ $activeTab === 'team' ? 'active' : '' }} {{ $financialLockout ? 'locked' : '' }}">
                         <i data-lucide="users" style="width: 18px; height: 18px;"></i>
                         <span class="nav-label">COMMAND</span>
@@ -412,7 +422,9 @@
             @endif
             
             <button @click="showGuide = true" style="background: transparent; border: 1px solid var(--brand-border); color: var(--brand-primary); padding: 6px 12px; border-radius: 4px; display: flex; align-items: center;"><i data-lucide="help-circle" style="width: 14px; height: 14px;"></i></button>
+            @if(($can['support.create'] ?? false))
             <button wire:click="$set('showRedlineModal', true)" class="btn-panic"><i data-lucide="triangle-alert" style="width: 14px; height: 14px;"></i> REDLINE</button>
+            @endif
 
             <div style="text-align: right; font-family: 'Roboto Mono', monospace; border-left: 1px solid var(--brand-border); padding-left: 20px;">
                 <div style="font-size: 0.75rem; font-weight: bold; color: #fff;">{{ $organization->name ?? 'Unknown Org' }}</div>
@@ -434,22 +446,32 @@
         </div>
         
         <div class="drawer-nav">
+            @if(($can['projects.view'] ?? false))
             <button wire:click="switchTab('overview')" @click="mobileMenuOpen = false" class="drawer-nav-btn {{ $activeTab === 'overview' ? 'active' : '' }}">
                 <i data-lucide="layout-dashboard" style="width: 18px; height: 18px;"></i> OVERVIEW
             </button>
+            @endif
+            @if(($can['projects.view'] ?? false))
             <button wire:click="switchTab('sprints')" @click="mobileMenuOpen = false" class="drawer-nav-btn {{ $activeTab === 'sprints' ? 'active' : '' }}">
                 <i data-lucide="git-merge" style="width: 18px; height: 18px;"></i> SPRINTS
             </button>
+            @endif
+            @if(($can['qa.view'] ?? false))
             <button wire:click="switchTab('qa_hub')" @click="mobileMenuOpen = false" class="drawer-nav-btn {{ $activeTab === 'qa_hub' ? 'active' : '' }}">
                 <i data-lucide="shield-alert" style="width: 18px; height: 18px;"></i> QA HUB
             </button>
+            @endif
+            @if(($can['billing.view'] ?? false))
             <button wire:click="switchTab('financials')" @click="mobileMenuOpen = false" class="drawer-nav-btn {{ $activeTab === 'financials' ? 'active' : '' }}">
                 <i data-lucide="credit-card" style="width: 18px; height: 18px;"></i> FINANCIALS
             </button>
+            @endif
+            @if(($can['documents.view'] ?? false))
             <button wire:click="switchTab('vault')" @click="mobileMenuOpen = false" class="drawer-nav-btn {{ $activeTab === 'vault' ? 'active' : '' }}">
                 <i data-lucide="folder-lock" style="width: 18px; height: 18px;"></i> VAULT
             </button>
-            @if(Auth::user()->is_primary_client)
+            @endif
+            @if(($can['team.view'] ?? false))
                 <button wire:click="switchTab('team')" @click="mobileMenuOpen = false" class="drawer-nav-btn {{ $activeTab === 'team' ? 'active' : '' }}">
                     <i data-lucide="users" style="width: 18px; height: 18px;"></i> COMMAND
                 </button>
@@ -566,12 +588,16 @@
                             
                             @if($task->status === 'QA_Review')
                                 <div style="display: flex; gap: 10px; margin-top: 15px;">
+                                    @if(($can['projects.approve'] ?? false))
                                     <button wire:click="approveTask('{{ $task->id }}')" class="btn-submit" style="width: auto; padding: 6px 12px; font-size: 0.7rem; border-color: #00FF66; color: #00FF66;">
                                         <i data-lucide="check-circle" style="width: 14px; height: 14px;"></i> APPROVE & LOCK
                                     </button>
+                                    @endif
+                                    @if(($can['qa.create'] ?? false))
                                     <button wire:click="teleportToQa('{{ $task->id }}', '{{ addslashes($task->title) }}')" class="btn-submit" style="width: auto; padding: 6px 12px; font-size: 0.7rem; border-color: var(--brand-secondary); color: var(--brand-secondary);">
                                         <i data-lucide="shield-alert" style="width: 14px; height: 14px;"></i> LOG VULNERABILITY
                                     </button>
+                                    @endif
                                 </div>
                             @endif
                         </div>
@@ -618,6 +644,7 @@
                         </div>
                     @endif
 
+                    @if(($can['qa.create'] ?? false))
                     <form wire:submit.prevent="submitQaTicket">
                         <!-- Dual Purpose Dropdown -->
                         @if($qaTaskId)
@@ -661,6 +688,9 @@
 
                         <button type="submit" class="btn-submit" wire:loading.attr="disabled">
                     </form>
+                    @else
+                        <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #8A9BB2;">> Your role can follow tickets but not raise them.</p>
+                    @endif
                 </div>
 
                 <!-- RIGHT: HISTORICAL MATRIX -->
@@ -749,9 +779,11 @@
                                     </button>
                                     
                                     @if($inv->status !== 'Paid' && !$inv->has_pending_pop)
+                                        @if(($can['billing.create'] ?? false))
                                         <button wire:click="triggerPopUpload('{{ $inv->id }}', {{ $inv->total_amount }})" class="btn-submit" style="padding: 6px 12px; font-size: 0.7rem; width: auto; background: var(--brand-primary); color: var(--brand-bg);">
                                             <i data-lucide="upload-cloud" style="width: 14px; height: 14px;"></i> UPLOAD POP
                                         </button>
+                                        @endif
                                     @endif
                                 </div>
                             </div>
@@ -772,6 +804,7 @@
                                 > SECURE POP TRANSMISSION
                             </div>
 
+                            @if(($can['billing.create'] ?? false))
                             <form wire:submit.prevent="submitProofOfPayment">
                                 <label style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2;">PAYMENT METHOD</label>
                                 <select wire:model="popMethod" class="cyber-select">
@@ -803,6 +836,7 @@
                                     </button>
                                 </div>
                             </form>
+                            @endif
                         </div>
                     @else
                         <!-- Remittance Instructions -->
@@ -888,6 +922,7 @@
                         </div>
                     @endif
 
+                    @if(($can['settings.edit'] ?? false))
                     <form wire:submit.prevent="saveBrandSettings">
                         <div class="color-picker-wrap">
                             <div>
@@ -927,11 +962,12 @@
                             Default Fallback: JBS Praxis Protocol
                         </div>
                     </form>
+                    @endif
                 </div>
 
             </div>
     
-    @elseif($activeTab === 'team' && Auth::user()->is_primary_client)
+    @elseif($activeTab === 'team' && ($can['team.view'] ?? false))
             
             <div style="width: 100%; margin-bottom: 20px;">
                 <h2 style="font-family: 'Montserrat', sans-serif; font-size: 1.5rem; letter-spacing: 1px;">TEAM COMMAND CENTER</h2>
@@ -951,11 +987,24 @@
                             <div class="invoice-meta">
                                 <div class="inv-number" style="font-size: 1rem;">{{ $member->first_name }} {{ $member->last_name }}</div>
                                 <div class="inv-details" style="color: #FFF;">{{ $member->email }}</div>
+                                <div class="inv-details" style="margin-top: 8px;">
+                                    @if(!$member->is_primary_client && ($can['team.edit'] ?? false) && $member->id !== $this->user->id)
+                                        <label style="font-size: 0.6rem; color: #8A9BB2; display: block; margin-bottom: 3px;">PORTAL ROLE:</label>
+                                        <select wire:change="changeMemberRole('{{ $member->id }}', $event.target.value)" class="cyber-select" style="padding: 4px; font-size: 0.7rem; max-width: 250px;">
+                                            @foreach($clientRoles as $role)
+                                                <option value="{{ $role->id }}" {{ (int) $member->role_id === (int) $role->id ? 'selected' : '' }}>{{ $role->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    @else
+                                        ROLE: <span style="color: var(--brand-primary);">{{ strtoupper($member->role_name) }}</span>
+                                    @endif
+                                </div>
                                 <div class="inv-details" style="margin-top: 10px;">
                                     @if($member->is_primary_client)
                                         ACCESS: <span style="color: var(--brand-primary);">GLOBAL (ALPHA NODE)</span>
                                     @else
                                         <label style="font-size: 0.6rem; color: #8A9BB2; display: block; margin-bottom: 3px;">BATTLESPACE RESTRICTION:</label>
+                                        @if(($can['team.edit'] ?? false))
                                         <select wire:change="updateNodeAccess('{{ $member->id }}', $event.target.value)" class="cyber-select" style="padding: 4px; font-size: 0.7rem; max-width: 250px;">
                                             <option value="">-- GLOBAL (ALL PROJECTS) --</option>
                                             @foreach($allProjects as $proj)
@@ -964,6 +1013,9 @@
                                                 </option>
                                             @endforeach
                                         </select>
+                                        @else
+                                            <span style="font-size: 0.7rem;">{{ $member->restricted_project_title ? strtoupper($member->restricted_project_title) : 'ALL PROJECTS' }}</span>
+                                        @endif
                                     @endif
                                 </div>
                             </div>
@@ -971,12 +1023,12 @@
                             <div style="text-align: right; display: flex; flex-direction: column; gap: 10px; align-items: flex-end;">
                                 <span class="status-badge" style="font-size: 0.6rem; color: {{ $member->status === 'Active' ? '#00FF66' : '#FFF' }}; border-color: currentColor;">{{ strtoupper($member->status) }}</span>
                                 
-                                @if(!$member->is_primary_client)
+                                @if(!$member->is_primary_client && ($can['team.edit'] ?? false) && $member->id !== $this->user->id)
                                     <button wire:click="toggleSuspendUser('{{ $member->id }}')" class="btn-submit" style="padding: 6px 12px; font-size: 0.65rem; width: auto; border-color: var(--brand-secondary); color: var(--brand-secondary);">
                                         <i data-lucide="power" style="width: 12px; height: 12px;"></i> 
                                         {{ $member->status === 'Suspended' ? 'DEFROST NODE' : 'KILL SWITCH' }}
                                     </button>
-                                @else
+                                @elseif($member->is_primary_client)
                                     <span style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; padding: 6px 0;">[ PRIMARY ALPHA ]</span>
                                 @endif
                             </div>
@@ -1006,6 +1058,7 @@
                         </div>
                     @endif
 
+                    @if(($can['team.create'] ?? false))
                     <form wire:submit.prevent="inviteTeamMember">
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                             <input type="text" wire:model="inviteFirstName" class="cyber-input" placeholder="First Name" required>
@@ -1022,11 +1075,22 @@
                             @endforeach
                         </select>
 
+                        <label for="invite-role" style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-top: 10px; display: block;">PORTAL ROLE</label>
+                        <select id="invite-role" wire:model="inviteRoleId" class="cyber-select">
+                            <option value="">Client Member (default)</option>
+                            @foreach($clientRoles as $role)
+                                <option value="{{ $role->id }}">{{ $role->name }}</option>
+                            @endforeach
+                        </select>
+
                         <button type="submit" class="btn-submit" style="background: var(--brand-primary); color: var(--brand-bg); margin-top: 15px;" wire:loading.attr="disabled">
                             <span wire:loading.remove wire:target="inviteTeamMember">GENERATE ZERO-KNOWLEDGE LINK</span>
                             <span wire:loading wire:target="inviteTeamMember">ENCRYPTING...</span>
                         </button>
                     </form>
+                    @else
+                        <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #8A9BB2;">> Your role cannot invite team members.</p>
+                    @endif
                 </div>
             </div>
         @endif
@@ -1034,22 +1098,28 @@
     </div>
     
     <div class="floating-action-stack mobile-only">
+        @if(($can['support.create'] ?? false))
         <div wire:click="$set('showRedlineModal', true)" class="fab-btn fab-redline" title="Initiate Redline Protocol">
             <i data-lucide="triangle-alert" style="width: 20px; height: 20px;"></i>
         </div>
+        @endif
         
         <div @click="showGuide = true" class="fab-btn fab-help" title="Executive Manual">
             <i data-lucide="book-open" style="width: 20px; height: 20px;"></i>
         </div>
 
+        @if(($can['qa.view'] ?? false))
         <div wire:click="switchTab('qa_hub')" class="fab-btn fab-qa {{ $activeTab === 'qa_hub' ? 'qa-active-hide' : '' }}" title="Message Command">
             <i data-lucide="message-square" style="width: 20px; height: 20px;"></i>
         </div>
+        @endif
     </div>
 
+    @if(($can['qa.view'] ?? false))
     <button wire:click="switchTab('qa_hub')" class="floating-comm-btn desktop-only {{ $activeTab === 'qa_hub' ? 'qa-active-hide' : '' }}" title="Message Command / Report Bug">
         <i data-lucide="message-square"></i>
     </button>
+    @endif
 
     @if(session()->has('global_success'))
         <div style="position: fixed; bottom: 30px; right: 30px; background: rgba(0, 255, 102, 0.1); border: 1px solid #00FF66; color: #00FF66; padding: 15px 25px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; z-index: 9999; box-shadow: 0 0 30px rgba(0,255,102,0.2); backdrop-filter: blur(10px);" x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)">
@@ -1068,6 +1138,7 @@
                 <h2 style="font-family: 'Montserrat', sans-serif; font-size: 1.5rem; color: #FFF; letter-spacing: 1px; text-align: center; margin-bottom: 10px;">INITIATE REDLINE PROTOCOL</h2>
                 <p style="font-size: 0.85rem; color: #8A9BB2; text-align: center; margin-bottom: 30px;">Warning: This action bypasses standard SLA queues and directly pages Level 4/5 Command. Standard emergency engagement fees may apply depending on your SLA tier.</p>
                 
+                @if(($can['support.create'] ?? false))
                 <form wire:submit.prevent="triggerAuthenticatedRedline">
                     <label style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--brand-secondary); display: block; margin-bottom: 10px;">DEFINE INFRASTRUCTURE FAILURE</label>
                     <textarea wire:model="redlineAuthDescription" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,51,102,0.3); color: #FFF; padding: 15px; font-family: 'Inter', sans-serif; font-size: 0.85rem; border-radius: 2px; outline: none; min-height: 120px; resize: vertical; margin-bottom: 20px;" required placeholder="Enter diagnostic parameters..."></textarea>
@@ -1082,6 +1153,7 @@
                         </button>
                     </div>
                 </form>
+                @endif
             </div>
         </div>
     @endif
@@ -1120,10 +1192,12 @@
                 @if(in_array($selectedTicket->status, ['Open', 'Investigating']))
                     <div style="display: flex; gap: 10px; margin-bottom: 30px; align-items: center;">
                         <input type="file" wire:model="newQaAttachment" class="cyber-input" style="padding: 6px; font-size: 0.75rem; margin-bottom: 0;" accept=".png,.jpg,.jpeg,.pdf">
+                        @if(($can['qa.create'] ?? false))
                         <button wire:click="uploadQaEvidence" class="btn-submit" style="width: auto; padding: 8px 15px;" wire:loading.attr="disabled" wire:target="newQaAttachment, uploadQaEvidence">
                             <span wire:loading.remove wire:target="uploadQaEvidence"><i data-lucide="upload" style="width: 14px; height: 14px;"></i> UPLOAD</span>
                             <span wire:loading wire:target="uploadQaEvidence">PROCESSING...</span>
                         </button>
+                        @endif
                     </div>
                     @error('newQaAttachment') <span style="color: var(--brand-secondary); font-size: 0.65rem; display: block; margin-top: -25px; margin-bottom: 20px;">{{ $message }}</span> @enderror
                 @endif
@@ -1147,16 +1221,20 @@
                 @if(in_array($selectedTicket->status, ['Open', 'Investigating', 'Resolved']))
                     <div style="margin-top: 20px;">
                         <textarea wire:model="newCommentText" class="cyber-textarea" rows="3" placeholder="Type response to HQ here..."></textarea>
+                        @if(($can['qa.create'] ?? false))
                         <button wire:click="postTicketComment" class="btn-submit" style="padding: 8px 20px; width: 100%;">
                             <i data-lucide="send" style="width: 14px; height: 14px;"></i> TRANSMIT RESPONSE
                         </button>
+                        @endif
                     </div>
                     
                     @if($selectedTicket->task_id && $selectedTicket->status !== 'Closed')
                         <div style="margin-top: 20px; border-top: 1px dashed var(--brand-border); padding-top: 20px;">
+                            @if(($can['projects.approve'] ?? false))
                             <button wire:click="approveAndLockFromQa" class="btn-submit" style="background: rgba(0,255,102,0.1); border-color: #00FF66; color: #00FF66; width: 100%;" onclick="confirm('Are you sure you want to override this ticket and permanently lock the linked task?') || event.stopImmediatePropagation()">
                                 <i data-lucide="lock" style="width: 14px; height: 14px;"></i> OVERRIDE: APPROVE & LOCK LINKED TASK
                             </button>
+                            @endif
                         </div>
                     @endif
                 @endif
@@ -1167,9 +1245,11 @@
                     <div style="font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: #00FF66; margin-bottom: 10px; text-align: center;">
                         HQ HAS LOGGED THIS VULNERABILITY AS PATCHED.
                     </div>
+                    @if(($can['projects.approve'] ?? false))
                     <button wire:click="approveTicketFix" class="btn-submit" style="border-color: #00FF66; color: #00FF66; width: 100%;">
                         <i data-lucide="check-circle" style="width: 16px; height: 16px;"></i> APPROVE FIX & CLOSE TICKET
                     </button>
+                    @endif
                 </div>
             @endif
         @endif

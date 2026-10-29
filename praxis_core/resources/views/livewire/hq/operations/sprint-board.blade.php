@@ -134,7 +134,7 @@
                 <div class="kanban-body">
                     @foreach($tasks[$column] as $task)
                         @php
-                            $isDraggable = ($task['assigned_to'] === auth()->id() || $userClearance >= 4) ? 'true' : 'false';
+                            $isDraggable = (($task['assigned_to'] === auth()->id() && $canMoveOwn) || $canMoveAny) ? 'true' : 'false';
                         @endphp
 
                         <div class="task-card" 
@@ -157,9 +157,11 @@
                             @endif
 
                             @if(!$task['assigned_to'])
-                                <button wire:click="assignToMe('{{ $task['id'] }}')" class="btn-checkout">
-                                    <i data-lucide="crosshair" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> ASSIGN TO ME
-                                </button>
+                                @if($canMoveOwn)
+                                    <button wire:click="assignToMe('{{ $task['id'] }}')" class="btn-checkout">
+                                        <i data-lucide="crosshair" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> ASSIGN TO ME
+                                    </button>
+                                @endif
                             @else
                                 <div class="task-footer">
                                     <div class="fibonacci-badge" title="{{ $task['story_points'] }} Story Points">{{ $task['story_points'] }}</div>

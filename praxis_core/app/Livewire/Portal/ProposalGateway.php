@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Portal;
 
+use App\Support\Access;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\DB;
@@ -261,13 +262,12 @@ class ProposalGateway extends Component
             // 5. TRIGGER THE IFRS GENERAL LEDGER ENGINE
             \App\Livewire\Hq\Finance\GeneralLedgerManager::recordInvoiceIssued($invoiceId);
 
-            // 6. Notify Command Matrix
-            $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')
-                ->where('roles.clearance_level', '>=', 4)->select('users.id')->get();
+            // 6. Notify Command Matrix: the sales team (deal won) and finance (deposit invoice issued)
+            $recipients = array_unique(array_merge(Access::staffWith('crm.edit'), Access::staffWith('finance.approve')));
             $notifications = [];
-            foreach($admins as $admin) {
+            foreach($recipients as $adminId) {
                 $notifications[] = [
-                    'id' => (string) Str::uuid(), 'user_id' => $admin->id, 
+                    'id' => (string) Str::uuid(), 'user_id' => $adminId,
                     'title' => 'SOW SECURED & INVOICE ISSUED', 
                     'message' => "Client {$organization->name} bound SOW {$proposal->proposal_ref}. Deposit Invoice {$invNumber} generated and routed to ledger.", 
                     'type' => 'Project', 'created_at' => $timestamp

@@ -71,6 +71,9 @@ class GeneralLedgerManager extends Component
 
     public function executeReversingEntry()
     {
+        // A reversing entry voids a posted entry
+        abort_unless(Auth::user()->can('finance.delete'), 403);
+
         $this->validate([
             'reversalEntryId' => 'required|exists:journal_entries,id',
             'reversalReason' => 'required|string|min:10'

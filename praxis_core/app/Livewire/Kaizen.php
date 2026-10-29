@@ -6,6 +6,7 @@ use Livewire\Component;
 use App\Models\ClientUser;
 use App\Models\KaizenArticle;
 use App\Models\User;
+use App\Support\Access;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -126,12 +127,11 @@ class Kaizen extends Component
                     'contributor_id'      => $contributor->id,
                 ]);
 
-                // Tell senior staff there is an article to moderate
-                $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')->where('roles.clearance_level', '>=', 4)->select('users.id')->get();
+                // Tell the staff who moderate Kaizen there is an article to moderate
                 $notifications = [];
-                foreach ($admins as $admin) {
+                foreach (Access::staffWith('kaizen.approve') as $adminId) {
                     $notifications[] = [
-                        'id' => (string) Str::uuid(), 'user_id' => $admin->id,
+                        'id' => (string) Str::uuid(), 'user_id' => $adminId,
                         'title' => 'KAIZEN ARTICLE AWAITING MODERATION',
                         'message' => "'{$this->articleTitle}' was submitted by {$this->fullName}.",
                         'type' => 'System', 'created_at' => now(),

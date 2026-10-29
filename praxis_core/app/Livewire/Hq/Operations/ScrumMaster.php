@@ -9,13 +9,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use App\Support\Access;
 
 #[Layout('components.layouts.hq')]
 class ScrumMaster extends Component
 {
     public $projectId;
     public $project;
-    public $userClearance;
 
     // Staging Data
     public $sowContext = '';
@@ -24,10 +24,8 @@ class ScrumMaster extends Component
 
     public function mount($id)
     {
-        $this->userClearance = Auth::user()->role->clearance_level ?? 0;
-        
-        // Strict Access Control: Only L4 (Senior Partner) or L5 (Super Admin) can generate backlogs
-        if ($this->userClearance < 4) {
+        // Strict Access Control: this screen only builds backlogs (sprints, phases, tasks), so projects.create
+        if (! Auth::user()->can('projects.create')) {
             abort(403, 'UNAUTHORIZED: Strategic clearance required to engineer project backlogs.');
         }
 
@@ -62,6 +60,8 @@ class ScrumMaster extends Component
 
     public function generateScrumBacklog()
     {
+        abort_unless(Auth::user()->can('projects.create'), 403);
+
         $this->validate([
             'sowContext' => 'required|string|min:50'
         ]);
@@ -131,6 +131,8 @@ class ScrumMaster extends Component
 
     public function commitBacklogToDatabase()
     {
+        abort_unless(Auth::user()->can('projects.create'), 403);
+
         if (empty($this->generatedBacklog)) {
             session()->flash('error', 'No staging data to commit.');
             return;
@@ -218,12 +220,9 @@ class ScrumMaster extends Component
             ]);
             
             // Notification to Strike Team that a new board is live
-            $strikeTeam = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')
-                            ->where('roles.clearance_level', '>=', 2)->select('users.id')->get();
-            
-            foreach($strikeTeam as $member) {
+            foreach(Access::staffWith('projects.edit') as $memberId) {
                 DB::table('notifications')->insert([
-                    'id' => (string) Str::uuid(), 'user_id' => $member->id,
+                    'id' => (string) Str::uuid(), 'user_id' => $memberId,
                     'title' => 'NEW BATTLESPACE ENGINEERED', 
                     'message' => "The backlog for '{$this->project->title}' has been staged. Await task assignments.",
                     'type' => 'Project', 'created_at' => now()

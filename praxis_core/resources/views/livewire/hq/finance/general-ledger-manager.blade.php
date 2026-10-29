@@ -141,7 +141,7 @@
                         </div>
                         <div>MODULE: {{ strtoupper($entry->source_module) }} | REGION: {{ $entry->region_code }}</div>
                         
-                        @if(!$entry->is_reversal)
+                        @if(!$entry->is_reversal && auth()->user()->can('finance.delete'))
                             <button wire:click="triggerReversal('{{ $entry->id }}')" class="btn-action btn-danger" style="padding: 4px 10px; font-size: 0.6rem; margin-top: 10px; border-color: rgba(255,51,102,0.3);">
                                 <i data-lucide="rotate-ccw" style="width: 12px; height: 12px;"></i> EXECUTE IFRS REVERSAL
                             </button>

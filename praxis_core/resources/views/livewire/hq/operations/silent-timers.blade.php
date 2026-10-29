@@ -60,7 +60,7 @@
     @endif
 
     <div class="tab-nav">
-        @if($userClearance >= 4)
+        @if($canSeeAll)
             <button wire:click="$set('activeTab', 'live_burn')" class="tab-btn {{ $activeTab === 'live_burn' ? 'active' : '' }}">
                 <i data-lucide="activity" style="width: 14px; height: 14px; display: inline-block; vertical-align: text-bottom;"></i> LIVE BURN
             </button>
@@ -73,7 +73,7 @@
             <i data-lucide="book-open" style="width: 14px; height: 14px; display: inline-block; vertical-align: text-bottom;"></i> MASTER LEDGER
         </button>
         
-        @if($userClearance >= 4)
+        @if($canManage)
             <button wire:click="$set('activeTab', 'corrections')" class="tab-btn {{ $activeTab === 'corrections' ? 'active' : '' }}">
                 <i data-lucide="clipboard-check" style="width: 14px; height: 14px; display: inline-block; vertical-align: text-bottom;"></i> CORRECTIONS QUEUE
             </button>
@@ -81,7 +81,7 @@
     </div>
 
     <!-- TAB 1: LIVE BURN -->
-    @if($activeTab === 'live_burn' && $userClearance >= 4)
+    @if($activeTab === 'live_burn' && $canSeeAll)
         <div style="overflow-x: auto;">
             <table class="bloomberg-table">
                 <thead>
@@ -90,7 +90,7 @@
                         <th>BATTLESPACE (PROJECT & TASK)</th>
                         <th>START TIME</th>
                         <th>ELAPSED</th>
-                        <th>CURRENT MARGIN BURN</th>
+                        @if($canSeeMoney) <th>CURRENT MARGIN BURN</th> @endif
                         <th>STATUS</th>
                     </tr>
                 </thead>
@@ -104,7 +104,9 @@
                             </td>
                             <td style="font-family: 'Roboto Mono', monospace;">{{ \Carbon\Carbon::parse($burn['start_time'])->format('M d, H:i') }}</td>
                             <td style="font-family: 'Roboto Mono', monospace; color: #FFBD2E; font-weight: bold;">{{ $burn['live_duration'] }}</td>
-                            <td style="font-family: 'Roboto Mono', monospace; color: var(--erp-red); font-weight: bold;">- ${{ number_format($burn['live_cost'], 2) }}</td>
+                            @if($canSeeMoney)
+                                <td style="font-family: 'Roboto Mono', monospace; color: var(--erp-red); font-weight: bold;">- ${{ number_format($burn['live_cost'], 2) }}</td>
+                            @endif
                             <td>
                                 @if($burn['is_rework'])
                                     <span class="status-badge badge-rework">COPQ REWORK</span>
@@ -114,7 +116,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--erp-muted);">NO ACTIVE TIMERS IN THE MATRIX.</td></tr>
+                        <tr><td colspan="{{ $canSeeMoney ? '6' : '5' }}" style="text-align: center; padding: 40px; color: var(--erp-muted);">NO ACTIVE TIMERS IN THE MATRIX.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -122,7 +124,7 @@
     @endif
 
     <!-- TAB 2: ANOMALIES -->
-    @if($activeTab === 'anomalies' && $userClearance >= 4)
+    @if($activeTab === 'anomalies' && $canSeeAll)
         <div style="overflow-x: auto;">
             <table class="bloomberg-table">
                 <thead>
@@ -158,7 +160,7 @@
 
     <!-- TAB 3: MASTER LEDGER -->
     @if($activeTab === 'ledger')
-        @if($userClearance >= 4)
+        @if($canSeeAll)
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <div style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-teal);">> LEDGER GROUPING PREFERENCE</div>
                 <select wire:model.live="ledgerGroupBy" class="cyber-select">
@@ -176,14 +178,14 @@
                         <th>START TIME</th>
                         <th>END TIME</th>
                         <th>DURATION</th>
-                        @if($userClearance >= 4) <th>MARGIN COST</th> @endif
+                        @if($canSeeMoney) <th>MARGIN COST</th> @endif
                         <th>FLAGS</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($ledgerData as $groupName => $logs)
                         <tr class="group-header">
-                            <td colspan="{{ $userClearance >= 4 ? '6' : '5' }}">> {{ strtoupper($groupName) }}</td>
+                            <td colspan="{{ $canSeeMoney ? '6' : '5' }}">> {{ strtoupper($groupName) }}</td>
                         </tr>
                         @foreach($logs as $log)
                             <tr>
@@ -200,7 +202,7 @@
                                 <td style="font-family: 'Roboto Mono', monospace;">{{ \Carbon\Carbon::parse($log->end_time)->format('M d, H:i') }}</td>
                                 <td style="font-family: 'Roboto Mono', monospace; font-weight: bold;">{{ number_format($log->duration_minutes / 60, 2) }} HRS</td>
                                 
-                                @if($userClearance >= 4)
+                                @if($canSeeMoney)
                                     <td style="font-family: 'Roboto Mono', monospace; color: {{ $log->is_rework ? 'var(--erp-red)' : 'var(--erp-muted)' }};">
                                         ${{ number_format($log->cost_calculated, 2) }}
                                     </td>
@@ -217,7 +219,7 @@
                             </tr>
                         @endforeach
                     @empty
-                        <tr><td colspan="{{ $userClearance >= 4 ? '6' : '5' }}" style="text-align: center; padding: 40px; color: var(--erp-muted);">NO HISTORICAL LOGS FOUND.</td></tr>
+                        <tr><td colspan="{{ $canSeeMoney ? '6' : '5' }}" style="text-align: center; padding: 40px; color: var(--erp-muted);">NO HISTORICAL LOGS FOUND.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -225,7 +227,7 @@
     @endif
 
     <!-- TAB 4: CORRECTIONS QUEUE & GOD MODE -->
-    @if($activeTab === 'corrections' && $userClearance >= 4)
+    @if($activeTab === 'corrections' && $canManage)
         <div style="margin-bottom: 40px;">
             <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: #FFBD2E; margin-bottom: 15px;">> PENDING L4 TIME CORRECTION REQUESTS</div>
             <div style="overflow-x: auto;">
@@ -266,7 +268,7 @@
             </div>
         </div>
 
-        @if($userClearance == 5)
+        @if($canInject)
             <div class="god-mode-box">
                 <div class="god-mode-header">
                     <i data-lucide="shield-alert" style="width: 24px; height: 24px;"></i> L5 SUPER ADMIN OVERRIDE (GOD MODE INJECTION)

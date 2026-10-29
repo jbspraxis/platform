@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Support\Access;
 use Livewire\Component;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -235,19 +236,21 @@ class ScheduleConsultation extends Component
             ]);
 
             // 4. System Telemetry (Notify Admins)
-            $admin = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')
-                       ->where('roles.clearance_level', 5)->select('users.id')->first();
-            // Notices are for staff; with no owner account yet, skip it rather than fail the booking
-            if ($admin) DB::table('notifications')->insert([
-                'id' => (string) Str::uuid(),
-                'user_id' => $admin->id,
-                'title' => 'NEW CONSULTATION REQUEST',
-                'message' => strtoupper(trim($this->enterpriseName)) . " requested a meeting for " . $startDateTime->format('M d @ H:i') . ". Awaiting approval in the Lobby.",
-                'link_url' => '/hq/intelligence/consultation',
-                'type' => 'System',
-                'is_read' => 0,
-                'created_at' => now()
-            ]);
+            // Notices are for staff; with no CRM staff account yet, skip it rather than fail the booking
+            $notifications = [];
+            foreach (Access::staffWith('crm.edit') as $adminId) {
+                $notifications[] = [
+                    'id' => (string) Str::uuid(),
+                    'user_id' => $adminId,
+                    'title' => 'NEW CONSULTATION REQUEST',
+                    'message' => strtoupper(trim($this->enterpriseName)) . " requested a meeting for " . $startDateTime->format('M d @ H:i') . ". Awaiting approval in the Lobby.",
+                    'link_url' => '/hq/intelligence/consultation',
+                    'type' => 'System',
+                    'is_read' => 0,
+                    'created_at' => now()
+                ];
+            }
+            if (!empty($notifications)) DB::table('notifications')->insert($notifications);
 
             return true;
         });

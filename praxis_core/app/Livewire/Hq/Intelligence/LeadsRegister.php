@@ -123,6 +123,8 @@ class LeadsRegister extends Component
 
     public function updateStage($orgId, $newStage)
     {
+        abort_unless(Auth::user()->can('crm.edit'), 403);
+
         DB::table('organizations')->where('id', $orgId)->update(['pipeline_stage' => $newStage, 'updated_at' => now()]);
         $this->loadLeads();
         if ($this->selectedLead && $this->selectedLead->org_id === $orgId) {
@@ -132,6 +134,8 @@ class LeadsRegister extends Component
 
     public function claimLead($orgId)
     {
+        abort_unless(Auth::user()->can('crm.edit'), 403);
+
         $userId = Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c';
         DB::table('organizations')->where('id', $orgId)->update(['assigned_to' => $userId, 'updated_at' => now()]);
         $this->loadLeads();
@@ -141,6 +145,8 @@ class LeadsRegister extends Component
     // --- THE DIFF-VIEWER ENGINE ---
     public function openDiffViewer($orgId)
     {
+        abort_unless(Auth::user()->can('crm.edit'), 403);
+
         $records = DB::table('copq_assessments')
             ->where('organization_id', $orgId)
             ->orderBy('created_at', 'desc')
@@ -172,6 +178,8 @@ class LeadsRegister extends Component
 
     public function executeMerge()
     {
+        abort_unless(Auth::user()->can('crm.edit'), 403);
+
         $finalData = [];
         
         foreach (array_keys($this->diffFields) as $field) {
@@ -200,6 +208,8 @@ class LeadsRegister extends Component
 
     public function submitManualPitch()
     {
+        abort_unless(Auth::user()->can('crm.create'), 403);
+
         // Strict validation requiring every single variable for the COPQ formula
         $this->validate([
             'company' => 'required|string', 
@@ -313,6 +323,8 @@ class LeadsRegister extends Component
     // --- AD-HOC CONSULTATION PIPELINE ---
     public function requestConsultation($orgId)
     {
+        abort_unless(Auth::user()->can('crm.create'), 403);
+
         $appointmentId = (string) Str::uuid();
         
         // 1. Create a Pending Appointment in the Lobby
@@ -331,9 +343,11 @@ class LeadsRegister extends Component
         return $this->redirect('/hq/intelligence/consultation', navigate: true);
     }
 
-    // --- EXPORT PROTOCOL (L4 / L5 ONLY) ---
+    // --- EXPORT PROTOCOL (crm.export) ---
     public function exportCsv()
     {
+        abort_unless(Auth::user()->can('crm.export'), 403);
+
         $filename = "JBS_Pipeline_Extract_" . now()->format('Ymd_His') . ".csv";
         $headers = ["Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=$filename"];
         $columns = ['Company', 'Contact', 'Email', 'Stage', 'Owner', 'COPQ', 'Currency', 'Tier', 'Date Acquired'];

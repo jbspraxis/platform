@@ -57,6 +57,14 @@ Total: about 18–24 hours of work, over 2–3 sessions. Each phase is committed
 - Notifications stay staff-only. The client portal has no inbox, so the old "notify the client" rows (invoice issued, payment verified or rejected, ticket resolved) were never seen and are no longer written; emailing clients those events is a possible later addition.
 - The HQ gate is now "any active staff account", with clearance 4 still required for senior screens until S3 replaces clearance with roles.
 
+### S3 notes (roles & permissions)
+- `config/access.php` is the single catalogue: 17 HQ modules and 7 portal modules, each with the actions that make sense (view, create, edit, delete, approve, export), plus the starter roles. `php artisan access:sync` (and the seeders) write it to `permissions` and add missing starter roles without touching roles the owner has edited.
+- Staff hold one or more roles (`staff_roles`); permissions add up. Clients hold one portal role (`client_users.role_id`); an organisation's primary account is always Client Admin. Clearance levels and `users.role_id` are gone.
+- Checks: routes use `can:<module>.view`; components check `Auth::user()->can('<module>.<action>')` on the server for every action (the UI only hides buttons); Blade uses `@can`. Staff notifications go to `Access::staffWith('<permission>')`.
+- Starter staff roles: Owner (protected, always everything), Partner / Director, Finance & Payroll, Delivery Lead, Engineer, Sales & Marketing, HR, Auditor (view + export only). Client roles: Client Admin, Client Finance, Client Member.
+- Guards against climbing: only an owner gives or removes the Owner role or changes an owner's account; nobody else can give a role, or add a permission to a role, that they don't hold themselves; nobody can change an account with more access than their own; the last active owner can't be suspended or lose the role. The same rule applies in the portal (a client role can only be given by someone holding all of its permissions; the primary account can't be changed from the Team tab).
+- Screens: System & Access → Accounts (invite staff with roles, clients with a portal role) and Roles & Permissions (module × action matrix per role). Portal: Team tab assigns portal roles.
+
 ## Not in this project
 - The new marketing app (PR2), the homepage and demo (PR3), proof pages (PR4).
 - Record scope (all / team / own) and field masking: not chosen. Two-step sign-in comes later.

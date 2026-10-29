@@ -2,6 +2,7 @@
 
 namespace App\Livewire\ClientOs;
 
+use App\Support\Access;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\Auth;
@@ -82,11 +83,10 @@ class LoginMatrix extends Component
                 ->select('first_name', 'last_name', 'email')
                 ->first();
             if ($client) {
-                $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')->where('roles.clearance_level', '>=', 4)->select('users.id')->get();
                 $notifications = [];
-                foreach ($admins as $admin) {
+                foreach (Access::staffWith('access.edit') as $adminId) {
                     $notifications[] = [
-                        'id' => (string) Str::uuid(), 'user_id' => $admin->id,
+                        'id' => (string) Str::uuid(), 'user_id' => $adminId,
                         'title' => 'CLIENT PASSWORD RESET REQUESTED',
                         'message' => "Client {$client->first_name} {$client->last_name} ({$client->email}) asked to reset their Client OS password. Send them a new setup link.",
                         'type' => 'System', 'created_at' => now(),
@@ -144,18 +144,12 @@ class LoginMatrix extends Component
                 'created_at' => now()
             ]);
 
-            // 3. Notify L4/L5 Command immediately
-            $admins = DB::table('users')
-                ->join('roles', 'users.role_id', '=', 'roles.id')
-                ->where('roles.clearance_level', '>=', 4)
-                ->select('users.id')
-                ->get();
-            
+            // 3. Notify the CRM team immediately
             $notifications = [];
-            foreach($admins as $admin) {
+            foreach(Access::staffWith('crm.edit') as $adminId) {
                 $notifications[] = [
-                    'id' => (string) Str::uuid(), 
-                    'user_id' => $admin->id,
+                    'id' => (string) Str::uuid(),
+                    'user_id' => $adminId,
                     'title' => 'CRITICAL: REDLINE SOS RECEIVED', 
                     'message' => "Emergency request from {$this->sosCompany}. Priority Triage Required.",
                     'type' => 'System', 

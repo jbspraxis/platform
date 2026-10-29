@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Mdm;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
@@ -81,6 +82,9 @@ class FinancialDictionary extends Component
 
     public function saveCode()
     {
+        // The route needs mdm.view; adding or changing a code needs mdm.create / mdm.edit
+        abort_unless(Auth::user()->can(($this->editMode && $this->recordId) ? 'mdm.edit' : 'mdm.create'), 403);
+
         sleep(1); // UI/UX micro-delay for the loading spinner
 
         $this->validate([
@@ -155,6 +159,8 @@ class FinancialDictionary extends Component
 
     public function toggleStatus($id, $currentStatus)
     {
+        abort_unless(Auth::user()->can('mdm.edit'), 403);
+
         DB::table('mdm_financial_dictionary')->where('id', $id)->update([
             'is_active' => !$currentStatus,
             'updated_at' => now()

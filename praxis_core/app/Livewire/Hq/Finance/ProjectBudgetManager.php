@@ -102,6 +102,8 @@ class ProjectBudgetManager extends Component
 
     public function executeSweep()
     {
+        abort_unless(Auth::user()->can('finance.edit'), 403);
+
         $this->validate([
             'sweepFromId' => 'required|string|exists:project_budgets,id',
             'sweepToId' => 'required|string|different:sweepFromId|exists:project_budgets,id',

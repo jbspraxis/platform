@@ -100,6 +100,9 @@ class AuditTerminal extends Component
 
     public function exportBooks()
     {
+        // The books are the invoice ledger, so finance exporters may take them too
+        abort_unless(auth()->user()->can('audit.export') || auth()->user()->can('finance.export'), 403);
+
         $fileName = 'Horizon_Segment_Audit_Ledger_' . Carbon::now()->format('Y_m_d') . '.csv';
 
         DB::table('system_audit_logs')->insert([

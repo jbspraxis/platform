@@ -5,6 +5,7 @@ namespace App\Livewire\Hq\Operations;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
@@ -17,7 +18,11 @@ class QaHub extends Component
 {
     use WithFileUploads;
 
-    public $userClearance;
+    // What this user may do here (set in mount, see config/access.php)
+    #[Locked]
+    public bool $canWork = false;    // qa.edit: comment, upload evidence, rework timer
+    #[Locked]
+    public bool $canResolve = false; // qa.approve: verify and close tickets
 
     // Firehose State
     public $filterStatus = 'Open'; // Default to Open/Investigating
@@ -36,7 +41,8 @@ class QaHub extends Component
 
     public function mount()
     {
-        $this->userClearance = Auth::user()->role->clearance_level ?? 0;
+        $this->canWork = Auth::user()->can('qa.edit');
+        $this->canResolve = Auth::user()->can('qa.approve');
         $this->loadFirehose();
 
         // NEW: Auto-open ticket if teleporting from the Sprint Board
@@ -126,8 +132,8 @@ class QaHub extends Component
             $this->activeTimerId = $openLog ? $openLog->id : null;
         }
 
-        // Auto-Update Status to Investigating if it was Open
-        if ($this->selectedTicket['status'] === 'Open') {
+        // Auto-Update Status to Investigating if it was Open (only for someone who works tickets: qa.edit)
+        if ($this->selectedTicket['status'] === 'Open' && Auth::user()->can('qa.edit')) {
             DB::table('qa_tickets')->where('id', $ticketId)->update(['status' => 'Investigating', 'updated_at' => now()]);
             $this->loadFirehose();
             $this->selectedTicket['status'] = 'Investigating';
@@ -139,6 +145,8 @@ class QaHub extends Component
     // --- 3. COMMUNICATION & EVIDENCE ---
     public function postComment()
     {
+        abort_unless(Auth::user()->can('qa.edit'), 403);
+
         $this->validate(['newCommentText' => 'required|string|min:2']);
 
         DB::table('qa_comments')->insert([
@@ -158,6 +166,8 @@ class QaHub extends Component
 
     public function uploadEvidence()
     {
+        abort_unless(Auth::user()->can('qa.edit'), 403);
+
         $this->validate([
             'newAttachment' => 'required|file|max:10240' // Max 10MB (Selection 4-B)
         ]);
@@ -182,14 +192,17 @@ class QaHub extends Component
     // --- 4. COPQ REWORK TIMER ---
     public function toggleReworkTimer()
     {
+        abort_unless(Auth::user()->can('qa.edit'), 403);
+
         if (!$this->selectedTicket['task_id']) {
             session()->flash('error', 'Cannot track rework time: Ticket is not linked to a specific Task.');
             return;
         }
 
         if ($this->activeTimerId) {
-            // Stop Timer
-            $openLog = DB::table('task_time_logs')->where('id', $this->activeTimerId)->first();
+            // Stop Timer (only this user's own open log; activeTimerId comes from the browser)
+            $openLog = DB::table('task_time_logs')->where('id', $this->activeTimerId)
+                ->where('user_id', Auth::id())->whereNull('end_time')->first();
             if ($openLog) {
                 $endTime = now();
                 $durationMinutes = Carbon::parse($openLog->start_time)->diffInMinutes($endTime);
@@ -226,8 +239,8 @@ class QaHub extends Component
     // --- 5. GATEKEEPER RESOLUTION (Rule 5: B & 9: A) ---
     public function markResolved()
     {
-        // Only L4 or L5 can officially resolve a QA Ticket
-        if ($this->userClearance < 4) {
+        // Only QA approvers (qa.approve) can officially resolve a QA Ticket
+        if (! Auth::user()->can('qa.approve')) {
             session()->flash('error', 'GATEKEEPER LOCK: Only Level 4/5 Command can verify and close vulnerabilities.');
             return;
         }

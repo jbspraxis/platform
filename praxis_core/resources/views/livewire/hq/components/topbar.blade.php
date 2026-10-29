@@ -47,7 +47,7 @@
     <a href="{{ route('hq.logout') }}" class="admin-profile" title="Click to Terminate Session">
         <div class="admin-details">
             <span class="admin-name">{{ auth()->user()->name ?? 'System Admin' }}</span>
-            <span class="admin-role">{{ auth()->user()->role->name ?? 'Level 5 Clearance' }}</span>
+            <span class="admin-role">{{ auth()->user()?->role_names ?: 'Staff' }}</span>
         </div>
         <div class="admin-avatar">
             {{ strtoupper(substr(auth()->user()->first_name ?? 'S', 0, 1) . substr(auth()->user()->last_name ?? 'A', 0, 1)) }}

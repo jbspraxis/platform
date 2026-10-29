@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Portal;
 
+use App\Support\Access;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
@@ -225,13 +226,10 @@ class SignoffGateway extends Component
             }
 
             // Notify Command Team of successful signoff
-            $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')
-                        ->where('roles.clearance_level', '>=', 4)->select('users.id')->get();
-
             $notifications = [];
-            foreach($admins as $admin) {
+            foreach(Access::staffWith('signoffs.approve') as $adminId) {
                 $notifications[] = [
-                    'id' => (string) Str::uuid(), 'user_id' => $admin->id,
+                    'id' => (string) Str::uuid(), 'user_id' => $adminId,
                     'title' => 'CRYPTOGRAPHIC SIGNOFF SECURED',
                     'message' => "Project '{$this->signoff->project_title}' has been legally signed and hashed by {$this->signerName}.",
                     'type' => 'Project', 'created_at' => now()

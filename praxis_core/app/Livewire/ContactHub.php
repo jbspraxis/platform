@@ -5,6 +5,7 @@ namespace App\Livewire;
 use Livewire\Component;
 use App\Models\Organization;
 use App\Models\User;
+use App\Support\Access;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -163,11 +164,10 @@ class ContactHub extends Component
             // Note: AI Lead Scoring Job will be dispatched here later.
 
             // D. HQ notification, as the booking form does
-            $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')->where('roles.clearance_level', '>=', 4)->select('users.id')->get();
             $notifications = [];
-            foreach ($admins as $admin) {
+            foreach (Access::staffWith('crm.edit') as $adminId) {
                 $notifications[] = [
-                    'id' => (string) Str::uuid(), 'user_id' => $admin->id,
+                    'id' => (string) Str::uuid(), 'user_id' => $adminId,
                     'title' => 'NEW WEBSITE ENQUIRY',
                     'message' => "{$this->fullName} ({$cleanOrgName}) sent a message through the contact form.",
                     'type' => 'System', 'created_at' => now(),

@@ -68,9 +68,13 @@
                     </td>
                     <td style="padding: 15px 12px; border-bottom: 1px solid rgba(255,255,255,0.02); text-align: center;">
                         @if($activeTab === 'pending_auth')
+                            @can('expenses.approve')
                             <button wire:click="openAuthModal('{{ $req->id }}')" style="background: rgba(0,229,255,0.1); border: 1px solid var(--erp-teal); color: var(--erp-teal); padding: 6px 12px; font-size: 0.7rem; font-family: 'Roboto Mono', monospace; font-weight: bold; border-radius: 2px; cursor: pointer;">REVIEW & SEAL</button>
+                            @endcan
                         @elseif($activeTab === 'pending_clearance')
+                            @can('expenses.approve')
                             <button wire:click="openClearanceModal('{{ $req->id }}')" style="background: rgba(255,189,46,0.1); border: 1px solid #FFBD2E; color: #FFBD2E; padding: 6px 12px; font-size: 0.7rem; font-family: 'Roboto Mono', monospace; font-weight: bold; border-radius: 2px; cursor: pointer;">AUDIT CLEARANCE</button>
+                            @endcan
                         @else
                             <span style="font-size: 0.7rem; font-family: 'Roboto Mono', monospace; font-weight: bold; padding: 4px 8px; border-radius: 2px; border: 1px solid {{ $req->status === 'Cleared' ? '#00FF66' : 'var(--erp-red)' }}; color: {{ $req->status === 'Cleared' ? '#00FF66' : 'var(--erp-red)' }};">{{ strtoupper($req->status) }}</span>
                         @endif

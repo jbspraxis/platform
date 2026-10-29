@@ -70,13 +70,19 @@
         </div>
     @endif
 
+    @if(session()->has('error'))
+        <div style="background: rgba(255,51,102,0.08); border: 1px solid var(--erp-red); color: var(--erp-red); font-family: 'Roboto Mono', monospace; font-size: 0.75rem; padding: 10px 14px; margin-bottom: 20px; border-radius: 2px;">{{ session('error') }}</div>
+    @endif
+
     <div style="margin-bottom: 30px; border-bottom: 1px solid var(--erp-border-dark); padding-bottom: 15px; display: flex; justify-content: space-between; align-items: flex-end;">
         <div>
             <h1 style="font-family: 'Montserrat', sans-serif; font-size: 1.2rem; color: var(--erp-white); letter-spacing: 1px;">SYSTEM USER DIRECTORY</h1>
             <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-muted);">IDENTITY & ACCESS MATRIX</p>
         </div>
         <div style="display: flex; gap: 10px;">
+            @if($canCreate)
             <button wire:click="setTab('CREATE')" class="nav-pill {{ $activeTab === 'CREATE' ? 'active' : '' }}"><i data-lucide="user-plus" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> INIT USER</button>
+            @endif
             <button wire:click="setTab('INTERNAL')" class="nav-pill {{ $activeTab === 'INTERNAL' ? 'active' : '' }}">JBS COMMAND</button>
             <button wire:click="setTab('CLIENTS')" class="nav-pill {{ $activeTab === 'CLIENTS' ? 'active' : '' }}">CLIENT OS</button>
         </div>
@@ -131,18 +137,27 @@
                         
                         <div>
                             @if($editingIsClient || $this->isClientForm())
-                                {{-- Client portal accounts have no staff role; the client's primary account manages their team --}}
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-teal); margin-bottom: 6px; font-weight: bold;">Account Type</label>
-                                <div style="font-size: 0.8rem; color: var(--erp-muted); padding: 10px 0;">Client portal account. The organisation's first account becomes its primary account.</div>
-                            @else
-                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-teal); margin-bottom: 6px; font-weight: bold;">System Role (Clearance) *</label>
-                                <select wire:model="role_id" required class="cyber-select" style="border-color: rgba(0, 229, 255, 0.4);">
-                                    <option value="">-- SELECT CLEARANCE LEVEL --</option>
-                                    @foreach($roles as $role)
-                                        <option value="{{ $role->id }}">LVL {{ $role->clearance_level }} - {{ $role->name }}</option>
+                                {{-- One portal role; the organisation's first account is its primary account and always Client Admin --}}
+                                <label for="client-role" style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-teal); margin-bottom: 6px; font-weight: bold;">Portal Role</label>
+                                <select id="client-role" wire:model="client_role_id" class="cyber-select" style="border-color: rgba(0, 229, 255, 0.4);">
+                                    <option value="">Client Member (default)</option>
+                                    @foreach($clientRoles as $role)
+                                        <option value="{{ $role->id }}">{{ $role->name }}</option>
                                     @endforeach
                                 </select>
-                                @error('role_id') <span class="validation-error">{{ $message }}</span> @enderror
+                                <div style="font-size: 0.7rem; color: var(--erp-muted); margin-top: 6px;">The organisation's first account becomes its primary account and is always Client Admin.</div>
+                            @else
+                                <label style="display: block; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-teal); margin-bottom: 6px; font-weight: bold;">Staff Roles * <span style="color: var(--erp-muted); font-weight: normal;">(one or more; permissions add up)</span></label>
+                                <div style="display: grid; gap: 6px; padding: 10px 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(0, 229, 255, 0.4); border-radius: 2px;">
+                                    @foreach($staffRoles as $role)
+                                        <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--erp-white); cursor: pointer;">
+                                            <input type="checkbox" wire:model="role_ids" value="{{ $role->id }}" style="accent-color: #00E5FF;">
+                                            {{ $role->name }}
+                                            @if($role->is_protected) <span style="font-size: 0.6rem; color: var(--erp-yellow);">PROTECTED</span> @endif
+                                        </label>
+                                    @endforeach
+                                </div>
+                                @error('role_ids') <span class="validation-error">{{ $message }}</span> @enderror
                             @endif
                         </div>
 
@@ -230,11 +245,7 @@
 
                                 <td style="padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.02);">
                                     <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: var(--erp-muted);">
-                                        @if($user->clearance_level !== null)
-                                            <span style="color: var(--erp-white); font-weight: bold;">LVL {{ $user->clearance_level }}</span> - {{ $user->role_name }}
-                                        @else
-                                            <span style="color: var(--erp-white); font-weight: bold;">PORTAL</span> - {{ $user->role_name }}
-                                        @endif
+                                        <span style="color: var(--erp-white); font-weight: bold;">{{ $user->role_name ?: 'No role' }}</span>
                                     </div>
                                 </td>
 
@@ -250,6 +261,7 @@
 
                                 <td style="padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.02); text-align: center;">
     
+                                @if($canEdit)
                                     @if($user->lifecycle_stage === 'Onboarding')
                                         <button wire:click="resendInvitation('{{ $user->id }}')" style="background: transparent; border: 1px solid #00E5FF; color: #00E5FF; padding: 4px 10px; font-size: 0.65rem; font-family: 'Roboto Mono', monospace; font-weight: bold; border-radius: 2px; cursor: pointer; transition: 0.3s; margin-right: 5px;" onmouseover="this.style.background='#00E5FF'; this.style.color='#0A1128';" onmouseout="this.style.background='transparent'; this.style.color='#00E5FF';">
                                             RESEND INIT
@@ -263,6 +275,7 @@
                                     <button wire:click="toggleUserStatus('{{ $user->id }}', '{{ $user->status }}')" style="background: transparent; border: 1px solid {{ $user->status === 'Active' ? 'var(--erp-red)' : 'var(--erp-green)' }}; color: {{ $user->status === 'Active' ? 'var(--erp-red)' : 'var(--erp-green)' }}; padding: 4px 10px; font-size: 0.65rem; font-family: 'Roboto Mono', monospace; font-weight: bold; border-radius: 2px; cursor: pointer; transition: 0.3s;" onmouseover="this.style.background='{{ $user->status === 'Active' ? 'var(--erp-red)' : 'var(--erp-green)' }}'; this.style.color='#0A1128';" onmouseout="this.style.background='transparent'; this.style.color='{{ $user->status === 'Active' ? 'var(--erp-red)' : 'var(--erp-green)' }}';">
                                         {{ $user->status === 'Active' ? 'REVOKE' : 'RESTORE' }}
                                     </button>
+                                @endif
                                 
                                 </td>
 

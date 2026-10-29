@@ -5,6 +5,7 @@ namespace App\Livewire\Hq\Finance;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Exception;
 
@@ -61,6 +62,8 @@ class TaxConfigurator extends Component
 
     public function saveConfiguration()
     {
+        abort_unless(Auth::user()->can('payroll.edit'), 403);
+
         try {
             $updateData = $this->config;
             unset($updateData['id'], $updateData['region_code'], $updateData['created_at'], $updateData['updated_at']);
@@ -91,6 +94,8 @@ class TaxConfigurator extends Component
 
     public function addTaxBand()
     {
+        abort_unless(Auth::user()->can('payroll.create'), 403);
+
         $this->validate([
             'newBandName' => 'required|string|max:100',
             'newBandLower' => 'required|numeric|min:0',
@@ -115,6 +120,8 @@ class TaxConfigurator extends Component
 
     public function removeTaxBand($bandId)
     {
+        abort_unless(Auth::user()->can('payroll.delete'), 403);
+
         DB::table('tax_bands')->where('id', $bandId)->delete();
         $this->loadConfiguration();
     }
@@ -126,6 +133,6 @@ class TaxConfigurator extends Component
 
     public function render()
     {
-        return view('livewire.hq.finance.tax-config-manager');
+        return view('livewire.hq.finance.tax-configurator');
     }
 }

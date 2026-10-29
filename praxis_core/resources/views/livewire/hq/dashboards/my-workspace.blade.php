@@ -71,7 +71,7 @@
                 @endif
             </div>
 
-            @if(Auth::user()->role && Auth::user()->role->clearance_level >= 4)
+            @can('dashboard.view')
             <div style="background: rgba(10, 17, 40, 0.85); border: 1px solid var(--erp-border-dark); border-radius: 4px; padding: 25px;">
                 <div style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: #FFBD2E; margin-bottom: 20px; border-bottom: 1px dashed var(--erp-border-dark); padding-bottom: 10px;">
                     > PENDING AUTHORIZATIONS
@@ -94,7 +94,7 @@
                     <div style="color: var(--erp-muted); font-family: 'Roboto Mono', monospace; font-size: 0.75rem;">> ZERO OUTSTANDING AUTHORIZATIONS.</div>
                 @endif
             </div>
-            @endif
+            @endcan
         </div>
 
         <div style="display: flex; flex-direction: column; gap: 20px;">

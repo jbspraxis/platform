@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Mdm;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Exception;
@@ -65,6 +66,9 @@ class LegalEntityRegistry extends Component
 
     public function saveEntity()
     {
+        // The route needs mdm.view; adding or changing an entity needs mdm.create / mdm.edit
+        abort_unless(Auth::user()->can(($this->editMode && $this->recordId) ? 'mdm.edit' : 'mdm.create'), 403);
+
         sleep(1); // UX buffer
 
         $this->validate([
@@ -146,6 +150,8 @@ class LegalEntityRegistry extends Component
 
     public function toggleStatus($id, $currentStatus)
     {
+        abort_unless(Auth::user()->can('mdm.edit'), 403);
+
         DB::table('mdm_legal_entities')->where('id', $id)->update([
             'is_active' => !$currentStatus, 
             'updated_at' => now()

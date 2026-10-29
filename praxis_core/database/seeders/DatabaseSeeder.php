@@ -6,7 +6,7 @@ use Illuminate\Database\Seeder;
 
 /**
  * Builds a working database from scratch (php artisan migrate:fresh --seed):
- * reference data, JBS Praxis itself, then the public website content.
+ * reference data, roles and permissions, JBS Praxis itself, then the public website content.
  * No test records and no people: the owner's account is created with
  * php artisan app:invite-owner (they choose their own password).
  */
@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             ReferenceDataSeeder::class,
+            AccessSeeder::class,
             CoreSeeder::class,
             WebsiteContentSeeder::class,
         ]);

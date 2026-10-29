@@ -77,9 +77,11 @@
                     <option value="{{ $proj->id }}">{{ strtoupper($proj->title) }}</option>
                 @endforeach
             </select>
+            @can('finance.edit')
             <button wire:click="openSweepModal" class="btn-action btn-sweep">
                 <i data-lucide="refresh-cw" style="width: 16px; height: 16px;"></i> SWEEP CAPITAL
             </button>
+            @endcan
         </div>
     </div>
 

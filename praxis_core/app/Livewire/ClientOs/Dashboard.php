@@ -7,6 +7,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\WithFileUploads;
 use App\Support\People;
+use App\Support\Access;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -104,12 +105,30 @@ class Dashboard extends Component
     public $inviteLastName = '';
     public $inviteEmail = '';
     public $inviteProjectId = ''; 
+    public $inviteRoleId = '';
+
+    // Portal permissions of this account, e.g. $can['billing.create'] (role-based, set on the server)
+    #[Locked]
+    public $can = [];
+    #[Locked]
+    public $clientRoles = [];
 
     // Brand Config State
     public $brandPrimary = '#00E5FF';
     public $brandSecondary = '#FF3366';
     public $brandAccent = '#FFBD2E';
     public $brandLogo; 
+
+    // Each tab needs this portal permission (config/access.php, "portal.<module>.<action>")
+    private const TAB_PERMISSIONS = [
+        'overview' => 'projects.view', 'sprints' => 'projects.view', 'qa_hub' => 'qa.view',
+        'financials' => 'billing.view', 'vault' => 'documents.view', 'team' => 'team.view',
+    ];
+
+    private function allowed(string $permission): bool
+    {
+        return Access::allows($this->user, Access::CLIENT_PREFIX . $permission);
+    }
 
     public function mount()
     {
@@ -128,6 +147,11 @@ class Dashboard extends Component
         }
 
         $this->loadBrandSettings();
+
+        // What this account may do (its role; an organisation's primary account is Client Admin)
+        $this->can = collect(Access::catalogue())->filter(fn ($p) => $p['audience'] === 'client')
+            ->mapWithKeys(fn ($p, $slug) => [substr($slug, strlen(Access::CLIENT_PREFIX)) => Access::allows($this->user, $slug)])->all();
+        $this->activeTab = collect(self::TAB_PERMISSIONS)->filter(fn ($perm) => $this->can[$perm] ?? false)->keys()->first() ?? 'overview';
 
         // Project Routing
         $projectQuery = DB::table('projects')->where('organization_id', $this->organization->id)->orderBy('created_at', 'desc');
@@ -227,7 +251,7 @@ class Dashboard extends Component
 
     public function loadProjectTelemetry()
     {
-        if (!$this->activeProject) return;
+        if (!$this->activeProject || !$this->allowed('projects.view')) return;
 
         $architect = DB::table('users')->where('id', $this->activeProject->created_by)->first();
         $this->leadArchitect = $architect ? strtoupper($architect->first_name . ' ' . substr($architect->last_name, 0, 1) . '.') : 'PRAXIS COMMAND';
@@ -250,14 +274,14 @@ class Dashboard extends Component
 
     public function loadQaHub()
     {
-        if (!$this->activeProject) return;
+        if (!$this->activeProject || !$this->allowed('qa.view')) return;
         $this->activeTasks = DB::table('tasks')->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')->where('project_phases.project_id', $this->activeProject->id)->select('tasks.id', 'tasks.title', 'tasks.status')->get()->toArray();
         $this->qaTickets = DB::table('qa_tickets')->leftJoin('tasks', 'qa_tickets.task_id', '=', 'tasks.id')->where('qa_tickets.project_id', $this->activeProject->id)->select('qa_tickets.*', 'tasks.title as task_title')->orderBy('qa_tickets.created_at', 'desc')->get()->toArray();
     }
 
     public function loadFinancials()
     {
-        if (!$this->activeProject) return;
+        if (!$this->activeProject || !$this->allowed('billing.view')) return;
         $this->invoices = DB::table('invoices')->where('project_id', $this->activeProject->id)->orderBy('created_at', 'desc')->get()->map(function($invoice) {
             $invoice->has_pending_pop = DB::table('transactions')->where('invoice_id', $invoice->id)->where('status', 'Pending Verification')->exists();
             return $invoice;
@@ -267,6 +291,8 @@ class Dashboard extends Component
 
     public function loadVault()
     {
+        if (!$this->allowed('documents.view')) return;
+
         $this->vaultSows = DB::table('proposals')
             ->where('organization_id', $this->organization->id)
             ->whereIn('status', ['Authorized', 'Converted'])
@@ -284,24 +310,32 @@ class Dashboard extends Component
 
     public function loadTeamCommand()
     {
-        if (!$this->user->is_primary_client) return;
+        if (!$this->allowed('team.view')) return;
         // Portal accounts of this organisation (not leads). Only display fields: the list is
         // sent to the browser, so never select passwords or invitation tokens.
         $this->teamMembers = DB::table('client_users')
             ->leftJoin('projects', 'client_users.restricted_project_id', '=', 'projects.id')
+            ->leftJoin('roles', 'client_users.role_id', '=', 'roles.id')
             ->where('client_users.organization_id', $this->organization->id)
             ->whereIn('client_users.lifecycle_stage', ['Onboarding', 'Active'])
             ->whereNull('client_users.deleted_at')
             ->select('client_users.id', 'client_users.first_name', 'client_users.last_name', 'client_users.email', 'client_users.job_title',
                      'client_users.status', 'client_users.lifecycle_stage', 'client_users.is_primary_client', 'client_users.restricted_project_id',
-                     'client_users.last_login_at', 'client_users.created_at', 'projects.title as restricted_project_title')
+                     'client_users.last_login_at', 'client_users.created_at', 'projects.title as restricted_project_title',
+                     'client_users.role_id', DB::raw("CASE WHEN client_users.is_primary_client = 1 THEN 'Client Admin' ELSE COALESCE(roles.name, 'No role') END as role_name"))
             ->get()->toArray();
+        $this->clientRoles = DB::table('roles')->where('audience', 'client')->whereNull('deleted_at')->orderBy('id')->get(['id', 'name'])->toArray();
     }
 
     public function switchTab($tab)
     {
         if ($this->financialLockout && $tab !== 'financials') {
             session()->flash('lockout_error', '> ACCESS DENIED: ' . $this->lockoutReason);
+            return;
+        }
+        $needs = self::TAB_PERMISSIONS[$tab] ?? null;
+        if (!$needs || !$this->allowed($needs)) {
+            session()->flash('lockout_error', '> ACCESS DENIED: Your portal role does not include this section.');
             return;
         }
         $this->activeTab = $tab;
@@ -318,6 +352,7 @@ class Dashboard extends Component
 
     public function submitQaTicket()
     {
+        abort_unless($this->allowed('qa.create'), 403);
         $this->validate([
             'qaTitle' => 'required|string|max:150', 
             'qaDescription' => 'required|string', 
@@ -355,10 +390,9 @@ class Dashboard extends Component
                 ]);
             }
 
-            $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')->where('roles.clearance_level', '>=', 4)->select('users.id')->get();
             $notifications = [];
-            foreach($admins as $admin) {
-                $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $admin->id, 'title' => $isGeneralMessage ? 'CLIENT COMMUNICATION RECEIVED' : 'QA BUG REPORT LOGGED', 'message' => "Project: {$this->activeProject->title} | By: {$this->user->first_name}", 'type' => 'Project', 'created_at' => now()];
+            foreach (Access::staffWith('qa.edit') as $adminId) {
+                $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => $isGeneralMessage ? 'CLIENT COMMUNICATION RECEIVED' : 'QA BUG REPORT LOGGED', 'message' => "Project: {$this->activeProject->title} | By: {$this->user->first_name}", 'type' => 'Project', 'created_at' => now()];
             }
             if(!empty($notifications)) DB::table('notifications')->insert($notifications);
         });
@@ -371,6 +405,7 @@ class Dashboard extends Component
     // --- DIRECT SPRINT APPROVALS ---
     public function approveTask($taskId)
     {
+        abort_unless($this->allowed('projects.approve'), 403);
         if (!$this->ownsTask($taskId)) return;
 
         DB::table('tasks')->where('id', $taskId)->update(['status' => 'Done', 'updated_at' => now()]);
@@ -386,6 +421,7 @@ class Dashboard extends Component
 
     public function teleportToQa($taskId, $taskTitle)
     {
+        abort_unless($this->allowed('qa.create'), 403);
         if (!$this->ownsTask($taskId)) return;
         $this->qaTaskId = $taskId;
         $this->qaTitle = "VULNERABILITY: " . strtoupper($taskTitle);
@@ -395,6 +431,7 @@ class Dashboard extends Component
     // --- QA HUB OFFCANVAS & COMMUNICATION ---
     public function openTicket($ticketId)
     {
+        abort_unless($this->allowed('qa.view'), 403);
         $this->selectedTicket = collect($this->qaTickets)->firstWhere('id', $ticketId);
         if (!$this->selectedTicket) return;
 
@@ -419,6 +456,7 @@ class Dashboard extends Component
     // NEW: Handle Client Uploads
     public function uploadQaEvidence()
     {
+        abort_unless($this->allowed('qa.create'), 403);
         if (!$this->selectedTicket) return;
 
         $this->validate([
@@ -444,6 +482,7 @@ class Dashboard extends Component
 
     public function postTicketComment()
     {
+        abort_unless($this->allowed('qa.create'), 403);
         if (!$this->selectedTicket) return;
 
         $this->validate(['newCommentText' => 'required|string|min:2|max:5000']);
@@ -455,10 +494,9 @@ class Dashboard extends Component
         ]);
 
         // Notify HQ
-        $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')->where('roles.clearance_level', '>=', 4)->select('users.id')->get();
         $notifications = [];
-        foreach($admins as $admin) {
-            $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $admin->id, 'title' => 'CLIENT RESPONSE LOGGED', 'message' => "Ticket: {$this->selectedTicket->title}", 'type' => 'Project', 'created_at' => now()];
+        foreach (Access::staffWith('qa.edit') as $adminId) {
+            $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => 'CLIENT RESPONSE LOGGED', 'message' => "Ticket: {$this->selectedTicket->title}", 'type' => 'Project', 'created_at' => now()];
         }
         if(!empty($notifications)) DB::table('notifications')->insert($notifications);
 
@@ -468,6 +506,7 @@ class Dashboard extends Component
 
     public function approveTicketFix()
     {
+        abort_unless($this->allowed('projects.approve'), 403);
         if (!$this->selectedTicket) return;
 
         DB::table('qa_tickets')->where('id', $this->selectedTicket->id)->update(['status' => 'Closed', 'updated_at' => now()]);
@@ -482,6 +521,7 @@ class Dashboard extends Component
     
     public function approveAndLockFromQa()
     {
+        abort_unless($this->allowed('projects.approve'), 403);
         if (!$this->selectedTicket) return;
 
         // 1. Force close the QA Ticket
@@ -514,6 +554,7 @@ class Dashboard extends Component
     }
     
     public function triggerPopUpload($invoiceId, $amountDue) {
+        abort_unless($this->allowed('billing.create'), 403);
         if (!collect($this->invoices)->contains('id', $invoiceId)) return;
         $this->uploadInvoiceId = $invoiceId;
         $this->popAmount = $amountDue; 
@@ -528,6 +569,7 @@ class Dashboard extends Component
     
     public function submitProofOfPayment()
     {
+        abort_unless($this->allowed('billing.create'), 403);
         $this->validate([
             'uploadInvoiceId' => 'required|exists:invoices,id',
             'popMethod' => 'required|string', 
@@ -565,11 +607,10 @@ class Dashboard extends Component
                 'updated_at' => now()
             ]);
 
-            $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')->where('roles.clearance_level', '>=', 4)->select('users.id')->get();
             $notifications = [];
-            foreach($admins as $admin) {
+            foreach (Access::staffWith('finance.approve') as $adminId) {
                 $notifications[] = [
-                    'id' => (string) Str::uuid(), 'user_id' => $admin->id, 'title' => 'FINANCIAL: POP UPLOADED', 
+                    'id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => 'FINANCIAL: POP UPLOADED', 
                     'message' => "Client {$this->organization->name} uploaded POP for {$this->activeProject->currency} {$this->popAmount} (+ {$this->popWhtAmount} WHT).", 'type' => 'Financial', 'created_at' => now()
                 ];
             }
@@ -584,6 +625,7 @@ class Dashboard extends Component
 
     public function saveBrandSettings()
     {
+        abort_unless($this->allowed('settings.edit'), 403);
         $this->validate([
             'brandPrimary' => 'required|string|size:7', 'brandSecondary' => 'required|string|size:7',
             'brandAccent' => 'required|string|size:7', 'brandLogo' => 'nullable|image|mimes:png,svg|max:5120',
@@ -609,15 +651,21 @@ class Dashboard extends Component
 
     public function inviteTeamMember()
     {
-        if (!$this->user->is_primary_client) return;
+        abort_unless($this->allowed('team.create'), 403);
 
         try {
             $this->validate([
                 'inviteFirstName' => 'required|string|max:50', 
                 'inviteLastName' => 'required|string|max:50', 
                 'inviteEmail' => 'required|email|unique:client_users,email',
-                'inviteProjectId' => 'nullable|string' // Added to prevent strict-type silent failures
+                'inviteProjectId' => 'nullable|string', // Added to prevent strict-type silent failures
+                'inviteRoleId' => 'nullable|integer',
             ]);
+
+            $roleId = $this->inviteRoleId ?: DB::table('roles')->where('audience', 'client')->where('slug', 'client-member')->value('id');
+            if (!$roleId || !$this->mayAssignRole($roleId)) {
+                session()->flash('team_error', '> ERR: You cannot give that role.'); return;
+            }
 
             if (!empty($this->inviteProjectId) && !$this->ownsProject($this->inviteProjectId)) {
                 session()->flash('team_error', '> ERR: Unknown project.'); return;
@@ -640,7 +688,7 @@ class Dashboard extends Component
             // No password until they open the setup link, so the account cannot sign in before then
             DB::table('client_users')->insert([
                 'id' => (string) Str::uuid(), 'organization_id' => $this->organization->id,
-                'is_primary_client' => 0, 'restricted_project_id' => $this->inviteProjectId ?: null,
+                'is_primary_client' => 0, 'role_id' => $roleId, 'restricted_project_id' => $this->inviteProjectId ?: null,
                 'first_name' => $this->inviteFirstName, 'last_name' => $this->inviteLastName, 'email' => $this->inviteEmail,
                 'password' => null, 'invitation_token' => $token, 'lifecycle_stage' => 'Onboarding', 'status' => 'Active',
                 'source' => 'invite', 'created_at' => now(), 'updated_at' => now()
@@ -680,9 +728,39 @@ class Dashboard extends Component
     }
 
     // NEW: Allow Primary Alpha to edit node access on the fly
+    // A member this account may manage: same organisation, not itself, not the primary account
+    private function manageableMember($userId)
+    {
+        if (!$this->allowed('team.edit') || $this->user->id === $userId) return null;
+
+        return DB::table('client_users')->where('id', $userId)->where('organization_id', $this->organization->id)
+            ->where('is_primary_client', 0)->whereNull('deleted_at')->first();
+    }
+
+    // A client role may only be given by someone who holds every permission in it
+    private function mayAssignRole($roleId): bool
+    {
+        if (!DB::table('roles')->where('id', $roleId)->where('audience', 'client')->whereNull('deleted_at')->exists()) return false;
+
+        return DB::table('role_permissions')->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
+            ->where('role_permissions.role_id', $roleId)->pluck('permissions.slug')
+            ->every(fn ($p) => Access::allows($this->user, $p));
+    }
+
+    public function changeMemberRole($userId, $roleId)
+    {
+        if (!$this->manageableMember($userId) || !$this->mayAssignRole($roleId)) {
+            session()->flash('team_error', '> ERR: You cannot give that role.'); return;
+        }
+        DB::table('client_users')->where('id', $userId)->update(['role_id' => (int) $roleId, 'updated_at' => now()]);
+
+        $this->loadTeamCommand();
+        session()->flash('team_success', '> ROLE UPDATED.');
+    }
+
     public function updateNodeAccess($userId, $projectId)
     {
-        if (!$this->user->is_primary_client || $this->user->id === $userId) return;
+        if (!$this->manageableMember($userId)) return;
         if (!empty($projectId) && !$this->ownsProject($projectId)) return;
 
         DB::table('client_users')->where('id', $userId)->where('organization_id', $this->organization->id)->update([
@@ -696,8 +774,7 @@ class Dashboard extends Component
 
     public function toggleSuspendUser($userId)
     {
-        if (!$this->user->is_primary_client || $this->user->id === $userId) return;
-        $target = DB::table('client_users')->where('id', $userId)->where('organization_id', $this->organization->id)->first();
+        $target = $this->manageableMember($userId);
         if ($target) {
             $newStatus = $target->status === 'Suspended' ? 'Active' : 'Suspended';
             // A new remember token ends any 'remember me' logins; ClientActive signs out open sessions
@@ -708,6 +785,7 @@ class Dashboard extends Component
 
     public function triggerAuthenticatedRedline()
     {
+        abort_unless($this->allowed('support.create'), 403);
         $this->validate(['redlineAuthDescription' => 'required|string|min:10']);
         DB::transaction(function () {
             DB::table('redline_sos_requests')->insert([
@@ -715,10 +793,9 @@ class Dashboard extends Component
                 'problem_description' => "[AUTH CLIENT OVERRIDE] " . $this->redlineAuthDescription,
                 'status' => 'Pending Triage', 'created_at' => now(), 'updated_at' => now()
             ]);
-            $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')->where('roles.clearance_level', '>=', 4)->select('users.id')->get();
             $notifications = [];
-            foreach($admins as $admin) {
-                $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $admin->id, 'title' => 'CRITICAL: AUTHENTICATED REDLINE TRIGGERED', 'message' => "Active client {$this->organization->name} initiated Redline.", 'type' => 'System', 'created_at' => now()];
+            foreach (Access::staffWith('projects.approve') as $adminId) {
+                $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => 'CRITICAL: AUTHENTICATED REDLINE TRIGGERED', 'message' => "Active client {$this->organization->name} initiated Redline.", 'type' => 'System', 'created_at' => now()];
             }
             if(!empty($notifications)) DB::table('notifications')->insert($notifications);
         });

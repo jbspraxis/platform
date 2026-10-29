@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Operations;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -12,7 +13,15 @@ use Carbon\Carbon;
 #[Layout('components.layouts.hq')]
 class SilentTimers extends Component
 {
-    public $userClearance;
+    // What this user may do here (set in mount, see config/access.php)
+    #[Locked]
+    public bool $canSeeAll = false;   // timesheets.approve or timesheets.export (Auditor): everyone's time, live burn, anomalies
+    #[Locked]
+    public bool $canManage = false;   // timesheets.approve: corrections queue
+    #[Locked]
+    public bool $canInject = false;   // timesheets.approve + payroll.approve: God Mode (creates billable, payable time)
+    #[Locked]
+    public bool $canSeeMoney = false; // finance.view: margin cost columns
 
     // View State
     public $activeTab = 'live_burn'; // live_burn, anomalies, ledger, corrections
@@ -32,9 +41,12 @@ class SilentTimers extends Component
 
     public function mount()
     {
-        $this->userClearance = Auth::user()->role->clearance_level ?? 0;
-        
-        if ($this->userClearance < 3) {
+        $this->canManage = Auth::user()->can('timesheets.approve');
+        $this->canInject = $this->canManage && Auth::user()->can('payroll.approve');
+        $this->canSeeAll = $this->canManage || Auth::user()->can('timesheets.export');
+        $this->canSeeMoney = Auth::user()->can('finance.view');
+
+        if (! $this->canSeeAll) {
             $this->activeTab = 'ledger';
         }
 
@@ -43,9 +55,11 @@ class SilentTimers extends Component
 
     public function loadAllData()
     {
-        if ($this->userClearance >= 4) {
+        if ($this->canSeeAll) {
             $this->loadLiveBurn();
             $this->loadAnomalies();
+        }
+        if ($this->canManage) {
             $this->loadCorrectionRequests();
         }
         $this->loadLedger();
@@ -70,7 +84,7 @@ class SilentTimers extends Component
                 $rate = DB::table('compensation_history')->where('user_id', $log->id ?? Auth::id())->orderBy('effective_from', 'desc')->value('hourly_rate') ?? 50.00;
                 
                 $log->live_duration = intdiv($elapsedMinutes, 60) . 'h ' . ($elapsedMinutes % 60) . 'm';
-                $log->live_cost = ($elapsedMinutes / 60) * $rate;
+                $log->live_cost = $this->canSeeMoney ? ($elapsedMinutes / 60) * $rate : null;
                 return (array) $log;
             })->toArray();
     }
@@ -112,11 +126,16 @@ class SilentTimers extends Component
             ->orderBy('task_time_logs.end_time', 'desc')
             ->limit(100);
 
-        if ($this->userClearance < 4) {
+        if (! $this->canSeeAll) {
             $query->where('task_time_logs.user_id', Auth::id());
         }
 
         $rawLogs = $query->get();
+
+        // Cost stays on the server without finance.view
+        if (! $this->canSeeMoney) {
+            $rawLogs->each(fn ($log) => $log->cost_calculated = null);
+        }
 
         if ($this->ledgerGroupBy === 'engineer') {
             $this->ledgerData = $rawLogs->groupBy(function($item) {
@@ -144,7 +163,7 @@ class SilentTimers extends Component
     // --- 5. APPROVE CORRECTION (THE PENALTY ENGINE) ---
     public function approveCorrection($requestId)
     {
-        if ($this->userClearance < 4) return;
+        if (! Auth::user()->can('timesheets.approve')) return;
 
         $request = DB::table('time_correction_requests')->where('id', $requestId)->first();
         if (!$request || $request->status !== 'Pending') return;
@@ -212,7 +231,7 @@ class SilentTimers extends Component
 
     public function rejectCorrection($requestId)
     {
-        if ($this->userClearance < 4) return;
+        if (! Auth::user()->can('timesheets.approve')) return;
         
         DB::table('time_correction_requests')->where('id', $requestId)->update([
             'status' => 'Rejected',
@@ -223,10 +242,10 @@ class SilentTimers extends Component
         session()->flash('error', 'Time Correction Rejected. Time is lost.');
     }
 
-    // --- 6. L5 GOD MODE INJECTION ---
+    // --- 6. GOD MODE INJECTION (timesheets.approve + payroll.approve: Owner and Partner by default) ---
     public function executeGodMode()
     {
-        if ($this->userClearance < 5) {
+        if (! Auth::user()->can('timesheets.approve') || ! Auth::user()->can('payroll.approve')) {
             session()->flash('error', 'L5 CLEARANCE REQUIRED.');
             return;
         }
@@ -284,8 +303,8 @@ class SilentTimers extends Component
 
     public function render()
     {
-        $allUsers = $this->userClearance == 5 ? DB::table('users')->where('status', 'Active')->get() : [];
-        $allTasks = $this->userClearance == 5 ? DB::table('tasks')->whereIn('status', ['To-Do', 'In-Progress', 'QA_Review'])->get() : [];
+        $allUsers = $this->canInject ? DB::table('users')->where('status', 'Active')->select('id', 'first_name', 'last_name', 'email')->get() : [];
+        $allTasks = $this->canInject ? DB::table('tasks')->whereIn('status', ['To-Do', 'In-Progress', 'QA_Review'])->get() : [];
 
         return view('livewire.hq.operations.silent-timers', compact('allUsers', 'allTasks'));
     }

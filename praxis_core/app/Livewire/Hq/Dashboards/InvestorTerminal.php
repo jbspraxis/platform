@@ -98,14 +98,28 @@ class InvestorTerminal extends Component
                 ->get();
 
             // Grid 3: Leadership / Strike Team (Who is running the money)
-            $this->leadershipTeam = DB::table('users')
-                ->leftJoin('roles', 'users.role_id', '=', 'roles.id')
-                ->where('users.status', 'Active')
-                ->whereNotNull('users.job_title')
-                ->select('users.first_name', 'users.last_name', 'users.job_title', 'roles.name as role_name')
-                ->orderBy('users.created_at', 'asc')
+            $team = DB::table('users')
+                ->where('status', 'Active')
+                ->whereNotNull('job_title')
+                ->select('id', 'first_name', 'last_name', 'job_title')
+                ->orderBy('created_at', 'asc')
                 ->limit(5)
                 ->get();
+
+            // A person may hold several roles (staff_roles): show them as "Partner / Director, Engineer"
+            $roleNames = DB::table('staff_roles')
+                ->join('roles', 'staff_roles.role_id', '=', 'roles.id')
+                ->whereIn('staff_roles.user_id', $team->pluck('id'))
+                ->whereNull('roles.deleted_at')
+                ->orderBy('roles.name')
+                ->get(['staff_roles.user_id', 'roles.name'])
+                ->groupBy('user_id');
+
+            $this->leadershipTeam = $team->map(function ($member) use ($roleNames) {
+                $member->role_name = isset($roleNames[$member->id]) ? $roleNames[$member->id]->pluck('name')->implode(', ') : null;
+                unset($member->id);
+                return $member;
+            });
 
         } catch (\Exception $e) {
             // Live Failsafe
@@ -118,6 +132,8 @@ class InvestorTerminal extends Component
     // Triggered when the investor clicks "Generate Report"
     public function logReportGeneration()
     {
+        abort_unless(auth()->user()->can('dashboard.export'), 403);
+
         DB::table('system_audit_logs')->insert([
             'user_id' => auth()->id(),
             'action' => 'GENERATED_SHAREHOLDER_PDF',

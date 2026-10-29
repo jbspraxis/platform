@@ -87,7 +87,7 @@ class SetupAccount extends Component
         Auth::guard('web')->loginUsingId($user->id);
         Session::regenerate();
 
-        // The workspace is open to every staff member; the admin dashboard needs clearance 4
+        // The workspace is open to every staff member; the admin dashboard needs dashboard.view
         return redirect()->route('hq.dash.workspace');
     }
 

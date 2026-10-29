@@ -129,41 +129,45 @@ Route::prefix('hq')->group(function () {
         return redirect()->route('login'); 
     })->name('hq.logout');
 
-    // Protected HQ Routes: staff only. 'hq.staff:4' marks screens for clearance 4+ (finance, payroll, HR, master data, CRM, roles).
+    // Protected HQ Routes: staff only. Each screen needs its module's view permission
+    // (can:<module>.view, see config/access.php); actions inside are checked per component.
     Route::middleware(['auth', 'hq.staff'])->group(function () {
 
-        // 1. COMMAND OVERVIEW
-        Route::get('/dashboard/admin', \App\Livewire\Hq\Dashboards\GlobalTelemetry::class)->middleware('hq.staff:4')->name('hq.dash.admin');
+        // 1. COMMAND OVERVIEW (the workspace is open to every staff member)
+        Route::get('/dashboard/admin', \App\Livewire\Hq\Dashboards\GlobalTelemetry::class)->middleware('can:dashboard.view')->name('hq.dash.admin');
         Route::get('/dashboard/workspace', \App\Livewire\Hq\Dashboards\MyWorkspace::class)->name('hq.dash.workspace');
-        Route::get('/dashboard/investor', \App\Livewire\Hq\Dashboards\InvestorTerminal::class)->middleware('hq.staff:4')->name('hq.dash.investor');
-        Route::get('/dashboard/audit', \App\Livewire\Hq\Dashboards\AuditTerminal::class)->middleware('hq.staff:4')->name('hq.dash.audit');
+        Route::get('/dashboard/investor', \App\Livewire\Hq\Dashboards\InvestorTerminal::class)->middleware('can:dashboard.view')->name('hq.dash.investor');
+        Route::get('/dashboard/audit', \App\Livewire\Hq\Dashboards\AuditTerminal::class)->middleware('can:audit.view')->name('hq.dash.audit');
 
         // 2. MASTER DATA MANAGEMENT (MDM)
-        Route::prefix('mdm')->middleware('hq.staff:4')->group(function () {
-            // Financial Sub-Module
-            Route::get('/dictionary', \App\Livewire\Hq\Mdm\FinancialDictionary::class)->name('hq.mdm.dictionary');
-            Route::get('/copq-matrices', \App\Livewire\Hq\Mdm\CopqMatrices::class)->name('hq.mdm.copq');
-            Route::get('/tax-compliance', \App\Livewire\Hq\Mdm\TaxCompliance::class)->name('hq.mdm.tax');
-            Route::get('/remittance', \App\Livewire\Hq\Mdm\RemittanceAccounts::class)->name('hq.mdm.remittance');
-            
-            // Corporate Entities
-            Route::get('/legal-entities', \App\Livewire\Hq\Mdm\LegalEntityRegistry::class)->name('hq.mdm.legal');
-            Route::get('/employees', \App\Livewire\Hq\Mdm\EmployeeRegistry::class)->name('hq.mdm.employees');
+        Route::prefix('mdm')->group(function () {
+            Route::middleware('can:mdm.view')->group(function () {
+                // Financial Sub-Module
+                Route::get('/dictionary', \App\Livewire\Hq\Mdm\FinancialDictionary::class)->name('hq.mdm.dictionary');
+                Route::get('/copq-matrices', \App\Livewire\Hq\Mdm\CopqMatrices::class)->name('hq.mdm.copq');
+                Route::get('/tax-compliance', \App\Livewire\Hq\Mdm\TaxCompliance::class)->name('hq.mdm.tax');
+                Route::get('/remittance', \App\Livewire\Hq\Mdm\RemittanceAccounts::class)->name('hq.mdm.remittance');
+
+                // Corporate Entities
+                Route::get('/legal-entities', \App\Livewire\Hq\Mdm\LegalEntityRegistry::class)->name('hq.mdm.legal');
+            });
+            // People records belong to HR
+            Route::get('/employees', \App\Livewire\Hq\Mdm\EmployeeRegistry::class)->middleware('can:hr.view')->name('hq.mdm.employees');
         });
 
-        // HUMAN CAPITAL (Newly Expanded HR Routes)
-        Route::prefix('hr')->middleware('hq.staff:4')->group(function () {
+        // HUMAN CAPITAL
+        Route::prefix('hr')->middleware('can:hr.view')->group(function () {
             Route::get('/time-attendance', \App\Livewire\Hq\Hr\TimeAttendance::class)->name('hq.hr.time');
             Route::get('/compliance-contracts', \App\Livewire\Hq\Hr\ContractsAppraisals::class)->name('hq.hr.compliance');
         });
 
         // 3. FINANCIAL DISPATCH (Treasury, Ledger, Tax & Accounting)
         Route::prefix('finance')->group(function () {
-            // Treasury & Expenses (any staff member can submit a cash request)
-            Route::get('/cash-request', \App\Livewire\Hq\Finance\CashRequestSubmitter::class)->name('hq.finance.request');
+            // Treasury & Expenses
+            Route::get('/cash-request', \App\Livewire\Hq\Finance\CashRequestSubmitter::class)->middleware('can:expenses.create')->name('hq.finance.request');
+            Route::get('/cash-manager', \App\Livewire\Hq\Finance\CashRequestManager::class)->middleware('can:expenses.view')->name('hq.finance.manager');
 
-            Route::middleware('hq.staff:4')->group(function () {
-                Route::get('/cash-manager', \App\Livewire\Hq\Finance\CashRequestManager::class)->name('hq.finance.manager');
+            Route::middleware('can:finance.view')->group(function () {
                 Route::get('/budget-matrix', \App\Livewire\Hq\Finance\ProjectBudgetManager::class)->name('hq.finance.budgets');
 
                 // Invoicing & Escrow
@@ -174,46 +178,54 @@ Route::prefix('hq')->group(function () {
                 Route::get('/chart-of-accounts', \App\Livewire\Hq\Finance\ChartOfAccountsManager::class)->name('hq.finance.coa');
                 Route::get('/general-ledger', \App\Livewire\Hq\Finance\GeneralLedgerManager::class)->name('hq.finance.gl');
 
-                // Payroll & Tax Engine (Newly Added Endpoints)
+                // Executive BI (The Financial Matrix)
+                Route::get('/executive-bi', \App\Livewire\Hq\Finance\ExecutiveBiDashboard::class)->name('hq.finance.bi');
+            });
+
+            // Payroll & Tax Engine
+            Route::middleware('can:payroll.view')->group(function () {
                 Route::get('/payroll', \App\Livewire\Hq\Finance\PayrollManager::class)->name('hq.finance.payroll');
                 Route::get('/tax-configurator', \App\Livewire\Hq\Finance\TaxConfigurator::class)->name('hq.finance.tax-config');
                 Route::get('/variable-compensation', \App\Livewire\Hq\Finance\VariableCompensation::class)->name('hq.finance.variables');
                 Route::get('/compliance-matrix', \App\Livewire\Hq\Finance\ComplianceMatrix::class)->name('hq.finance.matrix');
                 Route::get('/payslips', \App\Livewire\Hq\Finance\PayslipInspector::class)->name('hq.finance.payslips');
-
-                // Executive BI (The Financial Matrix)
-                Route::get('/executive-bi', \App\Livewire\Hq\Finance\ExecutiveBiDashboard::class)->name('hq.finance.bi');
             });
         });
-        
+
         // 4. INTELLIGENCE DESK (CRM / Lead Management)
-        Route::prefix('intelligence')->middleware('hq.staff:4')->group(function () {
-            Route::get('/leads', \App\Livewire\Hq\Intelligence\LeadsRegister::class)->name('hq.crm.leads');
-            Route::get('/consultation', \App\Livewire\Hq\Intelligence\LiveConsultation::class)->name('hq.crm.consult');
-            Route::get('/proposal-builder/{id?}', \App\Livewire\Hq\Intelligence\ProposalBuilder::class)->name('hq.crm.proposal');
-            Route::get('/broadcast-ledger', \App\Livewire\Hq\Intelligence\BroadcastLedger::class)->name('hq.crm.broadcast');
+        Route::prefix('intelligence')->group(function () {
+            Route::middleware('can:crm.view')->group(function () {
+                Route::get('/leads', \App\Livewire\Hq\Intelligence\LeadsRegister::class)->name('hq.crm.leads');
+                Route::get('/consultation', \App\Livewire\Hq\Intelligence\LiveConsultation::class)->name('hq.crm.consult');
+                Route::get('/proposal-builder/{id?}', \App\Livewire\Hq\Intelligence\ProposalBuilder::class)->name('hq.crm.proposal');
+            });
+            Route::get('/broadcast-ledger', \App\Livewire\Hq\Intelligence\BroadcastLedger::class)->middleware('can:broadcasts.view')->name('hq.crm.broadcast');
         });
-        
+
         // 5. MARKETING & ROAS
-        Route::prefix('marketing')->middleware('hq.staff:4')->group(function () {
+        Route::prefix('marketing')->middleware('can:marketing.view')->group(function () {
             Route::get('/campaigns', \App\Livewire\Hq\Marketing\MarketingSync::class)->name('hq.marketing.campaigns');
         });
 
         // 6. OPERATIONS & DEPLOYMENT MATRIX
         Route::prefix('operations')->group(function () {
-            Route::get('/active-deployments', \App\Livewire\Hq\Operations\ActiveDeployments::class)->name('hq.ops.deployments');
-            Route::get('/scrum-master/{id}', \App\Livewire\Hq\Operations\ScrumMaster::class)->name('hq.ops.scrum');
-            Route::get('/sprint-boards', \App\Livewire\Hq\Operations\SprintBoardDirectory::class)->name('hq.ops.boards.directory');
-            Route::get('/sprint-board/{id}', \App\Livewire\Hq\Operations\SprintBoard::class)->name('hq.ops.board');
-            Route::get('/qa-hub', \App\Livewire\Hq\Operations\QaHub::class)->name('hq.ops.qa');
-            Route::get('/silent-timers', \App\Livewire\Hq\Operations\SilentTimers::class)->name('hq.ops.timers');
-            Route::get('/project-signoffs', \App\Livewire\Hq\Operations\SignoffManager::class)->name('hq.ops.signoffs');
+            Route::middleware('can:projects.view')->group(function () {
+                Route::get('/active-deployments', \App\Livewire\Hq\Operations\ActiveDeployments::class)->name('hq.ops.deployments');
+                Route::get('/scrum-master/{id}', \App\Livewire\Hq\Operations\ScrumMaster::class)->name('hq.ops.scrum');
+                Route::get('/sprint-boards', \App\Livewire\Hq\Operations\SprintBoardDirectory::class)->name('hq.ops.boards.directory');
+                Route::get('/sprint-board/{id}', \App\Livewire\Hq\Operations\SprintBoard::class)->name('hq.ops.board');
+            });
+            Route::get('/qa-hub', \App\Livewire\Hq\Operations\QaHub::class)->middleware('can:qa.view')->name('hq.ops.qa');
+            Route::get('/silent-timers', \App\Livewire\Hq\Operations\SilentTimers::class)->middleware('can:timesheets.view')->name('hq.ops.timers');
+            // Sign-offs and Kaizen moderation share this screen; each part checks its own module
+            Route::get('/project-signoffs', \App\Livewire\Hq\Operations\SignoffManager::class)->middleware('can:signoffs.view')->name('hq.ops.signoffs');
         });
-        
+
         // 7. SYSTEM ADMINISTRATION (Identity & Access)
-        Route::prefix('system')->middleware('hq.staff:4')->group(function () {
-            Route::get('/role-management', \App\Livewire\Hq\System\RoleManagement::class)->name('hq.system.roles');
-            Route::get('/health', \App\Livewire\Hq\System\SystemHealth::class)->name('hq.system.health');
+        Route::prefix('system')->group(function () {
+            Route::get('/role-management', \App\Livewire\Hq\System\RoleManagement::class)->middleware('can:access.view')->name('hq.system.roles');
+            Route::get('/roles-permissions', \App\Livewire\Hq\System\RolesPermissions::class)->middleware('can:access.view')->name('hq.system.permissions');
+            Route::get('/health', \App\Livewire\Hq\System\SystemHealth::class)->middleware('can:system.view')->name('hq.system.health');
         });
 
     });

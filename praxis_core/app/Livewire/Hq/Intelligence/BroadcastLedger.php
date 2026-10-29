@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use App\Support\Access;
 
 #[Layout('components.layouts.hq')]
 class BroadcastLedger extends Component
@@ -157,6 +158,11 @@ class BroadcastLedger extends Component
     // --- 3. GEMINI AI ENHANCEMENT ---
     public function enhanceWithGemini()
     {
+        if (! Auth::user()->can('broadcasts.create')) {
+            session()->flash('error', 'ACCESS DENIED: Composing broadcasts is not in your role.');
+            return;
+        }
+
         $this->validate([
             'rawBody' => 'required|string|min:10',
             'selectedTone' => 'required|string'
@@ -192,6 +198,12 @@ class BroadcastLedger extends Component
     // --- 4. SECURE DISPATCH & NOTIFICATIONS ---
     public function dispatchCampaign()
     {
+        // Sending to clients authorises the broadcast
+        if (! Auth::user()->can('broadcasts.approve')) {
+            session()->flash('error', 'ACCESS DENIED: Dispatching broadcasts is not in your role.');
+            return;
+        }
+
         $this->checkSystemLock();
         
         if ($this->activeLock) {
@@ -247,12 +259,8 @@ class BroadcastLedger extends Component
                 DB::table('broadcast_logs')->insert($chunk);
             }
 
-            // 3. System Notification for Level 3+ Management
-            $executiveIds = DB::table('users')
-                ->where('role_id', '>=', 3)
-                ->where('status', 'Active')
-                ->pluck('id')
-                ->toArray();
+            // 3. System Notification for staff who follow broadcasts
+            $executiveIds = Access::staffWith('broadcasts.approve');
 
             $notificationInserts = [];
             foreach ($executiveIds as $adminId) {

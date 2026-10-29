@@ -125,6 +125,13 @@ class ContractsAppraisals extends Component
 
     public function saveContract()
     {
+        // The route needs hr.view; issuing a contract needs hr.create, changing one needs hr.edit
+        $hasContract = DB::table('employment_contracts')->where('mdm_employee_id', $this->selectedEmployeeId)->exists();
+        if (!Auth::user()->can($hasContract ? 'hr.edit' : 'hr.create')) {
+            session()->flash('error', 'Authorization Error: Your role cannot issue or change employment contracts.');
+            return;
+        }
+
         $this->validate([
             'contract_type' => 'required|in:CDI,CDD,Probation,Freelance',
             'standard_weekly_hours' => 'required|numeric|min:1|max:60',
@@ -249,6 +256,11 @@ class ContractsAppraisals extends Component
 
     public function finalizeAppraisal($appraisalId)
     {
+        if (!Auth::user()->can('hr.approve')) {
+            session()->flash('error', 'Authorization Error: Your role cannot finalize performance appraisals.');
+            return;
+        }
+
         DB::table('performance_appraisals')->where('id', $appraisalId)->update([
             'status' => 'Finalized',
             'updated_at' => now()

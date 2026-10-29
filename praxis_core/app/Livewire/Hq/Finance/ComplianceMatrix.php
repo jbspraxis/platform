@@ -5,6 +5,7 @@ namespace App\Livewire\Hq\Finance;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use App\Services\Payroll\CameroonTaxCalculator;
 use App\Services\Payroll\NigeriaTaxCalculator;
 use App\Services\Payroll\ProrationService;
@@ -216,6 +217,8 @@ class ComplianceMatrix extends Component
      */
     public function exportBankRemittance()
     {
+        abort_unless(Auth::user()->can('payroll.export'), 403);
+
         $status = $this->matrix_run_filter === 'live' ? 'FORECAST' : 'ACTUALS';
         $filename = "JBS_Net_Remittance_{$status}_" . date('Y_m_d') . ".csv";
 
@@ -242,6 +245,8 @@ class ComplianceMatrix extends Component
      */
     public function exportStatutoryRemittance()
     {
+        abort_unless(Auth::user()->can('payroll.export'), 403);
+
         $status = $this->matrix_run_filter === 'live' ? 'FORECAST' : 'ACTUALS';
         $filename = "JBS_Statutory_Remittance_{$status}_" . date('Y_m_d') . ".csv";
 
@@ -273,6 +278,6 @@ class ComplianceMatrix extends Component
 
     public function render()
     {
-        return view('livewire.hq.finance.compliance-matrix-manager');
+        return view('livewire.hq.finance.compliance-matrix');
     }
 }

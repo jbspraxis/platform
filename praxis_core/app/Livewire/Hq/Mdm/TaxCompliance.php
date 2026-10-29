@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Mdm;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
@@ -63,6 +64,9 @@ class TaxCompliance extends Component
     // ==========================================
     public function saveTax()
     {
+        // The route needs mdm.view; adding or changing tax and currency data needs mdm.create / mdm.edit
+        abort_unless(Auth::user()->can(($this->editMode && $this->recordId) ? 'mdm.edit' : 'mdm.create'), 403);
+
         $this->validate([
             'region_name' => 'required|string|max:100',
             'country_code' => 'required|string|max:10',
@@ -108,6 +112,8 @@ class TaxCompliance extends Component
 
     public function toggleTaxStatus($id, $currentStatus)
     {
+        abort_unless(Auth::user()->can('mdm.edit'), 403);
+
         DB::table('mdm_tax_compliance')->where('id', $id)->update(['is_active' => !$currentStatus, 'updated_at' => now()]);
         $this->loadData();
     }
@@ -117,6 +123,8 @@ class TaxCompliance extends Component
     // ==========================================
     public function saveCurrency()
     {
+        abort_unless(Auth::user()->can(($this->currEditMode && $this->currId) ? 'mdm.edit' : 'mdm.create'), 403);
+
         $this->validate([
             'currency_code' => 'required|string|max:10',
             'currency_name' => 'required|string|max:100',
@@ -161,6 +169,8 @@ class TaxCompliance extends Component
 
     public function syncRatesFromApi()
     {
+        abort_unless(Auth::user()->can('mdm.edit'), 403);
+
         try {
             // Retrieve API key securely from config (set this in your .env)
             $apiKey = config('services.exchangerate.key'); 

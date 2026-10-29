@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use App\Support\Access;
 
 #[Layout('components.layouts.hq')]
 class InvoiceLedger extends Component
@@ -93,6 +94,8 @@ class InvoiceLedger extends Component
 
     public function draftSubsequentInvoice()
     {
+        abort_unless(Auth::user()->can('finance.create'), 403);
+
         $this->validate([
             'new_project_id' => 'required|exists:projects,id',
             'new_phase_id' => 'nullable|exists:project_phases,id',
@@ -194,6 +197,8 @@ class InvoiceLedger extends Component
 
     public function cancelInvoice($invoiceId)
     {
+        abort_unless(Auth::user()->can('finance.delete'), 403);
+
         DB::table('invoices')->where('id', $invoiceId)->update([
             'status' => 'Cancelled',
             'updated_by' => Auth::id(),
@@ -217,10 +222,12 @@ class InvoiceLedger extends Component
     /**
      * THE 10-DAY GUILLOTINE EXECUTOR
      * In production, this runs via Laravel Scheduler daily.
-     * Here, it can be manually triggered by Level 5 Admins to audit the ledger.
+     * Here, it can be manually triggered by staff with finance.approve to audit the ledger.
      */
     public function enforceGuillotineProtocol()
     {
+        abort_unless(Auth::user()->can('finance.approve'), 403);
+
         $expiredInvoices = DB::table('invoices')
             ->where('status', 'Pending')
             ->whereDate('due_date', '<', now()->toDateString())
@@ -239,14 +246,13 @@ class InvoiceLedger extends Component
                     'updated_at' => now()
                 ]);
 
-                // 2. Alert Level 5 Command
-                $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')
-                    ->where('roles.clearance_level', 5)->select('users.id')->get();
-                
+                // 2. Alert finance approvers
+                $admins = Access::staffWith('finance.approve');
+
                 $notifications = [];
-                foreach($admins as $admin) {
+                foreach($admins as $adminId) {
                     $notifications[] = [
-                        'id' => (string) Str::uuid(), 'user_id' => $admin->id, 
+                        'id' => (string) Str::uuid(), 'user_id' => $adminId,
                         'title' => 'GUILLOTINE DROPPED: DELINQUENT ACCOUNT', 
                         'message' => "Invoice {$invoice->invoice_number} is overdue. Client OS has been automatically locked. Awaiting manual order to halt engineering deployment.", 
                         'type' => 'System', 'created_at' => now()

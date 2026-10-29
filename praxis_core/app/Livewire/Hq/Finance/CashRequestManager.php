@@ -75,6 +75,8 @@ class CashRequestManager extends Component
 
     public function authorizeRequest()
     {
+        abort_unless(Auth::user()->can('expenses.approve'), 403);
+
         // UX micro-delay
         sleep(1);
 
@@ -131,6 +133,8 @@ class CashRequestManager extends Component
 
     public function rejectRequest()
     {
+        abort_unless(Auth::user()->can('expenses.approve'), 403);
+
         DB::table('cash_requests')->where('id', $this->selectedRequest->id)->update([
             'status' => 'Rejected',
             'updated_at' => now(),
@@ -163,6 +167,8 @@ class CashRequestManager extends Component
 
     public function uploadReceipt()
     {
+        abort_unless(Auth::user()->can('expenses.approve'), 403);
+
         $this->validate([
             'receipt_file' => 'required|image|max:5120', // 5MB max
         ]);
@@ -180,6 +186,8 @@ class CashRequestManager extends Component
 
     public function clearLedger()
     {
+        abort_unless(Auth::user()->can('expenses.approve'), 403);
+
         $userId = Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c';
 
         DB::transaction(function () use ($userId) {

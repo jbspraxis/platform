@@ -4,17 +4,24 @@ namespace App\Livewire\Hq\Operations;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
+use App\Support\Access;
 
 #[Layout('components.layouts.hq')]
 class SprintBoard extends Component
 {
     public $projectId;
     public $project;
-    public $userClearance;
+
+    // What this user may do here (set in mount, see config/access.php)
+    #[Locked]
+    public bool $canMoveOwn = false; // projects.edit: check out and move own tasks
+    #[Locked]
+    public bool $canMoveAny = false; // projects.approve: move anyone's task
 
     // Board State
     public $activeSprintId = null;
@@ -32,7 +39,8 @@ class SprintBoard extends Component
 
     public function mount($id)
     {
-        $this->userClearance = Auth::user()->role->clearance_level ?? 0;
+        $this->canMoveOwn = Auth::user()->can('projects.edit');
+        $this->canMoveAny = Auth::user()->can('projects.approve');
         $this->projectId = $id;
         $this->project = DB::table('projects')->where('id', $id)->first();
 
@@ -116,12 +124,17 @@ class SprintBoard extends Component
     // --- CHECKOUT SYSTEM (Rule 8: C) ---
     public function assignToMe($taskId)
     {
-        DB::table('tasks')->where('id', $taskId)->update([
-            'assigned_to' => Auth::id(),
-            'updated_at' => now()
-        ]);
-        
-        $this->logAudit('TASK_CHECKOUT', "Engineer checked out Task ID: {$taskId}");
+        abort_unless(Auth::user()->can('projects.edit'), 403);
+
+        // Only an unassigned task, unless the user may move anyone's task
+        $updated = DB::table('tasks')->where('id', $taskId)
+            ->when(! Auth::user()->can('projects.approve'), fn ($q) => $q->whereNull('assigned_to'))
+            ->update([
+                'assigned_to' => Auth::id(),
+                'updated_at' => now()
+            ]);
+
+        if ($updated) $this->logAudit('TASK_CHECKOUT', "Engineer checked out Task ID: {$taskId}");
         $this->loadBoardData();
     }
 
@@ -131,8 +144,9 @@ class SprintBoard extends Component
         $task = DB::table('tasks')->where('id', $taskId)->first();
         if (!$task || $task->status === $newStatus) return;
 
-        // Security Gate: You cannot move someone else's task unless you are Level 4+
-        if ($task->assigned_to !== Auth::id() && $this->userClearance < 4) {
+        // Security Gate: own tasks need projects.edit; someone else's (or unassigned) need projects.approve
+        $isOwn = $task->assigned_to === Auth::id();
+        if (! Auth::user()->can($isOwn ? 'projects.edit' : 'projects.approve')) {
             session()->flash('error', 'ACCESS DENIED: You cannot alter a Battlespace assigned to another engineer.');
             return;
         }
@@ -210,13 +224,11 @@ class SprintBoard extends Component
 
     private function notifyAdmins($message)
     {
-        $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')
-                    ->where('roles.clearance_level', '>=', 4)->select('users.id')->get();
-        
+        // QA approvers (they verify what lands in QA review)
         $inserts = [];
-        foreach($admins as $admin) {
+        foreach(Access::staffWith('qa.approve') as $adminId) {
             $inserts[] = [
-                'id' => (string) Str::uuid(), 'user_id' => $admin->id,
+                'id' => (string) Str::uuid(), 'user_id' => $adminId,
                 'title' => 'QA SLA TRIGGERED', 'message' => $message,
                 'type' => 'Project', 'created_at' => now()
             ];

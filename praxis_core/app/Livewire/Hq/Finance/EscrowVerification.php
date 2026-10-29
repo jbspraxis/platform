@@ -78,6 +78,8 @@ class EscrowVerification extends Component
 
     public function approveTransaction()
     {
+        abort_unless(Auth::user()->can('finance.approve'), 403);
+
         $this->validate([
             'tolerance_writeoff' => 'required|numeric|min:0',
             'extend_guillotine_days' => 'required|integer|min:0'
@@ -138,6 +140,8 @@ class EscrowVerification extends Component
 
     public function rejectTransaction()
     {
+        abort_unless(Auth::user()->can('finance.approve'), 403);
+
         DB::transaction(function () {
             DB::table('transactions')->where('id', $this->selectedTx->id)->update([
                 'status' => 'Rejected',

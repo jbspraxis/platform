@@ -125,6 +125,10 @@ class ProposalBuilder extends Component
 
     public function initiateForLead()
     {
+        if (! Auth::user()->can('crm.create')) {
+            session()->flash('error', '> ACCESS DENIED: Creating proposals is not in your role.');
+            return;
+        }
         if (empty($this->selectedLeadId)) return;
 
         $this->proposalId = (string) Str::uuid();
@@ -221,6 +225,10 @@ class ProposalBuilder extends Component
     public function triggerAI()
     {
         if ($this->isLocked) return;
+        if (! Auth::user()->can('crm.edit')) {
+            session()->flash('error', '> ACCESS DENIED: Editing proposals is not in your role.');
+            return;
+        }
 
         // Cache the current state before overwriting
         $this->previousAiState = [
@@ -373,7 +381,8 @@ class ProposalBuilder extends Component
 
     public function saveBlueprintProgress()
     {
-        if ($this->isLocked) return;
+        // Also runs on every tab switch, so viewers without crm.edit just don't save
+        if ($this->isLocked || ! Auth::user()->can('crm.edit')) return;
         $this->calculateCommercials();
 
         // Structure Phases for JSON
@@ -428,6 +437,10 @@ class ProposalBuilder extends Component
     public function compileAndSecure()
     {
         if ($this->isLocked) return;
+        if (! Auth::user()->can('crm.approve')) {
+            session()->flash('error', '> ACCESS DENIED: Signing proposals for dispatch is not in your role.');
+            return;
+        }
 
         $this->validate([
             'hqSignerName' => 'required|string',
@@ -473,6 +486,11 @@ class ProposalBuilder extends Component
     
     public function unlockProposal()
     {
+        if (! Auth::user()->can('crm.approve')) {
+            session()->flash('error', '> ACCESS DENIED: Unlocking signed proposals is not in your role.');
+            return;
+        }
+
         // Prevent unlocking if the client already signed it
         if (in_array($this->proposal->status, ['Authorized', 'Converted'])) {
             session()->flash('error', '> CANNOT UNLOCK: Client has already counter-signed.');

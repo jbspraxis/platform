@@ -17,9 +17,11 @@
             <a href="{{ route('hq.dash.audit') }}" wire:navigate class="ws-tab" style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--erp-muted); padding: 5px 15px; border: 1px solid transparent; text-decoration: none; transition: 0.3s;">[ AUDIT_TERMINAL ]</a>
         </div>
         
+        @can('dashboard.export')
         <button wire:click="logReportGeneration" style="background: transparent; border: 1px solid var(--erp-muted); color: var(--erp-muted); font-family: 'Roboto Mono', monospace; font-size: 0.75rem; font-weight: bold; padding: 10px 20px; border-radius: 2px; cursor: pointer; transition: 0.3s;" onmouseover="this.style.background='var(--erp-white)'; this.style.color='#0A1128'; this.style.borderColor='var(--erp-white)';" onmouseout="this.style.background='transparent'; this.style.color='var(--erp-muted)'; this.style.borderColor='var(--erp-muted)';">
             GENERATE SHAREHOLDER PDF
         </button>
+        @endcan
     </div>
 
     <div style="margin-bottom: 30px;">

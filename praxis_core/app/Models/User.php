@@ -23,7 +23,6 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'organization_id',
-        'role_id',
         'first_name',
         'last_name',
         'email',
@@ -70,10 +69,17 @@ class User extends Authenticatable
     }
 
     /**
-     * RBAC Relationship: Links the user to their security clearance level.
+     * Staff roles (several allowed; permissions add up). Checks go through
+     * $user->can('module.action'), see App\Support\Access.
      */
-    public function role()
+    public function roles()
     {
-        return $this->belongsTo(Role::class);
+        return $this->belongsToMany(Role::class, 'staff_roles')->where('roles.audience', 'staff');
+    }
+
+    /** Role names for display, e.g. "Delivery Lead, Engineer". */
+    public function getRoleNamesAttribute(): string
+    {
+        return $this->roles->pluck('name')->implode(', ');
     }
 }

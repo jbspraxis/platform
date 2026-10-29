@@ -73,9 +73,11 @@
         <button wire:click="switchMainTab('ledger')" class="tab-btn {{ $mainTab === 'ledger' ? 'active' : '' }}">
             <i data-lucide="shield-check" style="width: 14px; height: 14px; display: inline-block; vertical-align: text-bottom;"></i> THE SIGNOFF LEDGER
         </button>
-        <button wire:click="switchMainTab('marketing')" class="tab-btn {{ $mainTab === 'marketing' ? 'active' : '' }}">
-            <i data-lucide="sparkles" style="width: 14px; height: 14px; display: inline-block; vertical-align: text-bottom;"></i> AI MARKETING PUSH
-        </button>
+        @if($canViewKaizen)
+            <button wire:click="switchMainTab('marketing')" class="tab-btn {{ $mainTab === 'marketing' ? 'active' : '' }}">
+                <i data-lucide="sparkles" style="width: 14px; height: 14px; display: inline-block; vertical-align: text-bottom;"></i> AI MARKETING PUSH
+            </button>
+        @endif
     </div>
 
     <!-- ========================================== -->
@@ -84,6 +86,7 @@
     @if($mainTab === 'ledger')
         
         <!-- Synthesis Generator Form -->
+        @if($canDraft)
         <div class="cyber-panel">
             <div class="panel-title"><i data-lucide="cpu" style="width: 16px; height: 16px;"></i> SYNTHESIZE NEW SIGNOFF (AI GENERATOR)</div>
             @if(empty($eligibleProjects))
@@ -118,6 +121,7 @@
                 </form>
             @endif
         </div>
+        @endif
 
         <!-- Bloomberg Grid of All Signoffs -->
         <div style="overflow-x: auto;">
@@ -167,14 +171,14 @@
                                 @endif
                             </td>
                             <td>
-                                @if($doc->status === 'Draft' || $doc->status === 'Awaiting Signature')
+                                @if(($doc->status === 'Draft' || $doc->status === 'Awaiting Signature') && $doc->token)
                                     <!-- We will link this to the frontend gateway in Phase 4 -->
                                     <button onclick="navigator.clipboard.writeText('{{ url('/signoff/gateway/' . $doc->token) }}'); alert('Magic Link Copied to Clipboard!');" class="btn-action">
                                         <i data-lucide="link" style="width: 14px; height: 14px;"></i> COPY LINK
                                     </button>
                                 @endif
 
-                                @if($doc->status === 'Frozen' && $userClearance == 5)
+                                @if($doc->status === 'Frozen' && $canUnfreeze)
                                     <button wire:click="unfreezeSignoff('{{ $doc->id }}')" class="btn-action btn-danger" onclick="confirm('UNFREEZE: This will reopen the Sprint Board. Proceed?') || event.stopImmediatePropagation()">
                                         <i data-lucide="flame" style="width: 14px; height: 14px;"></i> L5 DEFROST
                                     </button>
@@ -193,17 +197,19 @@
     <!-- ========================================== -->
     <!-- TAB 2: AI MARKETING PUSH                   -->
     <!-- ========================================== -->
-    @if($mainTab === 'marketing')
-        
+    @if($mainTab === 'marketing' && $canViewKaizen)
+
         <div class="sub-tab-nav">
-            <button wire:click="switchMarketingTab('portfolio_gen')" class="sub-tab-btn {{ $marketingTab === 'portfolio_gen' ? 'active' : '' }}">PORTFOLIO GENERATOR</button>
-            <button wire:click="switchMarketingTab('kaizen_gen')" class="sub-tab-btn {{ $marketingTab === 'kaizen_gen' ? 'active' : '' }}">KAIZEN GENERATOR</button>
+            @if($canPushKaizen)
+                <button wire:click="switchMarketingTab('portfolio_gen')" class="sub-tab-btn {{ $marketingTab === 'portfolio_gen' ? 'active' : '' }}">PORTFOLIO GENERATOR</button>
+                <button wire:click="switchMarketingTab('kaizen_gen')" class="sub-tab-btn {{ $marketingTab === 'kaizen_gen' ? 'active' : '' }}">KAIZEN GENERATOR</button>
+            @endif
             <button wire:click="switchMarketingTab('portfolio_ledger')" class="sub-tab-btn {{ $marketingTab === 'portfolio_ledger' ? 'active' : '' }}">PORTFOLIO LEDGER</button>
             <button wire:click="switchMarketingTab('kaizen_ledger')" class="sub-tab-btn {{ $marketingTab === 'kaizen_ledger' ? 'active' : '' }}">KAIZEN LEDGER</button>
         </div>
 
         <!-- GENERATOR TABS -->
-        @if($marketingTab === 'portfolio_gen' || $marketingTab === 'kaizen_gen')
+        @if(($marketingTab === 'portfolio_gen' || $marketingTab === 'kaizen_gen') && $canPushKaizen)
             <div class="cyber-panel">
                 <div class="panel-title"><i data-lucide="wand-2" style="width: 16px; height: 16px; color: var(--erp-gold);"></i> AI SANITIZATION PIPELINE</div>
                 <div style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-muted); margin-bottom: 20px;">

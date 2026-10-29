@@ -73,9 +73,11 @@
             <h1 style="font-family: 'Montserrat', sans-serif; font-size: 1.8rem; font-weight: 900; letter-spacing: 1px; color: #FFF; margin: 0;">CHART OF ACCOUNTS</h1>
             <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #8A9BB2; margin: 5px 0 0 0;">> Master Double-Entry Ledger Configuration Matrix</p>
         </div>
+        @can('finance.create')
         <button wire:click="$set('showModal', true)" class="btn-action" style="background: rgba(0, 229, 255, 0.1);">
             <i data-lucide="plus-circle" style="width: 16px; height: 16px;"></i> PROVISION SUB-LEDGER
         </button>
+        @endcan
     </div>
 
     @if(session()->has('success'))
@@ -146,10 +148,12 @@
                                 
                                 <td style="text-align: right;">
                                     @if(!$acc->is_system_locked)
+                                        @can('finance.edit')
                                         <button wire:click="toggleStatus({{ $acc->id }})" class="btn-action {{ $acc->is_active ? 'btn-halt' : '' }}" style="padding: 6px 12px; font-size: 0.65rem;">
                                             <i data-lucide="power" style="width: 12px; height: 12px;"></i>
                                             {{ $acc->is_active ? 'SUSPEND' : 'ACTIVATE' }}
                                         </button>
+                                        @endcan
                                     @else
                                         <span style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #5a6b82;">[ SYSTEM LOCKED ]</span>
                                     @endif

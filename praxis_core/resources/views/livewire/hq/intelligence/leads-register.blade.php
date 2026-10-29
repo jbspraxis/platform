@@ -120,14 +120,18 @@
             <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-teal); margin-top: 5px;">[ LEADS_REGISTER ] : PIPELINE & DIAGNOSTIC VAULT</p>
         </div>
         <div style="display: flex; gap: 10px;">
+            @can('crm.create')
             <button wire:click="openIntakeModal" wire:loading.attr="disabled" wire:target="openIntakeModal" class="nav-pill" style="border-color: #FFBD2E; color: #FFBD2E; box-shadow: 0 0 10px rgba(255,189,46,0.1);">
                 <span wire:loading.remove wire:target="openIntakeModal">[+ INITIATE MANUAL PITCH]</span>
                 <span wire:loading wire:target="openIntakeModal">LOADING...</span>
             </button>
+            @endcan
+            @can('crm.export')
             <button wire:click="exportCsv" wire:loading.attr="disabled" wire:target="exportCsv" class="nav-pill">
                 <span wire:loading.remove wire:target="exportCsv">EXPORT SECURE CSV</span>
                 <span wire:loading wire:target="exportCsv">GENERATING...</span>
             </button>
+            @endcan
         </div>
     </div>
 

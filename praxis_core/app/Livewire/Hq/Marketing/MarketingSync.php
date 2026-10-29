@@ -5,10 +5,12 @@ namespace App\Livewire\Hq\Marketing;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
+use App\Support\Access;
 
 #[Layout('components.layouts.hq')]
 class MarketingSync extends Component
@@ -16,7 +18,12 @@ class MarketingSync extends Component
     use WithFileUploads;
 
     public $activeTab = 'campaigns'; // 'campaigns', 'social', or 'assets'
-    public $userClearance;
+
+    // What the signed-in user may do here (UI only; each action re-checks)
+    #[Locked]
+    public bool $canApprove = false;
+    #[Locked]
+    public bool $canSeeCredentials = false;
 
     // View Data
     public $campaigns = [];
@@ -66,7 +73,8 @@ class MarketingSync extends Component
 
     public function mount()
     {
-        $this->userClearance = Auth::user()->role->clearance_level ?? 0;
+        $this->canApprove = Auth::user()->can('marketing.approve');
+        $this->canSeeCredentials = Auth::user()->can('marketing.delete');
         $this->loadData();
     }
 
@@ -81,8 +89,8 @@ class MarketingSync extends Component
         // 1. Load Campaigns
         $query = DB::table('marketing_campaigns')->orderBy('created_at', 'desc');
         
-        // Isolation: If Level 0.25 (Agency), they only see their own campaigns
-        if ($this->userClearance < 4) {
+        // Isolation: someone who submits campaigns but can't approve them (e.g. an agency) only sees their own
+        if (! Auth::user()->can('marketing.approve') && Auth::user()->can('marketing.create')) {
             $query->where('created_by', Auth::id());
         }
         
@@ -98,6 +106,8 @@ class MarketingSync extends Component
 
     public function submitDraft()
     {
+        abort_unless(Auth::user()->can('marketing.create'), 403);
+
         $this->validate([
             'campName' => 'required|string|max:255',
             'platform' => 'required|string',
@@ -156,14 +166,11 @@ class MarketingSync extends Component
                 'updated_at' => now()
             ]);
 
-            // Notify L4 & L5 Admins
-            $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')
-                        ->where('roles.clearance_level', '>=', 4)->select('users.id')->get();
-            
-            foreach($admins as $admin) {
+            // Notify campaign approvers
+            foreach (Access::staffWith('marketing.approve') as $adminId) {
                 DB::table('notifications')->insert([
                     'id' => (string) Str::uuid(),
-                    'user_id' => $admin->id,
+                    'user_id' => $adminId,
                     'title' => 'BUDGET APPROVAL REQUIRED',
                     'message' => "Marketing requested $" . number_format($this->budgetAmount, 2) . " for '{$this->campName}'.",
                     'type' => 'Financial',
@@ -188,7 +195,7 @@ class MarketingSync extends Component
 
     public function approveCampaign()
     {
-        if ($this->userClearance < 4 || !$this->selectedCampaign) return;
+        if (! Auth::user()->can('marketing.approve') || !$this->selectedCampaign) return;
 
         DB::transaction(function () {
             // 1. Determine MDM Financial Category based on Platform
@@ -247,7 +254,7 @@ class MarketingSync extends Component
 
     public function rejectCampaign()
     {
-        if ($this->userClearance < 4 || !$this->selectedCampaign) return;
+        if (! Auth::user()->can('marketing.approve') || !$this->selectedCampaign) return;
         
         $this->validate(['rejectionReason' => 'required|string|min:5']);
 
@@ -271,6 +278,11 @@ class MarketingSync extends Component
 
     public function activateCampaign()
     {
+        // Editors link any campaign; a submitter may link their own approved one
+        $ownCampaign = $this->selectedCampaign && DB::table('marketing_campaigns')
+            ->where('id', $this->selectedCampaign->id)->where('created_by', Auth::id())->exists();
+        abort_unless(Auth::user()->can('marketing.edit') || ($ownCampaign && Auth::user()->can('marketing.create')), 403);
+
         $this->validate(['externalCampaignId' => 'required|string|min:5']);
 
         DB::table('marketing_campaigns')->where('id', $this->selectedCampaign->id)->update([
@@ -290,6 +302,8 @@ class MarketingSync extends Component
 
     public function registerDigitalAsset()
     {
+        abort_unless(Auth::user()->can('marketing.create'), 403);
+
         $this->validate([
             'assetPlatform' => 'required|string',
             'assetName' => 'required|string',
@@ -337,7 +351,7 @@ class MarketingSync extends Component
         $this->selectedAsset = DB::table('social_media_accounts')->where('id', $id)->first();
         $this->newPassword = '';
         
-        if ($this->userClearance == 5) {
+        if (Auth::user()->can('marketing.delete')) {
             try {
                 $this->decryptedPassword = Crypt::decryptString($this->selectedAsset->encrypted_password);
             } catch (\Exception $e) {
@@ -360,6 +374,8 @@ class MarketingSync extends Component
 
     public function updateAssetPassword()
     {
+        abort_unless(Auth::user()->can('marketing.edit'), 403);
+
         $this->validate(['newPassword' => 'required|string|min:6']);
 
         DB::transaction(function () {
@@ -379,12 +395,10 @@ class MarketingSync extends Component
 
             $this->logSystemAudit('CREDENTIAL_UPDATED', "Password changed for asset: {$this->selectedAsset->account_name}");
 
-            $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')
-                        ->where('roles.clearance_level', 5)->select('users.id')->get();
-            
-            foreach($admins as $admin) {
+            // Alert whoever holds the credential vault (marketing.delete)
+            foreach (Access::staffWith('marketing.delete') as $adminId) {
                 DB::table('notifications')->insert([
-                    'id' => (string) Str::uuid(), 'user_id' => $admin->id,
+                    'id' => (string) Str::uuid(), 'user_id' => $adminId,
                     'title' => 'ASSET SECURITY ALERT', 
                     'message' => (Auth::user()->name ?? 'Agency') . " updated the password for {$this->selectedAsset->platform} ({$this->selectedAsset->account_name}).",
                     'type' => 'System', 'created_at' => now()

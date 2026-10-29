@@ -87,6 +87,8 @@ class PayrollManager extends Component
      */
     public function generateDraftRun()
     {
+        abort_unless(Auth::user()->can('payroll.create'), 403);
+
         $this->validate([
             'draftPeriodMonth' => 'required|numeric|min:1|max:12',
             'draftPeriodYear' => 'required|numeric|min:2020',
@@ -178,6 +180,8 @@ class PayrollManager extends Component
      */
     public function submitForReview($runId)
     {
+        abort_unless(Auth::user()->can('payroll.edit'), 403);
+
         $run = collect($this->payrollRuns)->firstWhere('id', $runId);
         $currentUserId = Auth::id() ?? 'sys-admin';
 
@@ -208,6 +212,8 @@ class PayrollManager extends Component
      */
     public function approveRun($runId)
     {
+        abort_unless(Auth::user()->can('payroll.approve'), 403);
+
         $run = collect($this->payrollRuns)->firstWhere('id', $runId);
         $currentUserId = Auth::id() ?? 'sys-admin';
 
@@ -250,6 +256,8 @@ class PayrollManager extends Component
      */
     public function disburseRun($runId)
     {
+        abort_unless(Auth::user()->can('payroll.approve'), 403);
+
         DB::table('payroll_runs')
             ->where('id', $runId)
             ->where('status', 'Approved')
@@ -270,6 +278,8 @@ class PayrollManager extends Component
      */
     public function rejectRun($runId)
     {
+        abort_unless(Auth::user()->can('payroll.approve'), 403);
+
         $run = collect($this->payrollRuns)->firstWhere('id', $runId);
 
         try {

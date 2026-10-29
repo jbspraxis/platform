@@ -5,6 +5,7 @@ namespace App\Livewire\Hq\Finance;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 #[Layout('components.layouts.hq')]
@@ -249,6 +250,8 @@ class ExecutiveBiDashboard extends Component
 
     public function exportStatements()
     {
+        abort_unless(Auth::user()->can('finance.export'), 403);
+
         // Phase 16 PDF Engine Placeholder
         session()->flash('success', '> PDF ENGINE HOOK PENDING (PHASE 16). Statements calculated successfully.');
     }

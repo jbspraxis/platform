@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Operations;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
@@ -12,8 +13,17 @@ use Illuminate\Support\Str;
 #[Layout('components.layouts.hq')]
 class SignoffManager extends Component
 {
-    public $userClearance;
-    public $mainTab = 'ledger'; 
+    // What this user may do here (set in mount, see config/access.php)
+    #[Locked]
+    public bool $canDraft = false;      // signoffs.create: synthesize handovers
+    #[Locked]
+    public bool $canUnfreeze = false;   // signoffs.approve: defrost a frozen signoff
+    #[Locked]
+    public bool $canViewKaizen = false; // kaizen.view: AI marketing push tab and its ledgers (portfolio + Kaizen)
+    #[Locked]
+    public bool $canPushKaizen = false; // kaizen.create: generate and commit portfolio/Kaizen drafts
+
+    public $mainTab = 'ledger';
     public $marketingTab = 'portfolio_gen'; 
 
     public $signoffs = [];
@@ -36,9 +46,13 @@ class SignoffManager extends Component
 
     public function mount()
     {
-        $this->userClearance = Auth::user()->role->clearance_level ?? 0;
-        if ($this->userClearance < 4) {
-            abort(403, 'GATEKEEPER LOCK: Only Level 4/5 Command can execute legal signoffs.');
+        $user = Auth::user();
+        $this->canDraft = $user->can('signoffs.create');
+        $this->canUnfreeze = $user->can('signoffs.approve');
+        $this->canViewKaizen = $user->can('kaizen.view');
+        $this->canPushKaizen = $user->can('kaizen.create');
+        if (! $this->canPushKaizen) {
+            $this->marketingTab = 'portfolio_ledger';
         }
         $this->loadLedgers();
     }
@@ -50,7 +64,15 @@ class SignoffManager extends Component
             ->join('organizations', 'projects.organization_id', '=', 'organizations.id')
             ->select('project_signoffs.*', 'projects.title as project_title', 'organizations.name as client_name')
             ->orderBy('project_signoffs.created_at', 'desc')
-            ->get()->toArray();
+            ->get()
+            // The sign-off link works like a client password: only people who issue sign-offs receive it
+            ->map(function ($signoff) {
+                if (! $this->canDraft) {
+                    $signoff->token = null;
+                }
+                return $signoff;
+            })
+            ->toArray();
 
         // FIXED: Bridging through project_phases to check task eligibility
         $this->eligibleProjects = DB::table('projects')
@@ -77,8 +99,10 @@ class SignoffManager extends Component
             ->select('projects.id', 'projects.title', 'organizations.name as client_name')
             ->get()->toArray();
 
-        $this->portfolioLedger = DB::table('portfolio_case_studies')->orderBy('created_at', 'desc')->get()->toArray();
-        $this->kaizenLedger = DB::table('kaizen_articles')->orderBy('created_at', 'desc')->get()->toArray();
+        if ($this->canViewKaizen) {
+            $this->portfolioLedger = DB::table('portfolio_case_studies')->orderBy('created_at', 'desc')->get()->toArray();
+            $this->kaizenLedger = DB::table('kaizen_articles')->orderBy('created_at', 'desc')->get()->toArray();
+        }
     }
 
     public function switchMainTab($tab) { $this->mainTab = $tab; $this->loadLedgers(); }
@@ -86,6 +110,8 @@ class SignoffManager extends Component
 
     public function generateSignoffDraft()
     {
+        abort_unless(Auth::user()->can('signoffs.create'), 403);
+
         $this->validate([
             'draftProjectId' => 'required',
             'draftSignatoryEmail' => 'required|email'
@@ -170,6 +196,8 @@ class SignoffManager extends Component
 
     public function generateMarketingAsset()
     {
+        abort_unless(Auth::user()->can('kaizen.create'), 403);
+
         $this->validate(['selectedSignoffForMarketing' => 'required']);
         $this->isGenerating = true;
 
@@ -218,6 +246,8 @@ class SignoffManager extends Component
 
     public function commitMarketingAsset()
     {
+        abort_unless(Auth::user()->can('kaizen.create'), 403);
+
         if ($this->marketingTab === 'portfolio_gen') {
             DB::table('portfolio_case_studies')->insert([
                 'id' => (string) Str::uuid(),
@@ -256,7 +286,7 @@ class SignoffManager extends Component
 
     public function unfreezeSignoff($signoffId)
     {
-        if ($this->userClearance < 5) return;
+        if (! Auth::user()->can('signoffs.approve')) return;
         DB::transaction(function () use ($signoffId) {
             $signoff = DB::table('project_signoffs')->where('id', $signoffId)->first();
             if (!$signoff) return;

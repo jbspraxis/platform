@@ -7,10 +7,12 @@
             <a href="{{ route('hq.dash.audit') }}" wire:navigate class="ws-tab active" style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--erp-teal); padding: 5px 15px; background: rgba(0, 229, 255, 0.05); border: 1px solid var(--erp-teal); border-radius: 4px; text-decoration: none;">[ AUDIT_TERMINAL ]</a>
         </div>
         
+        @canany(['audit.export', 'finance.export'])
         <button wire:click="exportBooks" wire:loading.attr="disabled" style="background: transparent; border: 1px solid var(--erp-red); color: var(--erp-red); font-family: 'Roboto Mono', monospace; font-size: 0.75rem; font-weight: bold; padding: 10px 20px; border-radius: 2px; cursor: pointer; transition: 0.3s;" onmouseover="this.style.background='var(--erp-red)'; this.style.color='#FFF';" onmouseout="this.style.background='transparent'; this.style.color='var(--erp-red)';">
             <span wire:loading.remove>EXPORT BOOKS (CSV)</span>
             <span wire:loading>EXPORTING...</span>
         </button>
+        @endcanany
     </div>
 
     <div style="background: rgba(255, 51, 102, 0.05); border: 1px solid rgba(255, 51, 102, 0.3); border-left: 4px solid var(--erp-red); padding: 15px 25px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; border-radius: 4px;">

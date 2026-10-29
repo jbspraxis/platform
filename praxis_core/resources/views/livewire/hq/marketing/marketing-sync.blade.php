@@ -96,9 +96,11 @@
         <div style="background: rgba(10, 17, 40, 0.6); border: 1px solid var(--erp-border-dark); border-radius: 4px; padding: 30px; min-height: 500px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: var(--erp-muted);">> CAMPAIGN LEDGER</div>
+                @can('marketing.create')
                 <button wire:click="$set('showCreateModal', true)" class="btn-primary">
                     <i data-lucide="plus" style="width: 16px; height: 16px;"></i> DRAFT NEW BUDGET
                 </button>
+                @endcan
             </div>
 
             <table class="bloomberg-table">
@@ -138,7 +140,7 @@
                             <td style="font-family: 'Roboto Mono', monospace; color: var(--erp-amber);">${{ number_format($camp['actual_spend'], 2) }}</td>
                             <td style="font-family: 'Roboto Mono', monospace; color: #00FF66; font-weight: bold;">${{ number_format($camp['liquid_roas'], 2) }}</td>
                             <td style="text-align: right;">
-                                @if($userClearance >= 4 && $camp['status'] === 'PENDING_APPROVAL')
+                                @if($canApprove && $camp['status'] === 'PENDING_APPROVAL')
                                     <button wire:click="openReviewModal('{{ $camp['id'] }}')" class="btn-action" style="border-color: #FFBD2E; color: #FFBD2E;">REVIEW & APPROVE</button>
                                 @endif
 
@@ -163,7 +165,9 @@
         <div style="background: rgba(10, 17, 40, 0.6); border: 1px solid var(--erp-border-dark); border-radius: 4px; padding: 30px; min-height: 500px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: var(--erp-muted);">> CORPORATE DIGITAL FOOTPRINT & CREDENTIAL VAULT</div>
+                @can('marketing.create')
                 <button wire:click="$set('showAssetModal', true)" class="btn-primary"><i data-lucide="shield" style="width: 16px; height: 16px;"></i> REGISTER NEW ASSET</button>
+                @endcan
             </div>
             
             <table class="bloomberg-table">
@@ -361,14 +365,16 @@
                     </div>
                 </div>
 
+                @can('marketing.edit')
                 <div style="margin-top: 30px; background: rgba(255,51,102,0.05); border: 1px solid rgba(255,51,102,0.2); padding: 25px;">
                     <label class="form-label" style="color: var(--erp-red);">UPDATE PASSWORD (OVERWRITE VAULT)</label>
                     <input type="password" wire:model="newPassword" class="cyber-input" placeholder="Type new password to overwrite..." style="margin-bottom: 15px; border-color: rgba(255,51,102,0.4);">
                     <button wire:click="updateAssetPassword" class="btn-primary" style="width: 100%; justify-content: center; background: var(--erp-red); border-color: var(--erp-red);">ENCRYPT & OVERWRITE</button>
                     <span style="font-size: 0.65rem; color: var(--erp-red); text-align: center; display: block; margin-top: 12px; opacity: 0.8;">WARNING: This action is permanently logged in the Audit Trail. L5 will be notified.</span>
                 </div>
+                @endcan
 
-                @if($userClearance == 5 && count($credentialHistory) > 0)
+                @if($canSeeCredentials && count($credentialHistory) > 0)
                     <div style="margin-top: 30px; border-top: 1px solid var(--erp-border-dark); padding-top: 20px;">
                         <span style="font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: var(--erp-muted); text-transform: uppercase;">> IMMUTABLE MODIFICATION LEDGER</span>
                         <ul class="history-list">
@@ -420,7 +426,7 @@
                     </div>
                 @endif
 
-                @if($userClearance >= 4 && $selectedCampaign->status === 'PENDING_APPROVAL')
+                @if($canApprove && $selectedCampaign->status === 'PENDING_APPROVAL')
                     <div style="border-top: 1px dashed var(--erp-border-dark); padding-top: 25px; margin-top: 10px;">
                         <label class="form-label" style="color: var(--erp-red);">REJECTION DIRECTIVE (REQUIRED FOR DENIAL)</label>
                         <textarea wire:model="rejectionReason" class="cyber-textarea" placeholder="If rejecting, state the operational reason..." style="border-color: var(--erp-red); min-height: 100px;"></textarea>
@@ -429,7 +435,7 @@
             </div>
 
             <div style="border-top: 1px solid var(--erp-border-dark); padding-top: 25px; margin-top: 30px;">
-                @if($userClearance >= 4 && $selectedCampaign->status === 'PENDING_APPROVAL')
+                @if($canApprove && $selectedCampaign->status === 'PENDING_APPROVAL')
                     <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px;">
                         <button wire:click="rejectCampaign" class="btn-action" style="color: var(--erp-red); border-color: var(--erp-red); background: rgba(255,51,102,0.05); padding: 12px 20px; flex: 1; text-align: center;">REJECT TO AGENCY</button>
                         <button wire:click="approveCampaign" class="btn-primary" style="background: #00FF66; color: #0A1128; border-color: #00FF66; padding: 12px 20px; flex: 2; justify-content: center;">

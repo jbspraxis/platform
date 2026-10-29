@@ -20,6 +20,7 @@ class ClientUser extends Authenticatable
 
     protected $fillable = [
         'organization_id',
+        'role_id',
         'restricted_project_id',
         'is_primary_client',
         'first_name',
@@ -62,5 +63,11 @@ class ClientUser extends Authenticatable
     public function organization()
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    /** Portal role (audience 'client'); the primary account always counts as Client Admin. */
+    public function role()
+    {
+        return $this->belongsTo(Role::class);
     }
 }

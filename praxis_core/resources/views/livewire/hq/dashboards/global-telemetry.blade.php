@@ -6,10 +6,12 @@
             <a href="{{ route('hq.dash.investor') }}" wire:navigate class="ws-tab" style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--erp-muted); padding: 5px 15px; border: 1px solid transparent; text-decoration: none; transition: 0.3s;" onmouseover="this.style.color='#FFF'" onmouseout="this.style.color='var(--erp-muted)'">[ INVESTOR_TERMINAL ]</a>
             <a href="{{ route('hq.dash.audit') }}" wire:navigate class="ws-tab" style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--erp-muted); padding: 5px 15px; border: 1px solid transparent; text-decoration: none; transition: 0.3s;" onmouseover="this.style.color='#FFF'" onmouseout="this.style.color='var(--erp-muted)'">[ AUDIT_TERMINAL ]</a>
         </div>
+        @can('dashboard.export')
         <button wire:click="exportTelemetry" wire:loading.attr="disabled" style="background: transparent; border: 1px solid var(--erp-teal); color: var(--erp-teal); font-family: 'Roboto Mono', monospace; font-size: 0.75rem; font-weight: bold; padding: 10px 20px; border-radius: 2px; cursor: pointer; transition: 0.3s;" onmouseover="this.style.background='var(--erp-teal)'; this.style.color='#0A1128';" onmouseout="this.style.background='transparent'; this.style.color='var(--erp-teal)'">
             <span wire:loading.remove>EXPORT TELEMETRY (CSV)</span>
             <span wire:loading>EXPORTING...</span>
         </button>
+        @endcan
     </div>
 
     <div style="margin-bottom: 25px;">

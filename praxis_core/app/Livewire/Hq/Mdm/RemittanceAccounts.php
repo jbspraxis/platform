@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Mdm;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
@@ -44,6 +45,9 @@ class RemittanceAccounts extends Component
 
     public function saveAccount()
     {
+        // The route needs mdm.view; adding or changing an account needs mdm.create / mdm.edit
+        abort_unless(Auth::user()->can(($this->editMode && $this->recordId) ? 'mdm.edit' : 'mdm.create'), 403);
+
         $this->validate([
             'type' => 'required|in:Bank,Mobile Money,Crypto,Cash',
             'provider_name' => 'required|string|max:150',
@@ -154,6 +158,8 @@ class RemittanceAccounts extends Component
 
     public function toggleStatus($id, $currentStatus)
     {
+        abort_unless(Auth::user()->can('mdm.edit'), 403);
+
         DB::transaction(function () use ($id, $currentStatus) {
             $newStatus = !$currentStatus;
             

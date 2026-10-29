@@ -101,10 +101,12 @@
                         <option value="KE">Kenya (KRA)</option>
                     </select>
                 </div>
+                @can('payroll.create')
                 <button wire:click="generateDraftRun" class="btn-action" wire:loading.attr="disabled">
                     <span wire:loading.remove wire:target="generateDraftRun"><i data-lucide="play" style="width: 14px; height: 14px;"></i> GENERATE DRAFT LEDGER</span>
                     <span wire:loading wire:target="generateDraftRun">CALCULATING... <div class="spinner"></div></span>
                 </button>
+                @endcan
             </div>
 
             <div class="table-panel">
@@ -188,13 +190,13 @@
 
                 <div style="display: flex; gap: 15px; justify-content: flex-end; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
                     
-                    @if($runDetails['status'] === 'Draft')
+                    @if($runDetails['status'] === 'Draft' && auth()->user()->can('payroll.edit'))
                         <button wire:click="submitForReview('{{ $selectedRunId }}')" class="btn-action btn-warning">
                             <i data-lucide="send" style="width: 14px; height: 14px;"></i> SUBMIT FOR CHECKER REVIEW
                         </button>
                     @endif
 
-                    @if($runDetails['status'] === 'Pending_Review')
+                    @if($runDetails['status'] === 'Pending_Review' && auth()->user()->can('payroll.approve'))
                         <button wire:click="rejectRun('{{ $selectedRunId }}')" class="btn-action btn-danger">
                             <i data-lucide="x-circle" style="width: 14px; height: 14px;"></i> REJECT TO DRAFT
                         </button>
@@ -203,7 +205,7 @@
                         </button>
                     @endif
 
-                    @if($runDetails['status'] === 'Approved')
+                    @if($runDetails['status'] === 'Approved' && auth()->user()->can('payroll.approve'))
                         <button wire:click="rejectRun('{{ $selectedRunId }}')" class="btn-action btn-danger">
                             <i data-lucide="alert-triangle" style="width: 14px; height: 14px;"></i> REVOKE APPROVAL
                         </button>

@@ -75,12 +75,16 @@
             <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #8A9BB2; margin: 5px 0 0 0;">> Accounts Receivable & Guillotine Protocol Matrix</p>
         </div>
         <div style="display: flex; gap: 15px;">
+            @can('finance.approve')
             <button wire:click="enforceGuillotineProtocol" class="btn-action btn-danger" onclick="confirm('WARNING: Executing this audit will immediately lock Client OS access for any account with an expired due date. Proceed?') || event.stopImmediatePropagation()">
                 <i data-lucide="skull" style="width: 16px; height: 16px;"></i> EXECUTE GUILLOTINE AUDIT
             </button>
+            @endcan
+            @can('finance.create')
             <button wire:click="$set('showCreateModal', true)" class="btn-action" style="background: rgba(0, 229, 255, 0.1);">
                 <i data-lucide="receipt" style="width: 16px; height: 16px;"></i> DRAFT INVOICE
             </button>
+            @endcan
         </div>
     </div>
 
@@ -153,7 +157,7 @@
                                         <i data-lucide="file-text" style="width: 14px; height: 14px;"></i> PDF
                                     </button>
                                     
-                                    @if($inv->status === 'Pending')
+                                    @if($inv->status === 'Pending' && auth()->user()->can('finance.delete'))
                                         <button wire:click="cancelInvoice('{{ $inv->id }}')" class="btn-action btn-danger" style="padding: 6px 12px; font-size: 0.7rem;" onclick="confirm('Are you sure you want to completely void this invoice? This action cannot be fully erased from the audit logs.') || event.stopImmediatePropagation()">
                                             <i data-lucide="ban" style="width: 14px; height: 14px;"></i> VOID
                                         </button>

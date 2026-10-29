@@ -274,6 +274,7 @@
                                     <input type="number" wire:model="extend_guillotine_days" step="1" min="0" class="cyber-input">
                                 </div>
 
+                                @can('finance.approve')
                                 <div style="display: flex; gap: 10px; margin-top: 20px;">
                                     <button type="button" wire:click="rejectTransaction" class="btn-action btn-danger" style="flex: 1;" onclick="confirm('Are you sure you want to REJECT this payment? The client will be notified immediately.') || event.stopImmediatePropagation()">
                                         <i data-lucide="ban" style="width: 14px; height: 14px;"></i> REJECT
@@ -283,6 +284,7 @@
                                         <span wire:loading wire:target="approveTransaction">SECURING...</span>
                                     </button>
                                 </div>
+                                @endcan
                             </form>
                         @else
                             <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 4px; text-align: center; border: 1px dashed rgba(255,255,255,0.2);">

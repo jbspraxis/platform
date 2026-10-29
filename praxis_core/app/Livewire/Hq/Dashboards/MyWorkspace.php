@@ -31,7 +31,6 @@ class MyWorkspace extends Component
     public function loadWorkspaceData()
     {
         $userId = Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c'; // Fallback to your ID if session edge-case
-        $clearanceLevel = Auth::user()->role->clearance_level ?? 5; // Defaulting to your Super Admin/Partner level
 
         try {
             $now = Carbon::now();
@@ -67,8 +66,8 @@ class MyWorkspace extends Component
                 ->select('task_time_logs.*', 'tasks.title as task_title')
                 ->first();
 
-            // 4. Pending Approvals (For Executive / Level 4+)
-            if ($clearanceLevel >= 4) {
+            // 4. Pending Approvals (command-level widget: dashboard.view)
+            if (Auth::user()->can('dashboard.view')) {
                 $this->pendingApprovals = DB::table('proposals')
                     ->join('organizations', 'proposals.organization_id', '=', 'organizations.id')
                     ->where('proposals.status', 'Pending Auth')
@@ -112,6 +111,13 @@ class MyWorkspace extends Component
     {
         $userId = Auth::id();
         
+        // Your own assigned tasks, or any task if you may log time
+        $ownTask = DB::table('tasks')->where('id', $taskId)->where('assigned_to', $userId)->exists();
+        if (! $ownTask && ! Auth::user()->can('timesheets.create')) {
+            session()->flash('error', 'You can only time tasks assigned to you.');
+            return;
+        }
+
         // Prevent starting if a timer is already running
         if ($this->activeTimer) {
             session()->flash('error', 'A chronometer is already active. Halt it first.');
@@ -143,6 +149,7 @@ class MyWorkspace extends Component
 
         DB::table('task_time_logs')
             ->where('id', $this->activeTimer->id)
+            ->where('user_id', $userId) // only your own timer
             ->update([
                 'end_time' => $endTime,
                 'duration_minutes' => $durationMinutes

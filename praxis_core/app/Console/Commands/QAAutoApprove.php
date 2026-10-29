@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Support\Access;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -34,17 +35,12 @@ class QAAutoApprove extends Command
                     'updated_at' => now()
                 ]);
 
-                // Notify Level 4/5 Command of the auto-approval
-                $admins = DB::table('users')
-                    ->join('roles', 'users.role_id', '=', 'roles.id')
-                    ->where('roles.clearance_level', '>=', 4)
-                    ->select('users.id')->get();
-
+                // Notify the QA approvers of the auto-approval
                 $notifications = [];
-                foreach ($admins as $admin) {
+                foreach (Access::staffWith('qa.approve') as $adminId) {
                     $notifications[] = [
                         'id' => (string) Str::uuid(),
-                        'user_id' => $admin->id,
+                        'user_id' => $adminId,
                         'title' => 'SLA AUTO-APPROVAL',
                         'message' => "Client failed to respond within 5 hours. Task '{$task->title}' force-moved to Done.",
                         'type' => 'Project',

@@ -4,18 +4,20 @@ namespace App\Livewire\Hq\Operations;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
 #[Layout('components.layouts.hq')]
 class SprintBoardDirectory extends Component
 {
-    public $userClearance;
+    #[Locked]
+    public bool $canSeeAll = false; // projects.approve or projects.export (Auditor): every project, not only assigned ones
     public $projects = [];
 
     public function mount()
     {
-        $this->userClearance = Auth::user()->role->clearance_level ?? 0;
+        $this->canSeeAll = Auth::user()->can('projects.approve') || Auth::user()->can('projects.export');
         $this->loadDirectory();
     }
 
@@ -27,11 +29,13 @@ class SprintBoardDirectory extends Component
             ->select('projects.id', 'projects.title', 'projects.status', 'organizations.name as client_name')
             ->orderBy('projects.created_at', 'desc');
 
-        // Isolation: If Level 2 or 3, they only see projects where they have assigned tasks.
-        if ($this->userClearance < 4) {
+        // Isolation: without $canSeeAll, they only see projects where they have assigned tasks.
+        // (tasks has no project_id; bridge through project_phases)
+        if (! $this->canSeeAll) {
             $assignedProjectIds = DB::table('tasks')
-                ->where('assigned_to', Auth::id())
-                ->pluck('project_id')
+                ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
+                ->where('tasks.assigned_to', Auth::id())
+                ->pluck('project_phases.project_id')
                 ->unique();
                 
             $query->whereIn('projects.id', $assignedProjectIds);

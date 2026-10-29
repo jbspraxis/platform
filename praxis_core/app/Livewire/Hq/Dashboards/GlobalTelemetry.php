@@ -108,6 +108,8 @@ class GlobalTelemetry extends Component
 
     public function exportTelemetry()
     {
+        abort_unless(auth()->user()->can('dashboard.export'), 403);
+
         $fileName = 'JBS_Praxis_Global_Telemetry_' . Carbon::now()->format('Y_m_d_H_i') . '.csv';
 
         DB::table('system_audit_logs')->insert([

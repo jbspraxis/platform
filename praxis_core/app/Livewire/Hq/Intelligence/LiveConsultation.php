@@ -31,9 +31,6 @@ class LiveConsultation extends Component
     public $historyData = [];
     public $historySummary = null;
 
-    // User Clearance
-    public $userClearance = 1;
-
     // Master Data Collections
     public $dbIndustries = [], $dbArchitectures = [], $dbBottlenecks = [], $dbCurrencies = [];
 
@@ -44,20 +41,12 @@ class LiveConsultation extends Component
 
     public function mount()
     {
-        $this->loadClearance();
         $this->loadLobby();
         
         $this->dbIndustries = DB::table('mdm_copq_industries')->orderBy('industry_name')->get();
         $this->dbArchitectures = DB::table('mdm_copq_architectures')->orderBy('display_name')->get();
         $this->dbBottlenecks = DB::table('mdm_copq_bottlenecks')->orderBy('bottleneck_name')->get();
         $this->dbCurrencies = DB::table('mdm_exchange_rates')->orderBy('currency_code')->get();
-    }
-
-    private function loadClearance()
-    {
-        $user = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')
-            ->where('users.id', Auth::id())->select('roles.clearance_level')->first();
-        $this->userClearance = $user ? (int) $user->clearance_level : 5;
     }
 
     // ==========================================
@@ -75,6 +64,11 @@ class LiveConsultation extends Component
 
     public function approveMeeting($appointmentId, $meetingLink)
     {
+        if (! Auth::user()->can('crm.approve')) {
+            session()->flash('error', 'AUTHORIZATION DENIED: Approving consultations is not in your role.');
+            return;
+        }
+
         if(empty(trim($meetingLink))) {
             session()->flash('error', 'Meeting link is required for approval.');
             return;
@@ -176,6 +170,11 @@ class LiveConsultation extends Component
     // ==========================================
     public function generateInlineCopq()
     {
+        if (! Auth::user()->can('crm.create')) {
+            session()->flash('error', 'AUTHORIZATION DENIED: Creating diagnostics is not in your role.');
+            return;
+        }
+
         $this->validate([
             'inlineIndustry' => 'required|string', 'inlineTool' => 'required|string', 'inlineBottleneck' => 'required|string',
             'inlineTurnover' => 'required|numeric', 'inlineHeadcount' => 'required|numeric', 'inlineMgmtNodes' => 'required|numeric',
@@ -324,7 +323,13 @@ class LiveConsultation extends Component
     // ==========================================
     public function disqualifyLead($reason = '')
     {
-        if ($this->userClearance < 5 && empty(trim($reason))) {
+        if (! Auth::user()->can('crm.edit')) {
+            session()->flash('error', 'AUTHORIZATION DENIED: Changing leads is not in your role.');
+            return;
+        }
+
+        // Only approvers may archive without a written reason
+        if (! Auth::user()->can('crm.approve') && empty(trim($reason))) {
             session()->flash('error', 'AUTHORIZATION DENIED: Written justification required.');
             return;
         }
@@ -349,6 +354,12 @@ class LiveConsultation extends Component
     // ==========================================
     public function closeAndSynthesize($rawNotesData)
     {
+        if (! Auth::user()->can('crm.create')) {
+            $this->dispatch('consultation-error');
+            session()->flash('error', 'AUTHORIZATION DENIED: Creating proposals is not in your role.');
+            return;
+        }
+
         // 1. Gather Inputs
         $ctx = $rawNotesData['context'] ?? '';
         $vis = $rawNotesData['vision'] ?? '';

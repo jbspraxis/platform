@@ -84,9 +84,11 @@
             <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #8A9BB2; margin: 5px 0 0 0;">> Global Double-Entry Aggregation & Financial Health Matrices</p>
         </div>
         <div>
+            @can('finance.export')
             <button wire:click="exportStatements" class="btn-action" style="border-color: #FFBD2E; color: #FFBD2E;">
                 <i data-lucide="download-cloud" style="width: 16px; height: 16px;"></i> EXPORT AUDITOR REPORTS
             </button>
+            @endcan
         </div>
     </div>
 

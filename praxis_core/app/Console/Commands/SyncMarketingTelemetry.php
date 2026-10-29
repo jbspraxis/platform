@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Support\Access;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -122,13 +123,10 @@ class SyncMarketingTelemetry extends Command
 
     private function triggerRedAlert($campaign, $spend)
     {
-        $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')
-                    ->where('roles.clearance_level', '>=', 4)->select('users.id')->get();
-        
-        foreach($admins as $admin) {
+        foreach(Access::staffWith('marketing.approve') as $adminId) {
             DB::table('notifications')->insert([
                 'id' => (string) Str::uuid(),
-                'user_id' => $admin->id,
+                'user_id' => $adminId,
                 'title' => 'WARNING: CAPITAL BLEED DETECTED',
                 'message' => "Campaign '{$campaign->name}' has spent $" . number_format($spend, 2) . " with ZERO qualified opportunities. Intervention advised.",
                 'type' => 'System',

@@ -82,8 +82,8 @@ class LoginTerminal extends Component
                 'created_at' => now(),
             ]);
 
-            // 4. Route to the Command Overview (senior staff) or the personal workspace
-            return redirect()->route(\App\Http\Middleware\HqStaff::allows($user, 4) ? 'hq.dash.admin' : 'hq.dash.workspace');
+            // 4. Route to the Command Overview (dashboard.view) or the personal workspace
+            return redirect()->route($user->can('dashboard.view') ? 'hq.dash.admin' : 'hq.dash.workspace');
         }
 
         // Brute force is handled by the rate limit above (5 tries per email and IP per 15 minutes)
@@ -100,21 +100,17 @@ class LoginTerminal extends Component
 
         $user = DB::table('users')->where('email', $this->email)->first();
 
+        // Every users row is staff (clients live in client_users and reset via Client OS)
         if ($user) {
-            $role = DB::table('roles')->where('id', $user->role_id)->first();
-            
-            // Ensure they are HQ/Internal. Clients must reset via Client OS.
-            if ($role && strtolower($role->name) !== 'client') {
-                $token = Str::random(60);
-                
-                DB::table('users')->where('id', $user->id)->update([
-                    'invitation_token' => $token,
-                    'updated_at' => now()
-                ]);
+            $token = Str::random(60);
 
-                // TODO: Hook this up to the HQ key recovery email later
-                // Mail::to($user->email)->send(new \App\Mail\HqKeyRecovery($user->first_name, $token));
-            }
+            DB::table('users')->where('id', $user->id)->update([
+                'invitation_token' => $token,
+                'updated_at' => now()
+            ]);
+
+            // TODO: Hook this up to the HQ key recovery email later
+            // Mail::to($user->email)->send(new \App\Mail\HqKeyRecovery($user->first_name, $token));
         }
 
         // Universal success message prevents bad actors from enumerating valid internal emails

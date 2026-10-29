@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Operations;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -11,7 +12,18 @@ use Illuminate\Support\Str;
 #[Layout('components.layouts.hq')]
 class ActiveDeployments extends Component
 {
-    public $userClearance;
+    // What this user may do here (set in mount, see config/access.php)
+    #[Locked]
+    public bool $canSeeAll = false;    // projects.approve, projects.export or finance.view: every deployment, not only assigned ones
+    #[Locked]
+    public bool $canCreate = false;    // projects.create
+    #[Locked]
+    public bool $canSeeMoney = false;  // finance.view: budgets, burn, capital at risk
+    #[Locked]
+    public bool $canLock = false;      // finance.approve: financial lock override
+    #[Locked]
+    public bool $canExport = false;    // projects.export
+
     public $activeTab = 'matrix'; // 'matrix' or 'ledger'
 
     // View State
@@ -47,7 +59,14 @@ class ActiveDeployments extends Component
 
     public function mount()
     {
-        $this->userClearance = Auth::user()->role->clearance_level ?? 0;
+        $user = Auth::user();
+        // Managers, readers who export (Auditor) and finance (money columns, lock) see every deployment
+        $this->canSeeAll = $user->can('projects.approve') || $user->can('projects.export') || $user->can('finance.view');
+        $this->canCreate = $user->can('projects.create');
+        $this->canSeeMoney = $user->can('finance.view');
+        $this->canLock = $user->can('finance.approve');
+        $this->canExport = $user->can('projects.export');
+
         $this->loadAssignees();
         $this->loadOrganizations();
         $this->loadData();
@@ -68,7 +87,7 @@ class ActiveDeployments extends Component
 
     private function loadAssignees()
     {
-        if ($this->userClearance >= 4) {
+        if ($this->canSeeAll) {
             $this->availableAssignees = DB::table('users')
                 ->where('status', 'Active')
                 ->whereIn('id', function($query) {
@@ -116,8 +135,8 @@ class ActiveDeployments extends Component
             });
         }
 
-        // Security Clearance Isolation
-        if ($this->userClearance < 4) {
+        // Isolation: without $canSeeAll, only projects with tasks assigned to this user
+        if (! $this->canSeeAll) {
             $assignedProjectIds = DB::table('tasks')
                 ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
                 ->where('tasks.assigned_to', Auth::id())
@@ -165,7 +184,7 @@ class ActiveDeployments extends Component
                 ->whereIn('status', ['Pending', 'Overdue'])
                 ->sum('total_amount');
 
-            if ($this->userClearance >= 4) {
+            if ($this->canSeeMoney) {
                 if ($burnPercent > ($progressPercent + 15)) {
                     $bleedingCount++;
                     $isBleeding = true;
@@ -184,10 +203,11 @@ class ActiveDeployments extends Component
                 'total_points' => $totalPoints,
                 'completed_points' => $completedPoints,
                 'progress_percent' => $progressPercent,
-                'total_budget' => $project->total_budget,
-                'spent_amount' => $spentAmount,
-                'burn_percent' => $burnPercent,
-                'unpaid_invoices' => $unpaidInvoices,
+                // Money stays on the server without finance.view
+                'total_budget' => $this->canSeeMoney ? $project->total_budget : null,
+                'spent_amount' => $this->canSeeMoney ? $spentAmount : null,
+                'burn_percent' => $this->canSeeMoney ? $burnPercent : null,
+                'unpaid_invoices' => $this->canSeeMoney ? $unpaidInvoices : null,
                 'needs_midpoint_funds' => ($unpaidInvoices > 0 && $progressPercent >= 40),
                 'is_bleeding' => $isBleeding
             ];
@@ -204,7 +224,7 @@ class ActiveDeployments extends Component
             ->where('updated_at', '>=', now()->subDays(7))
             ->sum('story_points');
 
-        if ($this->userClearance >= 4) {
+        if ($this->canSeeMoney) {
             $this->kpiCapitalAtRisk = DB::table('invoices')
                 ->join('projects', 'invoices.project_id', '=', 'projects.id')
                 ->whereIn('projects.status', ['Active', 'Locked'])
@@ -233,24 +253,29 @@ class ActiveDeployments extends Component
             $query->where('projects.status', $this->filterStatus);
         }
 
-        // Still isolate for lower clearance levels
-        if ($this->userClearance < 4) {
+        // Still isolate without $canSeeAll
+        if (! $this->canSeeAll) {
             $assignedProjectIds = DB::table('tasks')
                 ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
                 ->where('tasks.assigned_to', Auth::id())
                 ->pluck('project_phases.project_id')
                 ->unique();
-                
+
             $query->whereIn('projects.id', $assignedProjectIds);
         }
 
         $this->ledgerProjects = json_decode(json_encode($query->get()), true);
+
+        // Budgets stay on the server without finance.view
+        if (! $this->canSeeMoney) {
+            $this->ledgerProjects = array_map(fn ($p) => array_merge($p, ['total_budget' => null]), $this->ledgerProjects);
+        }
     }
 
     // --- NEW PROJECT CREATION ---
     public function createProject()
     {
-        if ($this->userClearance < 4) {
+        if (! Auth::user()->can('projects.create')) {
             session()->flash('error', 'ACCESS DENIED: Insufficient clearance to initialize deployments.');
             return;
         }
@@ -293,10 +318,10 @@ class ActiveDeployments extends Component
         session()->flash('success', 'New deployment successfully initialized.');
     }
 
-    // --- LEVEL 5 SUPER ADMIN OVERRIDE ---
+    // --- FINANCIAL LOCK OVERRIDE (finance.approve) ---
     public function toggleFinancialLock($projectId)
     {
-        if ($this->userClearance < 5) {
+        if (! Auth::user()->can('finance.approve')) {
             session()->flash('error', 'ACCESS DENIED: Only Level 5 Super Admins can override the financial matrix.');
             return;
         }
@@ -332,6 +357,11 @@ class ActiveDeployments extends Component
     // --- CSV EXPORT ---
     public function exportCsv()
     {
+        if (! Auth::user()->can('projects.export')) {
+            session()->flash('error', 'ACCESS DENIED: Insufficient clearance to export deployments.');
+            return;
+        }
+
         $data = $this->activeTab === 'matrix' ? $this->matrixProjects : $this->ledgerProjects;
 
         if (empty($data)) {
@@ -351,7 +381,8 @@ class ActiveDeployments extends Component
                         $p['client_name'], $p['title'], $p['status'], 
                         $p['is_financially_locked'] ? 'YES' : 'NO',
                         $p['completed_points'], $p['total_points'], $p['progress_percent'], 
-                        $p['burn_percent'], round($p['spent_amount'], 2),
+                        $this->canSeeMoney ? $p['burn_percent'] : '',
+                        $this->canSeeMoney ? round($p['spent_amount'], 2) : '',
                         $p['is_bleeding'] ? 'YES' : 'NO'
                     ]);
                 }
@@ -360,7 +391,7 @@ class ActiveDeployments extends Component
                 foreach ($data as $p) {
                     fputcsv($file, [
                         $p['client_name'], $p['title'], $p['status'], 
-                        $p['total_budget'] . ' ' . $p['currency'], 
+                        $this->canSeeMoney ? $p['total_budget'] . ' ' . $p['currency'] : '',
                         $p['start_date'], $p['target_end_date']
                     ]);
                 }

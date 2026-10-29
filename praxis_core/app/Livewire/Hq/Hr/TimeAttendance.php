@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Hr;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Services\Payroll\TimeAggregationEngine;
 use Carbon\Carbon;
@@ -94,6 +95,9 @@ class TimeAttendance extends Component
      */
     public function runAggregationEngine()
     {
+        // The route needs hr.view; writing attendance variables into the payroll ledger needs hr.edit
+        abort_unless(Auth::user()->can('hr.edit'), 403);
+
         try {
             // Call the static engine
             TimeAggregationEngine::aggregateMonth($this->targetMonth, $this->targetYear, $this->targetRegion);
@@ -116,6 +120,6 @@ class TimeAttendance extends Component
 
     public function render()
     {
-        return view('livewire.hq.hr.time-attendance-manager');
+        return view('livewire.hq.hr.time-attendance');
     }
 }

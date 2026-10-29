@@ -8,6 +8,7 @@ use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use App\Support\Access;
 
 #[Layout('components.layouts.hq')]
 class CashRequestSubmitter extends Component
@@ -85,6 +86,8 @@ class CashRequestSubmitter extends Component
 
     public function submitRequest()
     {
+        abort_unless(Auth::user()->can('expenses.create'), 403);
+
         sleep(1);
 
         $final_details = '';
@@ -142,7 +145,7 @@ class CashRequestSubmitter extends Component
             'user_id' => $userId, 'action' => 'SUBMITTED_CASH_REQUEST', 'target_table' => 'cash_requests', 'ip_address' => $ipAddress, 'created_at' => now()
         ]);
 
-        $adminIds = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')->where('roles.clearance_level', 5)->pluck('users.id');
+        $adminIds = Access::staffWith('expenses.approve');
         foreach ($adminIds as $adminId) {
             DB::table('notifications')->insert([
                 'id' => Str::uuid()->toString(), 'user_id' => $adminId, 'type' => 'Financial', 'title' => 'CAPITAL REQUISITION',
@@ -155,6 +158,12 @@ class CashRequestSubmitter extends Component
 
     public function uploadReceipt($requestId)
     {
+        abort_unless(Auth::user()->can('expenses.create'), 403);
+
+        // Staff upload receipts for their own requests only
+        $req = DB::table('cash_requests')->where('id', $requestId)->where('requester_id', Auth::id())->first();
+        abort_unless($req, 403);
+
         $this->validate([
             'receipt_file' => 'required|image|max:5120',
         ]);
@@ -167,8 +176,7 @@ class CashRequestSubmitter extends Component
         ]);
 
         // Notify Admins that Receipt is ready for Audit Clearance
-        $req = collect($this->myRequests)->firstWhere('id', $requestId);
-        $adminIds = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')->where('roles.clearance_level', 5)->pluck('users.id');
+        $adminIds = Access::staffWith('expenses.approve');
         foreach ($adminIds as $adminId) {
             DB::table('notifications')->insert([
                 'id' => Str::uuid()->toString(), 'user_id' => $adminId, 'type' => 'Financial', 'title' => 'RECEIPT UPLOADED',

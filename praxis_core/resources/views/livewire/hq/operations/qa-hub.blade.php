@@ -143,7 +143,7 @@
 
             <div class="offcanvas-body">
                 
-                @if(in_array($selectedTicket['status'], ['Open', 'Investigating']))
+                @if($canWork && in_array($selectedTicket['status'], ['Open', 'Investigating']))
                     <div style="background: rgba(0,0,0,0.5); border: 1px dashed {{ $activeTimerId ? '#00FF66' : 'var(--erp-border-dark)' }}; padding: 20px; border-radius: 4px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center;">
                         <div>
                             <div style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: {{ $activeTimerId ? '#00FF66' : 'var(--erp-teal)' }}; font-weight: bold; margin-bottom: 5px;">COPQ REWORK TIMER (MARGIN BLEED)</div>
@@ -173,7 +173,7 @@
                     @endforelse
                 </div>
 
-                @if(in_array($selectedTicket['status'], ['Open', 'Investigating']))
+                @if($canWork && in_array($selectedTicket['status'], ['Open', 'Investigating']))
                     <div style="display: flex; gap: 10px; margin-bottom: 30px; align-items: center;">
                         <input type="file" wire:model="newAttachment" class="cyber-input" style="padding: 6px; font-size: 0.75rem;">
                         <button wire:click="uploadEvidence" class="btn-action" wire:loading.attr="disabled" wire:target="newAttachment, uploadEvidence">
@@ -202,7 +202,7 @@
                     <div style="text-align: center; padding: 20px; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: var(--erp-muted);">No thread history.</div>
                 @endforelse
 
-                @if(in_array($selectedTicket['status'], ['Open', 'Investigating']))
+                @if($canWork && in_array($selectedTicket['status'], ['Open', 'Investigating']))
                     <div style="margin-top: 20px;">
                         <textarea wire:model="newCommentText" class="cyber-textarea" rows="3" placeholder="Type response here..."></textarea>
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
@@ -218,7 +218,7 @@
             </div>
 
             <div class="offcanvas-footer">
-                @if($userClearance >= 4 && in_array($selectedTicket['status'], ['Open', 'Investigating']))
+                @if($canResolve && in_array($selectedTicket['status'], ['Open', 'Investigating']))
                     <button wire:click="markResolved" class="btn-action" style="width: 100%; justify-content: center; border-color: #00FF66; color: #00FF66; padding: 12px; font-size: 0.85rem;" onclick="confirm('Verify fix deployed and notify client?') || event.stopImmediatePropagation()">
                         <i data-lucide="check-circle" style="width: 18px; height: 18px;"></i> MARK AS RESOLVED & NOTIFY CLIENT
                     </button>

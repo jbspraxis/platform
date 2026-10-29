@@ -91,130 +91,180 @@
         
         <nav class="nav-list">
             
-    @if(auth()->user() && auth()->user()->role->clearance_level >= 1)
-        <a href="{{ route('hq.dash.admin') }}" class="nav-item {{ request()->routeIs('hq.dash.*') ? 'active' : '' }}" wire:navigate>
+    {{-- Each link shows only when the person can open that screen (roles & permissions, config/access.php) --}}
+    @php $sub = fn ($route) => request()->routeIs($route) ? 'color: var(--erp-teal); font-weight: bold;' : ''; @endphp
+
+    <a href="{{ route('hq.dash.workspace') }}" class="nav-item {{ request()->routeIs('hq.dash.workspace') ? 'active' : '' }}" wire:navigate>
+        <i data-lucide="user-round" class="w-4 h-4"></i> MY WORKSPACE
+    </a>
+
+    @canany(['dashboard.view', 'audit.view'])
+        <a href="{{ auth()->user()->can('dashboard.view') ? route('hq.dash.admin') : route('hq.dash.audit') }}" class="nav-item {{ request()->routeIs('hq.dash.admin', 'hq.dash.investor', 'hq.dash.audit') ? 'active' : '' }}" wire:navigate>
             <i data-lucide="layout-dashboard" class="w-4 h-4"></i> COMMAND OVERVIEW
         </a>
-        @if(request()->routeIs('hq.dash.*'))
-            <div class="nav-sub">DB: global_telemetry, user_logs</div>
+        @if(request()->routeIs('hq.dash.admin', 'hq.dash.investor', 'hq.dash.audit'))
+            <div class="nav-sub-menu">
+                @can('dashboard.view')
+                    <a href="{{ route('hq.dash.admin') }}" class="nav-sub-link" style="{{ $sub('hq.dash.admin') }}" wire:navigate>GLOBAL TELEMETRY</a>
+                    <a href="{{ route('hq.dash.investor') }}" class="nav-sub-link" style="{{ $sub('hq.dash.investor') }}" wire:navigate>INVESTOR TERMINAL</a>
+                @endcan
+                @can('audit.view')
+                    <a href="{{ route('hq.dash.audit') }}" class="nav-sub-link" style="{{ $sub('hq.dash.audit') }}" wire:navigate>AUDIT TERMINAL</a>
+                @endcan
+            </div>
+        @endif
+    @endcanany
+
+    @can('mdm.view')
+        <a href="{{ route('hq.mdm.dictionary') }}" class="nav-item {{ request()->routeIs('hq.mdm.dictionary', 'hq.mdm.copq', 'hq.mdm.tax', 'hq.mdm.remittance') ? 'active' : '' }}" wire:navigate>
+            <i data-lucide="database" class="w-4 h-4"></i> FINANCIAL MDM
+        </a>
+        @if(request()->routeIs('hq.mdm.dictionary', 'hq.mdm.copq', 'hq.mdm.tax', 'hq.mdm.remittance'))
+            <div class="nav-sub-menu">
+                <a href="{{ route('hq.mdm.dictionary') }}" class="nav-sub-link" style="{{ $sub('hq.mdm.dictionary') }}" wire:navigate>FINANCIAL DICTIONARY</a>
+                <a href="{{ route('hq.mdm.copq') }}" class="nav-sub-link" style="{{ $sub('hq.mdm.copq') }}" wire:navigate>COPQ MATRICES</a>
+                <a href="{{ route('hq.mdm.tax') }}" class="nav-sub-link" style="{{ $sub('hq.mdm.tax') }}" wire:navigate>TAX COMPLIANCE</a>
+                <a href="{{ route('hq.mdm.remittance') }}" class="nav-sub-link" style="{{ $sub('hq.mdm.remittance') }}" wire:navigate>REMITTANCE ACCOUNTS</a>
+            </div>
         @endif
 
-        @if(auth()->user()->role->clearance_level == 5)
-            <a href="{{ route('hq.mdm.dictionary') }}" class="nav-item {{ request()->routeIs('hq.mdm.dictionary', 'hq.mdm.copq', 'hq.mdm.tax', 'hq.mdm.remittance') ? 'active' : '' }}" wire:navigate>
-                <i data-lucide="database" class="w-4 h-4"></i> FINANCIAL MDM
-            </a>
-            @if(request()->routeIs('hq.mdm.dictionary', 'hq.mdm.copq', 'hq.mdm.tax', 'hq.mdm.remittance'))
-                <div class="nav-sub">DB: service_catalog, tax_logic</div>
-            @endif
-        
-            <a href="{{ route('hq.mdm.legal') }}" class="nav-item {{ request()->routeIs('hq.mdm.legal') ? 'active' : '' }}" wire:navigate>
-                <i data-lucide="building-2" class="w-4 h-4"></i> CORPORATE ENTITIES
-            </a>
-        @endif
+        <a href="{{ route('hq.mdm.legal') }}" class="nav-item {{ request()->routeIs('hq.mdm.legal') ? 'active' : '' }}" wire:navigate>
+            <i data-lucide="building-2" class="w-4 h-4"></i> CORPORATE ENTITIES
+        </a>
+    @endcan
 
+    @can('hr.view')
         <a href="{{ route('hq.mdm.employees') }}" class="nav-item {{ request()->routeIs('hq.mdm.employees', 'hq.hr.*') ? 'active' : '' }}" wire:navigate>
             <i data-lucide="users" class="w-4 h-4"></i> HUMAN CAPITAL
         </a>
         @if(request()->routeIs('hq.mdm.employees', 'hq.hr.*'))
             <div class="nav-sub-menu">
-                <a href="{{ route('hq.mdm.employees') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.mdm.employees') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>
-                    MASTER REGISTRY
-                </a>
-                <a href="{{ route('hq.hr.time') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.hr.time') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>
-                    TIME & ATTENDANCE
-                </a>
-                <a href="{{ route('hq.hr.compliance') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.hr.compliance') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>
-                    CONTRACTS & APPRAISALS
-                </a>
+                <a href="{{ route('hq.mdm.employees') }}" class="nav-sub-link" style="{{ $sub('hq.mdm.employees') }}" wire:navigate>MASTER REGISTRY</a>
+                <a href="{{ route('hq.hr.time') }}" class="nav-sub-link" style="{{ $sub('hq.hr.time') }}" wire:navigate>TIME & ATTENDANCE</a>
+                <a href="{{ route('hq.hr.compliance') }}" class="nav-sub-link" style="{{ $sub('hq.hr.compliance') }}" wire:navigate>CONTRACTS & APPRAISALS</a>
             </div>
         @endif
-        
-        <a href="{{ route('hq.crm.leads') }}" class="nav-item {{ request()->routeIs('hq.crm.*') ? 'active' : '' }}" wire:navigate>
+    @endcan
+
+    @canany(['crm.view', 'broadcasts.view'])
+        <a href="{{ auth()->user()->can('crm.view') ? route('hq.crm.leads') : route('hq.crm.broadcast') }}" class="nav-item {{ request()->routeIs('hq.crm.*') ? 'active' : '' }}" wire:navigate>
             <i data-lucide="target" class="w-4 h-4"></i> INTELLIGENCE DESK
         </a>
         @if(request()->routeIs('hq.crm.*'))
             <div class="nav-sub-menu">
-                <a href="{{ route('hq.crm.leads') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.crm.leads') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>LEADS REGISTER</a>
-                <a href="{{ route('hq.crm.consult') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.crm.consult') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>LIVE CONSULTATION</a>
-                <a href="{{ route('hq.crm.proposal') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.crm.proposal') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>PROPOSALS LEDGER</a>
-                <a href="{{ route('hq.crm.broadcast') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.crm.broadcast') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>BROADCAST LEDGER</a>
+                @can('crm.view')
+                    <a href="{{ route('hq.crm.leads') }}" class="nav-sub-link" style="{{ $sub('hq.crm.leads') }}" wire:navigate>LEADS REGISTER</a>
+                    <a href="{{ route('hq.crm.consult') }}" class="nav-sub-link" style="{{ $sub('hq.crm.consult') }}" wire:navigate>LIVE CONSULTATION</a>
+                    <a href="{{ route('hq.crm.proposal') }}" class="nav-sub-link" style="{{ $sub('hq.crm.proposal') }}" wire:navigate>PROPOSALS LEDGER</a>
+                @endcan
+                @can('broadcasts.view')
+                    <a href="{{ route('hq.crm.broadcast') }}" class="nav-sub-link" style="{{ $sub('hq.crm.broadcast') }}" wire:navigate>BROADCAST LEDGER</a>
+                @endcan
             </div>
         @endif
+    @endcanany
 
-        <a href="{{ route('hq.ops.deployments') }}" class="nav-item {{ request()->routeIs('hq.ops.*') ? 'active' : '' }}" wire:navigate>
+    @canany(['projects.view', 'qa.view', 'timesheets.view', 'signoffs.view'])
+        @php
+            $opsHome = collect(['projects.view' => 'hq.ops.deployments', 'qa.view' => 'hq.ops.qa', 'timesheets.view' => 'hq.ops.timers', 'signoffs.view' => 'hq.ops.signoffs'])
+                ->first(fn ($route, $perm) => auth()->user()->can($perm));
+        @endphp
+        <a href="{{ route($opsHome) }}" class="nav-item {{ request()->routeIs('hq.ops.*') ? 'active' : '' }}" wire:navigate>
             <i data-lucide="cpu" class="w-4 h-4"></i> OPERATIONS MATRIX
         </a>
         @if(request()->routeIs('hq.ops.*'))
             <div class="nav-sub-menu">
-                <a href="{{ route('hq.ops.deployments') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.ops.deployments') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>ACTIVE DEPLOYMENTS</a>
-                <a href="{{ route('hq.ops.boards.directory') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.ops.boards.directory', 'hq.ops.board') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>SPRINT BOARDS (LIVE)</a>
-                <a href="{{ route('hq.ops.qa') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.ops.qa') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>QA VULNERABILITY HUB</a>
-                <a href="{{ route('hq.ops.timers') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.ops.timers') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>SILENT TIMERS LOG</a>
-                <a href="{{ route('hq.ops.signoffs') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.ops.signoffs') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>PROJECT SIGNOFFS</a>
+                @can('projects.view')
+                    <a href="{{ route('hq.ops.deployments') }}" class="nav-sub-link" style="{{ $sub('hq.ops.deployments') }}" wire:navigate>ACTIVE DEPLOYMENTS</a>
+                    <a href="{{ route('hq.ops.boards.directory') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.ops.boards.directory', 'hq.ops.board') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>SPRINT BOARDS (LIVE)</a>
+                @endcan
+                @can('qa.view')
+                    <a href="{{ route('hq.ops.qa') }}" class="nav-sub-link" style="{{ $sub('hq.ops.qa') }}" wire:navigate>QA VULNERABILITY HUB</a>
+                @endcan
+                @can('timesheets.view')
+                    <a href="{{ route('hq.ops.timers') }}" class="nav-sub-link" style="{{ $sub('hq.ops.timers') }}" wire:navigate>SILENT TIMERS LOG</a>
+                @endcan
+                @can('signoffs.view')
+                    <a href="{{ route('hq.ops.signoffs') }}" class="nav-sub-link" style="{{ $sub('hq.ops.signoffs') }}" wire:navigate>PROJECT SIGNOFFS</a>
+                @endcan
             </div>
         @endif
+    @endcanany
 
-        <a href="{{ route('hq.finance.bi') }}" class="nav-item {{ request()->routeIs('hq.finance.*') ? 'active' : '' }}" wire:navigate>
+    @canany(['finance.view', 'payroll.view', 'expenses.view', 'expenses.create'])
+        @php
+            $financeHome = collect(['finance.view' => 'hq.finance.bi', 'payroll.view' => 'hq.finance.payroll', 'expenses.view' => 'hq.finance.manager', 'expenses.create' => 'hq.finance.request'])
+                ->first(fn ($route, $perm) => auth()->user()->can($perm));
+        @endphp
+        <a href="{{ route($financeHome) }}" class="nav-item {{ request()->routeIs('hq.finance.*') ? 'active' : '' }}" wire:navigate>
             <i data-lucide="landmark" class="w-4 h-4"></i> FINANCIAL DISPATCH
         </a>
         @if(request()->routeIs('hq.finance.*'))
             <div class="nav-sub-menu">
-                <a href="{{ route('hq.finance.bi') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.finance.bi') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>EXECUTIVE BI MATRIX</a>
-                <a href="{{ route('hq.finance.invoices') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.finance.invoices') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>INVOICE LEDGER</a>
-                <a href="{{ route('hq.finance.escrow') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.finance.escrow') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>ESCROW VERIFICATION</a>
-                
-                @if(auth()->user()->role->clearance_level >= 4)
-                    <div style="margin-top:10px; padding-top:10px; border-top: 1px dashed rgba(255,255,255,0.1); color: #8A9BB2; font-family: 'Roboto Mono', monospace; font-size: 0.6rem; font-weight: bold; padding-left: 10px;">TREASURY & IFRS</div>
-                    <a href="{{ route('hq.finance.budgets') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.finance.budgets') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>PROJECT BUDGETS</a>
-                    <a href="{{ route('hq.finance.request') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.finance.request') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>CAPITAL REQUISITION</a>
-                    <a href="{{ route('hq.finance.manager') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.finance.manager') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>TREASURY MANAGER</a>
-                    <a href="{{ route('hq.finance.coa') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.finance.coa') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>CHART OF ACCOUNTS</a>
-                    <a href="{{ route('hq.finance.gl') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.finance.gl') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>GENERAL LEDGER (IFRS)</a>
+                @can('finance.view')
+                    <a href="{{ route('hq.finance.bi') }}" class="nav-sub-link" style="{{ $sub('hq.finance.bi') }}" wire:navigate>EXECUTIVE BI MATRIX</a>
+                    <a href="{{ route('hq.finance.invoices') }}" class="nav-sub-link" style="{{ $sub('hq.finance.invoices') }}" wire:navigate>INVOICE LEDGER</a>
+                    <a href="{{ route('hq.finance.escrow') }}" class="nav-sub-link" style="{{ $sub('hq.finance.escrow') }}" wire:navigate>ESCROW VERIFICATION</a>
+                @endcan
 
+                @canany(['finance.view', 'expenses.view', 'expenses.create'])
+                    <div style="margin-top:10px; padding-top:10px; border-top: 1px dashed rgba(255,255,255,0.1); color: #8A9BB2; font-family: 'Roboto Mono', monospace; font-size: 0.6rem; font-weight: bold; padding-left: 10px;">TREASURY & IFRS</div>
+                    @can('finance.view')
+                        <a href="{{ route('hq.finance.budgets') }}" class="nav-sub-link" style="{{ $sub('hq.finance.budgets') }}" wire:navigate>PROJECT BUDGETS</a>
+                    @endcan
+                    @can('expenses.create')
+                        <a href="{{ route('hq.finance.request') }}" class="nav-sub-link" style="{{ $sub('hq.finance.request') }}" wire:navigate>CAPITAL REQUISITION</a>
+                    @endcan
+                    @can('expenses.view')
+                        <a href="{{ route('hq.finance.manager') }}" class="nav-sub-link" style="{{ $sub('hq.finance.manager') }}" wire:navigate>TREASURY MANAGER</a>
+                    @endcan
+                    @can('finance.view')
+                        <a href="{{ route('hq.finance.coa') }}" class="nav-sub-link" style="{{ $sub('hq.finance.coa') }}" wire:navigate>CHART OF ACCOUNTS</a>
+                        <a href="{{ route('hq.finance.gl') }}" class="nav-sub-link" style="{{ $sub('hq.finance.gl') }}" wire:navigate>GENERAL LEDGER (IFRS)</a>
+                    @endcan
+                @endcanany
+
+                @can('payroll.view')
                     <div style="margin-top:10px; padding-top:10px; border-top: 1px dashed rgba(255,255,255,0.1); color: #8A9BB2; font-family: 'Roboto Mono', monospace; font-size: 0.6rem; font-weight: bold; padding-left: 10px;">PAYROLL & TAX ENGINE</div>
-                    <a href="{{ route('hq.finance.tax-config') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.finance.tax-config') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>TAX CONFIGURATOR</a>
-                    <a href="{{ route('hq.finance.variables') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.finance.variables') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>VARIABLE COMPENSATION</a>
-                    <a href="{{ route('hq.finance.payroll') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.finance.payroll') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>MASTER PAYROLL LEDGER</a>
-                    <a href="{{ route('hq.finance.matrix') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.finance.matrix') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>COMPLIANCE MATRIX</a>
-                    <a href="{{ route('hq.finance.payslips') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.finance.payslips') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>PAYSLIP INSPECTOR</a>
-                @endif
+                    <a href="{{ route('hq.finance.tax-config') }}" class="nav-sub-link" style="{{ $sub('hq.finance.tax-config') }}" wire:navigate>TAX CONFIGURATOR</a>
+                    <a href="{{ route('hq.finance.variables') }}" class="nav-sub-link" style="{{ $sub('hq.finance.variables') }}" wire:navigate>VARIABLE COMPENSATION</a>
+                    <a href="{{ route('hq.finance.payroll') }}" class="nav-sub-link" style="{{ $sub('hq.finance.payroll') }}" wire:navigate>MASTER PAYROLL LEDGER</a>
+                    <a href="{{ route('hq.finance.matrix') }}" class="nav-sub-link" style="{{ $sub('hq.finance.matrix') }}" wire:navigate>COMPLIANCE MATRIX</a>
+                    <a href="{{ route('hq.finance.payslips') }}" class="nav-sub-link" style="{{ $sub('hq.finance.payslips') }}" wire:navigate>PAYSLIP INSPECTOR</a>
+                @endcan
             </div>
         @endif
+    @endcanany
 
-        <a href="#" class="nav-item {{ request()->routeIs('hq.vaults.*') ? 'active' : '' }}" wire:navigate>
-            <i data-lucide="library" class="w-4 h-4"></i> THE VAULTS
+    @can('marketing.view')
+        <a href="{{ route('hq.marketing.campaigns') }}" class="nav-item {{ request()->routeIs('hq.marketing.*') ? 'active' : '' }}" wire:navigate>
+            <i data-lucide="megaphone" class="w-4 h-4"></i> MARKETING & ROAS
         </a>
-        @if(request()->routeIs('hq.vaults.*'))
-            <div class="nav-sub">DB: talent_pool, kaizen_articles</div>
+        @if(request()->routeIs('hq.marketing.*'))
+            <div class="nav-sub-menu">
+                <a href="{{ route('hq.marketing.campaigns') }}" class="nav-sub-link" style="color: var(--erp-teal); font-weight: bold;" wire:navigate>
+                    CAMPAIGN COMMAND
+                </a>
+            </div>
         @endif
-    @endif
+    @endcan
 
-    <a href="{{ route('hq.marketing.campaigns') }}" class="nav-item {{ request()->routeIs('hq.marketing.*') ? 'active' : '' }}" wire:navigate>
-        <i data-lucide="megaphone" class="w-4 h-4"></i> MARKETING & ROAS
-    </a>
-    @if(request()->routeIs('hq.marketing.*'))
-        <div class="nav-sub-menu">
-            <a href="{{ route('hq.marketing.campaigns') }}" class="nav-sub-link" style="color: var(--erp-teal); font-weight: bold;" wire:navigate>
-                CAMPAIGN COMMAND
-            </a>
-        </div>
-    @endif
-
-    @if(auth()->user() && auth()->user()->role->clearance_level == 5)
-        <a href="{{ route('hq.system.roles') }}" class="nav-item {{ request()->routeIs('hq.system.*') ? 'active' : '' }}" style="margin-top: auto; border-top: 1px solid var(--erp-border-dark); padding-top: 20px;" wire:navigate>
-            <i data-lucide="shield" class="w-4 h-4"></i> SYSTEM CLEARANCE
+    @canany(['access.view', 'system.view'])
+        <a href="{{ auth()->user()->can('access.view') ? route('hq.system.roles') : route('hq.system.health') }}" class="nav-item {{ request()->routeIs('hq.system.*') ? 'active' : '' }}" style="margin-top: auto; border-top: 1px solid var(--erp-border-dark); padding-top: 20px;" wire:navigate>
+            <i data-lucide="shield" class="w-4 h-4"></i> SYSTEM & ACCESS
         </a>
         @if(request()->routeIs('hq.system.*'))
             <div class="nav-sub-menu">
-                <a href="{{ route('hq.system.roles') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.system.roles') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>
-                    IDENTITY & ACCESS
-                </a>
-                <a href="{{ route('hq.system.health') }}" class="nav-sub-link" style="{{ request()->routeIs('hq.system.health') ? 'color: var(--erp-teal); font-weight: bold;' : '' }}" wire:navigate>
-                    SYSTEM HEALTH
-                </a>
+                @can('access.view')
+                    <a href="{{ route('hq.system.roles') }}" class="nav-sub-link" style="{{ $sub('hq.system.roles') }}" wire:navigate>ACCOUNTS</a>
+                    <a href="{{ route('hq.system.permissions') }}" class="nav-sub-link" style="{{ $sub('hq.system.permissions') }}" wire:navigate>ROLES & PERMISSIONS</a>
+                @endcan
+                @can('system.view')
+                    <a href="{{ route('hq.system.health') }}" class="nav-sub-link" style="{{ $sub('hq.system.health') }}" wire:navigate>SYSTEM HEALTH</a>
+                @endcan
             </div>
         @endif
-    @endif
+    @endcanany
 </nav>
 
         <div class="sidebar-footer">
@@ -245,7 +295,7 @@
                 <a href="{{ route('hq.logout') }}" class="admin-profile" title="Click to Terminate Session">
                     <div class="admin-details">
                         <span class="admin-name">{{ auth()->user()->name ?? 'System Admin' }}</span>
-                        <span class="admin-role">{{ auth()->user()->role->name ?? 'Level 5 Clearance' }}</span>
+                        <span class="admin-role">{{ auth()->user()?->role_names ?: 'Staff' }}</span>
                     </div>
                     <div class="admin-avatar">
                         {{ strtoupper(substr(auth()->user()->first_name ?? 'S', 0, 1) . substr(auth()->user()->last_name ?? 'A', 0, 1)) }}
