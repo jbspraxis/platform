@@ -19,3 +19,4 @@ praxis_core/bootstrap/cache/*.php
 *.sql
 *.sql.gz
 _downloads/
+_ref/
