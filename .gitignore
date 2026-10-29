@@ -28,3 +28,4 @@ praxis_core/.env.localtest
 _mon/
 praxis_core/.env.localmysql
 praxis_core/database/seeders/private/
+_s6

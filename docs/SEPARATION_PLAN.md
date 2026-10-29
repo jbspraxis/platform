@@ -62,6 +62,12 @@ Total: about 18–24 hours of work, over 2–3 sessions. Each phase is committed
 - `php artisan app:invite-owner <email>` creates the owner's staff account with the Owner role and emails a one-time setup link to `hq.jbspraxis.com/setup/…`; the owner chooses the password. Re-running sends a fresh link. Later staff are invited from HQ → System & Access → Accounts.
 - Email checked live on 29 Oct: the site sends as `system@jbspraxis.com` (mail.jbspraxis.com:465, relayed by SMTP2GO); a real test reached the Gmail inbox with SPF, DKIM and DMARC passing. Broadcasts still send as `intelligence@`.
 
+### S6 done (29 Oct, 14:57–15:08 UTC, owner approved)
+- Backups in `~/s6_backup_20261029/`: `praxis_core_code.zip` (app, bootstrap, config, database, resources, routes), `smartqaq_praxis_core_before_s6.sql.gz` (full export, 96 tables, checked), `retired/` (the 7 removed files), `jbs_subdomain_placeholder/`.
+- 136 files uploaded byte-exact (checked by size); live files matched the last deploy before upload. Database rebuilt: 96 tables, 1 organisation, the Editorial account, 11 roles, 86 permissions, reference data and website content; nothing else.
+- `hq` and `portal` point at `public_html/PRAXIS`; nginx cache cleared. All one-time cron jobs removed; the scheduler cron is unchanged.
+- Owner invite sent to jbspraxisllc@gmail.com at 15:08 (arrived in the inbox). The account waits for the owner to open the link and choose a password.
+
 ### S6 runbook (owner approval)
 1. Back up the live files (`praxis_core` and `public_html/PRAXIS`) and the database (export) to `~/s6_backup_<date>/`.
 2. Maintenance mode on.
