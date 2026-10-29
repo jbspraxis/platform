@@ -266,7 +266,7 @@ class LiveConsultation extends Component
         elseif ($turnover >= 1000000 || $totalCOPQ >= 50000) $tier = 2; 
 
         // 6. Lock Data into the COPQ Vault
-        $token = strtoupper('PRX-' . Str::random(6) . '-' . date('Y'));
+        $token = 'PRX-' . strtoupper(Str::random(24)) . '-' . date('Y');
         
         $user = DB::table('users')->where('organization_id', $this->activeOrgId)->first();
         $execEmail = $user ? $user->email : 'client@' . strtolower(str_replace(' ', '', $companyName)) . '.com';

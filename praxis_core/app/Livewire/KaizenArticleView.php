@@ -45,6 +45,10 @@ class KaizenArticleView extends Component
     {
         if (empty($text)) return $text;
 
+        // Escape first (public submissions can reach this text), then allow **bold**
+        $text = e($text);
+        $text = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $text);
+
         $dictionary = [
             '\b(PostgreSQL|relational database|data silos|ETL)\b' => '<a href="/services#node-data" class="seo-matrix-link">$1</a>',
             '\b(ISO 9001|ISO 27001|compliance|Internal Control Systems|corporate governance)\b' => '<a href="/services#node-governance" class="seo-matrix-link">$1</a>',

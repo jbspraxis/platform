@@ -35,36 +35,41 @@ Route::view('/framework', 'framework')->name('framework');
 Route::get('/sitemap.xml', [SitemapController::class, 'index']);
 Route::get('/kaizen/{slug}', \App\Livewire\KaizenArticleView::class)->name('kaizen.show');
 
-// Old placeholder portal (Optional: You might want to remove this eventually)
-Route::get('/client-portal', ClientPortal::class)->name('client.portal');
+// Old placeholder portal: retired, its sign-in had no rate limit and its key recovery crashed
+Route::redirect('/client-portal', '/client/login', 301)->name('client.portal');
 
 
 // =========================================================
 // ZONE 2: PUBLIC GATEWAYS & ESCROW (No Auth Required)
+// Token links are rate-limited (30 requests a minute per IP) so tokens cannot be guessed at speed.
 // =========================================================
-// 2.1 The SOW / Proposal Binding Engine
-Route::get('/portal/proposal/{token}', \App\Livewire\Portal\ProposalGateway::class)->name('portal.proposal');
+Route::middleware('throttle:30,1')->group(function () {
+    // 2.1 The SOW / Proposal Binding Engine
+    Route::get('/portal/proposal/{token}', \App\Livewire\Portal\ProposalGateway::class)->name('portal.proposal');
 
-// 2.2 The Project Signoff & Handover Gateway
-Route::get('/signoff/gateway/{token}', \App\Livewire\Portal\SignoffGateway::class)->name('portal.signoff.gateway');
+    // 2.2 The Project Signoff & Handover Gateway
+    Route::get('/signoff/gateway/{token}', \App\Livewire\Portal\SignoffGateway::class)->name('portal.signoff.gateway');
 
-// 2.3 The Public PDF Verification Radar (Immutable Audits)
-Route::get('/verify/contract/{hash}', \App\Livewire\Portal\ContractVerification::class)->name('portal.verify.contract');
+    // 2.3 The Public PDF Verification Radar (Immutable Audits)
+    Route::get('/verify/contract/{hash}', \App\Livewire\Portal\ContractVerification::class)->name('portal.verify.contract');
 
-// 2.4 The COPQ Executive Dossier
-Route::get('/dossier/{token}', function ($token) {
-    $assessment = DB::table('copq_assessments')->where('report_token', $token)->first();
-    if (!$assessment) abort(404, 'Dossier not found.');
-    $isExecMode = request()->query('exec') === 'true';
-    return view('copq-report', ['assessment' => $assessment, 'isExecMode' => $isExecMode]);
-})->name('dossier.show');
+    // 2.4 The COPQ Executive Dossier
+    Route::get('/dossier/{token}', function ($token) {
+        $assessment = DB::table('copq_assessments')->where('report_token', $token)->first();
+        if (!$assessment) abort(404, 'Dossier not found.');
+        $isExecMode = request()->query('exec') === 'true';
+        return view('copq-report', ['assessment' => $assessment, 'isExecMode' => $isExecMode]);
+    })->name('dossier.show');
+
+    // 2.5 Client OS account setup link
+    Route::get('/client/setup/{token}', \App\Livewire\ClientOs\SetupAccount::class)->name('client.setup');
+
+    // 2.6 The Client Project Tracker (Mobile-First Portal)
+    Route::get('/portal/tracker/{token}', \App\Livewire\Portal\ProjectTracker::class)->name('portal.tracker');
+});
 
 // 2.5 Client OS Public Entry
 Route::get('/client/login', \App\Livewire\ClientOs\LoginMatrix::class)->name('client.login');
-Route::get('/client/setup/{token}', \App\Livewire\ClientOs\SetupAccount::class)->name('client.setup');
-
-// 2.6 The Client Project Tracker (Mobile-First Portal)
-Route::get('/portal/tracker/{token}', \App\Livewire\Portal\ProjectTracker::class)->name('portal.tracker');
 
 
 // =========================================================
@@ -82,11 +87,10 @@ Route::middleware(['auth'])->group(function () {
 // ZONE 4: EXTERNAL TELEMETRY & TRACKING PIXELS
 // =========================================================
 Route::get('/tracking/open/{campaign_id}/{user_id}', function ($campaign_id, $user_id) {
-    $ip = request()->ip(); $geo = 'Unknown Location';
-    try {
-        $geoData = Illuminate\Support\Facades\Http::timeout(3)->get("http://ip-api.com/json/{$ip}")->json();
-        if ($geoData && $geoData['status'] === 'success') { $geo = $geoData['city'] . ', ' . $geoData['country']; }
-    } catch (\Exception $e) { /* Fail silently */ }
+    // Country comes from Cloudflare's header once the site is proxied; visitor IPs are no
+    // longer sent in plain text to a third-party geolocation service.
+    $ip = request()->ip();
+    $geo = request()->header('CF-IPCountry') ?: 'Unknown Location';
 
     DB::table('broadcast_logs')->where('campaign_id', $campaign_id)->where('user_id', $user_id)->update([
         'open_count' => DB::raw('open_count + 1'), 'last_opened_at' => now(), 'last_open_ip' => $ip, 'last_open_geo' => $geo
@@ -97,12 +101,17 @@ Route::get('/tracking/open/{campaign_id}/{user_id}', function ($campaign_id, $us
 
     $pixel = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
     return response($pixel)->header('Content-Type', 'image/png');
-})->name('tracking.open');
-    
+})->middleware('throttle:60,1')->name('tracking.open');
+
+// Unsubscribe needs a click: email security scanners open links automatically, which used to unsubscribe people.
 Route::get('/tracking/unsubscribe/{user_id}', function ($user_id) {
+    return view('unsubscribe', ['userId' => $user_id, 'done' => false]);
+})->middleware('throttle:30,1')->name('tracking.unsubscribe');
+
+Route::post('/tracking/unsubscribe/{user_id}', function ($user_id) {
     DB::table('users')->where('id', $user_id)->update(['is_subscribed' => 0]);
-    return "You have been successfully unsubscribed from JBS Praxis communications. You may close this window.";
-})->name('tracking.unsubscribe');
+    return view('unsubscribe', ['userId' => $user_id, 'done' => true]);
+})->middleware('throttle:30,1')->name('tracking.unsubscribe.confirm');
 
 
 // =========================================================

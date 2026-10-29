@@ -156,31 +156,14 @@
                     <span><strong>DESKS:</strong> Global HQ (Lagos) | CEMAC (Douala)</span>
                     <span><strong>UPDATED:</strong> {{ date('F Y') }}</span>
                 </div>
-                <div class="doc-classification">
-                    <span class="pulse-dot" style="margin-right: 5px;"></span> [ SYSTEM: VERIFIED ]
-                </div>
             </div>
 
             <h1 class="dossier-title">Corporate Governance & Compliance Nexus</h1>
 
-            <div class="compliance-grid">
-                <div class="compliance-badge">
-                    <span class="cb-val">ISO 9001</span>
-                    <span class="cb-label">Quality Control</span>
-                </div>
-                <div class="compliance-badge">
-                    <span class="cb-val">FCPA / UKBA</span>
-                    <span class="cb-label">Anti-Bribery</span>
-                </div>
-                <div class="compliance-badge">
-                    <span class="cb-val">ISO 14001</span>
-                    <span class="cb-label">ESG Framework</span>
-                </div>
-                <div class="compliance-badge">
-                    <span class="cb-val">ISO 27001</span>
-                    <span class="cb-label">InfoSec (BCMS)</span>
-                </div>
-            </div>
+            <p style="color: var(--text-secondary); font-size: 1.05rem; line-height: 1.7; margin: 0 0 2rem;">
+                Our information-security processes are aligned with ISO/IEC 27001, and we are working towards certification.
+                We will publish certificate details here once they are issued.
+            </p>
 
             <section class="dossier-section">
                 <h3><span class="mono-font" style="opacity: 0.5;">I.</span> THE QUALITY & OPERATIONAL EXCELLENCE PROTOCOL</h3>
@@ -256,23 +239,23 @@
             </section>
 
             <section class="dossier-section">
-                <h3><span class="mono-font" style="opacity: 0.5;">IV.</span> INFORMATION SECURITY & BUSINESS CONTINUITY (ISO 27001)</h3>
+                <h3><span class="mono-font" style="opacity: 0.5;">IV.</span> INFORMATION SECURITY & BUSINESS CONTINUITY (ALIGNED WITH ISO/IEC 27001)</h3>
                 <span class="doc-ref">> DOCUMENT REF: JBS-PRX-INFOSEC-04</span>
                 
                 <div class="zt-block">
                     <h4>1. The Zero-Trust Architecture</h4>
                     <p>Data is the apex asset of the modern enterprise. The JBS Praxis Intelligence Desk operates on a strict Zero-Trust cybersecurity model. We assume the environment is always hostile.</p>
                     <ul style="margin-top: 10px; color: var(--text-secondary); list-style-type: none; padding-left: 0; font-size: 1.05rem; line-height: 1.8;">
-                        <li style="margin-bottom: 10px;"><strong style="color: var(--stark-white);">Cryptographic Sovereignty:</strong> All proprietary client intelligence, audit findings, and source code are encrypted at rest and in transit utilizing military-grade cryptographic standards.</li>
-                        <li><strong style="color: var(--stark-white);">Role-Based Access Control (RBAC):</strong> Access to the PostgreSQL Relational Vaults is strictly siloed. No single architect or consultant has unilateral access to a client’s entire digital ecosystem without authenticated, multi-factor authorization.</li>
+                        <li style="margin-bottom: 10px;"><strong style="color: var(--stark-white);">Cryptographic Sovereignty:</strong> Client data travels over encrypted connections (TLS), and private files such as contracts, receipts and CVs are kept out of public storage and released only to authorised users.</li>
+                        <li><strong style="color: var(--stark-white);">Role-Based Access Control (RBAC):</strong> Access to client data is restricted by role. Each person sees only what their role requires, and sensitive areas need senior clearance.</li>
                     </ul>
                 </div>
 
                 <div class="zt-block">
                     <h4>2. Catastrophic Resilience & BCMS</h4>
-                    <p>We engineer systems to survive. In alignment with ISO 22301 (Business Continuity Management Systems), JBS Praxis maintains aggressive redundancy protocols.</p>
+                    <p>We engineer systems to survive failures and to be recovered quickly when something goes wrong.</p>
                     <ul style="margin-top: 10px; color: var(--text-secondary); list-style-type: none; padding-left: 0; font-size: 1.05rem; line-height: 1.8;">
-                        <li style="margin-bottom: 10px;"><strong style="color: var(--stark-white);">Failover Mechanisms:</strong> Our cloud infrastructure utilizes multi-region mirroring. In the event of a catastrophic server failure or regional blackout, our digital operating systems failover seamlessly to backup environments with near-zero latency.</li>
+                        <li style="margin-bottom: 10px;"><strong style="color: var(--stark-white);">Backups & Recovery:</strong> The systems we deliver are backed up automatically, and we test restoring those backups, so data and service can be recovered after a failure.</li>
                         <li><strong style="color: var(--stark-white);">Incident Response Protocol:</strong> If a cyber-threat or operational shock is detected, the Praxis Nexus locks down the affected silos, preserves the forensic audit trail, and alerts the Strike Team for immediate neutralization.</li>
                     </ul>
                 </div>
@@ -280,7 +263,7 @@
 
             <div class="dossier-footer">
                 <div class="signature-block">
-                    > To initiate a compliance audit or verify JBS Praxis certifications, contact the Desk at:<br>
+                    > To request our security overview or discuss a compliance audit, contact the Desk at:<br>
                     <a href="mailto:intelligence@jbspraxis.com" style="display: inline-block; margin-top: 10px; font-weight: bold; font-size: 0.9rem;">intelligence@jbspraxis.com</a>
                 </div>
                 <div class="terminal-teal-text mono-font" style="margin: 0; font-size: 0.7rem;">

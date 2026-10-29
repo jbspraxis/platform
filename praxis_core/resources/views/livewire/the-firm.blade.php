@@ -336,7 +336,7 @@
                 <div class="pillar-card">
                     <div class="pillar-icon">02</div>
                     <h4>{{ __('The Data Pillar') }}</h4>
-                    <p>{{ __('Architecting high-velocity PostgreSQL databases and guaranteeing absolute data integrity.') }}</p>
+                    <p>{{ __('Architecting high-velocity PostgreSQL databases that protect data integrity.') }}</p>
                 </div>
                 <div class="pillar-card">
                     <div class="pillar-icon">03</div>
@@ -414,7 +414,7 @@
                 <div class="axiom-number">05</div>
                 <div class="axiom-content">
                     <h4>{{ __('Kaizen (Continuous Evolution)') }}</h4>
-                    <p>{{ __('Code is a living organism. We are dedicated to the relentless optimization of our systems, our people, and our clients\' infrastructure. As market dynamics shift, we dynamically refine the architecture to guarantee lifetime systemic resilience.') }}</p>
+                    <p>{{ __('Code is a living organism. We are dedicated to the relentless optimization of our systems, our people, and our clients\' infrastructure. As market dynamics shift, we keep refining the architecture so your systems stay resilient.') }}</p>
                 </div>
             </div>
         </div>

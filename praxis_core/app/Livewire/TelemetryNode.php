@@ -19,16 +19,25 @@ class TelemetryNode extends Component
 
     // Validation Rules
     protected $rules = [
-        'email'       => 'nullable|email',
-        'category'    => 'required|string',
+        'identity'    => 'nullable|string|max:255',
+        'email'       => 'nullable|email|max:255',
+        'category'    => 'required|string|max:255',
         'severity'    => 'required|integer|in:1,2,3',
-        'description' => 'required|string|min:10',
+        'description' => 'required|string|min:10|max:5000',
     ];
 
     public function transmitTelemetry()
     {
         // 1. Validate the incoming data
         $validatedData = $this->validate();
+
+        // 5 reports per IP per hour
+        $rateKey = 'feedback:' . request()->ip();
+        if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($rateKey, 5)) {
+            $this->addError('description', 'Too many reports from this connection. Please try again later.');
+            return;
+        }
+        \Illuminate\Support\Facades\RateLimiter::hit($rateKey, 3600);
 
         // 2. Store the data in the PostgreSQL Vault (Database)
         KaizenTelemetry::create([

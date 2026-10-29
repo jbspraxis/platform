@@ -285,7 +285,7 @@ class LeadsRegister extends Component
         elseif ($this->turnover >= 1000000 || $totalCOPQ >= 50000) $tier = 2; 
 
         // 6. Lock Data into the Vault
-        $token = strtoupper('PRX-' . Str::random(6) . '-' . date('Y'));
+        $token = 'PRX-' . strtoupper(Str::random(24)) . '-' . date('Y');
         DB::table('copq_assessments')->insert([
             'id' => (string) Str::uuid(), 'report_token' => $token, 'organization_id' => $orgId,
             'executive_name' => $this->name, 'company_name' => $this->company, 'corporate_email' => $this->email,

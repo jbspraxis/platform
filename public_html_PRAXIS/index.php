@@ -5,8 +5,8 @@ use Illuminate\Http\Request;
 
 define('LARAVEL_START', microtime(true));
 
-// Determine if the application is in maintenance mode...
-if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php')) {
+// Determine if the application is in maintenance mode (the app lives in ../../praxis_core)...
+if (file_exists($maintenance = __DIR__.'/../../praxis_core/storage/framework/maintenance.php')) {
     require $maintenance;
 }
 

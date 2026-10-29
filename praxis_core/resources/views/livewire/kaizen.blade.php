@@ -490,6 +490,7 @@
                             <label class="terminal-label">THE FINAL ROI *</label>
                             <input type="text" class="custom-input" wire:model="roi" placeholder="e.g. 40% latency reduction, $1M saved." onfocus="updateDrawerLog('CALCULATING_FINANCIAL_IMPACT')">
                             @error('roi') <span class="error-text">> {{ $message }}</span> @enderror
+                            @if($errorMessage) <span class="error-text" role="alert">> {{ $errorMessage }}</span> @endif
 
                             <div style="display: flex; gap: 15px; margin-top: 15px;">
                                 <button type="button" class="btn-outline" style="padding: 14px 20px; min-width: 60px;" @click="step = 1"><</button>

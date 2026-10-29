@@ -16,6 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // 1. CANONICAL SEO ENFORCER
         $middleware->append(\App\Http\Middleware\EnforceCanonicalUrl::class);
 
+        // 1b. BROWSER SECURITY HEADERS (+ noindex on private areas)
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+
         // 2. LOCALE ENFORCER (Inject our new gatekeeper here)
         $middleware->web(append: [
             \App\Http\Middleware\SetLocale::class,

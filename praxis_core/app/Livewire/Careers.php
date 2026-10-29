@@ -37,7 +37,7 @@ class Careers extends Component
         $this->validate([
             'fullName'          => 'required|string|max:100',
             'email'             => 'required|email|max:100',
-            'countryCode'       => 'required|string|max:10',
+            'countryCode'       => 'required|string|max:6', // with phone it must fit talent_pool.phone (30 chars)
             'phone'             => 'required|string|max:20',
             'city'              => 'required|string|max:255', // Updated to match new DB schema
             'primaryWeapon'     => 'required|string',
@@ -45,7 +45,7 @@ class Careers extends Component
             'secondarySkillset' => 'required|string|max:255',
             'linkedinUrl'       => 'required|url|max:255',
             'portfolioUrl'      => 'nullable|url|max:255',
-            'praxisAnswer'      => 'required|string', // Removed max:1000 since DB is type TEXT
+            'praxisAnswer'      => 'required|string|max:10000', // DB is TEXT; cap it to stop abuse
             'resume'            => 'required|file|mimes:pdf,doc,docx|max:5120', 
         ], [
             'resume.required'   => 'ASSET UPLOAD REQUIRED: You must attach a dossier (PDF/DOC).',

@@ -95,7 +95,7 @@
             "telephone" => "+234-816-978-9106",
             "contactType" => "technical support",
             "email" => "intelligence@jbspraxis.com",
-            "availableLanguage" => ["English", "French", "Spanish"]
+            "availableLanguage" => ["English", "French"]
         ],
         "address" => [
             "@type" => "PostalAddress",
@@ -551,49 +551,18 @@
                 </div>
 
                 <div class="footer-col">
-                    <h5 class="mono-font">{{ __('THE PRAXIS SLA') }}</h5>
-                    <div class="sla-block">
-                        <div class="sla-item">
-                            <span class="sla-value">99.9%</span>
-                            <span class="sla-label">{{ __('System Uptime Matrix') }}</span>
-                        </div>
-                        <div class="sla-item">
-                            <span class="sla-value">{{ __('ZERO') }}</span>
-                            <span class="sla-label">{{ __('Data Loss PostgreSQL Arch') }}</span>
-                        </div>
-                        <div class="sla-item">
-                            <span class="sla-value">{{ __('ISO') }}</span>
-                            <span class="sla-label">{{ __('Compliant Tech Maintenance') }}</span>
-                        </div>
-                        <div class="sla-item">
-                            <span class="sla-value">&lt;30m</span>
-                            <span class="sla-label">{{ __('Critical Incident Response') }}</span>
-                        </div>
-                    </div>
+                    <h5 class="mono-font">{{ __('START HERE') }}</h5>
+                    <ul class="footer-links">
+                        <li><a href="/schedule" wire:navigate>{{ __('Book a free audit & demo') }}</a></li>
+                        <li><a href="/contact" wire:navigate>{{ __('Send us a message') }}</a></li>
+                        <li><a href="/client/login">{{ __('Client login') }}</a></li>
+                    </ul>
                 </div>
             </div>
 
             <div class="footer-bottom">
             <div class="copyright">
-                {{ __('© :year JBS Praxis. All Protocol Rights Reserved.', ['year' => date('Y')]) }}
-            </div>
-            
-            <div class="social-links">
-                <a href="#" class="social-icon" aria-label="LinkedIn">
-                    <i data-lucide="linkedin"></i>
-                </a>
-                <a href="#" class="social-icon" aria-label="Twitter">
-                    <i data-lucide="twitter"></i>
-                </a>
-                <a href="#" class="social-icon" aria-label="Instagram">
-                    <i data-lucide="instagram"></i>
-                </a>
-            </div>
-        
-            <div class="command-gateway">
-                <a href="/hq/login" class="command-link" wire:navigate>
-                    <span class="command-icon">⟁</span> {{ __('COMMAND ACCESS') }}
-                </a>
+                {{ __('© :year JBS Praxis. All rights reserved.', ['year' => date('Y')]) }}
             </div>
         </div>
         </div>

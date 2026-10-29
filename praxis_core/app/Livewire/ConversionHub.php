@@ -2,19 +2,28 @@
 
 namespace App\Livewire;
 
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\CopqReportMail;
 
 class ConversionHub extends Component
 {
+    // Reference lists loaded on the server. Locked: bots used to overwrite them, which crashed the page.
+    #[Locked]
     public $dbIndustries = [];
+    #[Locked]
     public $dbArchitectures = [];
+    #[Locked]
     public $dbCurrencies = [];
+    #[Locked]
     public $dbBottlenecks = [];
 
     public function mount()
@@ -32,6 +41,33 @@ class ConversionHub extends Component
 
     public function generateCopqReport($data)
     {
+        // Each report calls the AI and creates CRM records: 5 per IP per hour
+        $rateKey = 'copq-report:' . request()->ip();
+        if (!is_array($data) || RateLimiter::tooManyAttempts($rateKey, 5)) {
+            return 'ERROR';
+        }
+
+        $validator = Validator::make($data, [
+            'name' => 'nullable|string|max:100',
+            'company' => 'nullable|string|max:150',
+            'email' => 'required|email|max:150',
+            'industry' => 'nullable|string|max:100',
+            'tool' => 'nullable|string|max:50',
+            'bottleneck' => 'nullable|string|max:100',
+            'acv' => 'nullable|numeric|min:0|max:1000000000000',
+            'headcount' => 'nullable|integer|min:1|max:1000000',
+            'mgmtNodes' => 'nullable|integer|min:0|max:1000000',
+            'turnover' => 'nullable|numeric|min:0|max:1000000000000000',
+            'manualHrs' => 'nullable|numeric|min:0|max:168',
+            'hourlyCost' => 'nullable|numeric|min:0|max:100000000',
+            'errorRate' => 'nullable|numeric|min:0|max:100',
+            'currency' => 'nullable|string|max:3',
+        ]);
+        if ($validator->fails()) {
+            return 'ERROR';
+        }
+        RateLimiter::hit($rateKey, 3600);
+
         $name        = trim($data['name'] ?? 'Executive');
         $company     = trim($data['company'] ?? 'Enterprise Client');
         $email       = strtolower(trim($data['email'] ?? ''));
@@ -64,7 +100,9 @@ class ConversionHub extends Component
         // 2A. Find or Create Organization (Case-Insensitive)
         $existingOrg = DB::table('organizations')->whereRaw('LOWER(name) = ?', [strtolower($cleanOrgName)])->first();
 
-        if ($existingOrg) {
+        // Only merge into an existing *lead*: anyone can type a client's company name, so a
+        // match on a client organisation gets its own lead record, flagged for HQ to review.
+        if ($existingOrg && $existingOrg->status === 'Lead') {
             $orgId = $existingOrg->id;
             // Flag the organization as having a duplicate submission / new diagnostic activity
             DB::table('organizations')->where('id', $orgId)->update([
@@ -77,6 +115,7 @@ class ConversionHub extends Component
                 'id' => $orgId, 'name' => $cleanOrgName, 'industry' => $industry,
                 'tech_reality' => $tool, 'turnover_bracket' => $turnover,
                 'status' => 'Lead', 'pipeline_stage' => 'Lead Captured',
+                'is_duplicate_suspect' => $existingOrg ? 1 : 0,
                 'created_at' => now(), 'updated_at' => now(),
             ]);
         }
@@ -160,13 +199,17 @@ class ConversionHub extends Component
         $externalFailure = $externalFailure * $failMult;
         $totalCOPQ = $appraisalCost + $internalFailure + $externalFailure;
 
-        // 5. Tier Scoring Logic
+        // 5. Tier Scoring Logic (thresholds are in USD; rate_to_usd = units of this currency per 1 USD)
+        $rateToUsd = (float) (DB::table('mdm_exchange_rates')->where('currency_code', $currency)->value('rate_to_usd') ?: 0);
+        $turnoverUsd = $rateToUsd > 0 ? $turnover / $rateToUsd : $turnover;
+        $copqUsd = $rateToUsd > 0 ? $totalCOPQ / $rateToUsd : $totalCOPQ;
+
         $tier = 3; // Default SME/Junk
-        if ($turnover >= 5000000 || $totalCOPQ >= 250000) $tier = 1; // Enterprise
-        elseif ($turnover >= 1000000 || $totalCOPQ >= 50000) $tier = 2; // Mid-Market
+        if ($turnoverUsd >= 5000000 || $copqUsd >= 250000) $tier = 1; // Enterprise
+        elseif ($turnoverUsd >= 1000000 || $copqUsd >= 50000) $tier = 2; // Mid-Market
 
         // 6. Lock Data into the COPQ Vault
-        $token = strtoupper('PRX-' . Str::random(6) . '-' . date('Y'));
+        $token = 'PRX-' . strtoupper(Str::random(24)) . '-' . date('Y');
         DB::table('copq_assessments')->insert([
             'id' => (string) Str::uuid(), 'report_token' => $token, 'organization_id' => $orgId,
             'executive_name' => $name, 'company_name' => $company, 'corporate_email' => $email,
@@ -200,15 +243,21 @@ class ConversionHub extends Component
     
     public function dispatchReportToEmail($token)
     {
+        $rateKey = 'copq-mail:' . request()->ip();
+        if (RateLimiter::tooManyAttempts($rateKey, 3)) {
+            return false;
+        }
+        RateLimiter::hit($rateKey, 3600);
+
         $assessment = DB::table('copq_assessments')->where('report_token', $token)->first();
-        
+
         if ($assessment && $assessment->corporate_email) {
             try {
                 Mail::to($assessment->corporate_email)->send(new CopqReportMail($assessment));
                 return true;
             } catch (\Exception $e) {
-                // Silently fail or log error so the frontend doesn't crash
-                // \Log::error('Mail dispatch failed: ' . $e->getMessage());
+                // The page shows a "could not send" message; the report link still works
+                Log::error('COPQ report email failed', ['message' => $e->getMessage()]);
                 return false;
             }
         }

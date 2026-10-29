@@ -5,9 +5,12 @@ namespace App\Livewire\Portal;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use App\Models\Tracker;
 use App\Models\TrackerMessage;
+use App\Models\TrackerTask;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 
@@ -20,15 +23,22 @@ class ProjectTracker extends Component
     // CORE STATE (Primitive Types Only)
     // ============================================================================
     
+    // Locked: set on the server only, so the browser cannot unlock the tracker
+    #[Locked]
     public $token;
+    #[Locked]
     public $trackerId;
+    #[Locked]
     public $isAuthorized = false;
+    #[Locked]
     public $isArchived = false;
 
-    // PIN AUTHENTICATION
+    // PIN AUTHENTICATION (5 wrong PINs per tracker and IP lock it for 15 minutes)
     public $pinInput = '';
     public $pinError = false;
+    #[Locked]
     public $authAttempts = 0;
+    #[Locked]
     public $maxAuthAttempts = 5;
 
     // CHAT STATE
@@ -70,8 +80,9 @@ class ProjectTracker extends Component
 
     public function verifyPin($pinInput = null)
 {
-    // Rate limiting: Prevent brute force
-    if ($this->authAttempts >= $this->maxAuthAttempts) {
+    // Rate limiting: Prevent brute force (server-side, survives page reloads)
+    $limiterKey = 'tracker-pin:' . $this->trackerId . ':' . request()->ip();
+    if (RateLimiter::tooManyAttempts($limiterKey, $this->maxAuthAttempts)) {
         $this->pinError = true;
         Log::warning('Auth Attempts Exceeded', [
             'trackerId' => $this->trackerId,
@@ -87,6 +98,7 @@ class ProjectTracker extends Component
         if (!$pin || strlen(trim($pin)) !== 4) {
             $this->pinError = true;
             $this->authAttempts++;
+            RateLimiter::hit($limiterKey, 900);
             return;
         }
 
@@ -100,7 +112,8 @@ class ProjectTracker extends Component
             $this->isAuthorized = true;
             $this->pinError = false;
             $this->authAttempts = 0;
-            
+            RateLimiter::clear($limiterKey);
+
             Log::info('Tracker Access Granted', [
                 'trackerId' => $this->trackerId,
                 'ip' => request()->ip()
@@ -109,10 +122,10 @@ class ProjectTracker extends Component
             $this->pinError = true;
             $this->authAttempts++;
             $this->pinInput = '';
-            
+            RateLimiter::hit($limiterKey, 900);
+
             Log::warning('Invalid PIN Attempt', [
                 'trackerId' => $this->trackerId,
-                'entered' => $pin,
                 'attempts' => $this->authAttempts,
                 'ip' => request()->ip()
             ]);

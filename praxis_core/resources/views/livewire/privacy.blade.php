@@ -166,23 +166,23 @@
                 
                 <div class="compliance-list">
                     <div class="comp-item">
-                        <div class="comp-tag">[ENFORCED]</div>
+                        <div class="comp-tag">[IN SCOPE]</div>
                         <div><strong>The Global Standard:</strong> GDPR (General Data Protection Regulation - Europe)</div>
                     </div>
                     <div class="comp-item">
-                        <div class="comp-tag">[ENFORCED]</div>
+                        <div class="comp-tag">[IN SCOPE]</div>
                         <div><strong>West Africa & ECOWAS:</strong> NDPR & NDPA (Nigeria Data Protection Regulation / Act)</div>
                     </div>
                     <div class="comp-item">
-                        <div class="comp-tag">[ENFORCED]</div>
+                        <div class="comp-tag">[IN SCOPE]</div>
                         <div><strong>Southern Africa:</strong> POPIA (Protection of Personal Information Act - South Africa)</div>
                     </div>
                     <div class="comp-item">
-                        <div class="comp-tag">[ENFORCED]</div>
+                        <div class="comp-tag">[IN SCOPE]</div>
                         <div><strong>East Africa:</strong> DPA (Data Protection Act - Kenya)</div>
                     </div>
                     <div class="comp-item">
-                        <div class="comp-tag">[ENFORCED]</div>
+                        <div class="comp-tag">[IN SCOPE]</div>
                         <div><strong>Central Africa:</strong> CEMAC Directives on Cyber-security and Data Protection</div>
                     </div>
                 </div>

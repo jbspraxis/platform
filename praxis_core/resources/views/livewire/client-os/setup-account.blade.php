@@ -14,7 +14,7 @@
         <h2 style="font-family: 'Montserrat', sans-serif; font-size: 1.6rem; font-weight: 900; letter-spacing: 1px; margin-bottom: 10px; text-transform: uppercase;">Zero-Knowledge Init</h2>
         
         <p style="font-size: 0.85rem; color: #8A9BB2; margin-bottom: 35px; line-height: 1.6;">
-            Welcome, <strong style="color: #FFF;">{{ strtoupper($user->first_name) }}</strong>. Establish your permanent cryptographic key to access the Client OS. This key is hashed client-side; Praxis Command cannot recover it.
+            Welcome, <strong style="color: #FFF;">{{ strtoupper($firstName) }}</strong>. Establish your permanent cryptographic key to access the Client OS. This key is hashed client-side; Praxis Command cannot recover it.
         </p>
 
         <form wire:submit.prevent="lockAndAuthenticate" style="display: flex; flex-direction: column; gap: 20px;">

@@ -17,5 +17,5 @@ Schedule::command('ops:timer-killswitch')->everyFiveMinutes();
 // The Fetch fresh Exchange Rates right at Midnight
 Schedule::command('finance:sync-exchange-rates')->dailyAt('00:00');
 
-// The Wait 30 minutes to ensure API finished, then run the complex Ledger Math
-Schedule::command('finance:run-automations')->dailyAt('00:30');
+// 'finance:run-automations' (00:30) was removed: no such command exists, so it failed every night.
+// Add it back here once the ledger automation command is built.

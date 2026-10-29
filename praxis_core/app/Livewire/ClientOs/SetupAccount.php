@@ -4,6 +4,7 @@ namespace App\Livewire\ClientOs;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
@@ -12,25 +13,34 @@ use Illuminate\Support\Facades\Session;
 #[Layout('components.layouts.portal')]
 class SetupAccount extends Component
 {
+    // Locked: the browser cannot swap the token. Only display fields are kept in
+    // component state; the user row is looked up again from the token on save.
+    #[Locked]
     public $token;
-    public $user;
-    
+
+    #[Locked]
+    public $firstName = '';
+
     public $password = '';
     public $passwordConfirmation = '';
 
     public function mount($token)
     {
         $this->token = $token;
-        
-        // Strict lookup using the correct lifecycle column
-        $this->user = DB::table('users')
-            ->where('invitation_token', $this->token)
-            ->where('lifecycle_stage', 'Onboarding') // FIXED
-            ->first();
-            
-        if (!$this->user) {
+
+        $user = $this->invitedUser();
+        if (!$user) {
             abort(404, 'CRYPTOGRAPHIC LINK INVALID, EXPIRED, OR ALREADY CONSUMED.');
         }
+        $this->firstName = $user->first_name;
+    }
+
+    private function invitedUser()
+    {
+        return DB::table('users')
+            ->where('invitation_token', $this->token)
+            ->where('lifecycle_stage', 'Onboarding')
+            ->first();
     }
 
     public function lockAndAuthenticate()
@@ -42,8 +52,13 @@ class SetupAccount extends Component
             'passwordConfirmation.same' => '> ERR: Cryptographic keys do not match.'
         ]);
 
-        DB::transaction(function () {
-            DB::table('users')->where('id', $this->user->id)->update([
+        $user = $this->invitedUser();
+        if (!$user) {
+            abort(404, 'CRYPTOGRAPHIC LINK INVALID, EXPIRED, OR ALREADY CONSUMED.');
+        }
+
+        DB::transaction(function () use ($user) {
+            DB::table('users')->where('id', $user->id)->update([
                 'password' => Hash::make($this->password),
                 'lifecycle_stage' => 'Active', // Graduate them
                 'invitation_token' => null, 
@@ -53,7 +68,7 @@ class SetupAccount extends Component
         });
 
         // Secure Authentication & Session Regeneration
-        Auth::loginUsingId($this->user->id);
+        Auth::loginUsingId($user->id);
         Session::regenerate();
 
         return redirect()->route('client.dashboard');

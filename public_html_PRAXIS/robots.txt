@@ -1,2 +1,10 @@
 User-agent: *
-Disallow:
+Disallow: /files/
+Disallow: /livewire/
+Disallow: /dossier/
+Disallow: /portal/
+Disallow: /signoff/
+Disallow: /verify/
+Disallow: /tracking/
+
+Sitemap: https://jbspraxis.com/sitemap.xml

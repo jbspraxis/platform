@@ -890,7 +890,7 @@
                 <div class="timeline-dot" style="background: var(--luminous-teal);"></div>
                 <span class="timeline-phase">PHASE V</span>
                 <div class="timeline-title">SOVEREIGN HANDOVER & KAIZEN</div>
-                <p><strong>The Transfer of Power.</strong> We build fortresses, but we hand over the keys. Deployment culminates in rigorous executive and operational training, ensuring your personnel command the architecture with total fluency. Post-launch, we initiate the Kaizen Protocol—a continuous cycle of code optimization, database indexing, and algorithm recalibration. As your enterprise scales and market dynamics shift, our engineering team dynamically refines the infrastructure, guaranteeing zero-latency performance and unbreakable security for the lifetime of the system.</p>
+                <p><strong>The Transfer of Power.</strong> We build fortresses, but we hand over the keys. Deployment culminates in rigorous executive and operational training, ensuring your personnel command the architecture with total fluency. Post-launch, we initiate the Kaizen Protocol—a continuous cycle of code optimization, database indexing, and algorithm recalibration. As your enterprise scales and market dynamics shift, our engineering team keeps refining the infrastructure so it stays fast and secure for the life of the system.</p>
             </div>
         </div>
 

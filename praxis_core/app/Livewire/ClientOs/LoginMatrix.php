@@ -14,6 +14,8 @@ use Illuminate\Support\Str;
 #[Layout('components.layouts.portal')]
 class LoginMatrix extends Component
 {
+    use \App\Livewire\Concerns\ThrottlesLogins;
+
     public $viewState = 'login'; // login, forgot_password, redline_sos, redline_success
 
     // Auth State
@@ -46,24 +48,53 @@ class LoginMatrix extends Component
             'password' => 'required',
         ]);
 
+        if ($this->tooManyLoginAttempts('client')) {
+            return;
+        }
+
         if (Auth::attempt(['email' => $this->email, 'password' => $this->password, 'status' => 'Active'])) {
+            $this->clearLoginAttempts('client');
+            session()->regenerate();
             return redirect()->route('client.dashboard');
         } else {
+            $this->recordFailedLogin('client');
             $this->addError('email', '> ERR: INVALID CREDENTIALS OR SUSPENDED NODE.');
         }
     }
 
+    // There is no self-service reset page yet, so a request alerts HQ, who re-send
+    // a setup link. The reply is the same whether or not the email has an account.
     public function sendResetLink()
     {
         $this->validate(['resetEmail' => 'required|email']);
-        $status = Password::sendResetLink(['email' => $this->resetEmail]);
 
-        if ($status === Password::RESET_LINK_SENT) {
-            $this->authMessage = '> RECOVERY PROTOCOL INITIATED. CHECK INBOX.';
-            $this->resetEmail = '';
-        } else {
-            $this->addError('resetEmail', '> ERR: IDENTITY NOT FOUND IN VAULT.');
+        $rateKey = 'client-reset:' . request()->ip();
+        if (! RateLimiter::tooManyAttempts($rateKey, 3)) {
+            RateLimiter::hit($rateKey, 3600);
+
+            $client = DB::table('users')
+                ->join('roles', 'users.role_id', '=', 'roles.id')
+                ->where('roles.slug', 'client_exec')
+                ->where('users.email', $this->resetEmail)
+                ->select('users.first_name', 'users.last_name', 'users.email')
+                ->first();
+            if ($client) {
+                $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')->where('roles.clearance_level', '>=', 4)->select('users.id')->get();
+                $notifications = [];
+                foreach ($admins as $admin) {
+                    $notifications[] = [
+                        'id' => (string) Str::uuid(), 'user_id' => $admin->id,
+                        'title' => 'CLIENT PASSWORD RESET REQUESTED',
+                        'message' => "Client {$client->first_name} {$client->last_name} ({$client->email}) asked to reset their Client OS password. Send them a new setup link.",
+                        'type' => 'System', 'created_at' => now(),
+                    ];
+                }
+                if (!empty($notifications)) DB::table('notifications')->insert($notifications);
+            }
         }
+
+        $this->authMessage = '> REQUEST RECEIVED. If this email has a Client OS account, the JBS Praxis team will send you a new access link.';
+        $this->resetEmail = '';
     }
 
     // --- 2. THE REDLINE SOS LEAD INJECTION (ARMORED) ---

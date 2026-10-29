@@ -1617,7 +1617,7 @@
             <header class="section-header text-center" data-reveal>
                 <div class="deploy-gradient-rule" aria-hidden="true"></div>
                 <h4 class="terminal-teal-text mono-font" style="justify-content:center;">
-                    <span class="pulse-dot"></span> <strong>{{ __('// SYSTEM.EVIDENCE : VERIFIED') }}</strong>
+                    <span class="pulse-dot"></span> <strong>{{ __('// CLIENT FEEDBACK') }}</strong>
                 </h4>
                 <h2 id="deployHeading">{{ __('The Architecture in Production.') }}</h2>
                 <p style="max-width:660px;margin:0 auto;">{{ __('We do not build speculative software. We engineer operational infrastructure for complex enterprises. Here is what happens when those systems go live.') }}</p>
@@ -2420,11 +2420,19 @@
             btn.disabled = true;
             textSpan.textContent = '{{ __("TRANSMITTING...") }}';
             btn.style.opacity = '.7';
-            await @this.dispatchReportToEmail(window.currentCopqToken);
+            const sent = await @this.dispatchReportToEmail(window.currentCopqToken);
             btn.style.opacity    = '1';
-            btn.style.borderColor= '#00FF66';
-            btn.style.color      = '#00FF66';
-            textSpan.textContent = '{{ __("PAYLOAD DELIVERED") }}';
+            if (sent) {
+                btn.style.borderColor= '#00FF66';
+                btn.style.color      = '#00FF66';
+                textSpan.textContent = '{{ __("PAYLOAD DELIVERED") }}';
+            } else {
+                // Let the visitor retry; the report link above still works
+                btn.disabled = false;
+                btn.style.borderColor= '#FF3366';
+                btn.style.color      = '#FF3366';
+                textSpan.textContent = '{{ __("COULD NOT SEND. USE THE REPORT LINK ABOVE") }}';
+            }
         };
 
         /* ── LIVEWIRE NAVIGATION RE-INIT ───────────────────────── */

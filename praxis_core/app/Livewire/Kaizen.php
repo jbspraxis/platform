@@ -59,14 +59,33 @@ class Kaizen extends Component
                     }
                 },
             ],
-            'vulnerability' => 'required|string',
-            'solution'      => 'required|string',
+            'vulnerability' => 'required|string|max:10000',
+            'solution'      => 'required|string|max:10000',
             'roi'           => 'required|string|max:255',
+            'category'      => 'required|in:The Boardroom,The Server Room',
         ]);
+
+        // 3 submissions per IP per hour
+        $rateKey = 'kaizen-submit:' . request()->ip();
+        if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($rateKey, 3)) {
+            $this->errorMessage = 'Too many submissions from this connection. Please try again later.';
+            return;
+        }
+        \Illuminate\Support\Facades\RateLimiter::hit($rateKey, 3600);
 
         try {
             DB::transaction(function () {
                 $nameParts = explode(' ', trim($this->fullName), 2);
+
+                // Every user needs an organisation: public contributors share one
+                $contributorOrgId = DB::table('organizations')->where('name', 'Kaizen Public Contributors')->value('id');
+                if (!$contributorOrgId) {
+                    $contributorOrgId = (string) Str::uuid();
+                    DB::table('organizations')->insert([
+                        'id' => $contributorOrgId, 'name' => 'Kaizen Public Contributors',
+                        'status' => 'Internal', 'created_at' => now(), 'updated_at' => now(),
+                    ]);
+                }
 
                 // 1. Check if the email already exists in the system
                 $user = User::where('email', $this->email)->first();
@@ -74,6 +93,7 @@ class Kaizen extends Component
                 // 2. If no user exists, create a heavily restricted "Quarantined" profile
                 if (!$user) {
                     $user = User::create([
+                        'organization_id' => $contributorOrgId,
                         'first_name'      => $nameParts[0],
                         'last_name'       => $nameParts[1] ?? 'Unknown',
                         'email'           => $this->email,
@@ -103,13 +123,26 @@ class Kaizen extends Component
                     'status'              => 'Pending Moderation',
                     'created_by'          => $user->id,
                 ]);
+
+                // Tell senior staff there is an article to moderate
+                $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')->where('roles.clearance_level', '>=', 4)->select('users.id')->get();
+                $notifications = [];
+                foreach ($admins as $admin) {
+                    $notifications[] = [
+                        'id' => (string) Str::uuid(), 'user_id' => $admin->id,
+                        'title' => 'KAIZEN ARTICLE AWAITING MODERATION',
+                        'message' => "'{$this->articleTitle}' was submitted by {$this->fullName}.",
+                        'type' => 'System', 'created_at' => now(),
+                    ];
+                }
+                if (!empty($notifications)) DB::table('notifications')->insert($notifications);
             });
 
             $this->isSuccess = true;
 
-        } catch (\Throwable $e) { 
+        } catch (\Throwable $e) {
             Log::error('Kaizen Public Submission Failure: ' . $e->getMessage());
-            $this->errorMessage = '> SYSTEM ERROR: ' . $e->getMessage(); 
+            $this->errorMessage = 'Your submission could not be saved. Please try again later or email info@jbspraxis.com.';
         }
     }
 

@@ -43,4 +43,9 @@ return [
     'key' => env('EXCHANGERATE_API_KEY'),
 ],
 
+    // Inbox that receives website enquiries (contact form, bookings, cost reports)
+    'leads' => [
+        'alert_email' => env('LEAD_ALERT_EMAIL', 'info@jbspraxis.com'),
+    ],
+
 ];

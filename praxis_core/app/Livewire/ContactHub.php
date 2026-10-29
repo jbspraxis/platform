@@ -7,6 +7,9 @@ use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 
 class ContactHub extends Component
@@ -49,17 +52,33 @@ class ContactHub extends Component
             'email' => 'required|email|max:100',
             'companyName' => 'required|string|max:150',
             'message' => 'required|string|max:2000',
+            'title' => 'nullable|string|max:100',
+            'countryCode' => 'nullable|string|max:6',
+            'phone' => 'nullable|string|max:20',
+            'city' => 'nullable|string|max:100',
+            'language' => 'nullable|string|max:50',
+            'budget' => 'nullable|string|max:100',
         ];
 
         if ($this->isDiagnosticMode) {
-            $rules['stage'] = 'required|string';
-            $rules['bottleneck'] = 'required|string';
+            $rules['stage'] = 'required|string|max:100';
+            $rules['bottleneck'] = 'required|string|max:100';
+            $rules['techReality'] = 'nullable|string|max:100';
+            $rules['govStatus'] = 'nullable|string|max:100';
             if ($this->bottleneck === 'other') {
-                $rules['otherBottleneck'] = 'required|string';
+                $rules['otherBottleneck'] = 'required|string|max:255';
             }
         }
 
         $this->validate($rules);
+
+        // 5 enquiries per IP per hour
+        $rateKey = 'contact-form:' . request()->ip();
+        if (RateLimiter::tooManyAttempts($rateKey, 5)) {
+            $this->addError('email', 'Too many messages from this connection. Please try again later or email info@jbspraxis.com.');
+            return;
+        }
+        RateLimiter::hit($rateKey, 3600);
 
         // 2. Database Transaction (All or Nothing)
         DB::transaction(function () {
@@ -141,10 +160,80 @@ class ContactHub extends Component
             ]);
 
             // Note: AI Lead Scoring Job will be dispatched here later.
+
+            // D. HQ notification, as the booking form does
+            $admins = DB::table('users')->join('roles', 'users.role_id', '=', 'roles.id')->where('roles.clearance_level', '>=', 4)->select('users.id')->get();
+            $notifications = [];
+            foreach ($admins as $admin) {
+                $notifications[] = [
+                    'id' => (string) Str::uuid(), 'user_id' => $admin->id,
+                    'title' => 'NEW WEBSITE ENQUIRY',
+                    'message' => "{$this->fullName} ({$cleanOrgName}) sent a message through the contact form.",
+                    'type' => 'System', 'created_at' => now(),
+                ];
+            }
+            if (!empty($notifications)) DB::table('notifications')->insert($notifications);
         });
 
-        // 3. Trigger Success UI
+        // 3. Emails: confirmation to the visitor, alert to the team (failures are logged, the enquiry is already saved)
+        $this->sendEnquiryEmails();
+
+        // 4. Trigger Success UI
         $this->isSuccess = true;
+    }
+
+    private function sendEnquiryEmails(): void
+    {
+        $firstName = explode(' ', trim($this->fullName), 2)[0];
+        $visitor = strtolower(trim($this->email));
+        $team = config('services.leads.alert_email');
+
+        try {
+            Mail::raw(
+                "Hello {$firstName},\n\n"
+                . "Thank you for contacting JBS Praxis. We have received your message and a member of our team will get back to you shortly.\n\n"
+                . "If you would like to choose a time now, book a free audit & demo here:\n" . url('/schedule') . "\n\n"
+                . "JBS Praxis\ninfo@jbspraxis.com\n" . url('/'),
+                function ($m) use ($visitor) {
+                    $m->to($visitor)->subject('We have received your message | JBS Praxis');
+                }
+            );
+        } catch (\Throwable $e) {
+            Log::error('Contact form: confirmation email failed', ['message' => $e->getMessage()]);
+        }
+
+        if (!$team) {
+            return;
+        }
+
+        $finalBottleneck = $this->bottleneck === 'other' ? $this->otherBottleneck : $this->bottleneck;
+        $lines = [
+            'Name' => $this->fullName,
+            'Email' => $visitor,
+            'Job title' => $this->title,
+            'Phone' => trim(($this->countryCode ?? '') . ' ' . ($this->phone ?? '')),
+            'Company' => $this->companyName,
+            'City' => $this->city,
+            'Language' => $this->language,
+            'Budget' => $this->budget,
+            'Stage' => $this->isDiagnosticMode ? $this->stage : null,
+            'Main bottleneck' => $this->isDiagnosticMode ? $finalBottleneck : null,
+            'Current systems' => $this->isDiagnosticMode ? $this->techReality : null,
+            'Governance' => $this->isDiagnosticMode ? $this->govStatus : null,
+        ];
+        $body = "New enquiry from the jbspraxis.com contact form.\n\n";
+        foreach ($lines as $label => $value) {
+            if (filled($value)) $body .= "{$label}: {$value}\n";
+        }
+        $body .= "\nMessage:\n{$this->message}\n\nReply directly to this email to answer the visitor.";
+
+        try {
+            Mail::raw($body, function ($m) use ($team, $visitor) {
+                $m->to($team)->replyTo($visitor)->subject('New website enquiry: ' . trim($this->companyName));
+            });
+        } catch (\Throwable $e) {
+            Log::error('Contact form: team alert email failed', ['message' => $e->getMessage()]);
+        }
     }
 
     public function render()

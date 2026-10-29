@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 #[Layout('layouts.client-light')] // We can reuse the light layout or a blank one
 class Login extends Component
 {
+    use \App\Livewire\Concerns\ThrottlesLogins;
+
     public $email = '';
     public $password = '';
 
@@ -20,9 +22,15 @@ class Login extends Component
             'password' => 'required'
         ]);
 
+        if ($this->tooManyLoginAttempts('tracker')) {
+            return;
+        }
+
         // Attempt login using the strictly isolated 'tracker' guard
         if (Auth::guard('tracker')->attempt(['email' => $this->email, 'password' => $this->password, 'is_active' => 1])) {
-            
+            $this->clearLoginAttempts('tracker');
+            session()->regenerate();
+
             $user = Auth::guard('tracker')->user();
             
             // Find the first project this user is assigned to
@@ -38,6 +46,7 @@ class Login extends Component
             return redirect()->route('taskforce.login');
         }
 
+        $this->recordFailedLogin('tracker');
         $this->addError('email', 'Invalid credentials or inactive account.');
     }
 

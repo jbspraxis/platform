@@ -297,7 +297,7 @@
 
 {{ __('> COMPILING SOLUTION:') }}
 {{ __('> Applying "Code as Law" architecture...') }}
-{{ __('> ISO 9001 Compliance:') }} <span class="faux-highlight">{{ __('HARDCODED') }}</span>
+{{ __('> Approval rules:') }} <span class="faux-highlight">{{ __('HARDCODED') }}</span>
                 </div>
             </div>
         </div>
@@ -523,7 +523,7 @@ CREATE TABLE enterprise_vault (
     {{ __('rollback') }}: <span class="faux-highlight">{{ __('INSTANT') }}</span>
     <span class="faux-highlight">{{ __('status') }}</span>: <span class="faux-highlight">{{ __('LIVE') }}</span> ✓
 
-> {{ __('Uptime:') }} <span class="faux-highlight">99.97%</span> | {{ __('Incidents:') }} <span class="faux-highlight">0</span>
+> {{ __('Monitoring:') }} <span class="faux-highlight">{{ __('ACTIVE') }}</span> | {{ __('Alerts:') }} <span class="faux-highlight">{{ __('ON') }}</span>
 > {{ __('Last deploy:') }} <span class="faux-highlight">{{ __('2 minutes ago') }}</span>
 > {{ __('Active nodes:') }} <span class="faux-highlight">{{ __('Auto-scaling') }} ↑</span>
                 </div>
@@ -551,7 +551,7 @@ CREATE TABLE enterprise_vault (
                     </div>
                     <div class="feature-item">
                         <h4>{{ __('Observability & Incident Response') }}</h4>
-                        <p>{{ __('Centralised logging, real-time performance dashboards, and automated alerting mean your team sees anomalies before clients do. Critical incidents trigger automated rollbacks and notify your on-call engineer within 30 minutes — guaranteed.') }}</p>
+                        <p>{{ __('Centralised logging, real-time performance dashboards, and automated alerting mean your team sees anomalies before clients do. Critical incidents trigger automated rollbacks and alert your on-call engineer straight away.') }}</p>
                     </div>
                 </div>
                 <button class="btn-outline" onclick="window.location.href='/contact'" wire:navigate>{{ __('Architect Your Infrastructure') }}</button>

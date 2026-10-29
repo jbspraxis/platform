@@ -4,9 +4,11 @@ namespace App\Livewire\ClientOs;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
@@ -16,48 +18,72 @@ class Dashboard extends Component
 {
     use WithFileUploads;
 
+    // Everything that identifies this client (organisation, projects, tickets,
+    // invoices, lockout) is #[Locked]: set on the server only. Actions that take
+    // an id from the browser check it belongs to this organisation.
+
     // View State
-    public $activeTab = 'overview'; 
+    #[Locked]
+    public $activeTab = 'overview';
+    #[Locked]
     public $financialLockout = false;
+    #[Locked]
     public $lockoutReason = '';
     public $showRedlineModal = false;
     public $redlineAuthDescription = '';
 
     // Core Data
+    #[Locked]
     public $user;
+    #[Locked]
     public $organization;
+    #[Locked]
     public $clientSettings;
-    
+
     // Project Management
+    #[Locked]
     public $allProjects = [];
     public $activeProjectId;
+    #[Locked]
     public $activeProject;
 
     // Overview & Sprints State
+    #[Locked]
     public $leadArchitect;
+    #[Locked]
     public $overallProgress = 0;
+    #[Locked]
     public $phases = [];
+    #[Locked]
     public $liveLogs = [];
+    #[Locked]
     public $activeTasks = [];
 
     // QA Hub State
+    #[Locked]
     public $qaTickets = [];
     public $qaTaskId = '';
     public $qaTitle = '';
     public $qaSeverity = 'Medium';
     public $qaDescription = '';
-    
+
     // QA Offcanvas State
+    #[Locked]
     public $selectedTicket = null;
+    #[Locked]
     public $ticketComments = [];
     public $initialAttachment;
     public $newCommentText = '';
+    #[Locked]
     public $ticketAttachments = [];
     public $newQaAttachment;
 
     // Financial State
+    #[Locked]
     public $invoices = [];
+    #[Locked]
     public $remittanceAccounts = [];
+    #[Locked]
     public $uploadInvoiceId = null;
     public $popMethod = 'Bank Transfer';
     public $popRef = '';
@@ -67,8 +93,11 @@ class Dashboard extends Component
     public $popWhtFile;
 
     // Vault & Team State
+    #[Locked]
     public $vaultSows = [];
+    #[Locked]
     public $vaultSignoffs = [];
+    #[Locked]
     public $teamMembers = [];
     public $inviteFirstName = '';
     public $inviteLastName = '';
@@ -132,10 +161,30 @@ class Dashboard extends Component
         }
     }
 
+    // Ids this client may touch, checked by every action that takes an id from the browser
+    private function ownsProject($projectId): bool
+    {
+        return $projectId && collect($this->allProjects)->contains('id', $projectId);
+    }
+
+    private function ownsTask($taskId): bool
+    {
+        return $taskId && $this->activeProject && DB::table('tasks')
+            ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
+            ->where('tasks.id', $taskId)
+            ->where('project_phases.project_id', $this->activeProject->id)
+            ->exists();
+    }
+
     public function switchProject($projectId)
     {
+        $project = collect($this->allProjects)->firstWhere('id', $projectId);
+        if (!$project) {
+            $this->activeProjectId = $this->activeProject->id ?? null;
+            return;
+        }
         $this->activeProjectId = $projectId;
-        $this->activeProject = collect($this->allProjects)->firstWhere('id', $projectId);
+        $this->activeProject = $project;
         
         $this->enforceFinancialLockout();
         
@@ -272,6 +321,10 @@ class Dashboard extends Component
             'initialAttachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120' // 5MB Limit
         ]);
 
+        if (!$this->activeProject || (!empty($this->qaTaskId) && !$this->ownsTask($this->qaTaskId))) {
+            return;
+        }
+
         DB::transaction(function () {
             $ticketId = (string) Str::uuid(); 
             $isGeneralMessage = empty($this->qaTaskId);
@@ -314,6 +367,8 @@ class Dashboard extends Component
     // --- DIRECT SPRINT APPROVALS ---
     public function approveTask($taskId)
     {
+        if (!$this->ownsTask($taskId)) return;
+
         DB::table('tasks')->where('id', $taskId)->update(['status' => 'Done', 'updated_at' => now()]);
         
         DB::table('task_comments')->insert([
@@ -327,6 +382,7 @@ class Dashboard extends Component
 
     public function teleportToQa($taskId, $taskTitle)
     {
+        if (!$this->ownsTask($taskId)) return;
         $this->qaTaskId = $taskId;
         $this->qaTitle = "VULNERABILITY: " . strtoupper($taskTitle);
         $this->switchTab('qa_hub');
@@ -361,6 +417,8 @@ class Dashboard extends Component
     // NEW: Handle Client Uploads
     public function uploadQaEvidence()
     {
+        if (!$this->selectedTicket) return;
+
         $this->validate([
             'newQaAttachment' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120' // 5MB max
         ]);
@@ -384,7 +442,9 @@ class Dashboard extends Component
 
     public function postTicketComment()
     {
-        $this->validate(['newCommentText' => 'required|string|min:2']);
+        if (!$this->selectedTicket) return;
+
+        $this->validate(['newCommentText' => 'required|string|min:2|max:5000']);
 
         DB::table('qa_comments')->insert([
             'id' => (string) Str::uuid(), 'ticket_id' => $this->selectedTicket->id, 'user_id' => Auth::id(),
@@ -406,6 +466,8 @@ class Dashboard extends Component
 
     public function approveTicketFix()
     {
+        if (!$this->selectedTicket) return;
+
         DB::table('qa_tickets')->where('id', $this->selectedTicket->id)->update(['status' => 'Closed', 'updated_at' => now()]);
         if ($this->selectedTicket->task_id) {
             DB::table('tasks')->where('id', $this->selectedTicket->task_id)->update(['status' => 'Done', 'updated_at' => now()]);
@@ -448,8 +510,9 @@ class Dashboard extends Component
         session()->flash('global_success', '> VULNERABILITY OVERRIDDEN. TASK SECURED & LOCKED.');
     }
     
-    public function triggerPopUpload($invoiceId, $amountDue) { 
-        $this->uploadInvoiceId = $invoiceId; 
+    public function triggerPopUpload($invoiceId, $amountDue) {
+        if (!collect($this->invoices)->contains('id', $invoiceId)) return;
+        $this->uploadInvoiceId = $invoiceId;
         $this->popAmount = $amountDue; 
         $this->popRef = ''; 
         $this->popWhtAmount = 0.00;
@@ -471,6 +534,9 @@ class Dashboard extends Component
             'popWhtAmount' => 'nullable|numeric|min:0',
             'popWhtFile' => 'nullable|required_with:popWhtAmount|file|mimes:pdf,jpg,jpeg,png|max:5120',
         ]);
+
+        $invoiceProjectId = DB::table('invoices')->where('id', $this->uploadInvoiceId)->value('project_id');
+        if (!$this->ownsProject($invoiceProjectId)) return;
 
         $filePath = $this->popFile->store('pop_receipts', 'local');
         
@@ -550,6 +616,10 @@ class Dashboard extends Component
                 'inviteProjectId' => 'nullable|string' // Added to prevent strict-type silent failures
             ]);
 
+            if (!empty($this->inviteProjectId) && !$this->ownsProject($this->inviteProjectId)) {
+                session()->flash('team_error', '> ERR: Unknown project.'); return;
+            }
+
             if (DB::table('users')->where('organization_id', $this->organization->id)->count() >= 3) {
                 session()->flash('team_error', '> ERR: MAXIMUM NODE CAPACITY (3) REACHED.'); return;
             }
@@ -572,13 +642,14 @@ class Dashboard extends Component
             ]);
 
             $setupUrl = url('/client/setup/' . $token);
-            $orgName = $this->organization->name;
+            $orgName = e($this->organization->name);
+            $inviteName = e($this->inviteFirstName);
 
             // ACTUALLY DISPATCH THE EMAIL
             Mail::html(
                 "<div style='font-family: sans-serif; color: #333;'>
                     <h2 style='color: #00E5FF; background: #0A1128; padding: 15px;'>JBS Praxis: Node Provisioned</h2>
-                    <p>Hello {$this->inviteFirstName},</p>
+                    <p>Hello {$inviteName},</p>
                     <p>You have been granted executive access to the <strong>{$orgName}</strong> deployment matrix.</p>
                     <p>Click the secure link below to verify your cryptographic signature and set your password:</p>
                     <p><a href='{$setupUrl}' style='display: inline-block; background: #00E5FF; color: #000; padding: 10px 20px; text-decoration: none; font-weight: bold;'>INITIALIZE SECURE LINK</a></p>
@@ -598,7 +669,8 @@ class Dashboard extends Component
             throw $e;
         } catch (\Exception $e) {
             // Catch DB constraint errors (like UUID mismatches) so it doesn't fail silently
-            session()->flash('team_error', '> FATAL DATABASE REJECTION: ' . $e->getMessage());
+            Log::error('Client team invite failed', ['organization_id' => $this->organization->id, 'message' => $e->getMessage()]);
+            session()->flash('team_error', '> ERR: The invitation could not be completed. Please contact JBS Praxis.');
         }
     }
 
@@ -606,7 +678,8 @@ class Dashboard extends Component
     public function updateNodeAccess($userId, $projectId)
     {
         if (!$this->user->is_primary_client || $this->user->id === $userId) return;
-        
+        if (!empty($projectId) && !$this->ownsProject($projectId)) return;
+
         DB::table('users')->where('id', $userId)->where('organization_id', $this->organization->id)->update([
             'restricted_project_id' => empty($projectId) ? null : $projectId,
             'updated_at' => now()

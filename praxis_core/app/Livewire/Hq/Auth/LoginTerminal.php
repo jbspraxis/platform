@@ -12,6 +12,8 @@ use Illuminate\Support\Str;
 #[Layout('components.layouts.auth')]
 class LoginTerminal extends Component
 {
+    use \App\Livewire\Concerns\ThrottlesLogins;
+
     // --- AUTH STATE ---
     #[Validate('required|email')]
     public $email = '';
@@ -43,8 +45,13 @@ class LoginTerminal extends Component
             'password' => 'required'
         ]);
 
+        if ($this->tooManyLoginAttempts('hq', 'auth')) {
+            return;
+        }
+
         // 1. Attempt login
         if (Auth::attempt(['email' => $this->email, 'password' => $this->password, 'status' => 'Active'])) {
+            $this->clearLoginAttempts('hq');
             $user = Auth::user();
             
             // ==========================================
@@ -79,8 +86,8 @@ class LoginTerminal extends Component
             return redirect()->route(\App\Http\Middleware\HqStaff::allows($user, 4) ? 'hq.dash.admin' : 'hq.dash.workspace');
         }
 
-        // Delay to prevent brute-force timing attacks
-        sleep(1); 
+        // Brute force is handled by the rate limit above (5 tries per email and IP per 15 minutes)
+        $this->recordFailedLogin('hq');
         $this->addError('auth', '> ERR: CREDENTIALS REJECTED OR CLEARANCE REVOKED.');
     }
 

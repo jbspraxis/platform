@@ -10,7 +10,7 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Mail\Mailables\Attachment;
 
-class PraxisFrameworkDispatch extends Mailable implements ShouldQueue 
+class PraxisFrameworkDispatch extends Mailable // sent straight away: no queue worker runs on this host
 {
     use Queueable, SerializesModels;
 
