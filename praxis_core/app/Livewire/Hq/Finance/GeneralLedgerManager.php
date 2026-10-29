@@ -246,6 +246,71 @@ class GeneralLedgerManager extends Component
         );
     }
 
+    // 1b. CASH RECEIPT (client payment verified in Escrow Verification)
+    // Dr bank (cash received), WHT receivable (tax the client withheld) and bank fees (small
+    // shortfall written off); Cr the client's receivable, and any excess to client overpayments.
+    // Revenue was deferred when the invoice was issued: the net-of-VAT share now settled is earned.
+    public static function recordInvoicePaid($transactionId)
+    {
+        $tx = DB::table('transactions')->where('id', $transactionId)->first();
+        $invoice = DB::table('invoices')->where('id', $tx->invoice_id)->first();
+        $project = DB::table('projects')->where('id', $invoice->project_id)->first();
+
+        // Invoices issued before every issuing screen posted the accrual: post it now
+        $accrued = DB::table('journal_entries')->where('source_module', 'Invoicing')->where('source_id', $invoice->id)->exists();
+        if (!$accrued) {
+            self::recordInvoiceIssued($invoice->id);
+        }
+
+        $arAccount = self::getAccountId('1100', $project->organization_id);
+        $revenueAccount = self::getAccountId('4000');
+        $remittance = $invoice->remittance_account_id ? DB::table('mdm_remittance_accounts')->where('id', $invoice->remittance_account_id)->first() : null;
+        $cashAccount = $remittance->ledger_account_id ?? self::getAccountId($tx->method === 'USDT' ? '1020' : '1010');
+
+        $cash = round((float) $tx->amount_claimed, 2);
+        $wht = round((float) $tx->wht_deducted, 2);
+        $writeOff = round((float) $tx->tolerance_writeoff, 2);
+        $settled = round($cash + $wht + $writeOff, 2);
+
+        // What earlier receipts for this invoice already cleared and recognised
+        $prefix = 'JRN-RCPT-' . $invoice->invoice_number . '-';
+        $earlier = fn ($accountId, $column) => (float) DB::table('journal_lines')
+            ->join('journal_entries', 'journal_entries.id', '=', 'journal_lines.journal_entry_id')
+            ->where('journal_entries.reference_number', 'like', $prefix . '%')
+            ->where('journal_lines.account_id', $accountId)
+            ->sum("journal_lines.{$column}");
+        $arCleared = $earlier($arAccount, 'credit_amount');
+        $recognised = $earlier($revenueAccount, 'credit_amount');
+
+        $total = (float) $invoice->total_amount;
+        $toAr = round(min($settled, max(0, $total - $arCleared)), 2);
+        $overpaid = round($settled - $toAr, 2);
+
+        $net = (float) $invoice->amount_due;
+        $stillDeferred = max(0, $net - $recognised);
+        $earned = $total > 0 ? round(min($net * $toAr / $total, $stillDeferred), 2) : 0.00;
+        if ($toAr > 0 && round($arCleared + $toAr, 2) >= round($total, 2)) {
+            $earned = round($stillDeferred, 2); // final receipt: no pennies left deferred by rounding
+        }
+
+        self::postDoubleEntry(
+            $prefix . substr($transactionId, 0, 8),
+            "Receipt for Invoice {$invoice->invoice_number} ({$tx->method}, ref {$tx->tx_hash_or_ref})",
+            'Receipts',
+            $transactionId,
+            $invoice->region_code ?? 'GLOBAL',
+            [
+                ['account_id' => $cashAccount, 'memo' => 'Client payment received', 'debit' => $cash, 'credit' => 0.00],
+                ['account_id' => self::getAccountId('1300'), 'memo' => 'WHT withheld by client', 'debit' => $wht, 'credit' => 0.00],
+                ['account_id' => self::getAccountId('6950'), 'memo' => 'Shortfall written off (bank/network fees)', 'debit' => $writeOff, 'credit' => 0.00],
+                ['account_id' => $arAccount, 'memo' => 'Accounts Receivable settled', 'debit' => 0.00, 'credit' => $toAr],
+                ['account_id' => self::getAccountId('2500'), 'memo' => 'Client overpayment held', 'debit' => 0.00, 'credit' => $overpaid],
+                ['account_id' => self::getAccountId('2100'), 'memo' => 'Deferred revenue released', 'debit' => $earned, 'credit' => 0.00],
+                ['account_id' => $revenueAccount, 'memo' => 'Service revenue earned', 'debit' => 0.00, 'credit' => $earned],
+            ]
+        );
+    }
+
     // 2. EXPENSE REALIZATION (Cash Request Cleared)
     public static function recordExpenseCleared($requestId)
     {

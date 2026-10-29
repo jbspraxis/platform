@@ -175,18 +175,18 @@ class InvoiceLedger extends Component
                 'updated_at' => $timestamp
             ]);
 
-            // 3. HARDENED INVOICE LINES: Included UUID generation
+            // 3. INVOICE LINES (id is auto-increment and the table has no timestamps)
             DB::table('invoice_lines')->insert([
-                'id' => (string) Str::uuid(), // Critical Fix
                 'invoice_id' => $invoiceId,
                 'description' => $this->new_description,
                 'metric_of_billing' => 'Phase Completion',
                 'quantity' => 1,
                 'unit_price' => $this->new_amount_due,
                 'total_price' => $this->new_amount_due,
-                'created_at' => $timestamp
             ]);
 
+            // Accrue the receivable in the general ledger, as the proposal gateway does for deposits
+            \App\Livewire\Hq\Finance\GeneralLedgerManager::recordInvoiceIssued($invoiceId);
         });
 
         $this->showCreateModal = false;

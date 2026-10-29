@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Finance;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -15,9 +16,11 @@ class EscrowVerification extends Component
     public $activeTab = 'Pending Verification'; // Pending Verification, Verified, Rejected
     public $transactions = [];
     
-    // Verification Modal State
+    // Verification Modal State (set on the server; approve/reject re-read the payment from the database)
     public $showVerifyModal = false;
+    #[Locked]
     public $selectedTx = null;
+    #[Locked]
     public $linkedInvoice = null;
     
     // Admin Inputs
@@ -60,6 +63,7 @@ class EscrowVerification extends Component
     public function openVerifyModal($txId)
     {
         $this->selectedTx = collect($this->transactions)->firstWhere('id', $txId);
+        if (!$this->selectedTx) return; // no longer in this tab (handled meanwhile)
         $this->linkedInvoice = DB::table('invoices')->where('id', $this->selectedTx->invoice_id)->first();
         
         // Auto-calculate suggested tolerance write-off (Shortfall)
@@ -85,9 +89,19 @@ class EscrowVerification extends Component
             'extend_guillotine_days' => 'required|integer|min:0'
         ]);
 
-        DB::transaction(function () {
+        // Amounts come from the database, not from the page: only the write-off and extension are inputs
+        $error = DB::transaction(function () {
+            $tx = DB::table('transactions')->where('id', $this->selectedTx->id ?? null)->lockForUpdate()->first();
+            if (!$tx || $tx->status !== 'Pending Verification') {
+                return '> ERR: This payment has already been handled. Refresh the list.';
+            }
+            $invoice = DB::table('invoices')->where('id', $tx->invoice_id)->lockForUpdate()->first();
+            if (!$invoice || $invoice->status === 'Cancelled') {
+                return '> ERR: The invoice for this payment is cancelled. Reject the payment or reissue the invoice.';
+            }
+
             // 1. Mark Transaction as Verified and lock the write-off amount
-            DB::table('transactions')->where('id', $this->selectedTx->id)->update([
+            DB::table('transactions')->where('id', $tx->id)->update([
                 'status' => 'Verified',
                 'tolerance_writeoff' => $this->tolerance_writeoff,
                 'verified_by' => Auth::id(),
@@ -95,27 +109,28 @@ class EscrowVerification extends Component
                 'updated_at' => now()
             ]);
 
-            $expected = (float) $this->linkedInvoice->total_amount;
-            $totalCredited = (float) $this->selectedTx->amount_claimed + (float) $this->selectedTx->wht_deducted + (float) $this->tolerance_writeoff;
+            // 2. Is the invoice now fully cleared? Count every verified payment, not just this one
+            $verified = DB::table('transactions')->where('invoice_id', $invoice->id)->where('status', 'Verified')
+                ->selectRaw('COALESCE(SUM(amount_claimed + COALESCE(wht_deducted, 0) + COALESCE(tolerance_writeoff, 0)), 0) as settled, COALESCE(SUM(wht_deducted), 0) as wht')
+                ->first();
 
-            // 2. Check if invoice is fully cleared
-            if ($totalCredited >= $expected) {
-                DB::table('invoices')->where('id', $this->linkedInvoice->id)->update([
+            if ((float) $verified->settled >= (float) $invoice->total_amount) {
+                DB::table('invoices')->where('id', $invoice->id)->update([
                     'status' => 'Paid',
-                    'wht_amount' => $this->selectedTx->wht_deducted, // Sync WHT to invoice
+                    'wht_amount' => $verified->wht, // Sync WHT to invoice
                     'paid_at' => now(),
                     'updated_at' => now()
                 ]);
             } else {
                 // Partial Payment Logic: Invoice remains Pending/Overdue, but Guillotine can be extended
-                $updateData = ['wht_amount' => $this->selectedTx->wht_deducted, 'updated_at' => now()];
-                
+                $updateData = ['wht_amount' => $verified->wht, 'updated_at' => now()];
+
                 if ($this->extend_guillotine_days > 0) {
                     $updateData['status'] = 'Pending'; // Defrost if it was overdue
-                    $updateData['due_date'] = Carbon::parse($this->linkedInvoice->due_date)->addDays($this->extend_guillotine_days);
+                    $updateData['due_date'] = Carbon::parse($invoice->due_date)->addDays($this->extend_guillotine_days);
                 }
-                
-                DB::table('invoices')->where('id', $this->linkedInvoice->id)->update($updateData);
+
+                DB::table('invoices')->where('id', $invoice->id)->update($updateData);
             }
 
 
@@ -123,15 +138,24 @@ class EscrowVerification extends Component
             DB::table('system_audit_logs')->insert([
                 'user_id' => Auth::id(),
                 'action' => 'ESCROW_PAYMENT_VERIFIED',
-                'description' => "Verified TX {$this->selectedTx->id}. Write-off: {$this->tolerance_writeoff}. " . ($this->extend_guillotine_days > 0 ? "Guillotine extended by {$this->extend_guillotine_days} days." : ""),
+                'description' => "Verified TX {$tx->id}. Write-off: {$this->tolerance_writeoff}. " . ($this->extend_guillotine_days > 0 ? "Guillotine extended by {$this->extend_guillotine_days} days." : ""),
                 'target_table' => 'transactions',
-                'target_id' => $this->selectedTx->id,
+                'target_id' => $tx->id,
                 'created_at' => now()
             ]);
-            
-            // 5. TRIGGER IFRS DOUBLE-ENTRY (Phase 16 Hook Injection)
-            \App\Livewire\Hq\Finance\GeneralLedgerManager::recordInvoicePaid($this->selectedTx->id);
+
+            // 5. Double-entry receipt in the general ledger
+            \App\Livewire\Hq\Finance\GeneralLedgerManager::recordInvoicePaid($tx->id);
+
+            return null;
         });
+
+        if ($error) {
+            $this->showVerifyModal = false;
+            $this->loadTransactions();
+            session()->flash('error', $error);
+            return;
+        }
 
         $this->showVerifyModal = false;
         $this->loadTransactions();
@@ -142,15 +166,18 @@ class EscrowVerification extends Component
     {
         abort_unless(Auth::user()->can('finance.approve'), 403);
 
-        DB::transaction(function () {
-            DB::table('transactions')->where('id', $this->selectedTx->id)->update([
+        $handled = DB::transaction(function () {
+            // Only a payment still awaiting verification can be rejected (a verified one is already in the ledger)
+            $updated = DB::table('transactions')->where('id', $this->selectedTx->id ?? null)->where('status', 'Pending Verification')->update([
                 'status' => 'Rejected',
                 'verified_by' => Auth::id(),
                 'verified_at' => now(),
                 'updated_at' => now()
             ]);
+            if (!$updated) {
+                return false;
+            }
 
-            
             DB::table('system_audit_logs')->insert([
                 'user_id' => Auth::id(),
                 'action' => 'ESCROW_PAYMENT_REJECTED',
@@ -158,7 +185,16 @@ class EscrowVerification extends Component
                 'target_id' => $this->selectedTx->id,
                 'created_at' => now()
             ]);
+
+            return true;
         });
+
+        if (!$handled) {
+            $this->showVerifyModal = false;
+            $this->loadTransactions();
+            session()->flash('error', '> ERR: This payment has already been handled. Refresh the list.');
+            return;
+        }
 
         $this->showVerifyModal = false;
         $this->loadTransactions();
