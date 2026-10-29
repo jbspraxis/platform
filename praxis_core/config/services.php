@@ -37,6 +37,15 @@ return [
     
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
+        // Model for the public website chat (newer and cheaper than 2.5 Flash)
+        'chat_model' => env('GEMINI_CHAT_MODEL', 'gemini-3.1-flash-lite'),
+    ],
+
+    // Fallback for the website chat when Gemini is busy or down
+    'deepseek' => [
+        'api_key' => env('DEEPSEEK_API_KEY'),
+        'model' => env('DEEPSEEK_MODEL', 'deepseek-flash'),
+        'base_url' => env('DEEPSEEK_BASE_URL', 'https://api.deepseek.com'),
     ],
     
     'exchangerate' => [

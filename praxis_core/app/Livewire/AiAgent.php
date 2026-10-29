@@ -182,44 +182,31 @@ class AiAgent extends Component
         - Whenever you mention a URL, format it as a clickable Markdown link like this: [Text](https://url.com).
         - Always close by commanding the user to take action (e.g., 'Initiate a Diagnostic Audit', 'Enter the Kaizen Hub', or 'Secure a Consultation').";
 
-        // API Execution (key from .env via config/services.php; sent as a header, not in the URL)
-        $apiKey = config('services.gemini.api_key');
+        // API Execution: Gemini first, DeepSeek if Gemini is busy or fails (two providers, so one
+        // outage cannot take the chat down). Keys and model names come from .env via config/services.php.
         $fallback = "Our assistant is unavailable right now. Please book a free audit & demo at [jbspraxis.com/schedule](https://jbspraxis.com/schedule) or email info@jbspraxis.com.";
 
-        if (empty($apiKey)) {
-            Log::error('AiAgent: GEMINI_API_KEY is not set.');
-            $this->messages[] = ['id' => count($this->messages), 'role' => 'ai', 'content' => $fallback];
-            $this->dispatch('scrollToBottom');
-            return;
+        $providers = array_filter([
+            config('services.gemini.api_key') ? ['gemini', config('services.gemini.chat_model'), 12] : null,
+            config('services.deepseek.api_key') ? ['deepseek', config('services.deepseek.model'), 20] : null,
+        ]);
+
+        if (empty($providers)) {
+            Log::error('AiAgent: no AI provider key is set (GEMINI_API_KEY / DEEPSEEK_API_KEY).');
         }
 
-        // Gemini 2.5 Flash first; when it is overloaded or slow (503/429/timeouts happen at busy
-        // times), retry once on the lighter model so the visitor still gets an answer.
         @set_time_limit(60);
         $aiText = null;
-        foreach (['gemini-2.5-flash' => 12, 'gemini-flash-lite-latest' => 15] as $model => $timeout) {
+        foreach ($providers as [$provider, $model, $timeout]) {
             try {
-                $response = Http::timeout($timeout)->withHeaders([
-                    'Content-Type' => 'application/json',
-                    'x-goog-api-key' => $apiKey,
-                ])->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", [
-                    "system_instruction" => [
-                        "parts" => [["text" => $systemPrompt]]
-                    ],
-                    "contents" => $geminiHistory,
-                    "generationConfig" => [
-                        "temperature" => 0.25,
-                        "maxOutputTokens" => 800,
-                    ]
-                ]);
-
-                $aiText = $response->successful() ? $response->json('candidates.0.content.parts.0.text') : null;
+                $aiText = $provider === 'gemini'
+                    ? $this->askGemini($model, $timeout, $systemPrompt, $geminiHistory)
+                    : $this->askDeepSeek($model, $timeout, $systemPrompt, $geminiHistory);
                 if ($aiText) {
                     break;
                 }
-                Log::warning('AiAgent: Gemini request failed', ['model' => $model, 'status' => $response->status(), 'error' => $response->json('error.message')]);
             } catch (\Exception $e) {
-                Log::warning('AiAgent: Gemini request error', ['model' => $model, 'message' => $e->getMessage()]);
+                Log::warning('AiAgent: AI request error', ['provider' => $provider, 'model' => $model, 'message' => $e->getMessage()]);
             }
         }
 
@@ -230,6 +217,57 @@ class AiAgent extends Component
         ];
 
         $this->dispatch('scrollToBottom');
+    }
+
+    // Gemini generateContent; the key travels in a header, not in the URL
+    private function askGemini(string $model, int $timeout, string $systemPrompt, array $history): ?string
+    {
+        $response = Http::timeout($timeout)->withHeaders([
+            'Content-Type' => 'application/json',
+            'x-goog-api-key' => config('services.gemini.api_key'),
+        ])->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", [
+            "system_instruction" => [
+                "parts" => [["text" => $systemPrompt]]
+            ],
+            "contents" => $history,
+            "generationConfig" => [
+                "temperature" => 0.25,
+                "maxOutputTokens" => 800,
+            ]
+        ]);
+
+        $text = $response->successful() ? $response->json('candidates.0.content.parts.0.text') : null;
+        if (! $text) {
+            Log::warning('AiAgent: Gemini request failed', ['model' => $model, 'status' => $response->status(), 'error' => $response->json('error.message')]);
+        }
+        return $text;
+    }
+
+    // DeepSeek chat completions (OpenAI format); history is converted from Gemini's format
+    private function askDeepSeek(string $model, int $timeout, string $systemPrompt, array $history): ?string
+    {
+        $messages = [['role' => 'system', 'content' => $systemPrompt]];
+        foreach ($history as $turn) {
+            $messages[] = [
+                'role' => $turn['role'] === 'user' ? 'user' : 'assistant',
+                'content' => $turn['parts'][0]['text'] ?? '',
+            ];
+        }
+
+        $response = Http::timeout($timeout)
+            ->withToken(config('services.deepseek.api_key'))
+            ->post(rtrim(config('services.deepseek.base_url'), '/') . '/chat/completions', [
+                'model' => $model,
+                'messages' => $messages,
+                'temperature' => 0.25,
+                'max_tokens' => 800,
+            ]);
+
+        $text = $response->successful() ? $response->json('choices.0.message.content') : null;
+        if (! $text) {
+            Log::warning('AiAgent: DeepSeek request failed', ['model' => $model, 'status' => $response->status(), 'error' => $response->json('error.message')]);
+        }
+        return $text;
     }
 
     // NATIVE REGEX MARKDOWN PARSER (100% Crash-Proof)
