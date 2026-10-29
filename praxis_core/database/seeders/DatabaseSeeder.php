@@ -2,24 +2,22 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
+/**
+ * Builds a working database from scratch (php artisan migrate:fresh --seed):
+ * reference data, JBS Praxis itself, then the public website content.
+ * No test records and no people: the owner's account is created with
+ * php artisan app:invite-owner (they choose their own password).
+ */
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $this->call([
+            ReferenceDataSeeder::class,
+            CoreSeeder::class,
+            WebsiteContentSeeder::class,
         ]);
     }
 }

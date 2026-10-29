@@ -1,0 +1,2031 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Baseline: the 90 tables of the JBS Praxis app, generated from the live schema on
+ * 29 Oct 2026 (before this, tables were created by hand). Foreign keys are added in the next
+ * migration, so tables can be created in any order.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('appointments', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('organization_id', 36)->nullable();
+            $table->char('host_id', 36)->nullable();
+            $table->string('title', 150);
+            $table->string('meeting_link', 255)->nullable();
+            $table->dateTime('start_time');
+            $table->dateTime('end_time');
+            $table->enum('status', ['Requested', 'Scheduled', 'Completed', 'Cancelled', 'No-Show'])->default('Requested');
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->index('host_id', 'host_id');
+            $table->index('organization_id', 'organization_id');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('asset_credential_history', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_general_ci';
+            $table->id();
+            $table->char('asset_id', 36);
+            $table->text('encrypted_password');
+            $table->char('changed_by', 36);
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->index('asset_id', 'asset_id');
+        });
+
+        Schema::create('broadcast_campaigns', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->string('subject', 255);
+            $table->longText('body_html');
+            $table->string('gemini_tone_used', 50)->nullable();
+            $table->enum('status', ['Draft', 'Sending', 'Completed'])->default('Draft');
+            $table->integer('total_recipients')->default(0);
+            $table->integer('sent_count')->default(0);
+            $table->integer('failed_count')->default(0);
+            $table->integer('opened_count')->default(0);
+            $table->timestamp('estimated_completion_time')->nullable();
+            $table->char('created_by', 36);
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->index('created_by', 'created_by');
+        });
+
+        Schema::create('broadcast_logs', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->char('campaign_id', 36);
+            $table->char('user_id', 36);
+            $table->enum('status', ['Queued', 'Sent', 'Failed'])->default('Queued');
+            $table->text('error_message')->nullable();
+            $table->integer('open_count')->default(0);
+            $table->timestamp('last_opened_at')->nullable();
+            $table->string('last_open_ip', 45)->nullable();
+            $table->string('last_open_geo', 255)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->index('campaign_id', 'campaign_id');
+            $table->index('user_id', 'user_id');
+        });
+
+        Schema::create('cache', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->string('key', 255);
+            $table->mediumText('value');
+            $table->integer('expiration');
+            $table->primary('key');
+        });
+
+        Schema::create('cache_locks', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->string('key', 255);
+            $table->string('owner', 255);
+            $table->integer('expiration');
+            $table->primary('key');
+        });
+
+        Schema::create('calendar_availability', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->char('user_id', 36);
+            $table->enum('day_of_week', ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']);
+            $table->time('start_time');
+            $table->time('end_time');
+            $table->boolean('is_active')->default(1);
+            $table->index('user_id', 'user_id');
+        });
+
+        Schema::create('cash_requests', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->string('reference', 50);
+            $table->char('requester_id', 36);
+            $table->char('project_id', 36)->nullable();
+            $table->bigInteger('financial_dictionary_id')->unsigned();
+            $table->decimal('amount_requested', 15, 2);
+            $table->string('currency', 10)->nullable()->default('USD');
+            $table->text('purpose');
+            $table->enum('disbursement_method', ['Bank Transfer', 'Mobile Money', 'Crypto Wallet', 'Cash']);
+            $table->text('disbursement_details');
+            $table->longText('requester_signature');
+            $table->string('requester_ip', 45);
+            $table->string('requester_hash', 255);
+            $table->enum('status', ['Pending Auth', 'Authorized', 'Rejected', 'Cleared'])->default('Pending Auth');
+            $table->char('authorizer_id', 36)->nullable();
+            $table->longText('authorizer_signature')->nullable();
+            $table->string('authorizer_ip', 45)->nullable();
+            $table->string('authorizer_hash', 255)->nullable();
+            $table->timestamp('authorized_at')->nullable();
+            $table->string('receipt_url', 255)->nullable();
+            $table->char('cleared_by', 36)->nullable();
+            $table->timestamp('cleared_at')->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->index('authorizer_id', 'authorizer_id');
+            $table->index('cleared_by', 'cleared_by');
+            $table->index('financial_dictionary_id', 'financial_dictionary_id');
+            $table->index('project_id', 'project_id');
+            $table->unique('reference', 'reference');
+            $table->index('requester_id', 'requester_id');
+        });
+
+        Schema::create('chart_of_accounts', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->bigInteger('parent_account_id')->unsigned()->nullable();
+            $table->char('client_id', 36)->nullable();
+            $table->string('account_code', 20);
+            $table->string('account_name', 150);
+            $table->enum('account_type', ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense']);
+            $table->boolean('is_active')->default(1);
+            $table->boolean('is_system_locked')->nullable()->default(0);
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->unique('account_code', 'account_code');
+        });
+
+        Schema::create('client_portal_settings', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('organization_id', 36);
+            $table->string('primary_color', 7)->nullable()->default('#00E5FF');
+            $table->string('secondary_color', 7)->nullable()->default('#FF3366');
+            $table->string('accent_color', 7)->nullable()->default('#FFBD2E');
+            $table->string('logo_path', 255)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->index('organization_id', 'fk_cps_org');
+        });
+
+        Schema::create('compensation_history', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->char('user_id', 36);
+            $table->decimal('hourly_rate', 10, 2);
+            $table->string('currency', 3)->default('USD');
+            $table->date('effective_from');
+            $table->date('effective_to')->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->index('user_id', 'user_id');
+        });
+
+        Schema::create('copq_assessments', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->string('report_token', 64)->nullable();
+            $table->char('organization_id', 36);
+            $table->string('executive_name', 255)->nullable();
+            $table->string('company_name', 255)->nullable();
+            $table->string('corporate_email', 255)->nullable();
+            $table->string('copq_industry', 100)->nullable();
+            $table->string('copq_currency', 10)->nullable()->default('USD');
+            $table->decimal('copq_turnover', 15, 2)->nullable();
+            $table->string('primary_tool', 50);
+            $table->decimal('copq_latency', 8, 2)->nullable();
+            $table->decimal('copq_hourly_cost', 10, 2)->nullable();
+            $table->decimal('copq_error_rate', 5, 2)->nullable();
+            $table->string('bottleneck', 100);
+            $table->integer('headcount');
+            $table->integer('mgmt_nodes')->nullable();
+            $table->decimal('avg_contract_value', 15, 2);
+            $table->decimal('calculated_leakage', 15, 2);
+            $table->text('ai_friction_analysis')->nullable();
+            $table->integer('lead_score')->nullable()->default(0);
+            $table->integer('lead_tier')->nullable();
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->index('organization_id', 'organization_id');
+            $table->unique('report_token', 'report_token');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('crm_notes', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('organization_id', 36);
+            $table->char('author_id', 36);
+            $table->text('note_text');
+            $table->enum('interaction_type', ['Call', 'Email', 'Meeting', 'Internal Note'])->nullable()->default('Internal Note');
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('author_id', 'author_id');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->index('organization_id', 'organization_id');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('employee_leaves', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('mdm_employee_id', 36);
+            $table->enum('leave_type', ['Annual', 'Sick', 'Maternity', 'Paternity', 'Special_Family', 'Unpaid']);
+            $table->date('start_date');
+            $table->date('end_date');
+            $table->decimal('duration_days', 5, 2);
+            $table->text('reason')->nullable();
+            $table->enum('status', ['Pending', 'Approved', 'Rejected', 'Cancelled'])->default('Pending');
+            $table->char('manager_id', 36)->nullable();
+            $table->timestamp('approved_at')->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->index('mdm_employee_id', 'fk_el_employee');
+        });
+
+        Schema::create('employment_contracts', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('mdm_employee_id', 36);
+            $table->enum('contract_type', ['CDI', 'CDD', 'Probation', 'Freelance'])->default('CDI');
+            $table->string('professional_category', 50)->nullable();
+            $table->integer('standard_weekly_hours')->default(40);
+            $table->date('probation_end_date')->nullable();
+            $table->date('contract_end_date')->nullable();
+            $table->integer('notice_period_days')->default(30);
+            $table->text('severance_terms')->nullable();
+            $table->decimal('hourly_rate_offered', 10, 2);
+            $table->string('contract_pdf_path', 255);
+            $table->longText('signature_b64')->nullable();
+            $table->enum('status', ['Sent', 'Signed', 'Void'])->default('Sent');
+            $table->timestamp('signed_at')->nullable();
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->index('mdm_employee_id', 'fk_ec_employee');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('exchange_rates_ledger', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->string('target_currency', 3);
+            $table->decimal('rate_to_usd', 15, 4);
+            $table->char('set_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->index('set_by', 'set_by');
+        });
+
+        Schema::create('failed_jobs', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->string('uuid', 255);
+            $table->text('connection');
+            $table->text('queue');
+            $table->longText('payload');
+            $table->longText('exception');
+            $table->timestamp('failed_at')->useCurrent();
+            $table->unique('uuid', 'uuid');
+        });
+
+        Schema::create('financial_dictionary', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->string('billing_code', 50);
+            $table->string('title', 150);
+            $table->text('description')->nullable();
+            $table->decimal('unit_rate', 15, 2)->default('0.00');
+            $table->string('currency', 10)->default('USD');
+            $table->string('category', 50);
+            $table->boolean('is_active')->default(1);
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
+            $table->primary('id');
+            $table->unique('billing_code', 'financial_dictionary_billing_code_unique');
+        });
+
+        Schema::create('global_settings', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->string('setting_key', 100);
+            $table->text('setting_value')->nullable();
+            $table->string('description', 255)->nullable();
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->unique('setting_key', 'setting_key');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('invoice_lines', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->char('invoice_id', 36);
+            $table->string('description', 255);
+            $table->string('metric_of_billing', 50)->nullable()->default('Fixed Milestone')->comment('e.g., Hours, Man-Days, Milestone');
+            $table->boolean('is_expense')->nullable()->default(0)->comment('Flags billable travel/software vs actual service revenue');
+            $table->decimal('quantity', 10, 2)->nullable()->default('1.00');
+            $table->decimal('unit_price', 15, 2);
+            $table->decimal('total_price', 15, 2);
+            $table->index('invoice_id', 'invoice_id');
+        });
+
+        Schema::create('invoices', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('project_id', 36);
+            $table->char('phase_id', 36)->nullable();
+            $table->string('invoice_type', 50)->nullable()->default('Tax Invoice');
+            $table->string('invoice_number', 50);
+            $table->string('po_sow_reference', 100)->nullable();
+            $table->decimal('amount_due', 15, 2);
+            $table->decimal('vat_amount', 15, 2);
+            $table->decimal('wht_amount', 15, 2)->nullable()->default('0.00');
+            $table->decimal('total_amount', 15, 2);
+            $table->string('currency', 3);
+            $table->string('region_code', 10)->nullable()->default('NG');
+            $table->decimal('exchange_rate_locked', 15, 6)->nullable()->default('1.000000');
+            $table->enum('status', ['Pending', 'Overdue', 'Paid', 'Cancelled'])->default('Pending');
+            $table->date('due_date');
+            $table->date('supply_period_start')->nullable();
+            $table->date('supply_period_end')->nullable();
+            $table->text('client_billing_address')->nullable()->comment('Snapshot at time of issuance');
+            $table->string('client_tax_id', 100)->nullable()->comment('Snapshot at time of issuance');
+            $table->enum('tax_logic_type', ['Destination-based', 'Origin-based', 'Tax Exempt (B2B)', 'Reverse Charge'])->nullable();
+            $table->text('reverse_charge_note')->nullable();
+            $table->bigInteger('remittance_account_id')->unsigned()->nullable();
+            $table->string('payment_terms', 100)->nullable()->default('Net 30');
+            $table->text('late_fee_clause')->nullable();
+            $table->string('dispute_contact', 100)->nullable()->default('intelligence@jbspraxis.com');
+            $table->string('jbs_signature_hash', 255)->nullable()->comment('Cryptographic hash of the generated invoice');
+            $table->timestamp('client_viewed_at')->nullable();
+            $table->timestamp('issued_at')->nullable()->useCurrent();
+            $table->timestamp('paid_at')->nullable();
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->index('remittance_account_id', 'fk_inv_remittance');
+            $table->unique('invoice_number', 'invoice_number');
+            $table->index('phase_id', 'phase_id');
+            $table->index('project_id', 'project_id');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('job_batches', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->string('id', 255);
+            $table->string('name', 255);
+            $table->integer('total_jobs');
+            $table->integer('pending_jobs');
+            $table->integer('failed_jobs');
+            $table->longText('failed_job_ids');
+            $table->mediumText('options')->nullable();
+            $table->integer('cancelled_at')->nullable();
+            $table->integer('created_at');
+            $table->integer('finished_at')->nullable();
+            $table->primary('id');
+        });
+
+        Schema::create('jobs', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->string('queue', 255);
+            $table->longText('payload');
+            $table->tinyInteger('attempts')->unsigned();
+            $table->integer('reserved_at')->unsigned()->nullable();
+            $table->integer('available_at')->unsigned();
+            $table->integer('created_at')->unsigned();
+        });
+
+        Schema::create('journal_entries', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->string('reference_number', 50);
+            $table->date('entry_date');
+            $table->string('description', 255);
+            $table->string('region_code', 10)->nullable()->default('GLOBAL');
+            $table->boolean('is_reversal')->nullable()->default(0);
+            $table->char('reverses_entry_id', 36)->nullable();
+            $table->string('source_module', 50)->nullable()->comment('e.g., INVOICE, PAYROLL');
+            $table->char('source_id', 36)->nullable();
+            $table->char('created_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->primary('id');
+            $table->unique('reference_number', 'reference_number');
+        });
+
+        Schema::create('journal_lines', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->char('journal_entry_id', 36);
+            $table->bigInteger('account_id')->unsigned();
+            $table->string('memo', 255)->nullable()->comment('Line-specific IFRS description');
+            $table->decimal('debit_amount', 15, 2)->default('0.00');
+            $table->decimal('credit_amount', 15, 2)->default('0.00');
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->index('account_id', 'fk_jl_account');
+            $table->index('journal_entry_id', 'fk_jl_journal');
+        });
+
+        Schema::create('kaizen_articles', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->enum('category', ['The Boardroom', 'The Server Room', 'Internal SOP']);
+            $table->string('title', 255);
+            $table->string('slug', 255)->nullable();
+            $table->text('executive_summary');
+            $table->text('problem_statement');
+            $table->text('engineered_solution');
+            $table->text('final_roi');
+            $table->integer('read_time_minutes')->default(5);
+            $table->boolean('is_public')->default(0);
+            $table->boolean('is_internal_sop')->default(0);
+            $table->enum('status', ['Draft', 'Pending Moderation', 'Published', 'Rejected'])->default('Draft');
+            $table->timestamp('published_at')->nullable();
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->unique('slug', 'slug');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('kaizen_case_studies', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('project_id', 36);
+            $table->string('title', 255);
+            $table->string('public_slug', 255);
+            $table->json('sanitized_metrics')->nullable();
+            $table->longText('content_html');
+            $table->boolean('is_published')->default(0);
+            $table->timestamp('published_at')->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->index('project_id', 'project_id');
+            $table->unique('public_slug', 'public_slug');
+        });
+
+        Schema::create('kaizen_embeddings', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->char('article_id', 36);
+            $table->text('chunk_text');
+            $table->json('embedding_vector');
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->index('article_id', 'article_id');
+        });
+
+        Schema::create('kaizen_telemetries', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->string('identity', 255)->nullable();
+            $table->string('email', 255)->nullable();
+            $table->string('category', 255);
+            $table->tinyInteger('severity');
+            $table->text('description');
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
+        });
+
+        Schema::create('leave_balances', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('mdm_employee_id', 36);
+            $table->integer('leave_year');
+            $table->decimal('annual_accrued_days', 5, 2)->default('0.00');
+            $table->decimal('annual_taken_days', 5, 2)->default('0.00');
+            $table->decimal('sick_taken_days', 5, 2)->default('0.00');
+            $table->decimal('maternity_paternity_taken_days', 5, 2)->default('0.00');
+            $table->decimal('special_family_taken_days', 5, 2)->default('0.00');
+            $table->date('last_accrual_date')->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->unique(['mdm_employee_id', 'leave_year'], 'uk_employee_year');
+        });
+
+        Schema::create('marketing_campaigns', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->string('name', 255);
+            $table->enum('platform', ['META', 'GOOGLE', 'LINKEDIN', 'EMAIL', 'OFFLINE', 'OTHER'])->default('META');
+            $table->string('external_campaign_id', 255)->nullable();
+            $table->string('utm_campaign_tag', 255)->nullable();
+            $table->date('start_date');
+            $table->date('end_date')->nullable();
+            $table->decimal('budget_amount', 15, 2)->default('0.00');
+            $table->char('creative_media_id', 36)->nullable();
+            $table->string('creative_external_link', 255)->nullable();
+            $table->decimal('actual_spend', 15, 2)->nullable()->default('0.00');
+            $table->integer('clicks')->nullable()->default(0);
+            $table->integer('impressions')->nullable()->default(0);
+            $table->string('target_service', 100)->nullable()->default('ALL');
+            $table->string('target_url', 255)->nullable();
+            $table->integer('target_leads')->default(0);
+            $table->integer('target_opportunities')->default(0);
+            $table->integer('target_won')->default(0);
+            $table->integer('leads')->default(0);
+            $table->integer('opportunities')->default(0);
+            $table->integer('won')->default(0);
+            $table->decimal('calculated_cac', 15, 2)->nullable()->default('0.00');
+            $table->decimal('liquid_roas', 10, 2)->nullable()->default('0.00');
+            $table->text('end_of_campaign_debrief')->nullable();
+            $table->text('remarks')->nullable();
+            $table->text('rejection_reason')->nullable();
+            $table->char('cash_request_id', 36)->nullable();
+            $table->enum('status', ['PLANNED', 'PENDING_APPROVAL', 'REVISION_REQUIRED', 'ACTIVE', 'PAUSED', 'COMPLETED'])->default('PLANNED');
+            $table->string('owner_name', 150);
+            $table->char('created_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->index('creative_media_id', 'fk_marketing_media');
+        });
+
+        Schema::create('mdm_copq_architectures', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->string('tech_key', 50);
+            $table->string('display_name', 150);
+            $table->string('symptom_title', 150);
+            $table->text('intervention_strategy');
+            $table->decimal('error_multiplier', 4, 2)->default('1.00');
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->unique('tech_key', 'tech_key');
+        });
+
+        Schema::create('mdm_copq_bottlenecks', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_general_ci';
+            $table->id();
+            $table->string('bottleneck_name', 100);
+            $table->text('bottleneck_narrative')->nullable();
+            $table->decimal('appraisal_multiplier', 4, 2)->nullable()->default('1.00');
+            $table->decimal('failure_multiplier', 4, 2)->nullable()->default('1.00');
+            $table->decimal('opportunity_multiplier', 4, 2)->nullable()->default('1.00');
+            $table->integer('risk_weight')->nullable()->default(10);
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->unique('bottleneck_name', 'bottleneck_name');
+        });
+
+        Schema::create('mdm_copq_industries', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->string('industry_name', 100);
+            $table->string('sector_archetype', 50)->default('COMMERCIAL');
+            $table->string('external_failure_label', 100)->default('External Failure (Client Churn Tax)');
+            $table->string('architectural_mandate', 100)->default('CLOUD-NATIVE MICROSERVICES');
+            $table->decimal('opportunity_multiplier_value', 3, 1)->default('2.0');
+            $table->decimal('error_floor', 5, 2)->default('1.00');
+            $table->string('compliance_standard', 150);
+            $table->string('risk_type', 200);
+            $table->string('opportunity_focus', 200);
+            $table->string('value_term', 50)->default('capital');
+            $table->string('multiplier_term', 50)->default('revenue multiplier');
+            $table->string('organization_type', 50)->default('enterprises');
+            $table->string('deficit_context', 200);
+            $table->string('erosion_target', 100);
+            $table->text('fallback_diagnostic')->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->unique('industry_name', 'industry_name');
+        });
+
+        Schema::create('mdm_employee_compensations', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('mdm_employee_id', 36);
+            $table->decimal('base_salary', 15, 2)->default('0.00');
+            $table->decimal('allowance_housing', 15, 2)->default('0.00');
+            $table->decimal('allowance_transport', 15, 2)->default('0.00');
+            $table->decimal('allowance_utility', 15, 2)->default('0.00');
+            $table->boolean('bik_housing_provided')->default(0);
+            $table->boolean('bik_vehicle_provided')->default(0);
+            $table->boolean('bik_domestic_staff')->default(0);
+            $table->string('currency', 3)->default('USD');
+            $table->date('valid_from');
+            $table->date('valid_to')->nullable();
+            $table->boolean('is_active')->default(1);
+            $table->char('created_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->index('mdm_employee_id', 'fk_comp_employee');
+        });
+
+        Schema::create('mdm_employees', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('user_id', 36)->comment('Links to the core users table');
+            $table->string('employee_code', 50);
+            $table->string('job_classification', 100)->comment('Grade/Echelon for Minimum Wage Checks');
+            $table->char('line_manager_id', 36)->nullable()->comment('UUID of the reporting manager');
+            $table->enum('tax_region', ['CM', 'NG', 'KE', 'GLOBAL'])->default('GLOBAL');
+            $table->string('state_of_residence', 100)->nullable()->comment('Required for NG State PAYE Remittance');
+            $table->string('tin_number', 50)->nullable()->comment('Tax Identification Number');
+            $table->string('social_security_number', 50)->nullable()->comment('CNPS / NSS / Pension ID');
+            $table->string('national_id', 50)->nullable()->comment('Passport / NIC');
+            $table->string('pfa_name', 100)->nullable()->comment('Pension Fund Administrator');
+            $table->string('rsa_number', 50)->nullable()->comment('Retirement Savings Account PIN');
+            $table->string('nhf_number', 50)->nullable()->comment('National Housing Fund ID');
+            $table->string('kra_pin', 50)->nullable();
+            $table->string('nssf_number', 50)->nullable();
+            $table->string('nhif_number', 50)->nullable();
+            $table->enum('marital_status', ['Single', 'Married', 'Divorced', 'Widowed'])->default('Single');
+            $table->integer('dependents_count')->default(0);
+            $table->text('residential_address')->nullable();
+            $table->enum('pay_frequency', ['Monthly', 'Bi-Weekly', 'Weekly'])->default('Monthly');
+            $table->decimal('base_salary', 15, 2)->default('0.00');
+            $table->decimal('allowance_housing', 15, 2)->default('0.00');
+            $table->decimal('allowance_transport', 15, 2)->default('0.00');
+            $table->decimal('allowance_utility', 15, 2)->default('0.00');
+            $table->boolean('bik_housing_provided')->default(0)->comment('Triggers 15% CGI Gross up');
+            $table->boolean('bik_vehicle_provided')->default(0)->comment('Triggers 10% CGI Gross up');
+            $table->boolean('bik_domestic_staff')->default(0)->comment('Triggers 5% CGI Gross up');
+            $table->string('currency', 3)->default('USD');
+            $table->enum('payment_method', ['Bank Transfer', 'Mobile Money', 'Crypto', 'Cash'])->default('Bank Transfer');
+            $table->string('bank_name', 100)->nullable();
+            $table->string('account_number', 100)->nullable();
+            $table->bigInteger('loan_advance_account_id')->unsigned()->nullable()->comment('Maps to 1200 Accounts Receivable / Advances');
+            $table->boolean('is_active')->default(1);
+            $table->date('hire_date')->nullable();
+            $table->date('termination_date')->nullable();
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->unique('employee_code', 'employee_code_unique');
+            $table->index('loan_advance_account_id', 'fk_employee_ledger');
+            $table->index('user_id', 'fk_employee_user');
+        });
+
+        Schema::create('mdm_exchange_rates', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_general_ci';
+            $table->id();
+            $table->string('currency_code', 10);
+            $table->string('currency_name', 100)->nullable();
+            $table->decimal('rate_to_usd', 15, 6)->default('1.000000');
+            $table->boolean('is_manual_override')->nullable()->default(0);
+            $table->timestamp('last_synced_at')->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->unique('currency_code', 'currency_code');
+        });
+
+        Schema::create('mdm_financial_dictionary', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->string('item_code', 20);
+            $table->string('description', 255);
+            $table->string('category', 50);
+            $table->bigInteger('income_account_id')->unsigned()->nullable();
+            $table->bigInteger('expense_account_id')->unsigned()->nullable();
+            $table->string('default_quantity', 50)->nullable()->default('1 Phase');
+            $table->decimal('default_unit_rate_usd', 15, 2)->default('0.00');
+            $table->boolean('is_active')->default(1);
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->unique('item_code', 'item_code');
+        });
+
+        Schema::create('mdm_legal_entities', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->string('region_code', 10)->comment('e.g., CM, NG, KE');
+            $table->string('legal_name', 150)->comment('e.g., JBS Praxis Cameroon SARL');
+            $table->string('registration_number', 100)->nullable()->comment('RC Number / Registre du Commerce');
+            $table->string('tax_identification_number', 100)->nullable()->comment('NIU (CM) or TIN (NG)');
+            $table->string('employer_social_security_code', 100)->nullable()->comment('Employer CNPS (CM) or Employer PFA/NSITF (NG)');
+            $table->text('registered_address')->nullable()->comment('Legally required for contracts');
+            $table->string('contact_email', 100)->nullable();
+            $table->string('contact_phone', 50)->nullable();
+            $table->string('legal_representative_name', 100)->nullable()->comment('The Director signing the contracts');
+            $table->string('legal_representative_title', 100)->nullable()->comment('e.g., Managing Director, Gérant');
+            $table->boolean('is_active')->default(1);
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->unique('region_code', 'region_code');
+        });
+
+        Schema::create('mdm_remittance_accounts', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->enum('type', ['Bank', 'Mobile Money', 'Crypto', 'Cash']);
+            $table->string('provider_name', 150)->comment('e.g., UBA, USDT (TRC-20), MTN MoMo');
+            $table->string('account_name', 150);
+            $table->string('account_reference', 255)->comment('Account No, Wallet Address, or Phone');
+            $table->string('routing_code', 50)->nullable()->comment('SWIFT / BIC Code');
+            $table->bigInteger('ledger_account_id')->unsigned()->nullable();
+            $table->boolean('is_active')->default(1);
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+        });
+
+        Schema::create('mdm_service_catalog', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->string('service_code', 20);
+            $table->string('service_name', 150);
+            $table->enum('category', ['Consulting', 'Engineering', 'Data', 'Resilience']);
+            $table->text('description')->nullable();
+            $table->decimal('base_price_usd', 15, 2)->default('0.00');
+            $table->boolean('is_active')->default(1);
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->unique('service_code', 'service_code');
+        });
+
+        Schema::create('mdm_tax_compliance', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->string('region_name', 100);
+            $table->string('country_code', 10);
+            $table->decimal('vat_rate', 5, 2)->default('0.00');
+            $table->enum('tax_logic_type', ['Destination-based', 'Origin-based', 'Tax Exempt (B2B)', 'Reverse Charge'])->default('Destination-based');
+            $table->string('exchange_rate_peg', 10)->default('USD');
+            $table->boolean('is_active')->default(1);
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->unique(['region_name', 'country_code'], 'mdm_tax_region_unique');
+        });
+
+        Schema::create('mdm_tech_catalog', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_general_ci';
+            $table->id();
+            $table->string('category', 100);
+            $table->string('tech_name', 100);
+            $table->string('description', 255)->nullable();
+            $table->boolean('is_active')->nullable()->default(1);
+            $table->timestamp('created_at')->nullable()->useCurrent();
+        });
+
+        Schema::create('media_assets', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('talent_id', 36)->nullable();
+            $table->string('file_name', 255);
+            $table->string('file_path', 255);
+            $table->string('mime_type', 50);
+            $table->bigInteger('size_bytes')->unsigned();
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->index('talent_id', 'fk_media_talent');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('monthly_payroll_variables', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('mdm_employee_id', 36);
+            $table->date('payroll_period');
+            $table->decimal('overtime_hours_120', 5, 2)->default('0.00');
+            $table->decimal('overtime_hours_130', 5, 2)->default('0.00');
+            $table->decimal('overtime_hours_140', 5, 2)->default('0.00');
+            $table->decimal('night_premium_hours', 5, 2)->default('0.00');
+            $table->decimal('unexcused_absence_days', 5, 2)->default('0.00');
+            $table->decimal('prime_anciennete', 15, 2)->default('0.00');
+            $table->decimal('prime_performance', 15, 2)->default('0.00');
+            $table->decimal('thirteenth_month_bonus', 15, 2)->default('0.00');
+            $table->decimal('other_deductions', 15, 2)->default('0.00');
+            $table->boolean('is_processed')->default(0);
+            $table->char('created_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->index('mdm_employee_id', 'fk_mpv_employee');
+        });
+
+        Schema::create('notifications', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('user_id', 36);
+            $table->string('title', 150);
+            $table->text('message');
+            $table->string('link_url', 255)->nullable();
+            $table->enum('type', ['System', 'Financial', 'Project', 'Message', 'QA_Update'])->default('System');
+            $table->boolean('is_read')->default(0);
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->primary('id');
+            $table->index('user_id', 'user_id');
+        });
+
+        Schema::create('organizations', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->string('name', 150);
+            $table->string('industry', 100)->nullable();
+            $table->string('enterprise_stage', 100)->nullable();
+            $table->string('tech_reality', 100)->nullable();
+            $table->string('governance_status', 100)->nullable();
+            $table->string('turnover_bracket', 50)->nullable();
+            $table->string('budget_estimation', 50)->nullable();
+            $table->enum('status', ['Lead', 'Active Client', 'Past Client', 'Suspended', 'Internal'])->default('Lead');
+            $table->string('pipeline_stage', 50)->nullable()->default('Lead Captured');
+            $table->char('assigned_to', 36)->nullable();
+            $table->boolean('is_duplicate_suspect')->nullable()->default(0);
+            $table->text('disqualification_reason')->nullable();
+            $table->text('ai_history_summary')->nullable();
+            $table->string('country', 100)->nullable()->default('Nigeria');
+            $table->string('city', 100)->nullable();
+            $table->text('billing_address')->nullable();
+            $table->string('tax_identification_number', 100)->nullable();
+            $table->string('timezone', 50)->nullable()->default('Africa/Lagos');
+            $table->string('preferred_language', 20)->nullable()->default('EN');
+            $table->string('utm_source', 100)->nullable();
+            $table->string('utm_campaign', 100)->nullable();
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('password_reset_tokens', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->string('email', 255);
+            $table->string('token', 255);
+            $table->timestamp('created_at')->nullable();
+            $table->primary('email');
+        });
+
+        Schema::create('payroll_lines', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('payroll_run_id', 36);
+            $table->char('user_id', 36);
+            $table->string('job_classification', 100)->nullable();
+            $table->decimal('base_salary', 15, 2)->default('0.00');
+            $table->decimal('overtime_pay', 15, 2)->default('0.00');
+            $table->decimal('allowance_transport', 15, 2)->default('0.00');
+            $table->decimal('allowance_housing', 15, 2)->default('0.00');
+            $table->decimal('performance_bonus', 15, 2)->default('0.00');
+            $table->decimal('arrears', 15, 2)->default('0.00');
+            $table->decimal('benefits_in_kind', 15, 2)->default('0.00');
+            $table->decimal('gross_pay', 15, 2)->default('0.00');
+            $table->decimal('tax_paye', 15, 2)->default('0.00');
+            $table->decimal('deduction_pension', 15, 2)->default('0.00');
+            $table->decimal('employer_liability_pension', 15, 2)->default('0.00');
+            $table->decimal('deduction_nhis', 15, 2)->default('0.00');
+            $table->decimal('employer_liability_health', 15, 2)->default('0.00');
+            $table->decimal('employer_liability_training', 15, 2)->default('0.00');
+            $table->decimal('deduction_nhf', 15, 2)->default('0.00');
+            $table->decimal('deduction_voluntary', 15, 2)->default('0.00')->comment('Union dues, co-op savings');
+            $table->decimal('garnishments', 15, 2)->default('0.00')->comment('Court ordered, child support');
+            $table->decimal('deduction_other', 15, 2)->default('0.00');
+            $table->decimal('loan_repayment', 15, 2)->default('0.00');
+            $table->decimal('total_deductions', 15, 2)->default('0.00');
+            $table->decimal('net_pay', 15, 2)->default('0.00');
+            $table->decimal('ytd_gross', 15, 2)->default('0.00')->comment('Year-to-Date Gross Earnings');
+            $table->decimal('ytd_taxable_gross', 15, 2)->default('0.00');
+            $table->decimal('ytd_tax', 15, 2)->default('0.00')->comment('Year-to-Date Tax Paid');
+            $table->decimal('leave_balance_annual', 5, 2)->default('0.00')->comment('Remaining Annual Leave Days');
+            $table->decimal('leave_balance_sick', 5, 2)->default('0.00')->comment('Remaining Sick Leave Days');
+            $table->string('payment_method', 50)->nullable();
+            $table->string('account_or_wallet', 255)->nullable();
+            $table->longText('payslip_signature_b64')->nullable();
+            $table->string('payslip_hash', 255)->nullable();
+            $table->string('payslip_token', 64)->nullable()->comment('Secure URL parameter for QR Code Verification');
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->index('payroll_run_id', 'payroll_lines_run_idx');
+            $table->index('user_id', 'payroll_lines_user_idx');
+        });
+
+        Schema::create('payroll_runs', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->string('reference_number', 50);
+            $table->string('region_code', 10)->default('NG');
+            $table->enum('pay_frequency', ['Monthly', 'Bi-Weekly', 'Weekly'])->default('Monthly');
+            $table->string('currency', 3)->default('USD');
+            $table->date('pay_period_start');
+            $table->date('pay_period_end');
+            $table->date('payment_date');
+            $table->decimal('total_gross', 15, 2)->default('0.00');
+            $table->decimal('total_deductions', 15, 2)->default('0.00');
+            $table->decimal('total_net', 15, 2)->default('0.00');
+            $table->enum('status', ['Draft', 'Pending_Review', 'Approved', 'Disbursed', 'Locked'])->default('Draft');
+            $table->char('maker_id', 36)->nullable();
+            $table->char('checker_id', 36)->nullable();
+            $table->char('approver_id', 36)->nullable();
+            $table->char('approved_by', 36)->nullable();
+            $table->char('created_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('reviewed_at')->nullable();
+            $table->timestamp('approved_at')->nullable();
+            $table->timestamp('disbursed_at')->nullable();
+            $table->primary('id');
+            $table->index('approver_id', 'fk_approver_user');
+            $table->index('checker_id', 'fk_checker_user');
+            $table->index('maker_id', 'fk_maker_user');
+            $table->index('region_code', 'payroll_runs_region_idx');
+            $table->index('status', 'payroll_runs_status_idx');
+            $table->unique('reference_number', 'reference_number');
+        });
+
+        Schema::create('performance_appraisals', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('mdm_employee_id', 36);
+            $table->char('manager_id', 36)->nullable();
+            $table->date('review_period_start');
+            $table->date('review_period_end');
+            $table->decimal('kpi_score_overall', 5, 2);
+            $table->text('manager_comments')->nullable();
+            $table->text('employee_comments')->nullable();
+            $table->enum('status', ['Draft', 'Submitted_by_Manager', 'Acknowledged_by_Employee', 'Finalized'])->default('Draft');
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->index('mdm_employee_id', 'fk_pa_employee');
+            $table->index('manager_id', 'fk_pa_manager');
+        });
+
+        Schema::create('permissions', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->string('name', 100);
+            $table->string('slug', 100);
+            $table->unique('slug', 'slug');
+        });
+
+        Schema::create('portfolio_case_studies', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('project_id', 36)->nullable();
+            $table->string('client_pseudonym', 100);
+            $table->string('title', 255);
+            $table->string('industry', 100);
+            $table->text('challenge');
+            $table->text('audit');
+            $table->text('architecture_deployed');
+            $table->json('roi_metrics');
+            $table->string('cover_image_path', 255)->nullable();
+            $table->boolean('is_published')->default(0);
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->index('project_id', 'project_id');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('portfolio_quotes', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_general_ci';
+            $table->char('id', 36);
+            $table->text('quote');
+            $table->string('source', 255);
+            $table->boolean('is_active')->default(1);
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+        });
+
+        Schema::create('project_budgets', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('project_id', 36);
+            $table->bigInteger('dict_id')->unsigned()->nullable();
+            $table->string('description', 255);
+            $table->string('quantity', 50)->nullable()->default('1');
+            $table->decimal('unit_price', 15, 2);
+            $table->decimal('total_allocated', 15, 2);
+            $table->decimal('total_spent', 15, 2)->nullable()->default('0.00');
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->index('project_id', 'fk_pb_proj');
+        });
+
+        Schema::create('project_magic_links', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('project_id', 36);
+            $table->string('token_hash', 255);
+            $table->string('email_sent_to', 100);
+            $table->timestamp('expires_at');
+            $table->timestamp('last_used_at')->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->primary('id');
+            $table->index('project_id', 'project_id');
+            $table->unique('token_hash', 'token_hash');
+        });
+
+        Schema::create('project_phases', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('project_id', 36);
+            $table->integer('phase_number');
+            $table->string('title', 150);
+            $table->text('description')->nullable();
+            $table->decimal('weight_percentage', 5, 2);
+            $table->enum('status', ['Pending', 'Active', 'QA', 'Completed'])->default('Pending');
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->index('project_id', 'project_id');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('project_signoffs', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('project_id', 36);
+            $table->string('token', 64);
+            $table->string('signatory_email', 100)->nullable();
+            $table->string('signatory_name', 150)->nullable();
+            $table->string('signatory_job_title', 100)->nullable();
+            $table->string('signatory_company', 150)->nullable();
+            $table->text('executive_summary');
+            $table->json('roi_metrics_achieved');
+            $table->longText('client_signature_b64')->nullable();
+            $table->string('client_signature_hash', 100)->nullable();
+            $table->string('client_ip_address', 45)->nullable();
+            $table->text('client_user_agent')->nullable();
+            $table->string('client_ip_geo', 255)->nullable()->comment('City, Country based on IP');
+            $table->string('auth_otp', 10)->nullable();
+            $table->timestamp('otp_expires_at')->nullable();
+            $table->longText('jbs_signature_b64')->nullable()->comment('The Praxis Partner Counter-Signature');
+            $table->char('jbs_signer_id', 36)->nullable();
+            $table->enum('status', ['Draft', 'Awaiting Signature', 'Signed', 'Frozen'])->default('Draft');
+            $table->timestamp('frozen_at')->nullable()->comment('The 1-week lockout timestamp');
+            $table->timestamp('signed_at')->nullable();
+            $table->boolean('is_pushed_to_kaizen')->default(0);
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->primary('id');
+            $table->index('jbs_signer_id', 'fk_jbs_signer');
+            $table->index('project_id', 'fk_ps_project');
+            $table->unique('token', 'token');
+        });
+
+        Schema::create('projects', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('organization_id', 36);
+            $table->string('title', 255);
+            $table->text('description')->nullable();
+            $table->decimal('total_budget', 15, 2);
+            $table->string('currency', 3)->default('USD');
+            $table->decimal('locked_exchange_rate', 10, 4)->default('1.0000');
+            $table->enum('status', ['Scoping', 'Active', 'Locked', 'Completed', 'Cancelled'])->default('Scoping');
+            $table->boolean('is_financially_locked')->default(0);
+            $table->char('financial_override_by', 36)->nullable();
+            $table->date('start_date')->nullable();
+            $table->date('target_end_date')->nullable();
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->index('organization_id', 'organization_id');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('proposal_ai_narratives', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->char('proposal_id', 36);
+            $table->text('raw_consultation_notes')->nullable();
+            $table->text('ai_executive_summary')->nullable();
+            $table->text('ai_operational_strategy')->nullable();
+            $table->json('ai_slas_json')->nullable();
+            $table->json('ai_phases_json')->nullable();
+            $table->text('ai_case_study')->nullable();
+            $table->timestamp('generated_at')->nullable()->useCurrent();
+            $table->index('proposal_id', 'fk_pan_proposal');
+        });
+
+        Schema::create('proposal_line_items', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->char('proposal_id', 36);
+            $table->string('code', 20);
+            $table->string('description', 255);
+            $table->string('quantity', 50);
+            $table->decimal('unit_price', 15, 2);
+            $table->decimal('total_price', 15, 2)->default('0.00');
+            $table->integer('sort_order')->default(0);
+            $table->index('proposal_id', 'proposal_id');
+        });
+
+        Schema::create('proposal_tech_stack', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_general_ci';
+            $table->char('proposal_id', 36)->collation('utf8mb4_unicode_ci');
+            $table->bigInteger('tech_id')->unsigned();
+            $table->primary(array (
+  0 => 'proposal_id',
+  1 => 'tech_id',
+));
+            $table->index('tech_id', 'fk_tech_cat');
+        });
+
+        Schema::create('proposals', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('organization_id', 36);
+            $table->string('proposal_ref', 50)->nullable();
+            $table->string('token_hash', 100)->nullable();
+            $table->char('project_id', 36)->nullable();
+            $table->string('archetype_id', 255)->nullable();
+            $table->string('title', 255)->nullable();
+            $table->text('executive_summary')->nullable();
+            $table->text('exclusions')->nullable();
+            $table->integer('validity_days')->default(7);
+            $table->decimal('subtotal', 15, 2);
+            $table->decimal('vat_rate', 5, 2)->default('7.50');
+            $table->decimal('total_value', 15, 2);
+            $table->string('currency', 3)->default('USD');
+            $table->string('payment_schedule_type', 50);
+            $table->decimal('custom_deposit_percent', 5, 2)->nullable();
+            $table->enum('status', ['Draft', 'Pending Auth', 'Authorized', 'Expired', 'Rejected'])->default('Draft');
+            $table->string('hq_signer_name', 150)->nullable();
+            $table->longText('hq_signature_b64')->nullable();
+            $table->string('hq_signature_hash', 100)->nullable();
+            $table->string('hq_ip_address', 45)->nullable();
+            $table->timestamp('hq_signed_at')->nullable();
+            $table->string('auth_otp', 10)->nullable();
+            $table->timestamp('otp_expires_at')->nullable();
+            $table->string('signed_by_name', 150)->nullable();
+            $table->longText('client_signature_b64')->nullable();
+            $table->string('client_signature_hash', 100)->nullable();
+            $table->string('client_ip_address', 45)->nullable();
+            $table->string('ip_security_flag', 255)->nullable();
+            $table->timestamp('signed_at')->nullable();
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->index('organization_id', 'organization_id');
+            $table->index('project_id', 'project_id');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('qa_attachments', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('ticket_id', 36);
+            $table->char('uploaded_by', 36);
+            $table->string('file_name', 255);
+            $table->string('file_path', 255);
+            $table->string('mime_type', 100);
+            $table->integer('size_bytes');
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->primary('id');
+            $table->index('ticket_id', 'ticket_id');
+            $table->index('uploaded_by', 'uploaded_by');
+        });
+
+        Schema::create('qa_comments', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('ticket_id', 36);
+            $table->char('user_id', 36)->comment('Can be Client or HQ Staff');
+            $table->text('comment_text');
+            $table->boolean('is_internal_only')->default(0);
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->index('ticket_id', 'ticket_id');
+            $table->index('user_id', 'user_id');
+        });
+
+        Schema::create('qa_tickets', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('project_id', 36);
+            $table->char('task_id', 36)->nullable();
+            $table->char('submitted_by', 36);
+            $table->string('title', 200);
+            $table->text('description');
+            $table->enum('severity', ['Low', 'Medium', 'Critical'])->default('Medium');
+            $table->timestamp('sla_expires_at')->nullable();
+            $table->string('screenshot_path', 255)->nullable();
+            $table->enum('status', ['Open', 'Investigating', 'Resolved', 'Closed'])->default('Open');
+            $table->timestamp('resolved_at')->nullable();
+            $table->char('resolved_by', 36)->nullable();
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->index('resolved_by', 'fk_qa_resolved_by');
+            $table->index('project_id', 'project_id');
+            $table->index('submitted_by', 'submitted_by');
+            $table->index('task_id', 'task_id');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('redline_sos_requests', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('organization_id', 36)->nullable()->comment('If existing client');
+            $table->string('unregistered_email', 150)->nullable()->comment('If cold lead');
+            $table->string('unregistered_company', 150)->nullable()->comment('If cold lead');
+            $table->text('problem_description');
+            $table->enum('status', ['Pending Triage', 'Investigating', 'Converted', 'Rejected'])->nullable()->default('Pending Triage');
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->index('organization_id', 'fk_sos_org');
+        });
+
+        Schema::create('role_permissions', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->bigInteger('role_id')->unsigned();
+            $table->bigInteger('permission_id')->unsigned();
+            $table->primary(array (
+  0 => 'role_id',
+  1 => 'permission_id',
+));
+            $table->index('permission_id', 'permission_id');
+        });
+
+        Schema::create('roles', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->string('name', 50);
+            $table->string('slug', 50);
+            $table->integer('clearance_level')->default(1)->comment('1 = Client, 5 = Super Admin');
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->unique('slug', 'slug');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('sessions', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->string('id', 255);
+            $table->char('user_id', 36)->nullable();
+            $table->string('ip_address', 45)->nullable();
+            $table->text('user_agent')->nullable();
+            $table->longText('payload');
+            $table->integer('last_activity');
+            $table->primary('id');
+        });
+
+        Schema::create('social_media_accounts', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_general_ci';
+            $table->char('id', 36);
+            $table->string('platform', 100);
+            $table->string('asset_type', 100)->nullable()->default('Social Profile');
+            $table->string('account_name', 150);
+            $table->string('profile_url', 255)->nullable();
+            $table->enum('status', ['ACTIVE', 'RESTRICTED', 'PENDING_VERIFICATION', 'SUSPENDED'])->nullable()->default('ACTIVE');
+            $table->string('login_identifier', 255)->nullable();
+            $table->text('encrypted_password')->nullable();
+            $table->string('admin_profile_link', 255)->nullable();
+            $table->integer('total_followers')->nullable()->default(0);
+            $table->integer('weekly_reach')->nullable()->default(0);
+            $table->decimal('engagement_rate', 5, 2)->nullable()->default('0.00');
+            $table->char('created_by', 36)->nullable();
+            $table->timestamp('last_synced_at')->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+        });
+
+        Schema::create('sprints', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('project_id', 36);
+            $table->string('title', 100);
+            $table->date('start_date');
+            $table->date('end_date');
+            $table->enum('status', ['Planned', 'Active', 'Completed'])->default('Planned');
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->index('project_id', 'project_id');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('system_audit_logs', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->char('user_id', 36)->nullable();
+            $table->string('action', 100);
+            $table->text('description')->nullable();
+            $table->string('target_table', 50)->nullable();
+            $table->string('target_id', 36)->nullable();
+            $table->json('old_values')->nullable();
+            $table->json('new_values')->nullable();
+            $table->string('ip_address', 45)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->index('user_id', 'user_id');
+        });
+
+        Schema::create('talent_pool', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->string('full_name', 100);
+            $table->string('email', 100);
+            $table->string('phone', 30);
+            $table->string('city', 255);
+            $table->string('primary_weapon', 100);
+            $table->string('secondary_skillset', 255)->nullable();
+            $table->string('linkedin_url', 255)->nullable();
+            $table->string('portfolio_url', 255)->nullable();
+            $table->text('praxis_answer');
+            $table->enum('status', ['Pending', 'Drafted', 'Rejected'])->default('Pending');
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->unique('email', 'email');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('task_comments', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->char('task_id', 36);
+            $table->char('user_id', 36);
+            $table->text('comment_text');
+            $table->string('attachment_path', 255)->nullable();
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->index('task_id', 'task_id');
+            $table->index('updated_by', 'updated_by');
+            $table->index('user_id', 'user_id');
+        });
+
+        Schema::create('task_time_logs', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->char('task_id', 36);
+            $table->char('user_id', 36);
+            $table->timestamp('start_time');
+            $table->timestamp('end_time')->nullable();
+            $table->integer('duration_minutes')->nullable()->default(0);
+            $table->decimal('cost_calculated', 15, 2)->default('0.00');
+            $table->boolean('is_rework')->default(0)->comment('Flags time as Cost of Poor Quality (COPQ)');
+            $table->boolean('is_system_terminated')->default(0)->comment('Flagged if closed by the 120-min Killswitch');
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->index('task_id', 'task_id');
+            $table->index('user_id', 'user_id');
+        });
+
+        Schema::create('tasks', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('phase_id', 36);
+            $table->char('sprint_id', 36)->nullable();
+            $table->char('assigned_to', 36)->nullable();
+            $table->string('title', 255);
+            $table->text('description')->nullable();
+            $table->integer('story_points')->default(1);
+            $table->decimal('estimated_hours', 8, 2)->nullable()->comment('L5 Override for Firm-wide SP Multiplier');
+            $table->decimal('actual_hours_logged', 8, 2)->default('0.00');
+            $table->enum('status', ['To-Do', 'In-Progress', 'QA_Review', 'Failed', 'Done'])->default('To-Do');
+            $table->timestamp('qa_sla_expires_at')->nullable()->comment('5-Hour window for Client QA');
+            $table->boolean('qa_auto_approved')->default(0)->comment('Flagged if the 5-hour SLA expired without client feedback');
+            $table->boolean('is_client_visible')->default(1);
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('assigned_to', 'assigned_to');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->index('phase_id', 'phase_id');
+            $table->index('sprint_id', 'sprint_id');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('tax_bands', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('tax_configuration_id', 36);
+            $table->string('band_name', 100);
+            $table->decimal('lower_limit', 15, 2)->default('0.00');
+            $table->decimal('upper_limit', 15, 2)->nullable();
+            $table->decimal('tax_rate', 5, 4)->default('0.0000');
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->index('tax_configuration_id', 'fk_tb_config');
+        });
+
+        Schema::create('tax_configurations', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->enum('region_code', ['CM', 'NG', 'KE', 'GLOBAL']);
+            $table->decimal('minimum_wage', 15, 2)->default('0.00');
+            $table->decimal('pension_employee_rate', 5, 4)->default('0.0000');
+            $table->decimal('pension_employer_rate', 5, 4)->default('0.0000');
+            $table->decimal('pension_cap_amount', 15, 2)->nullable();
+            $table->decimal('health_employee_rate', 5, 4)->default('0.0000');
+            $table->decimal('health_employer_rate', 5, 4)->default('0.0000');
+            $table->decimal('housing_fund_rate', 5, 4)->default('0.0000');
+            $table->decimal('training_fund_rate', 5, 4)->default('0.0000');
+            $table->decimal('fixed_abatement', 15, 2)->default('0.00');
+            $table->decimal('proportional_abatement_rate', 5, 4)->default('0.0000');
+            $table->decimal('cra_fixed_amount', 15, 2)->default('0.00');
+            $table->decimal('cra_proportional_rate', 5, 4)->default('0.0000');
+            $table->decimal('minimum_tax_rate', 5, 4)->default('0.0000');
+            $table->char('updated_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->unique('region_code', 'region_code');
+        });
+
+        Schema::create('time_correction_requests', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('user_id', 36);
+            $table->char('task_id', 36);
+            $table->bigInteger('time_log_id')->unsigned()->nullable()->comment('Null if creating a forgotten log from scratch');
+            $table->timestamp('requested_start_time');
+            $table->timestamp('requested_end_time');
+            $table->text('reason_for_correction');
+            $table->enum('status', ['Pending', 'Approved', 'Rejected'])->default('Pending');
+            $table->boolean('is_god_mode')->default(0)->comment('Injected directly by L5 without L2 request');
+            $table->boolean('penalty_applied')->default(0)->comment('Flagged if the 80% rate penalty was enforced');
+            $table->char('reviewed_by', 36)->nullable();
+            $table->timestamp('reviewed_at')->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->primary('id');
+            $table->index('reviewed_by', 'reviewed_by');
+            $table->index('task_id', 'task_id');
+            $table->index('time_log_id', 'time_log_id');
+            $table->index('user_id', 'user_id');
+        });
+
+        Schema::create('tracker_messages', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('tracker_id', 36);
+            $table->char('task_id', 36)->nullable();
+            $table->char('parent_message_id', 36)->nullable();
+            $table->enum('sender_type', ['client', 'staff']);
+            $table->char('sender_user_id', 36)->nullable();
+            $table->text('body')->nullable();
+            $table->string('media_path', 255)->nullable();
+            $table->enum('media_type', ['image', 'voice', 'document'])->nullable();
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
+            $table->primary('id');
+            $table->index('parent_message_id', 'tracker_messages_parent_message_id_foreign');
+            $table->index('sender_user_id', 'tracker_messages_sender_user_id_foreign');
+            $table->index('task_id', 'tracker_messages_task_id_foreign');
+            $table->index('tracker_id', 'tracker_messages_tracker_id_foreign');
+        });
+
+        Schema::create('tracker_milestones', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('tracker_id', 36);
+            $table->string('title', 255);
+            $table->date('start_date')->nullable();
+            $table->date('end_date')->nullable();
+            $table->boolean('is_payment_trigger')->nullable()->default(0);
+            $table->integer('payment_percentage')->nullable()->default(0);
+            $table->enum('status', ['pending', 'in_progress', 'completed'])->nullable()->default('pending');
+            $table->integer('sort_order')->default(0);
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
+            $table->primary('id');
+            $table->index('tracker_id', 'tracker_milestones_tracker_id_foreign');
+        });
+
+        Schema::create('tracker_tasks', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('milestone_id', 36);
+            $table->string('team_category', 100)->nullable();
+            $table->char('assigned_to', 36)->nullable();
+            $table->string('title', 255);
+            $table->text('description')->nullable();
+            $table->date('due_date')->nullable();
+            $table->enum('status', ['todo', 'in_progress', 'done'])->default('todo');
+            $table->integer('sort_order')->default(0);
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
+            $table->primary('id');
+            $table->index('assigned_to', 'fk_task_assignee');
+            $table->index('milestone_id', 'tracker_tasks_milestone_id_foreign');
+        });
+
+        Schema::create('tracker_user_access', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->char('tracker_id', 36);
+            $table->char('user_id', 36);
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
+            $table->unique(['tracker_id', 'user_id'], 'tracker_user_access_unique');
+            $table->index('user_id', 'tracker_user_access_user_id_foreign');
+        });
+
+        Schema::create('tracker_users', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->string('name', 255);
+            $table->string('email', 255);
+            $table->string('password', 255);
+            $table->enum('role', ['superadmin', 'jbs_staff', 'consultant'])->default('consultant');
+            $table->boolean('is_active')->default(1);
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
+            $table->primary('id');
+            $table->unique('email', 'tracker_users_email_unique');
+        });
+
+        Schema::create('trackers', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->string('unique_token', 64);
+            $table->string('pin_code', 4);
+            $table->string('project_name', 255);
+            $table->string('client_name', 255);
+            $table->string('client_company', 255)->nullable();
+            $table->enum('status', ['active', 'archived'])->default('active');
+            $table->date('start_date')->nullable();
+            $table->date('target_end_date')->nullable();
+            $table->decimal('progress_percentage', 5, 2)->default('0.00');
+            $table->char('created_by', 36);
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
+            $table->primary('id');
+            $table->index('created_by', 'trackers_created_by_foreign');
+            $table->unique('unique_token', 'trackers_unique_token_unique');
+        });
+
+        Schema::create('transactions', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('invoice_id', 36);
+            $table->enum('method', ['Bank Transfer', 'USDT', 'Campay', 'Paystack']);
+            $table->string('tx_hash_or_ref', 255);
+            $table->string('proof_file_path', 255)->nullable();
+            $table->decimal('amount_claimed', 15, 2);
+            $table->decimal('wht_deducted', 15, 2)->nullable()->default('0.00');
+            $table->string('wht_proof_file_path', 255)->nullable();
+            $table->decimal('tolerance_writeoff', 15, 2)->nullable()->default('0.00');
+            $table->enum('status', ['Pending Verification', 'Verified', 'Rejected'])->default('Pending Verification');
+            $table->char('verified_by', 36)->nullable();
+            $table->timestamp('verified_at')->nullable();
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->index('invoice_id', 'invoice_id');
+            $table->index('updated_by', 'updated_by');
+            $table->index('verified_by', 'verified_by');
+        });
+
+        Schema::create('user_clock_logs', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->char('user_id', 36);
+            $table->string('session_id', 255);
+            $table->string('ip_address', 45)->nullable();
+            $table->text('user_agent')->nullable();
+            $table->timestamp('clock_in_time')->useCurrent();
+            $table->timestamp('clock_out_time')->nullable();
+            $table->integer('duration_minutes')->nullable()->default(0);
+            $table->boolean('auto_logged_out')->default(0);
+            $table->index('user_id', 'fk_clock_user');
+        });
+
+        Schema::create('users', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->char('id', 36);
+            $table->char('organization_id', 36);
+            $table->char('restricted_project_id', 36)->nullable();
+            $table->bigInteger('role_id')->unsigned()->nullable();
+            $table->boolean('is_primary_client')->nullable()->default(0);
+            $table->string('first_name', 50);
+            $table->string('last_name', 50);
+            $table->string('email', 100);
+            $table->boolean('is_subscribed')->default(1);
+            $table->timestamp('email_verified_at')->nullable();
+            $table->string('password', 255);
+            $table->string('invitation_token', 100)->nullable();
+            $table->string('remember_token', 100)->nullable();
+            $table->string('phone', 30)->nullable();
+            $table->string('job_title', 100)->nullable();
+            $table->string('mfa_secret', 255)->nullable();
+            $table->enum('status', ['Active', 'Suspended', 'Offboarded'])->default('Active');
+            $table->string('lifecycle_stage', 50)->nullable()->default('Onboarding');
+            $table->timestamp('last_login_at')->nullable();
+            $table->char('created_by', 36)->nullable();
+            $table->char('updated_by', 36)->nullable();
+            $table->char('deleted_by', 36)->nullable();
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->nullable()->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('deleted_at')->nullable();
+            $table->primary('id');
+            $table->index('created_by', 'created_by');
+            $table->index('deleted_by', 'deleted_by');
+            $table->unique('email', 'email');
+            $table->index('restricted_project_id', 'fk_user_restr_proj');
+            $table->index('organization_id', 'organization_id');
+            $table->index('role_id', 'role_id');
+            $table->index('updated_by', 'updated_by');
+        });
+
+        Schema::create('whitepaper_downloads', function (Blueprint $table) {
+            $table->engine = 'InnoDB';
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
+            $table->id();
+            $table->char('organization_id', 36)->nullable();
+            $table->string('email_captured', 100);
+            $table->string('document_name', 150);
+            $table->timestamp('created_at')->nullable()->useCurrent();
+            $table->index('organization_id', 'organization_id');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::disableForeignKeyConstraints();
+        Schema::dropIfExists('whitepaper_downloads');
+        Schema::dropIfExists('users');
+        Schema::dropIfExists('user_clock_logs');
+        Schema::dropIfExists('transactions');
+        Schema::dropIfExists('trackers');
+        Schema::dropIfExists('tracker_users');
+        Schema::dropIfExists('tracker_user_access');
+        Schema::dropIfExists('tracker_tasks');
+        Schema::dropIfExists('tracker_milestones');
+        Schema::dropIfExists('tracker_messages');
+        Schema::dropIfExists('time_correction_requests');
+        Schema::dropIfExists('tax_configurations');
+        Schema::dropIfExists('tax_bands');
+        Schema::dropIfExists('tasks');
+        Schema::dropIfExists('task_time_logs');
+        Schema::dropIfExists('task_comments');
+        Schema::dropIfExists('talent_pool');
+        Schema::dropIfExists('system_audit_logs');
+        Schema::dropIfExists('sprints');
+        Schema::dropIfExists('social_media_accounts');
+        Schema::dropIfExists('sessions');
+        Schema::dropIfExists('roles');
+        Schema::dropIfExists('role_permissions');
+        Schema::dropIfExists('redline_sos_requests');
+        Schema::dropIfExists('qa_tickets');
+        Schema::dropIfExists('qa_comments');
+        Schema::dropIfExists('qa_attachments');
+        Schema::dropIfExists('proposals');
+        Schema::dropIfExists('proposal_tech_stack');
+        Schema::dropIfExists('proposal_line_items');
+        Schema::dropIfExists('proposal_ai_narratives');
+        Schema::dropIfExists('projects');
+        Schema::dropIfExists('project_signoffs');
+        Schema::dropIfExists('project_phases');
+        Schema::dropIfExists('project_magic_links');
+        Schema::dropIfExists('project_budgets');
+        Schema::dropIfExists('portfolio_quotes');
+        Schema::dropIfExists('portfolio_case_studies');
+        Schema::dropIfExists('permissions');
+        Schema::dropIfExists('performance_appraisals');
+        Schema::dropIfExists('payroll_runs');
+        Schema::dropIfExists('payroll_lines');
+        Schema::dropIfExists('password_reset_tokens');
+        Schema::dropIfExists('organizations');
+        Schema::dropIfExists('notifications');
+        Schema::dropIfExists('monthly_payroll_variables');
+        Schema::dropIfExists('media_assets');
+        Schema::dropIfExists('mdm_tech_catalog');
+        Schema::dropIfExists('mdm_tax_compliance');
+        Schema::dropIfExists('mdm_service_catalog');
+        Schema::dropIfExists('mdm_remittance_accounts');
+        Schema::dropIfExists('mdm_legal_entities');
+        Schema::dropIfExists('mdm_financial_dictionary');
+        Schema::dropIfExists('mdm_exchange_rates');
+        Schema::dropIfExists('mdm_employees');
+        Schema::dropIfExists('mdm_employee_compensations');
+        Schema::dropIfExists('mdm_copq_industries');
+        Schema::dropIfExists('mdm_copq_bottlenecks');
+        Schema::dropIfExists('mdm_copq_architectures');
+        Schema::dropIfExists('marketing_campaigns');
+        Schema::dropIfExists('leave_balances');
+        Schema::dropIfExists('kaizen_telemetries');
+        Schema::dropIfExists('kaizen_embeddings');
+        Schema::dropIfExists('kaizen_case_studies');
+        Schema::dropIfExists('kaizen_articles');
+        Schema::dropIfExists('journal_lines');
+        Schema::dropIfExists('journal_entries');
+        Schema::dropIfExists('jobs');
+        Schema::dropIfExists('job_batches');
+        Schema::dropIfExists('invoices');
+        Schema::dropIfExists('invoice_lines');
+        Schema::dropIfExists('global_settings');
+        Schema::dropIfExists('financial_dictionary');
+        Schema::dropIfExists('failed_jobs');
+        Schema::dropIfExists('exchange_rates_ledger');
+        Schema::dropIfExists('employment_contracts');
+        Schema::dropIfExists('employee_leaves');
+        Schema::dropIfExists('crm_notes');
+        Schema::dropIfExists('copq_assessments');
+        Schema::dropIfExists('compensation_history');
+        Schema::dropIfExists('client_portal_settings');
+        Schema::dropIfExists('chart_of_accounts');
+        Schema::dropIfExists('cash_requests');
+        Schema::dropIfExists('calendar_availability');
+        Schema::dropIfExists('cache_locks');
+        Schema::dropIfExists('cache');
+        Schema::dropIfExists('broadcast_logs');
+        Schema::dropIfExists('broadcast_campaigns');
+        Schema::dropIfExists('asset_credential_history');
+        Schema::dropIfExists('appointments');
+        Schema::enableForeignKeyConstraints();
+    }
+};
