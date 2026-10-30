@@ -29,6 +29,7 @@ return [
             'who' => ['title' => 'Qui nous sommes', 'body' => [
                 ':company (« JBS Praxis », « nous ») est un cabinet de conseil et d’ingénierie qui travaille avec des institutions au Nigeria et au Cameroun. Nous éditons ce site, jbspraxis.com, et exploitons notre propre système (JBS Praxis HQ) ainsi que le portail client JBS Praxis.',
                 'Pour les données personnelles décrites dans cette politique, c’est nous qui décidons pourquoi et comment elles sont utilisées : au sens du droit de la protection des données, nous en sommes le responsable du traitement.',
+                'Les principales lois qui encadrent notre traitement des données personnelles sont la loi nigériane de 2023 sur la protection des données (Nigeria Data Protection Act 2023), complétée par la directive générale d’application de 2025 (General Application and Implementation Directive) de la Nigeria Data Protection Commission (NDPC), et la loi camerounaise n° 2024/017 du 23 décembre 2024 portant protection des données à caractère personnel.',
                 'Nos bureaux : :offices.',
                 'Pour toute question sur cette politique ou sur vos données, écrivez à :email.',
             ]],
@@ -171,7 +172,7 @@ return [
                     'Des limites et des contrôles sur chaque formulaire contre les abus automatisés.',
                     'Des processus alignés sur la norme ISO 27001. Nous ne détenons pas de certification et n’en revendiquons aucune.',
                 ]],
-                'Aucun système n’est parfaitement sûr. Si une violation met vos données en danger, nous agissons aussitôt pour la contenir, nous informons les autorités comme la loi l’exige (au Nigeria, la NDPC dans les 72 heures après en avoir pris connaissance) et nous vous informons sans retard injustifié lorsqu’elle risque de porter gravement atteinte à vos droits.',
+                'Aucun système n’est parfaitement sûr. Si une violation met vos données en danger, nous agissons aussitôt pour la contenir, nous informons les autorités comme la loi l’exige (au Nigeria, la NDPC dans les 72 heures après en avoir pris connaissance) et nous vous informons sans retard injustifié lorsque la loi l’exige, et toujours lorsqu’elle risque de porter gravement atteinte à vos droits.',
             ]],
 
             'cookies' => ['title' => 'Cookies', 'body' => [
@@ -210,7 +211,7 @@ return [
                 'Vous pouvez aussi saisir l’autorité de protection des données :',
                 ['items' => [
                     'Au Nigeria : la Nigeria Data Protection Commission (NDPC), par les moyens indiqués sur son site, ndpc.gov.ng.',
-                    'Au Cameroun : l’Autorité de protection des données à caractère personnel créée par la loi n° 2024/017, par les moyens qu’elle publie.',
+                    'Au Cameroun : l’Autorité de protection des données à caractère personnel prévue par la loi n° 2024/017, par les moyens qu’elle publie.',
                 ]],
                 'Si vous vivez ou travaillez ailleurs, vous pouvez aussi vous adresser à l’autorité de votre pays.',
             ]],

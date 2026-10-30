@@ -33,6 +33,7 @@ return [
             'who' => ['title' => 'Who we are', 'body' => [
                 ':company (“JBS Praxis”, “we”, “us”) is a consulting and engineering firm that works with institutions in Nigeria and Cameroon. We run this website, jbspraxis.com, our own system (JBS Praxis HQ) and the JBS Praxis Client Portal.',
                 'For the personal data described in this policy, we decide why and how it is used: in the words of data protection law, we are its controller.',
+                'The main laws that apply to how we handle personal data are Nigeria’s Data Protection Act 2023, with the General Application and Implementation Directive 2025 of the Nigeria Data Protection Commission (NDPC), and Cameroon’s Law No. 2024/017 of 23 December 2024 on personal data protection.',
                 'Our offices: :offices.',
                 'For any question about this policy or your data, write to :email.',
             ]],
@@ -175,7 +176,7 @@ return [
                     'Limits and checks on every form against automated abuse.',
                     'Processes aligned with ISO 27001. We don’t hold a certification and don’t claim one.',
                 ]],
-                'No system is perfectly secure. If a breach puts your data at risk, we act at once to contain it, tell the authorities as the law requires (in Nigeria, the NDPC within 72 hours of becoming aware of it), and tell you without undue delay when it is likely to put your rights at high risk.',
+                'No system is perfectly secure. If a breach puts your data at risk, we act at once to contain it, tell the authorities as the law requires (in Nigeria, the NDPC within 72 hours of becoming aware of it), and tell you without undue delay where the law requires it, and always when it is likely to put your rights at high risk.',
             ]],
 
             'cookies' => ['title' => 'Cookies', 'body' => [
@@ -214,7 +215,7 @@ return [
                 'You can also complain to the data protection authority:',
                 ['items' => [
                     'In Nigeria: the Nigeria Data Protection Commission (NDPC), through the channels on its website, ndpc.gov.ng.',
-                    'In Cameroon: the Personal Data Protection Authority (Autorité de protection des données à caractère personnel) created by Law No. 2024/017, through the channels it publishes.',
+                    'In Cameroon: the Personal Data Protection Authority (Autorité de protection des données à caractère personnel) provided for by Law No. 2024/017, through the channels it publishes.',
                 ]],
                 'If you live or work elsewhere, you can also contact the authority of your own country.',
             ]],
