@@ -273,6 +273,12 @@ Each PR, when its tests pass and the owner has seen it locally:
 - **Not yet checked by a person**: reading, sending, signatures and Praxis AI with a real mailbox and the live Gemini key. The owner connects the mailboxes; Claude never enters their passwords.
 - **Rollback**: copy the 16 backups back (convert `__` to `/`); the new files are then unused; the two new tables can stay or be rolled back by `--path`.
 
+### Fix 1: 30 October 2026, about 17:00 CET (owner report: focus jumping in the composer; PDFs not attaching)
+
+- **Focus**: the composer's `x-data` held the draft's HTML, so every autosave re-render changed it and Alpine restarted the editor (text reset to the last save, focus moved to To or the top of the message). Now `x-data` never changes; the draft's text rides on the editor inside `wire:ignore` (`data-html`), and the editor starts once per draft (`248c8d2`). Checked locally: typing through two autosaves keeps the cursor and every character. Live: `composer.blade.php` and `compose.js` replaced (sizes checked; backups in `~/mail_backup_fix1_20261030/`).
+- **Attachments**: HQ's PHP allowed 2 MB uploads (`upload_max_filesize=2M`, `post_max_size=8M`, cPanel defaults), so any larger PDF failed with "The uploads.0 failed to upload". Raised for `hq.jbspraxis.com` with cPanel's MultiPHP INI editor (UAPI `LangPHP/php_ini_set_user_basic_directives`): `upload_max_filesize=25M`, `post_max_size=30M`, `memory_limit=256M`, `max_execution_time=60` (written to `public_html/PRAXIS/.user.ini` and `php.ini`, shared with the portal). Checked live: a 10 MB POST now reaches Laravel (419) instead of being refused as too large.
+- Note: HQ and the portal run **ea-php82** (the site ea-php83); keep code PHP 8.2-compatible.
+
 ## 12. Changes to contracts, PR notes and requests
 
 *(each PR records here: payload keys it chose, new events, anything another PR must know; and requests for changes to files it doesn't own)*
