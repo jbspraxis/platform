@@ -1,13 +1,14 @@
-// QA helper: renders pages of the brand book PDF into one PNG contact sheet (pdf.js in headless Edge)
-//   node brand/build/pdf_sheet.js <firstPage> <lastPage> [columns] [thumbWidth]
+// QA helper: renders pages of a PDF (the brand book by default) into one PNG contact sheet (pdf.js in headless Edge)
+//   node brand/build/pdf_sheet.js <firstPage> <lastPage> [columns] [thumbWidth] [pdfPath]
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
-const [first = 1, last = 12, cols = 4, tw = 360] = process.argv.slice(2).map(Number);
+const [first = 1, last = 12, cols = 4, tw = 360] = process.argv.slice(2, 6).map(Number);
 const BRAND = path.resolve(__dirname, '..');
 const RENDER = path.join(__dirname, '_render');
-const pdf = fs.readFileSync(path.join(BRAND, 'JBS-Praxis-Brand-Book.pdf')).toString('base64');
+const PDF = process.argv[6] ? path.resolve(process.argv[6]) : path.join(BRAND, 'JBS-Praxis-Brand-Book.pdf');
+const pdf = fs.readFileSync(PDF).toString('base64');
 const CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174';
 const rows = Math.ceil((last - first + 1) / cols);
 const th = Math.round(tw * 297 / 210);
@@ -36,10 +37,21 @@ figure{margin:0}canvas{display:block;background:#fff;width:${tw}px;height:${th}p
   }
 })();
 </script></body></html>`;
+fs.mkdirSync(RENDER, { recursive: true });
 const src = path.join(RENDER, 'pdf_sheet.html');
 fs.writeFileSync(src, html);
-const out = path.join(RENDER, `pdf_${first}-${last}.png`);
+const out = path.join(RENDER, `${process.argv[6] ? path.basename(PDF, '.pdf') + '_' : 'pdf_'}${first}-${last}.png`);
+if (fs.existsSync(out)) fs.unlinkSync(out);
+// Its own profile, so a running Edge (or its startup boost) cannot take the job and quietly drop it
 execFileSync('C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', ['--headless=new', '--disable-gpu', '--hide-scrollbars',
-  '--force-device-scale-factor=1', '--virtual-time-budget=60000', `--window-size=${W},${H}`, `--screenshot=${out}`,
+  `--user-data-dir=${path.join(RENDER, 'edge-profile')}`, '--no-first-run', '--force-device-scale-factor=1', '--virtual-time-budget=60000', `--window-size=${W},${H}`, `--screenshot=${out}`,
   'file:///' + src.replace(/\\/g, '/')], { stdio: 'ignore', timeout: 150000 });
+// msedge.exe can hand the job to a background process and return at once, so wait until the file is written
+const sleep = t => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, t);
+for (let last = -1, end = Date.now() + 150000; ; sleep(1000)) {
+  const size = fs.existsSync(out) ? fs.statSync(out).size : -1;
+  if (size > 0 && size === last) break;
+  if (Date.now() > end) throw new Error(`${out} was not written`);
+  last = size;
+}
 console.log(out);

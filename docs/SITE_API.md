@@ -134,6 +134,7 @@ Details (PR2b API, as built; the rules live once in `app/Services/Site/*` and th
   `html` (`summary`, `problem`, `solution`, `roi`: escaped, `**bold**` as `<strong>`, key terms linked as on the old page).
 - `POST /enquiries`, `/kaizen/submissions`, `/feedback`, `/careers/applications` → `201 {"data":{"received":true}}`.
 - `POST /whitepaper` → `201 {"data":{"sent":true}}` (`false` when the email could not be sent; the request is recorded).
+  The email attaches the Praxis Method guide in the `X-Site-Locale` language (`praxis_core/resources/pdf`).
 - `POST /chat` → `{"data":{"reply":"…","limited":false}}`. `history` roles are `user` or `assistant`; the AI sees the last
   12 turns. When no AI provider answers, `reply` is a short "unavailable" text in the locale. `reply` is plain text
   with the old chat widget's light markdown (the AI's answers and HQ's own fallback and limit texts use it):
