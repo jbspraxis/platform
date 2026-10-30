@@ -63,15 +63,23 @@ class WithoutFileinfoTest extends TestCase
         ], $out['files']);
     }
 
-    /** This PHP without php.ini (-n), then the extensions it loads except fileinfo; null when fileinfo is compiled in */
+    /**
+     * A PHP without fileinfo: this one as it is when it already lacks it, else this one without php.ini (-n) plus the
+     * extensions it loads except fileinfo; null when fileinfo is compiled in. (A PHP 8.5 without fileinfo, started
+     * with -n and its own extensions, hung here on Windows; as it is, it runs.)
+     */
     private function phpWithoutFileinfo(): ?array
     {
+        if (! extension_loaded('fileinfo')) {
+            return [PHP_BINARY];
+        }
+
         $dir = (string) ini_get('extension_dir');
         if (! is_dir($dir)) {
             $dir = dirname(PHP_BINARY) . DIRECTORY_SEPARATOR . $dir;
         }
         $shared = fn (string $name) => is_file("{$dir}/php_{$name}.dll") || is_file("{$dir}/{$name}.so");
-        if (extension_loaded('fileinfo') && ! $shared('fileinfo')) {
+        if (! $shared('fileinfo')) {
             return null;
         }
 
