@@ -168,8 +168,13 @@ class ProposalGateway extends Component
             Mail::to($this->signerEmail)->locale($locale)
                 ->send(new SigningCode($otp, SigningCode::PROPOSAL, $proposal->title ?: $proposal->proposal_ref, $vectorPerson->first_name));
         } catch (\Exception $e) {
-            // Fallback for local testing so you can read the OTP in your log file
-            Log::info("Praxis Auth OTP for {$this->signerEmail}: {$otp}");
+            // Never log the code itself: anyone who can read the log could sign. The unsent code is cancelled, so a
+            // reload shows the signing form again (the signature stays saved) instead of asking for a code that never came.
+            Log::error('Proposal signing code email failed', ['proposal_id' => $proposal->id, 'message' => $e->getMessage()]);
+            DB::table('proposals')->where('id', $proposal->id)->update(['auth_otp' => null, 'otp_expires_at' => null]);
+            $this->addError('signerEmail', __('gateway.proposal.email_failed'));
+            $this->dispatch('reinit-canvas');
+            return;
         }
 
         $this->viewState = 'otp_verification';

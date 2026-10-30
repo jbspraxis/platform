@@ -119,6 +119,7 @@ return [
         'sending_code' => 'Sending code…',
         'signature_missing' => 'Draw your signature in the box before you continue.',
         'email_not_recognised' => 'We couldn’t send a code to that address because it isn’t a signatory email we have for your organisation. Use the email address JBS Praxis has on file for you, or ask your JBS Praxis contact to add it.',
+        'email_failed' => 'We couldn’t email your signing code just now. Try again in a few minutes, or ask your JBS Praxis contact for help.',
         // :wait is wait_minutes below ("12 minutes")
         'too_many_codes' => 'We’ve sent 3 signing codes for this proposal in the last 15 minutes. Wait :wait, then ask for a new code.',
         'too_many_codes_email' => 'We’ve sent 3 signing codes to this email address in the last 15 minutes. Wait :wait, then ask for a new code.',

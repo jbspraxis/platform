@@ -97,14 +97,22 @@ class AdHocConsultationTimeTest extends TestCase
             'id' => (string) Str::uuid(), 'organization_id' => $this->org, 'title' => 'Free audit and demo', 'status' => 'Scheduled',
             'start_time' => '2026-11-04 13:00:00', 'end_time' => '2026-11-04 14:00:00',
         ]);
-        Livewire::test(LeadsRegister::class)->call('requestConsultation', $this->org)
-            ->set('bookingTime', '13:00')->call('bookConsultation')
-            ->assertHasErrors('bookingTime')->assertSee('Another free audit is booked at that time. Choose another time.');
+        // The same start, or any hour that overlaps 13:00 to 14:00, is refused
+        foreach (['13:00', '12:30', '13:45'] as $time) {
+            Livewire::test(LeadsRegister::class)->call('requestConsultation', $this->org)
+                ->set('bookingTime', $time)->call('bookConsultation')
+                ->assertHasErrors('bookingTime')->assertSee('That time overlaps another free audit (13:00 to 14:00 WAT). Choose another time.');
+        }
 
         Livewire::test(LeadsRegister::class)->call('requestConsultation', $this->org)
             ->set('bookingTime', '9am')->call('bookConsultation')->assertHasErrors('bookingTime');
 
         $this->assertSame(1, DB::table('appointments')->count());
+
+        // An hour that ends as the other one starts is fine
+        Livewire::test(LeadsRegister::class)->call('requestConsultation', $this->org)
+            ->set('bookingTime', '12:00')->call('bookConsultation')->assertHasNoErrors();
+        $this->assertSame(2, DB::table('appointments')->count());
     }
 
     public function test_only_staff_who_can_add_leads_can_book(): void

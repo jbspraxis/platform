@@ -400,10 +400,15 @@ class LeadsRegister extends Component
             return;
         }
 
-        $taken = DB::table('appointments')->where('start_time', $start->format('Y-m-d H:i:s'))
-            ->whereIn('status', ['Requested', 'Scheduled'])->exists();
-        if ($taken) {
-            $this->addError('bookingTime', 'Another free audit is booked at that time. Choose another time.');
+        // The hour must not overlap a free audit that is waiting or approved (a meeting ending at the start is fine)
+        $end = $start->copy()->addMinutes(60);
+        $clash = DB::table('appointments')->whereIn('status', ['Requested', 'Scheduled'])->whereNull('deleted_at')
+            ->where('start_time', '<', $end->format('Y-m-d H:i:s'))
+            ->where('end_time', '>', $start->format('Y-m-d H:i:s'))
+            ->orderBy('start_time')->first();
+        if ($clash) {
+            $this->addError('bookingTime', 'That time overlaps another free audit (' . Carbon::parse($clash->start_time)->format('H:i')
+                . ' to ' . Carbon::parse($clash->end_time)->format('H:i') . ' WAT). Choose another time.');
             return;
         }
 
@@ -412,7 +417,7 @@ class LeadsRegister extends Component
             'organization_id' => $this->bookingOrgId,
             'title' => 'Free audit (booked from HQ)',
             'start_time' => $start->format('Y-m-d H:i:s'),
-            'end_time' => $start->copy()->addMinutes(60)->format('Y-m-d H:i:s'),
+            'end_time' => $end->format('Y-m-d H:i:s'),
             'status' => 'Requested',
             'created_at' => now(),
             'updated_at' => now()

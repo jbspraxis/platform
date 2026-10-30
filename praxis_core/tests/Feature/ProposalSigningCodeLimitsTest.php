@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Livewire\Portal\ProposalGateway;
 use App\Mail\SigningCode;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -131,6 +132,26 @@ class ProposalSigningCodeLimitsTest extends TestCase
 
         $this->assertSame('Authorized', DB::table('proposals')->where('id', $proposal['id'])->value('status'));
         $this->assertFalse(\Illuminate\Support\Facades\RateLimiter::tooManyAttempts(ProposalGateway::checkKey($proposal['id']), 1));
+    }
+
+    public function test_a_code_email_that_fails_is_not_logged_and_the_code_is_cancelled(): void
+    {
+        $proposal = $this->proposal();
+        Mail::shouldReceive('to')->andThrow(new \RuntimeException('SMTP unavailable'));
+        Log::spy();
+
+        $this->askForCode($proposal['token'])
+            ->assertHasErrors('signerEmail')
+            ->assertSet('viewState', 'review')
+            ->assertSee('We couldn’t email your signing code just now.');
+
+        // Nobody can read the code in the log, and a reload shows the signing form, not a code that never came
+        Log::shouldHaveReceived('error')->once()->withArgs(fn ($message, $context) => $message === 'Proposal signing code email failed'
+            && $context === ['proposal_id' => $proposal['id'], 'message' => 'SMTP unavailable']);
+        Log::shouldNotHaveReceived('info');
+        $row = DB::table('proposals')->where('id', $proposal['id'])->first();
+        $this->assertNull($row->auth_otp);
+        $this->assertNotNull($row->client_signature_b64, 'the drawn signature stays saved');
     }
 
     public function test_the_messages_read_well_in_french(): void

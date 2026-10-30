@@ -119,6 +119,7 @@ return [
         'sending_code' => 'Envoi du code…',
         'signature_missing' => 'Tracez votre signature dans le cadre avant de continuer.',
         'email_not_recognised' => "Nous n’avons pas pu envoyer de code à cette adresse\u{00A0}: elle ne figure pas parmi les adresses des signataires de votre organisation. Utilisez l’adresse e-mail que JBS Praxis a enregistrée pour vous, ou demandez à votre contact JBS Praxis de l’ajouter.",
+        'email_failed' => 'Nous n’avons pas pu vous envoyer votre code de signature par e-mail. Réessayez dans quelques minutes ou demandez de l’aide à votre contact JBS Praxis.',
         // :wait est wait_minutes ci-dessous (« 12 minutes »)
         'too_many_codes' => "Nous avons envoyé 3\u{202F}codes de signature pour cette proposition au cours des 15\u{202F}dernières minutes. Patientez :wait, puis demandez un nouveau code.",
         'too_many_codes_email' => "Nous avons envoyé 3\u{202F}codes de signature à cette adresse e-mail au cours des 15\u{202F}dernières minutes. Patientez :wait, puis demandez un nouveau code.",
