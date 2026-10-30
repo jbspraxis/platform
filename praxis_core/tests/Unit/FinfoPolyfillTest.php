@@ -14,6 +14,15 @@ class FinfoPolyfillTest extends TestCase
 {
     private array $files = [];
 
+    public static function setUpBeforeClass(): void
+    {
+        // A unit test boots no app: in a PHP without fileinfo (like the live CLI) the FILEINFO_* constants come
+        // from the stand-in, as AppServiceProvider loads it there
+        if (! extension_loaded('fileinfo')) {
+            require_once dirname(__DIR__, 2) . '/app/Support/Polyfill/fileinfo.php';
+        }
+    }
+
     protected function tearDown(): void
     {
         foreach ($this->files as $f) {
