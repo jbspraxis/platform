@@ -30,7 +30,9 @@ final class Format
             $formatter->setAttribute(NumberFormatter::MAX_FRACTION_DIGITS, $decimals);
             $digits = (string) $formatter->format($abs);
         } else {
-            $digits = number_format($abs, $decimals, '.', ',');
+            // The live web PHP has no intl: write the digits as fr_FR / en_GB do (French: 1 250 000,5 with U+202F)
+            $fr = self::intlLocale() === 'fr_FR';
+            $digits = number_format($abs, $decimals, $fr ? ',' : '.', $fr ? "\u{202F}" : ',');
         }
 
         return ($negative ? '−' : '') . $digits;
