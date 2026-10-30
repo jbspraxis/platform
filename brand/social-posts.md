@@ -56,7 +56,7 @@ Email in Outlook. Chat in Slack. Books in QuickBooks. Sales in a CRM. Approvals 
 
 Each tool answers for itself. None answers for the company.
 
-We build the one that does, around the way you work.
+JBS Praxis builds the one that does, around the way you work.
 
 jbspraxis.com
 
@@ -70,6 +70,8 @@ So teams re-key the same figures, reconcile spreadsheets at month end, and leade
 
 The answer is rarely another tool. It is a system designed around how your organisation actually runs: we keep what works, connect it, replace what doesn’t, and give you one place where finance, people and operations agree. You own the code and the data.
 
+JBS Praxis is a consulting and engineering firm for Africa’s institutions. We design how your organisation runs, then build the system that answers for it.
+
 Book a free audit and demo: jbspraxis.com/schedule
 
 **Instagram**
@@ -77,6 +79,8 @@ Book a free audit and demo: jbspraxis.com/schedule
 A dozen tools. Not one answer.
 
 Each app answers for itself. We build the system that answers for the company, around the way you work. You own the code and the data.
+
+JBS Praxis: consulting and engineering for Africa’s institutions.
 
 Book a free audit and demo: link in bio.
 
