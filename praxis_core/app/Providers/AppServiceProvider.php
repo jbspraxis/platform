@@ -11,7 +11,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // Storage that works without PHP's fileinfo extension (the live web PHP lacks it): App\Support\FilesystemManager
+        // The live web PHP has no fileinfo extension: a stand-in for finfo (App\Support\Polyfill\Finfo) keeps file
+        // type checks, uploads and storage working everywhere; App\Support\FilesystemManager stays as a second guard
+        if (! extension_loaded('fileinfo')) {
+            require_once app_path('Support/Polyfill/fileinfo.php');
+        }
         $this->app->singleton('filesystem', fn ($app) => new \App\Support\FilesystemManager($app));
     }
 
