@@ -97,8 +97,9 @@ function lint(lang, html) {
 
 // ---------- layout check (runs in Edge before it prints; only in the render copy) ----------
 // Each page is a fixed A4 box that hides what does not fit, so text that runs too long would be cut off quietly.
-// This script finds text that leaves its page or runs into the band or folio at the foot, and adds a last page
-// listing it; the page count check below then fails the build. It waits for the fonts, or it would measure the fallbacks.
+// This script finds text that leaves its page, runs into the band or folio at the foot, or is wider than its box,
+// and adds a last page listing it; the page count check below then fails the build. It waits for the fonts, or it
+// would measure the fallbacks.
 const LAYOUT_CHECK = `<script>
 document.fonts.ready.then(() => {
   const mm = 96 / 25.4, bad = [];
@@ -109,8 +110,12 @@ document.fonts.ready.then(() => {
     page.querySelectorAll('p, li, h1, h2, h3, a, .stage, .glance > div').forEach(el => {
       if (foot && foot.contains(el)) return;
       const r = el.getBoundingClientRect();
+      const where = 'page ' + (i + 1) + ': "' + el.textContent.trim().slice(0, 50) + '"';
       if (r.height && (r.bottom > limit || r.right > box.right - 15 * mm))
-        bad.push('page ' + (i + 1) + ': "' + el.textContent.trim().slice(0, 50) + '" ends ' + ((r.bottom - limit) / mm).toFixed(1) + ' mm too low');
+        bad.push(where + ' ends ' + ((r.bottom - limit) / mm).toFixed(1) + ' mm too low');
+      // A word too long for its box (a stage name in a table cell) spills sideways into the next one
+      if (el.clientWidth && el.scrollWidth > el.clientWidth + 1)
+        bad.push(where + ' is ' + ((el.scrollWidth - el.clientWidth) / mm).toFixed(1) + ' mm too wide');
     });
   });
   if (bad.length) document.body.insertAdjacentHTML('beforeend',
@@ -173,7 +178,7 @@ for (const lang of LANGS) {
   const issues = [];
   if (f.pages !== PAGES) {
     issues.push(`${f.pages} pages, expected ${PAGES} (text overflowed: the last page of the PDF lists where)`);
-    try { issues.push(execFileSync('pdftotext', ['-f', f.pages, '-l', f.pages, pdf, '-'], { encoding: 'utf8' }).trim()); } catch { /* pdftotext is optional */ }
+    try { issues.push(execFileSync('pdftotext', ['-enc', 'UTF-8', '-f', f.pages, '-l', f.pages, pdf, '-'], { encoding: 'utf8' }).trim()); } catch { /* pdftotext is optional */ }
   }
   if (f.type3) issues.push(`${f.type3} Type 3 fonts`);
   if (f.fonts.some(n => !/^(Jakarta|Newsreader)/.test(n))) issues.push(`fallback fonts used: ${f.fonts.join(', ')}`);
