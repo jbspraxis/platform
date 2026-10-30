@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Support\People;
+use App\Support\ProjectAccess;
 
 #[Layout('components.layouts.hq')]
 class QaHub extends Component
@@ -57,6 +58,10 @@ class QaHub extends Component
     }
 
     // --- 1. THE GLOBAL FIREHOSE ---
+    /**
+     * The tickets this person may see: QA approvers, managers and auditors see every ticket; everyone else
+     * the tickets on projects they can see (the sprint board rule, App\Support\ProjectAccess) and those they reported.
+     */
     private function ticketQuery()
     {
         $query = DB::table('qa_tickets')
@@ -72,6 +77,11 @@ class QaHub extends Component
             ->orderByRaw("FIELD(qa_tickets.severity, 'Critical', 'Medium', 'Low')") // Prioritize Critical
             ->orderBy('qa_tickets.created_at', 'desc');
         People::joinAuthor($query, 'qa_tickets.submitted_by', 'qa_tickets.submitted_by_type', 'submitter', ['email' => 'submitter_email']);
+
+        if (! Auth::user()->can('qa.approve') && ! ProjectAccess::seesEveryProject()) {
+            $query->where(fn ($q) => $q->whereIn('qa_tickets.project_id', ProjectAccess::assignedProjectIds())
+                ->orWhere(fn ($own) => $own->where('qa_tickets.submitted_by', Auth::id())->where('qa_tickets.submitted_by_type', 'staff')));
+        }
 
         return $query;
     }
@@ -95,7 +105,7 @@ class QaHub extends Component
         return (array) $ticket;
     }
 
-    /** The ticket as it is now in the database, for someone who may see QA tickets (qa.view), or null */
+    /** The ticket as it is now in the database, for someone who may see QA tickets (qa.view) and this one, or null */
     private function freshTicket($ticketId): ?array
     {
         if (! Auth::user()->can('qa.view')) return null;
