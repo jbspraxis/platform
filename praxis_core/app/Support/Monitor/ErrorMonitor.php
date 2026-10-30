@@ -199,14 +199,16 @@ class ErrorMonitor
             '/Too many connections/i' => 'The database ran out of connections. Usually a traffic spike or a stuck process.',
             '/CannotUpdateLockedPropertyException|CorruptComponentPayload/i' => 'Someone tried to change a protected value from the browser, usually a bot. The change was refused.',
             '/Undefined (variable|array key|index|offset)|Attempt to read property .* on (null|int|string|bool)|Trying to access array offset/i' => 'The code used a value that was not there (empty, missing or the wrong type). It needs a check before using it.',
-            '/Class "[^"]+" not found|Class \'[^\']+\' not found/i' => 'A PHP class is missing: a file that was not uploaded, or a missing "use" line.',
+            '/"intl" PHP extension|Class "(finfo|NumberFormatter|Collator|IntlDateFormatter)" not found|Call to undefined function (finfo_|sodium_|exif_|gmp_|idn_to_)/i' => 'The live web PHP is missing an extension (it has no fileinfo, intl, exif, sodium or gmp). Use code that works without it, as App\Support\FilesystemManager does for fileinfo (docs/MAIL.md, Fix 1 to 3).',
+            '/Class "[^"]+" not found|Class \'[^\']+\' not found/i' =>'A PHP class is missing: a file that was not uploaded, or a missing "use" line.',
             '/syntax error|ParseError|unexpected end of file/i' => 'A PHP or Blade file has a syntax error, so the page cannot load. Check the file named below.',
             '/cURL error 28|timed out|Operation timed out/i' => 'A call to an outside service (AI, email, payment) took too long and was stopped.',
             '/high demand|overloaded|UNAVAILABLE|status":503/i' => 'The AI provider was busy. The chat retries on the backup provider automatically.',
             '/email failed|Connection could not be established|Expected response code|stream_socket_client/i' => 'An email could not be sent. Check the mail server settings (MAIL_* in .env) and the mailbox in cPanel.',
             '/Allowed memory size .* exhausted/i' => 'PHP ran out of memory, usually from loading too much data at once.',
             '/Maximum execution time/i' => 'A request ran too long and PHP stopped it.',
-            '/419|Page Expired|TokenMismatch/i' => 'A form was sent after the page had expired (CSRF token). Usually harmless: the visitor reloads.',
+            // \b: "419" inside a user id (a29df726-14d8-4198-…) is not a 419 response
+            '/\b419\b|Page Expired|TokenMismatch/i' => 'A form was sent after the page had expired (CSRF token). Usually harmless: the visitor reloads.',
             '/Scheduled command .* failed/i' => 'A scheduled job failed. Run it by hand on the server to see the full error.',
         ];
         foreach ($hints as $pattern => $hint) {

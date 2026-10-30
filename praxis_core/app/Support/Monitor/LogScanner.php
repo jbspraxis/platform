@@ -87,7 +87,8 @@ class LogScanner
             $level = strtolower($m[2]);
 
             // An exception logged by Laravel: "message {"exception":"[object] (Class(code: 0): msg at /path/file.php:12)"} [stacktrace] ..."
-            if (preg_match('/\{"exception":"\[object\] \(([^(]+)\(code: [^)]*\): (.*?) at (\S+?):(\d+)\)/s', $body, $x)) {
+            // For a signed-in person Laravel writes {"userId":"…","exception":…}, so "exception" need not come first
+            if (preg_match('/[{,]"exception":"\[object\] \(([^(]+)\(code: [^)]*\): (.*?) at (\S+?):(\d+)\)/s', $body, $x)) {
                 $class = stripslashes(trim($x[1]));
                 if (self::alreadyRecorded($class, $time)) {
                     continue;
@@ -98,6 +99,7 @@ class LogScanner
                     'message' => stripslashes($x[2]), 'file' => stripslashes($x[3]), 'line' => (int) $x[4],
                     'trace' => $trace ? implode("\n", array_slice(explode("\n", $trace), 0, 40)) : null,
                     'occurred_at' => $time,
+                    'user_id' => preg_match('/[{,]"userId":"([0-9a-f-]{36})"/', $body, $u) ? $u[1] : null,
                 ]);
                 $count++;
                 continue;
