@@ -63,7 +63,7 @@ return [
         'coverage_text' => 'A mark shows that our work in the sector covers that domain. The marks come from the case studies themselves.',
         'coverage_caption' => 'The domains our work covers in each sector',
         'covered' => 'Covered',
-        'not_covered' => 'Not yet',
+        'not_covered' => 'Not covered',
     ],
 
     // Sector names, and one line on what the work there involves

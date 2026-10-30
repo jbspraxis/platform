@@ -62,7 +62,7 @@ return [
         'coverage_text' => 'Une marque indique que notre travail dans ce secteur couvre ce domaine. Les marques sont tirées des études de cas elles-mêmes.',
         'coverage_caption' => 'Les domaines couverts par notre travail dans chaque secteur',
         'covered' => 'Couvert',
-        'not_covered' => 'Pas encore',
+        'not_covered' => 'Non couvert',
     ],
 
     'sectors' => [
