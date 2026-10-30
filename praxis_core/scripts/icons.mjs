@@ -12,10 +12,13 @@ const walk = (dir) => readdirSync(dir, { withFileTypes: true })
 const names = new Set();
 for (const file of walk(VIEWS)) {
     const src = readFileSync(file, 'utf8');
-    for (const [, value] of src.matchAll(/data-lucide=["']([^"']*(?:\{\{[^}]*\}\}[^"']*)*)["']/g)) {
+    // The attribute's own quote ends the value, so a name quoted the other way inside a Blade
+    // expression stays in it: data-lucide="{{ $on ? 'eye' : 'eye-off' }}" gives eye and eye-off
+    for (const [, quote, value] of src.matchAll(/data-lucide=(["'])(.*?)\1/g)) {
         if (value.includes('{{')) {
-            for (const [, n] of value.matchAll(/'([a-z0-9-]+)'/g)) names.add(n);
-        } else if (value) {
+            const inner = quote === '"' ? /'([a-z0-9-]+)'/g : /"([a-z0-9-]+)"/g;
+            for (const [, n] of value.matchAll(inner)) names.add(n);
+        } else if (value.trim()) {
             names.add(value.trim());
         }
     }

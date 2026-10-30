@@ -4,10 +4,13 @@ namespace App\Livewire\Tracker\Auth;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
-#[Layout('layouts.client-light')] // We can reuse the light layout or a blank one
+// Sign-in for the delivery team's project tracker (staff and consultants): the same card on Mist as the HQ sign-in
+#[Layout('components.layouts.auth')]
+#[Title('Sign in to the project tracker')]
 class Login extends Component
 {
     use \App\Livewire\Concerns\ThrottlesLogins;
@@ -32,22 +35,22 @@ class Login extends Component
             session()->regenerate();
 
             $user = Auth::guard('tracker')->user();
-            
-            // Find the first project this user is assigned to
+
+            // Find the first project this person is assigned to
             $firstAccess = DB::table('tracker_user_access')->where('user_id', $user->id)->first();
-            
+
             if ($firstAccess) {
-                // Redirect directly to their assigned matrix
+                // Go straight to that project's tracker
                 return redirect()->route('taskforce.matrix', $firstAccess->tracker_id);
             }
 
             Auth::guard('tracker')->logout();
-            session()->flash('error', 'You have no active project assignments. Contact HQ.');
+            session()->flash('error', 'You’re not assigned to a project yet. Ask your project lead to add you to one, then sign in again.');
             return redirect()->route('taskforce.login');
         }
 
         $this->recordFailedLogin('tracker');
-        $this->addError('email', 'Invalid credentials or inactive account.');
+        $this->addError('email', 'That email address and password don’t match an active account. Check them and try again, or ask your project lead for help.');
     }
 
     public function render()

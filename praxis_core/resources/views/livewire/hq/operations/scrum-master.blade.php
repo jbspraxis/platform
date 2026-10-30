@@ -19,12 +19,11 @@
     <div class="grid items-start gap-6 lg:grid-cols-[2fr_3fr]">
 
         <div class="card">
-            <h2 class="card-title mb-2">Scope of work</h2>
-            <p class="help mb-4">The JBS Praxis assistant reads this text to draft sprints and tasks. Remove anything that isn’t scope, or add requirements, before you draft the backlog.</p>
+            <h2 class="card-title mb-2"><label for="sow-context">Scope of work</label></h2>
+            <p id="sow-help" class="help mb-4">The JBS Praxis assistant reads this text to draft sprints and tasks. Remove anything that isn’t scope, or add requirements, before you draft the backlog.</p>
 
             <div class="field">
-                <label for="sow-context" class="label">Scope of work</label>
-                <textarea id="sow-context" wire:model="sowContext" class="textarea min-h-[400px]"></textarea>
+                <textarea id="sow-context" wire:model="sowContext" class="textarea min-h-[400px]" aria-describedby="sow-help"></textarea>
                 @error('sowContext') <span class="field-error">{{ $message }}</span> @enderror
             </div>
 

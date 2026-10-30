@@ -84,7 +84,7 @@ class TimeAggregationEngine
                     // Skip to 10 PM tonight
                     $current->setTime(22, 0, 0);
                     if ($current->lt($shiftStart)) {
-                        $current->addDay(); // Move to next day's 10 PM if we jumped backward
+                        $current->addDay(); // Move to next day’s 10 PM if we jumped backward
                     }
                 }
             }
@@ -98,7 +98,7 @@ class TimeAggregationEngine
         $excessHours = $totalHoursLogged - $expectedMonthlyHours;
 
         if ($excessHours > 0) {
-            // Generalize weekly tiers to the exact month's proportionality
+            // Generalize weekly tiers to the exact month’s proportionality
             $weeksInMonth = $workingDaysInMonth / 5;
             $monthlyTier1Max = 8 * $weeksInMonth; // Next 8 hours/week
             $monthlyTier2Max = 8 * $weeksInMonth; // Subsequent 8 hours/week

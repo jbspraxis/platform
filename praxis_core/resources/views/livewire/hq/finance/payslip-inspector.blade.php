@@ -22,7 +22,7 @@
     <div class="page-header">
         <div>
             <h1 class="page-title">Payslips</h1>
-            <p class="page-subtitle">View and print a staff member's payslip from an approved payroll run.</p>
+            <p class="page-subtitle">View and print a staff member’s payslip from an approved payroll run.</p>
         </div>
     </div>
 

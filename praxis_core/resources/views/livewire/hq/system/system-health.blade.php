@@ -1,6 +1,6 @@
 <div class="sh">
     <style>
-        /* System Health: only what the shared component classes don't cover. Brand tokens only. */
+        /* System Health: only what the shared component classes don’t cover. Brand tokens only. */
         .sh-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 16px; }
         .sh-fix { margin-top: 12px; padding-left: 10px; border-left: 2px solid var(--color-warning); color: var(--color-ink); }
         .sh-row { cursor: pointer; }
@@ -28,7 +28,7 @@
 
     <div class="page-header">
         <div>
-            <h1 class="page-title">System Health</h1>
+            <h1 class="page-title">System health</h1>
             <p class="page-subtitle">Errors, scheduled jobs and alerts for jbspraxis.com.</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
@@ -112,7 +112,7 @@
                             <tr>
                                 <th style="width: 36px;"><span class="sr-only">Select</span></th>
                                 <th>Error</th>
-                                <th class="num sh-hide-sm">Times</th>
+                                <th class="num text-right sh-hide-sm">Times</th>
                                 <th>Last seen</th>
                                 <th class="sh-hide-sm">Status</th>
                             </tr>

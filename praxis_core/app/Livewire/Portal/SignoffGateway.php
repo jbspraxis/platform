@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Portal;
 
+use App\Livewire\Portal\Concerns\WithGatewayLanguage;
 use App\Mail\SigningCode;
 use App\Support\Access;
 use App\Support\MailLocale;
@@ -18,6 +19,8 @@ use Illuminate\Support\Str;
 #[Layout('components.layouts.portal')]
 class SignoffGateway extends Component
 {
+    use WithGatewayLanguage;
+
     // Locked: the browser cannot change which signoff this is, skip a step, or read the OTP.
     #[Locked]
     public $token;
@@ -37,9 +40,23 @@ class SignoffGateway extends Component
     public $signerCompany = '';
     public $signatureBase64 = ''; // Holds the drawn or typed SVG/PNG data
 
+    // Validation messages in the page language (lang/<locale>/gateway.php)
+    protected function messages(): array
+    {
+        return (array) __('gateway.validation.signoff');
+    }
+
     public function mount($token)
     {
         $this->token = $token;
+
+        // The page speaks the organisation's language unless the person already chose one
+        $this->useGatewayLanguage(DB::table('project_signoffs')
+            ->join('projects', 'project_signoffs.project_id', '=', 'projects.id')
+            ->join('organizations', 'projects.organization_id', '=', 'organizations.id')
+            ->where('project_signoffs.token', $token)
+            ->value('organizations.preferred_language'));
+
         $this->loadDocument();
     }
 
@@ -57,7 +74,7 @@ class SignoffGateway extends Component
             ->first();
 
         if (!$this->signoff) {
-            abort(404, 'CRYPTOGRAPHIC MISMATCH: Secure Link Invalid or Expired.');
+            abort(404, __('gateway.signoff.not_found'));
         }
 
         // Never send the OTP to the browser
@@ -99,7 +116,7 @@ class SignoffGateway extends Component
         // At most 3 codes per signoff and IP every 15 minutes
         $limiterKey = 'signoff-otp-send:' . $this->signoff->id . ':' . request()->ip();
         if (RateLimiter::tooManyAttempts($limiterKey, 3)) {
-            session()->flash('error', 'Too many codes requested. Please wait 15 minutes and try again.');
+            session()->flash('error', __('gateway.signoff.too_many_codes'));
             return;
         }
         RateLimiter::hit($limiterKey, 900);
@@ -107,11 +124,11 @@ class SignoffGateway extends Component
         $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $expiresAt = now()->addMinutes(10);
 
+        // project_signoffs has no updated_at column (live schema), so none is written here
         DB::table('project_signoffs')->where('id', $this->signoff->id)->update([
             'auth_otp' => $otp,
             'otp_expires_at' => $expiresAt,
             'status' => 'Awaiting Signature',
-            'updated_at' => now()
         ]);
 
         $email = $this->signoff->signatory_email;
@@ -123,10 +140,10 @@ class SignoffGateway extends Component
         try {
             Mail::to($email)->locale(session()->has('locale') ? MailLocale::forVisitor() : MailLocale::forRecipient($language))
                 ->send(new SigningCode($otp, SigningCode::HANDOVER, $this->signoff->project_title));
-            session()->flash('success', "SECURE OTP DISPATCHED TO: {$email}");
+            session()->flash('success', __('gateway.signoff.code_sent', ['email' => $email]));
         } catch (\Exception $e) {
             Log::error('Signoff OTP email failed', ['signoff_id' => $this->signoff->id, 'message' => $e->getMessage()]);
-            session()->flash('error', 'We could not send the code by email. Please contact your JBS Praxis project lead.');
+            session()->flash('error', __('gateway.signoff.email_failed'));
             return;
         }
 
@@ -142,7 +159,7 @@ class SignoffGateway extends Component
         // At most 5 wrong codes per signoff and IP every 15 minutes
         $limiterKey = 'signoff-otp-check:' . $this->signoff->id . ':' . request()->ip();
         if (RateLimiter::tooManyAttempts($limiterKey, 5)) {
-            session()->flash('error', 'Too many attempts. Please wait 15 minutes and request a new code.');
+            session()->flash('error', __('gateway.signoff.too_many_attempts'));
             return;
         }
 
@@ -150,27 +167,27 @@ class SignoffGateway extends Component
 
         if (!$currentData->auth_otp || !hash_equals((string) $currentData->auth_otp, (string) $this->otpInput)) {
             RateLimiter::hit($limiterKey, 900);
-            session()->flash('error', 'AUTHENTICATION FAILED: Invalid OTP Code.');
+            session()->flash('error', __('gateway.signoff.code_wrong'));
             return;
         }
 
         if (Carbon::parse($currentData->otp_expires_at)->isPast()) {
-            session()->flash('error', 'SESSION TIMEOUT: The 10-minute security window has expired. Please request a new OTP.');
+            session()->flash('error', __('gateway.signoff.code_expired'));
             $this->viewState = 'review';
             $this->otpInput = '';
             return;
         }
 
         // Single use: clear the code, and remember the verification on the server for 30 minutes
-        DB::table('project_signoffs')->where('id', $this->signoff->id)->update(['auth_otp' => null, 'updated_at' => now()]);
+        DB::table('project_signoffs')->where('id', $this->signoff->id)->update(['auth_otp' => null]);
         session()->put($this->otpSessionKey(), now()->addMinutes(30)->timestamp);
         RateLimiter::clear($limiterKey);
 
-        session()->flash('success', 'IDENTITY VERIFIED. CRYPTOGRAPHIC CANVAS UNLOCKED.');
+        session()->flash('success', __('gateway.signoff.code_ok'));
         $this->viewState = 'signature_canvas';
     }
 
-    // --- NEW: THE CRYPTOGRAPHIC BINDING ---
+    // --- Signing: records the signature and its SHA-256 fingerprint ---
     public function bindContract()
     {
         if ($this->isSealed()) {
@@ -180,7 +197,7 @@ class SignoffGateway extends Component
 
         $verifiedUntil = session()->get($this->otpSessionKey());
         if (!$verifiedUntil || $verifiedUntil < now()->timestamp) {
-            session()->flash('error', 'Please verify your email code before signing.');
+            session()->flash('error', __('gateway.signoff.verify_first'));
             $this->viewState = 'review';
             return;
         }
@@ -192,12 +209,12 @@ class SignoffGateway extends Component
             'signatureBase64' => 'required|string|max:500000'
         ]);
 
-        // 1. Capture Telemetry
+        // 1. Record where the signature came from
         $ipAddress = request()->ip();
         $userAgent = request()->userAgent();
         $timestamp = now();
 
-        // 2. Generate the Immutable Payload String
+        // 2. The signed content, as one string
         $payloadString = $this->signoff->executive_summary .
                          $this->signoff->roi_metrics_achieved .
                          $this->signatureBase64 .
@@ -222,20 +239,19 @@ class SignoffGateway extends Component
                     'client_signature_hash' => $hash,
                     'status' => 'Signed',
                     'signed_at' => $timestamp,
-                    'updated_at' => $timestamp
                 ]);
 
             if (!$updated) {
                 return;
             }
 
-            // Notify Command Team of successful signoff
+            // Tell the staff who approve sign-offs
             $notifications = [];
             foreach(Access::staffWith('signoffs.approve') as $adminId) {
                 $notifications[] = [
                     'id' => (string) Str::uuid(), 'user_id' => $adminId,
-                    'title' => 'CRYPTOGRAPHIC SIGNOFF SECURED',
-                    'message' => "Project '{$this->signoff->project_title}' has been legally signed and hashed by {$this->signerName}.",
+                    'title' => 'Project handover signed off',
+                    'message' => "{$this->signerName} signed off the handover of ‘{$this->signoff->project_title}’. The signed record is in Sign-offs.",
                     'type' => 'Project', 'created_at' => now()
                 ];
             }
@@ -247,11 +263,11 @@ class SignoffGateway extends Component
         // 5. Update State
         $this->loadDocument(); // Refresh to pull the new status
         $this->viewState = 'completed';
-        session()->flash('success', 'CONTRACT MATHEMATICALLY BOUND AND HASHED.');
+        session()->flash('success', __('gateway.signoff.signed'));
     }
 
     public function render()
     {
-        return view('livewire.portal.signoff-gateway');
+        return view('livewire.portal.signoff-gateway')->title(__('gateway.signoff.page_title'));
     }
 }

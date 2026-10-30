@@ -124,9 +124,9 @@
                     <thead>
                         <tr>
                             <th>Band</th>
-                            <th class="num">From</th>
-                            <th class="num">To</th>
-                            <th class="num">Rate</th>
+                            <th class="num text-right">From</th>
+                            <th class="num text-right">To</th>
+                            <th class="num text-right">Rate</th>
                             <th><span class="sr-only">Actions</span></th>
                         </tr>
                     </thead>
@@ -138,7 +138,7 @@
                                 <td class="num">{{ $band->upper_limit ? number_format($band->upper_limit, 0) : 'No limit' }}</td>
                                 <td class="num">{{ rtrim(rtrim(number_format($band->tax_rate * 100, 2), '0'), '.') }}%</td>
                                 <td class="text-right">
-                                    <button type="button" wire:click="removeTaxBand('{{ $band->id }}')" class="btn btn-ghost btn-sm" style="color: var(--color-danger);" aria-label="Remove band {{ $band->band_name }}" onclick="confirm('Remove this tax band? Payroll runs created after this use the remaining bands.') || event.stopImmediatePropagation()"><i data-lucide="trash-2"></i></button>
+                                    <button type="button" wire:click="removeTaxBand('{{ $band->id }}')" class="btn btn-ghost btn-sm" style="color: var(--color-danger);" aria-label="Remove band {{ $band->band_name }}" wire:confirm="Remove the tax band {{ $band->band_name }}? Payroll runs created after this use the remaining bands."><i data-lucide="trash-2"></i></button>
                                 </td>
                             </tr>
                         @empty

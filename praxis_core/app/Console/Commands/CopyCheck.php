@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\File;
 use Symfony\Component\Finder\Finder;
 
 /**
- * Finds retired wording and shouting capitals in what people read on HQ, the Client Portal and in emails
- * (docs/BRAND.md section 5; the list is docs/glossary.csv). Only visible text is checked: template text,
+ * Finds retired wording, shouting capitals and straight apostrophes in what people read on HQ, the Client
+ * Portal and in emails (docs/BRAND.md sections 4 and 5; the word list is docs/glossary.csv). Only visible text is checked: template text,
  * placeholder/title/label attributes, and messages in flash(), addError() and notification titles.
  * Code names (routes, variables, classes, database columns) are ignored.
  *
@@ -19,7 +19,7 @@ class CopyCheck extends Command
 {
     protected $signature = 'app:copy-check {--path=* : files or folders, relative to praxis_core} {--summary : counts per file only}';
 
-    protected $description = 'Find retired wording and all-caps text in HQ, portal and email screens';
+    protected $description = 'Find retired wording, all-caps text and straight apostrophes in HQ, portal and email screens';
 
     private const DEFAULT_PATHS = [
         'resources/views/livewire/hq', 'resources/views/components/hq', 'resources/views/livewire/client-os',
@@ -27,6 +27,8 @@ class CopyCheck extends Command
         'resources/views/components/layouts', 'resources/views/layouts/portal.blade.php', 'resources/views/layouts/client-light.blade.php',
         'resources/views/emails', 'resources/views/components/mail', 'resources/views/partials',
         'app/Livewire/Hq', 'app/Livewire/ClientOs', 'app/Livewire/Portal', 'app/Livewire/Tracker', 'app/Mail', 'lang/en/emails', 'lang/fr/emails',
+        // Scheduled commands and website forms that write the notifications staff read in HQ
+        'app/Console/Commands', 'app/Livewire/ScheduleConsultation.php', 'app/Livewire/ContactHub.php', 'app/Livewire/Kaizen.php',
     ];
 
     /** Capitalised words that are fine: acronyms and codes */
@@ -51,6 +53,11 @@ class CopyCheck extends Command
                 }
                 if ($caps = $this->shouting($text)) {
                     $hits[] = [$rel, $line, "capitals: {$caps}", $text];
+                }
+                // Typographic apostrophe in what people read (section 4): can’t, not can't. Matches the
+                // escaped form too (can\'t inside a single-quoted PHP string)
+                if (preg_match("~\p{L}\\\\?'\p{L}~u", $text, $m)) {
+                    $hits[] = [$rel, $line, "straight apostrophe \"" . str_replace('\\', '', $m[0]) . "\" → ’ (U+2019)", $text];
                 }
             }
         }

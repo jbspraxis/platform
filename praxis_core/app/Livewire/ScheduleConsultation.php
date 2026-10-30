@@ -233,7 +233,7 @@ class ScheduleConsultation extends Component
             DB::table('appointments')->insert([
                 'id' => $appointmentId,
                 'organization_id' => $orgId,
-                'title' => 'Executive Consultation: ' . $finalFocus,
+                'title' => 'Free audit: ' . $finalFocus,
                 'start_time' => $startDateTime,
                 'end_time' => $endDateTime,
                 'status' => 'Requested',
@@ -249,8 +249,8 @@ class ScheduleConsultation extends Component
                 $notifications[] = [
                     'id' => (string) Str::uuid(),
                     'user_id' => $adminId,
-                    'title' => 'NEW CONSULTATION REQUEST',
-                    'message' => strtoupper(trim($this->enterpriseName)) . " requested a meeting for " . $startDateTime->format('M d @ H:i') . ". Awaiting approval in the Lobby.",
+                    'title' => 'New free audit request',
+                    'message' => trim($this->enterpriseName) . " asked for a free audit on " . $startDateTime->format('j M, H:i') . " (WAT). Approve or move it in Free audits.",
                     'link_url' => route('hq.crm.consult', [], false),
                     'type' => 'System',
                     'is_read' => 0,

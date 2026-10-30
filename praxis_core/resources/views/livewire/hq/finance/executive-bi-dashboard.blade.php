@@ -17,7 +17,10 @@
     </div>
 
     @if(session()->has('success'))
-        <div class="alert alert-info mb-6" role="status"><i data-lucide="info"></i><span>{{ session('success') }}</span></div>
+        <div class="alert alert-success mb-6" role="status"><i data-lucide="check-circle"></i><span>{{ session('success') }}</span></div>
+    @endif
+    @if(session()->has('info'))
+        <div class="alert alert-info mb-6" role="status"><i data-lucide="info"></i><span>{{ session('info') }}</span></div>
     @endif
 
     <div class="card mb-6">
@@ -171,7 +174,7 @@
             const ctx = document.getElementById('financialTrendChart');
             if (!ctx || typeof Chart === 'undefined') return;
 
-            // Destroy the existing chart so they don't overlap
+            // Destroy the existing chart so they don’t overlap
             if (window.financialChart) {
                 window.financialChart.destroy();
             }
@@ -186,9 +189,8 @@
             const ink = token('--color-ink', '#0C142B');
             const font = { family: "'Plus Jakarta Sans', 'Segoe UI', Arial, sans-serif", size: 12 };
 
-            const area = ctx.getContext('2d').createLinearGradient(0, 0, 0, 320);
-            area.addColorStop(0, 'rgba(12, 139, 155, 0.18)');
-            area.addColorStop(1, 'rgba(12, 139, 155, 0)');
+            const paper = token('--color-paper', '#FFFFFF');
+            const area = token('--color-teal-tint', '#E3F2F3');
 
             window.financialChart = new Chart(ctx, {
                 type: 'line',
@@ -203,7 +205,7 @@
                             borderWidth: 2,
                             tension: 0.3,
                             fill: true,
-                            pointBackgroundColor: '#FFFFFF',
+                            pointBackgroundColor: paper,
                             pointBorderColor: petrol,
                             pointRadius: 3
                         },
@@ -215,7 +217,7 @@
                             borderWidth: 2,
                             tension: 0.3,
                             borderDash: [4, 2],
-                            pointBackgroundColor: '#FFFFFF',
+                            pointBackgroundColor: paper,
                             pointBorderColor: teal,
                             pointRadius: 3
                         }
@@ -227,7 +229,7 @@
                     color: muted,
                     plugins: {
                         legend: { position: 'bottom', labels: { color: muted, font: font, usePointStyle: true } },
-                        tooltip: { backgroundColor: ink, titleColor: '#FFFFFF', bodyColor: '#FFFFFF', padding: 10, titleFont: font, bodyFont: font, callbacks: { label: (c) => c.dataset.label + ': ' + c.parsed.y.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } }
+                        tooltip: { backgroundColor: ink, titleColor: paper, bodyColor: paper, padding: 10, titleFont: font, bodyFont: font, callbacks: { label: (c) => c.dataset.label + ': ' + c.parsed.y.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } }
                     },
                     scales: {
                         y: { beginAtZero: true, grid: { color: line }, border: { display: false }, ticks: { color: muted, font: font, callback: (value) => value.toLocaleString('en-GB') } },

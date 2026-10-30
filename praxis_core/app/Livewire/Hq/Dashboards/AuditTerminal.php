@@ -7,6 +7,7 @@ use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
 use Carbon\Carbon;
+use App\Livewire\Hq\HqMoney;
 
 #[Layout('components.layouts.hq')]
 class AuditTerminal extends Component
@@ -25,9 +26,10 @@ class AuditTerminal extends Component
     {
         // THE SAFETY NET: Pre-fill every possible key the frontend might ask for.
         // This guarantees you will NEVER get an "Undefined array key" error here again.
+        // Money figures are kept per currency (['NGN' => 3332.5, 'USD' => 322.5]), never added across currencies.
         $this->kpis = [
-            'ytd_cleared_revenue' => 0,
-            'ytd_vat_liability' => 0,
+            'ytd_cleared_revenue' => [],
+            'ytd_vat_liability' => [],
             'verified_transactions' => 0, 
             'escrow_verifications' => 0, 
             'pending_escrow' => 0,
@@ -38,15 +40,13 @@ class AuditTerminal extends Component
             $currentYear = Carbon::now()->year;
 
             // 1. Financial KPIs
-            $this->kpis['ytd_cleared_revenue'] = DB::table('invoices')
+            $this->kpis['ytd_cleared_revenue'] = HqMoney::sumByCurrency(DB::table('invoices')
                 ->where('status', 'Paid')
-                ->whereYear('paid_at', $currentYear)
-                ->sum('total_amount');
-                
-            $this->kpis['ytd_vat_liability'] = DB::table('invoices')
+                ->whereYear('paid_at', $currentYear), 'total_amount');
+
+            $this->kpis['ytd_vat_liability'] = HqMoney::sumByCurrency(DB::table('invoices')
                 ->where('status', 'Paid')
-                ->whereYear('paid_at', $currentYear)
-                ->sum('vat_amount');
+                ->whereYear('paid_at', $currentYear), 'vat_amount');
 
             // Map the same DB count to both possible keys just to be perfectly safe
             $verifiedCount = DB::table('transactions')

@@ -4,15 +4,18 @@
         // The permission keys stay as they are.
         $moduleLabels = [
             'staff' => [
-                'dashboard' => 'Overview', 'projects' => 'Projects and sprints', 'qa' => 'Quality and issues',
-                'kaizen' => 'JBS Praxis Insights articles', 'crm' => 'Leads and proposals', 'finance' => 'Invoices, ledger and budgets',
-                'payroll' => 'Payroll and tax', 'hr' => 'People and HR', 'access' => 'Accounts, roles and permissions', 'system' => 'System Health',
+                'dashboard' => 'Overview', 'projects' => 'Projects', 'qa' => 'Quality and issues',
+                'kaizen' => 'JBS Praxis Insights articles', 'crm' => 'Leads and proposals', 'finance' => 'Finance',
+                'payroll' => 'Payroll and tax', 'hr' => 'Team', 'access' => 'Accounts, roles and permissions', 'system' => 'System health',
             ],
             'client' => [
-                'projects' => 'Projects and progress', 'qa' => 'Issues and messages', 'billing' => 'Invoices and payments',
+                'projects' => 'Overview and project progress', 'qa' => 'Quality and issues', 'billing' => 'Invoices and payments',
                 'documents' => 'Documents', 'support' => 'Urgent support',
             ],
         ][$audience] ?? [];
+        // Client Portal roles are shown with the names clients see in the portal (lang/en/portal.php, roles); stored names stay as they are
+        $roleLabel = fn ($name) => ($audience === 'client' && \Illuminate\Support\Facades\Lang::has('portal.roles.' . $name, 'en'))
+            ? __('portal.roles.' . $name, [], 'en') : $name;
     @endphp
 
     <div class="page-header">
@@ -38,7 +41,7 @@
                             style="padding: 12px 16px; cursor: pointer; {{ $roleId === $role->id ? 'box-shadow: inset 2px 0 0 var(--color-deep-teal);' : '' }}"
                             @if($roleId === $role->id) aria-current="true" @endif>
                         <span class="flex items-center gap-2 text-ink" style="font-weight: 600;">
-                            {{ $role->name }}
+                            {{ $roleLabel($role->name) }}
                             @if($role->is_protected)
                                 <span class="pill pill-warning">Protected</span>
                             @endif
@@ -71,7 +74,7 @@
             @if($current?->is_protected)
                 <div class="alert alert-info" style="margin-bottom: 20px;">
                     <i data-lucide="lock"></i>
-                    <span>The Owner role always has every permission, including modules added later. It can't be edited or deleted.</span>
+                    <span>The Owner role always has every permission, including modules added later. It can’t be edited or deleted.</span>
                 </div>
             @endif
 
@@ -135,7 +138,7 @@
                         <button type="button" wire:click="save" class="btn btn-primary">{{ $roleId ? 'Save role' : 'Create role' }}</button>
                     @endif
                     @if($canDelete)
-                        <button type="button" wire:click="deleteRole" wire:confirm="Delete the role {{ $current->name }}? This can't be undone." class="btn btn-danger">Delete role</button>
+                        <button type="button" wire:click="deleteRole" wire:confirm="Delete the role {{ $roleLabel($current->name) }}? This can’t be undone." class="btn btn-danger">Delete role</button>
                     @endif
                 </div>
             @endif
@@ -145,7 +148,7 @@
                     <h2 class="card-title" style="font-size: 0.875rem;">Staff with this role</h2>
                     <div class="flex flex-wrap gap-2" style="margin-top: 8px;">
                         @foreach($members as $m)
-                            <span class="pill {{ $m->status === 'Active' ? 'pill-neutral' : 'pill-danger' }}">
+                            <span class="tag" @if($m->status !== 'Active') style="color: var(--color-danger);" @endif>
                                 {{ $m->first_name }} {{ $m->last_name }}{{ $m->status === 'Active' ? '' : ' (suspended)' }}
                             </span>
                         @endforeach
@@ -155,8 +158,8 @@
 
             @if($audience === 'client')
                 <p class="help" style="margin: 24px 0 0;">
-                    Each client's primary contact gives Client Portal roles to their team in the portal (Team tab). You can also give them on the Accounts screen.
-                    A client organisation's primary contact always has the Client Admin role.
+                    Each client’s primary contact gives Client Portal roles to their team in the portal (Team tab). You can also give them on the Accounts screen.
+                    A client organisation’s primary contact always has the Administrator role.
                 </p>
             @endif
         </div>

@@ -43,7 +43,7 @@ class ChartOfAccountsManager extends Component
 
     public function updatedParentAccountId($value)
     {
-        // Auto-match the account type to the parent's type to prevent IFRS mismatch
+        // Auto-match the account type to the parent’s type to prevent IFRS mismatch
         if (!empty($value)) {
             $parent = collect($this->parentAccounts)->firstWhere('id', $value);
             if ($parent) {
@@ -81,7 +81,7 @@ class ChartOfAccountsManager extends Component
             });
         } catch (Exception $e) {
             report($e);
-            session()->flash('error', "We couldn't create the account. Try again, and if it still fails, ask an administrator to check the error log.");
+            session()->flash('error', "We couldn’t create the account. Try again, and if it still fails, ask an administrator to check the error log.");
         }
 
         $this->reset(['account_name', 'parent_account_id', 'showModal']);
@@ -135,7 +135,7 @@ class ChartOfAccountsManager extends Component
         
         if ($acc) {
             if ($acc->is_system_locked) {
-                session()->flash('error', "This account is built into the system, so it can't be deactivated.");
+                session()->flash('error', "This account is built into the system, so it can’t be deactivated.");
                 return;
             }
 
@@ -147,7 +147,7 @@ class ChartOfAccountsManager extends Component
     }
 
     /**
-     * Creates a client's receivable account (static).
+     * Creates a client’s receivable account (static).
      * Called from ProposalGateway when a statement of work is signed.
      */
     public static function provisionClientAccounts($clientId, $clientName)
@@ -175,7 +175,7 @@ class ChartOfAccountsManager extends Component
                     $newCode = $parentAR->account_code . '-0001';
                 }
 
-                // Create the client's locked receivable account
+                // Create the client’s locked receivable account
                 DB::table('chart_of_accounts')->insert([
                     'account_code' => $newCode,
                     'account_name' => 'A/R - ' . strtoupper($clientName),
@@ -188,6 +188,16 @@ class ChartOfAccountsManager extends Component
                 ]);
             }
         }
+    }
+
+    /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
+    protected function validationAttributes(): array
+    {
+        return [
+            'account_name' => 'account name',
+            'account_type' => 'account type',
+            'parent_account_id' => 'parent account',
+        ];
     }
 
     public function render()

@@ -97,7 +97,7 @@ class EscrowVerification extends Component
             }
             $invoice = DB::table('invoices')->where('id', $tx->invoice_id)->lockForUpdate()->first();
             if (!$invoice || $invoice->status === 'Cancelled') {
-                return "The invoice for this payment is cancelled, so the payment can't be verified. Mark the payment as not verified, or create a new invoice.";
+                return "The invoice for this payment is cancelled, so the payment can’t be verified. Mark the payment as not verified, or create a new invoice.";
             }
 
             // 1. Mark Transaction as Verified and lock the write-off amount
@@ -198,7 +198,25 @@ class EscrowVerification extends Component
 
         $this->showVerifyModal = false;
         $this->loadTransactions();
-        session()->flash('error', 'Payment marked as not verified. The invoice stays unpaid; let the client know what to send instead.');
+        session()->flash('warning', 'Payment marked as not verified. The invoice stays unpaid; let the client know what to send instead.');
+    }
+
+    /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
+    protected function validationAttributes(): array
+    {
+        return [
+            'extend_guillotine_days' => 'extra days to pay the balance',
+            'tolerance_writeoff' => 'fee write-off',
+        ];
+    }
+
+    /** Validation messages that say what to enter instead */
+    public function messages(): array
+    {
+        return [
+            'extend_guillotine_days.min' => 'Enter 0 or more extra days.',
+            'tolerance_writeoff.min' => 'Enter a fee write-off of 0 or more.',
+        ];
     }
 
     public function render()

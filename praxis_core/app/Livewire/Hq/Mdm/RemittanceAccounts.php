@@ -104,7 +104,7 @@ class RemittanceAccounts extends Component
                     
                     // B. Fetch Parent ID
                     $parentAccount = DB::table('chart_of_accounts')->where('account_code', $parentCode)->first();
-                    if (!$parentAccount) throw new Exception("We couldn't add the account because parent account {$parentCode} is missing from the chart of accounts. Add it in Chart of accounts, then try again.");
+                    if (!$parentAccount) throw new Exception("We couldn’t add the account because parent account {$parentCode} is missing from the chart of accounts. Add it in Chart of accounts, then try again.");
 
                     // C. Auto-Generate the next logical Account Code (e.g., if 1011 exists, make 1012)
                     $latestChild = DB::table('chart_of_accounts')
@@ -121,7 +121,7 @@ class RemittanceAccounts extends Component
                         'account_name' => $this->provider_name . ' (' . $this->account_name . ')',
                         'account_type' => 'Asset', // Treasury accounts are always Assets
                         'is_active' => 1,
-                        'is_system_locked' => 0, // Unlocked because it's a dynamic sub-account
+                        'is_system_locked' => 0, // Unlocked because it’s a dynamic sub-account
                         'created_at' => now(),
                     ]);
 
@@ -171,7 +171,7 @@ class RemittanceAccounts extends Component
                 'updated_at' => now()
             ]);
 
-            // 2. Mirror status to Chart of Accounts so accountants can't post to frozen accounts
+            // 2. Mirror status to Chart of Accounts so accountants can’t post to frozen accounts
             $record = DB::table('mdm_remittance_accounts')->where('id', $id)->first();
             if ($record && $record->ledger_account_id) {
                 DB::table('chart_of_accounts')->where('id', $record->ledger_account_id)->update([
@@ -192,6 +192,18 @@ class RemittanceAccounts extends Component
     public function closeSuccessModal()
     {
         $this->showSuccessModal = false;
+    }
+
+    /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
+    protected function validationAttributes(): array
+    {
+        return [
+            'type' => 'account type',
+            'provider_name' => 'bank or provider name',
+            'account_name' => 'account name',
+            'account_reference' => 'account number, IBAN or wallet address',
+            'routing_code' => 'SWIFT, routing or short code',
+        ];
     }
 
     public function render()

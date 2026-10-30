@@ -78,7 +78,7 @@
         </div>
 
         <div class="card" style="padding: 0; overflow: hidden;">
-            <div class="table-wrap" style="max-height: 65vh; overflow-y: auto;">
+            <div class="table-wrap">
                 <table class="table">
                     <thead>
                         <tr>
@@ -94,7 +94,7 @@
                         <tr>
                             <td>
                                 <div class="text-ink" style="font-weight: 600;">{{ $acc->provider_name }}</div>
-                                <span class="pill pill-neutral" style="margin-top: 4px;">{{ $typeLabels[$acc->type] ?? $acc->type }}</span>
+                                <span class="tag" style="margin-top: 4px;">{{ $typeLabels[$acc->type] ?? $acc->type }}</span>
                             </td>
                             <td>
                                 <div class="text-ink" style="font-variant-numeric: tabular-nums; font-weight: 600; word-break: break-all;">{{ $acc->account_reference }}</div>

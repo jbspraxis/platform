@@ -10,12 +10,9 @@
         ];
         $stageLabel = fn ($stage) => $stageLabels[$stage] ?? $stage;
         $tierLabel = fn ($tier) => match ((int) $tier) { 1 => 'Tier 1: enterprise', 2 => 'Tier 2: mid-market', default => 'Tier 3: small business' };
-        $tierPill = fn ($tier) => (int) $tier === 1 ? 'pill-info' : 'pill-neutral';
-        $money = fn ($currency, $amount) => match ($currency) {
-            'NGN' => '₦' . number_format($amount),
-            'XAF', 'XOF' => number_format($amount) . ' FCFA',
-            default => trim($currency . ' ' . number_format($amount)),
-        };
+        // The tier is a category, not a status: a plain tag (app.css .tag), tinted for tier 1
+        $tierStyle = fn ($tier) => (int) $tier === 1 ? 'background: var(--color-teal-tint); color: var(--color-petrol);' : '';
+        $money = fn ($currency, $amount) => \App\Livewire\Hq\HqMoney::format($currency, $amount, 0);
     @endphp
 
     <style>
@@ -98,7 +95,7 @@
                                 <div class="text-ink">{{ $lead->executive_name }}</div>
                                 <div class="text-caption text-muted">{{ $lead->corporate_email }}</div>
                             </td>
-                            <td><span class="pill {{ $tierPill($lead->lead_tier) }}">{{ $tierLabel($lead->lead_tier) }}</span></td>
+                            <td><span class="tag" style="{{ $tierStyle($lead->lead_tier) }}">{{ $tierLabel($lead->lead_tier) }}</span></td>
                             <td>{{ $stageLabel($lead->pipeline_stage) }}</td>
                             <td class="num">
                                 @if($lead->calculated_leakage)
@@ -200,7 +197,7 @@
                 <div>
                     <div class="flex flex-wrap items-center gap-2">
                         <h2 id="lead-drawer-title" class="section-title" style="margin: 0;">{{ $selectedLead->company_name }}</h2>
-                        <span class="pill {{ $tierPill($selectedLead->lead_tier) }}">{{ $tierLabel($selectedLead->lead_tier) }}</span>
+                        <span class="tag" style="{{ $tierStyle($selectedLead->lead_tier) }}">{{ $tierLabel($selectedLead->lead_tier) }}</span>
                     </div>
                     <div class="text-small text-muted mt-1">{{ $selectedLead->executive_name }}@if($selectedLead->corporate_email) · {{ strtolower($selectedLead->corporate_email) }}@endif</div>
                 </div>
@@ -271,7 +268,7 @@
                 @else
                     <div class="card empty-state" style="padding: 24px;">
                         <strong>Not scored yet</strong>
-                        This lead has no cost of poor quality estimate. To score it, add the lead again with the same organisation name and enter its figures.
+                        This lead has no cost of poor quality estimate yet. Calculate one from Free audits, or book a free audit to collect the figures.
                     </div>
                 @endif
 
@@ -349,7 +346,7 @@
             <div class="lr-drawer-head">
                 <div>
                     <h2 id="intake-title" class="section-title" style="margin: 0;">Add lead</h2>
-                    <p class="text-small text-muted" style="margin: 4px 0 0;">Enter the organisation's figures. We calculate its cost of poor quality estimate and add it to the pipeline.</p>
+                    <p class="text-small text-muted" style="margin: 4px 0 0;">Enter the organisation’s figures. We calculate its cost of poor quality estimate and add it to the pipeline.</p>
                 </div>
                 <button type="button" wire:click="closeIntakeModal" class="btn btn-ghost btn-sm" aria-label="Close"><i data-lucide="x"></i></button>
             </div>

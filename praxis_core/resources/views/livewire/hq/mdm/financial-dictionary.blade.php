@@ -107,7 +107,7 @@
                             <th>Code</th>
                             <th style="min-width: 200px;">Description and category</th>
                             <th>Income and expense accounts</th>
-                            <th class="num">Base rate</th>
+                            <th class="num text-right">Base rate</th>
                             <th>Status</th>
                             <th><span class="sr-only">Actions</span></th>
                         </tr>
@@ -122,7 +122,7 @@
 
                             <td>
                                 <div class="text-ink">{{ $item->description }}</div>
-                                <span class="pill pill-neutral" style="margin-top: 6px;">{{ $availableCategories[$item->category]['label'] ?? $item->category }}</span>
+                                <span class="tag" style="margin-top: 6px;">{{ $availableCategories[$item->category]['label'] ?? $item->category }}</span>
                             </td>
 
                             <td style="font-variant-numeric: tabular-nums; white-space: nowrap;">

@@ -18,7 +18,7 @@
     <div class="page-header">
         <div>
             <h1 class="page-title">Variable pay</h1>
-            <p class="page-subtitle">Enter each month's bonuses and one-off deductions before the payroll run. Months in an approved payroll run are locked.</p>
+            <p class="page-subtitle">Enter each month’s bonuses and one-off deductions before the payroll run. Months in an approved payroll run are locked.</p>
         </div>
     </div>
 
@@ -65,7 +65,7 @@
                     <thead>
                         <tr>
                             <th style="min-width: 200px;">Staff member</th>
-                            <th style="width: 150px;">Seniority bonus (prime d'ancienneté)</th>
+                            <th style="width: 150px;">Seniority bonus (prime d’ancienneté)</th>
                             <th style="width: 150px;">Performance bonus</th>
                             <th style="width: 150px;">13th-month pay</th>
                             <th style="width: 150px;">Other deductions</th>
@@ -99,7 +99,7 @@
                                 </td>
                                 <td>
                                     @if($data['is_processed'])
-                                        <span class="pill pill-neutral"><i data-lucide="lock" style="width: 12px; height: 12px;"></i> Locked</span>
+                                        <span class="pill pill-neutral">Locked</span>
                                     @else
                                         <span class="pill pill-info">Open</span>
                                     @endif
@@ -110,7 +110,7 @@
                                 <td colspan="6">
                                     <div class="empty-state">
                                         <strong>No active staff members for this country</strong>
-                                        Staff members appear here once they're active in the staff directory. Choose another country to see others.
+                                        Staff members appear here once they’re active in the staff directory. Choose another country to see others.
                                     </div>
                                 </td>
                             </tr>

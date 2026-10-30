@@ -1,1343 +1,997 @@
-@section('robots', 'noindex, nofollow')
-<div style="min-height: 100vh; background-color: #03050A; font-family: 'Inter', sans-serif; color: #FFFFFF; display: flex; flex-direction: column;" x-data="{ showGuide: false, showQaOffcanvas: false, mobileMenuOpen: false }" @open-qa.window="showQaOffcanvas = true" @close-qa.window="showQaOffcanvas = false">    
-    
-    <!-- THE BRAND ENGINE: DYNAMIC CSS INJECTION -->
+{{-- The Client Portal (docs/BRAND.md sections 9, 12 and 14): Ink rail, white top bar with the organisation and the
+     language switch, light workspace with white cards. Every label is in lang/<locale>/portal.php (English and French). --}}
+@use('App\Livewire\ClientOs\PortalFormat')
+@php
+    // Stored values (statuses, severities, methods) stay in English in the database; these are their labels
+    $label = function (string $group, $value) {
+        $map = trans('portal.' . $group);
+        return is_array($map) ? ($map[(string) $value] ?? (string) $value) : (string) $value;
+    };
+    $pills = [
+        'project' => ['Active' => 'pill-success', 'Scoping' => 'pill-warning', 'Locked' => 'pill-warning', 'Completed' => 'pill-info', 'Cancelled' => 'pill-neutral'],
+        'task' => ['To-Do' => 'pill-neutral', 'In-Progress' => 'pill-info', 'QA_Review' => 'pill-warning', 'Failed' => 'pill-danger', 'Done' => 'pill-success'],
+        'issue' => ['Open' => 'pill-warning', 'Investigating' => 'pill-info', 'Resolved' => 'pill-success', 'Closed' => 'pill-neutral'],
+        'severity' => ['Low' => 'pill-neutral', 'Medium' => 'pill-info', 'Critical' => 'pill-danger'],
+        'invoice' => ['Pending' => 'pill-info', 'Overdue' => 'pill-danger', 'Paid' => 'pill-success', 'Cancelled' => 'pill-neutral'],
+        'account' => ['Active' => 'pill-success', 'Suspended' => 'pill-danger'],
+    ];
+    $pill = fn (string $group, $value) => $pills[$group][(string) $value] ?? 'pill-neutral';
+    // Older tickets were saved with a "[DIRECT COMM] " / "[BUG REPORT] " prefix; the type now shows as a label
+    $ticketTitle = fn ($title) => preg_replace('/^\[(DIRECT COMM|BUG REPORT)\]\s*/', '', (string) $title);
+    $roleLabel = fn ($name) => trans('portal.roles')[$name] ?? $name;
+    // Notes the portal itself writes on a task (stored in English), shown in the page's language
+    $activityText = function ($text) {
+        $approved = [__('portal.tasks.approved_comment', [], 'en'), '[CLIENT VERIFICATION] Deliverable approved and structurally locked.'];
+        $fromIssue = [__('portal.tasks.approved_from_issue_comment', [], 'en'), '[CLIENT VERIFICATION] Deliverable verified and locked directly from QA Hub override.'];
+        return in_array($text, $approved, true) ? __('portal.overview.log_approved')
+            : (in_array($text, $fromIssue, true) ? __('portal.overview.log_approved_from_issue') : (string) $text);
+    };
+
+    // Sections: [permission, icon]. scripts/icons.mjs bundles only icons named in the views, so the loop's icons are
+    // listed here: data-lucide="layout-dashboard" data-lucide="list-checks" data-lucide="shield-alert"
+    // data-lucide="credit-card" data-lucide="file-text" data-lucide="users" data-lucide="lock" data-lucide="clock" data-lucide="triangle-alert"
+    $tabs = [
+        'overview' => ['projects.view', 'layout-dashboard'], 'sprints' => ['projects.view', 'list-checks'],
+        'qa_hub' => ['qa.view', 'shield-alert'], 'financials' => ['billing.view', 'credit-card'],
+        'vault' => ['documents.view', 'file-text'], 'team' => ['team.view', 'users'],
+    ];
+
+    // The organisation's main colour marks the selected section and the progress bar (only a valid hex colour)
+    $clientColour = ($clientSettings && preg_match('/^#[0-9a-fA-F]{6}$/', (string) ($clientSettings->primary_color ?? ''))) ? $clientSettings->primary_color : null;
+    $initials = mb_strtoupper(mb_substr((string) $user->first_name, 0, 1) . mb_substr((string) $user->last_name, 0, 1)) ?: 'JP';
+    $emailDomain = strtolower(substr((string) strrchr((string) $user->email, '@'), 1));
+@endphp
+<div class="portal-app"
+     style="--portal-accent: {{ $clientColour ?? 'var(--color-deep-teal)' }}; --portal-indicator: {{ $clientColour ?? 'var(--color-bright-teal)' }};"
+     x-data="{ showGuide: false, showQaOffcanvas: false, mobileMenuOpen: false }"
+     @open-qa.window="showQaOffcanvas = true" @close-qa.window="showQaOffcanvas = false"
+     @keydown.escape.window="showGuide = false; showQaOffcanvas = false">
+
     <style>
-        /* --- GLOBAL RESETS (Zero Horizontal Scroll) --- */
-        *, *::before, *::after { box-sizing: border-box; }
-        html, body { margin: 0; padding: 0; overflow-x: hidden; width: 100%; max-width: 100vw; }
+        /* Portal-only layout on top of the shared shell (resources/css/app.css); brand tokens only */
+        .portal-app .rail-link { width: 100%; border-top: 0; border-right: 0; border-bottom: 0; background: transparent; font-family: inherit; text-align: left; cursor: pointer; }
+        .portal-app .rail-link.is-active { border-left-color: var(--portal-indicator); }
+        .portal-app .rail-link.is-locked { opacity: 0.6; }
+        .portal-app .rail-link .portal-lock { width: 14px; height: 14px; margin-left: auto; }
+        .portal-app .rail-head { justify-content: space-between; gap: 12px; }
+        .portal-app .rail-foot { display: flex; flex-direction: column; gap: 2px; padding: 12px; }
+        .portal-menu-btn { display: none; }
+        .portal-mobile-only { display: none; }
 
-        :root {
-            /* Fallback to JBS Praxis Defaults if client has no settings */
-            --brand-primary: {{ $clientSettings->primary_color ?? '#00E5FF' }};
-            --brand-secondary: {{ $clientSettings->secondary_color ?? '#FF3366' }};
-            --brand-accent: {{ $clientSettings->accent_color ?? '#FFBD2E' }};
-            --brand-bg: #03050A;
-            --brand-panel: rgba(10, 17, 40, 0.85);
-            --brand-border: rgba(255, 255, 255, 0.1);
-        }
+        .portal-progress { height: 8px; border-radius: 999px; background: var(--color-mist); overflow: hidden; }
+        .portal-progress > span { display: block; height: 100%; border-radius: 999px; background: var(--portal-accent); }
 
-        /* --- LIVEWIRE DOM MORPH ANIMATIONS --- */
-        .wire-modal-enter { animation: modalEnter 0.4s cubic-bezier(0.25, 1, 0.3, 1) forwards; }
-        @keyframes modalEnter { 
-            0% { opacity: 0; transform: scale(0.95) translateY(10px); } 
-            100% { opacity: 1; transform: scale(1) translateY(0); } 
-        }
+        /* Phases: horizontal rules only, dots for each phase (scrolls inside the card on small screens) */
+        .portal-phases-wrap { position: relative; }
+        .portal-phases-wrap::before { content: ""; position: absolute; top: 15px; left: 0; right: 0; height: 2px; background: var(--color-line); }
+        .portal-phases { position: relative; display: flex; list-style: none; margin: 0; padding: 0; }
+        .portal-phases-done { position: absolute; top: 15px; left: 0; height: 2px; background: var(--portal-accent); }
+        .portal-phase { position: relative; flex: 1 1 0; min-width: 132px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0 8px; text-align: center; }
+        .portal-phase-dot { position: relative; z-index: 1; width: 32px; height: 32px; margin-bottom: 6px; border-radius: 50%; display: grid; place-items: center; background: var(--color-paper); border: 2px solid var(--color-line-strong); color: var(--color-muted); font-size: 0.8125rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .portal-phase-dot svg { width: 16px; height: 16px; }
+        .portal-phase.is-done .portal-phase-dot { background: var(--color-deep-teal); border-color: var(--color-deep-teal); color: #fff; }
+        .portal-phase.is-active .portal-phase-dot { background: var(--color-teal-tint); border-color: var(--color-deep-teal); color: var(--color-deep-teal); }
 
-        .wire-fade-in { animation: fadeIn 0.3s ease forwards; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        
-        /* --- REFINED OS TOPBAR (Perfect Grid Centering) --- */
-        .os-topbar { 
-            background: var(--brand-panel); 
-            border-bottom: 1px solid var(--brand-border); 
-            padding: 0 30px; 
-            height: 70px; 
-            display: flex; /* Shift back to flex for dynamic width control */
-            align-items: center; 
-            gap: 40px; /* Creates a hard buffer between the 3 main zones */
-            position: sticky; 
-            top: 0; 
-            z-index: 100; 
-            backdrop-filter: blur(20px); 
-            width: 100%; 
-        }
-        
-        /* 1. Left Branding Zone */
-        .os-logo-area { 
-            display: flex; 
-            align-items: center; 
-            flex: 0 0 auto; /* Locks the logo area to its exact size */
-        }
-        .client-logo { height: 32px; max-width: 140px; object-fit: contain; }
-        .jbs-logo { height: 42px; opacity: 0.98; }
-        
-        /* 2. Center Dock Navigation */
-        .os-nav { 
-            display: flex; 
-            height: 100%; 
-            align-items: center; 
-            flex: 1; /* Takes up all available middle space */
-            justify-content: flex-start; /* Pushes the menu icons to the left */
-            gap: 5px; 
-        }
-        .os-nav-btn { background: transparent; border: none; color: #8A9BB2; height: 100%; cursor: pointer; transition: 0.3s; position: relative; display: flex; align-items: center; padding: 0 15px; }
-        .os-nav-btn i { transition: transform 0.3s ease; }
-        .os-nav-btn:hover i { transform: scale(1.1); color: #fff; }
-        
-        /* The Expanding Text Magic */
-        .nav-label { max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; font-family: 'Roboto Mono', monospace; font-size: 0.75rem; font-weight: bold; transition: all 0.4s cubic-bezier(0.25, 1, 0.3, 1); margin-left: 0; letter-spacing: 1px; }
-        .os-nav-btn:hover .nav-label, .os-nav-btn.active .nav-label { max-width: 150px; opacity: 1; margin-left: 12px; color: #fff; }
-        
-        .os-nav-btn.active { color: var(--brand-primary); }
-        .os-nav-btn.active i, .os-nav-btn.active .nav-label { color: var(--brand-primary); }
-        .os-nav-btn.active::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 3px; background: var(--brand-primary); box-shadow: 0 -2px 10px var(--brand-primary); }
-        
-        .os-nav-btn.locked { opacity: 0.3; cursor: not-allowed; }
-        .os-nav-btn.locked:hover .nav-label { max-width: 0; opacity: 0; margin-left: 0; } /* Keep closed if locked */
+        /* Slide-over panels (an issue, the guide) */
+        .portal-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(12, 20, 43, 0.5); opacity: 0; pointer-events: none; transition: opacity var(--motion-quick) var(--ease-settle); }
+        .portal-overlay.is-open { opacity: 1; pointer-events: auto; }
+        .portal-drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 61; width: 100%; max-width: 560px; display: flex; flex-direction: column; background: var(--color-paper); border-left: 1px solid var(--color-line); box-shadow: var(--shadow-float); transform: translateX(100%); visibility: hidden; transition: transform var(--motion-standard) var(--ease-settle), visibility 0s linear var(--motion-standard); }
+        .portal-drawer.is-open { transform: none; visibility: visible; transition: transform var(--motion-standard) var(--ease-settle), visibility 0s; }
+        .portal-drawer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 24px; border-bottom: 1px solid var(--color-line); }
+        .portal-drawer-body { flex: 1; overflow-y: auto; padding: 24px; }
+        .portal-drawer-foot { padding: 16px 24px; border-top: 1px solid var(--color-line); }
 
-        /* 3. Right Actions Zone */
-        .os-actions-area { 
-            display: flex; 
-            align-items: center; 
-            justify-content: flex-end; 
-            gap: 20px; 
-            flex: 0 0 auto; /* Prevents actions from stretching */
-        }
-        
-        /* Truncated Project Selector */
-        .project-selector { background: rgba(0,0,0,0.3); border: 1px solid var(--brand-border); color: var(--brand-primary); font-family: 'Roboto Mono', monospace; font-size: 0.75rem; font-weight: bold; padding: 8px 10px; border-radius: 4px; outline: none; cursor: pointer; max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
-        .project-selector option { background: var(--brand-bg); color: #fff; }
+        .portal-fab { position: fixed; right: 24px; bottom: 24px; z-index: 40; box-shadow: var(--shadow-float); }
+        .portal-toast { position: fixed; top: 80px; right: 24px; z-index: 70; max-width: 420px; box-shadow: var(--shadow-float); }
 
-        /* Mobile Menu Toggle Button (Hidden on Desktop) */
-        .mobile-menu-btn { display: none; background: transparent; border: 1px solid var(--brand-border); color: var(--brand-primary); padding: 8px; border-radius: 4px; cursor: pointer; }
-
-        .lockout-banner { background: rgba(255, 51, 102, 0.1); border-bottom: 1px solid var(--brand-secondary); color: var(--brand-secondary); padding: 15px; text-align: center; font-family: 'Roboto Mono', monospace; font-size: 0.85rem; font-weight: bold; letter-spacing: 1px; display: flex; align-items: center; justify-content: center; gap: 10px; animation: pulse-bg 2s infinite; width: 100%; }
-        @keyframes pulse-bg { 0% { background: rgba(255, 51, 102, 0.1); } 50% { background: rgba(255, 51, 102, 0.2); } 100% { background: rgba(255, 51, 102, 0.1); } }
-
-        /* FULL WIDTH OVERRIDE */
-        .os-content { flex: 1; padding: 40px; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; width: 100%; max-width: 100% !important; margin: 0; overflow-x: hidden; }
-        .glitch-text { font-family: 'Montserrat', sans-serif; font-size: 2rem; font-weight: 900; color: #333; letter-spacing: 5px; }
-
-        .btn-panic { background: rgba(255, 51, 102, 0.1); border: 1px solid var(--brand-secondary); color: var(--brand-secondary); padding: 6px 12px; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; font-weight: bold; cursor: pointer; transition: 0.3s; border-radius: 4px; display: flex; align-items: center; gap: 5px; white-space: nowrap; flex-shrink: 0; }
-        .btn-panic:hover { background: var(--brand-secondary); color: #fff; box-shadow: 0 0 15px var(--brand-secondary); }
-        
-        /* Lock submit buttons to prevent text-swap jitter */
-        .btn-submit { background: transparent; border: 1px solid var(--brand-primary); color: var(--brand-primary); padding: 12px; font-family: 'Roboto Mono', monospace; font-weight: bold; width: 100%; min-width: 140px; cursor: pointer; transition: 0.3s; display: flex; justify-content: center; align-items: center; gap: 10px; border-radius: 2px; text-align: center; }
-        .btn-submit:hover { background: var(--brand-primary); color: var(--brand-bg); box-shadow: 0 0 20px rgba(0,229,255,0.4); }
-        
-        .processing { animation: pulseOpacity 1s infinite alternate; pointer-events: none; opacity: 0.7; }
-        @keyframes pulseOpacity { from { opacity: 0.5; } to { opacity: 1; } }
-
-        /* OVERVIEW DASHBOARD STYLES */
-        .exec-summary-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; background: var(--brand-panel); border: 1px solid var(--brand-border); border-left: 4px solid var(--brand-primary); padding: 25px 30px; border-radius: 4px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); width: 100%; margin-bottom: 30px; }
-        .summary-node { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-        .summary-label { font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: #8A9BB2; text-transform: uppercase; letter-spacing: 1px; }
-        .summary-value { font-size: 1.1rem; font-weight: 700; color: #FFFFFF; text-transform: uppercase; letter-spacing: -0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .summary-value.highlight { color: var(--brand-primary); text-shadow: 0 0 10px rgba(0,229,255,0.2); }
-
-        /* THE SPRINT TIMELINE */
-        .sprint-timeline { background: var(--brand-panel); border: 1px solid var(--brand-border); padding: 50px 40px; border-radius: 4px; overflow-x: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.4); width: 100%; margin-bottom: 30px; }
-        .sprint-timeline::-webkit-scrollbar { height: 6px; }
-        .sprint-timeline::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-        .sprint-timeline::-webkit-scrollbar-thumb { background: var(--brand-primary); border-radius: 3px; }
-        .timeline-wrapper { display: flex; justify-content: space-between; position: relative; min-width: 800px; }
-        .timeline-track { position: absolute; top: 20px; left: 0; width: 100%; height: 2px; background: rgba(255,255,255,0.1); z-index: 1; }
-        .timeline-progress { position: absolute; top: 20px; left: 0; height: 2px; background: var(--brand-primary); z-index: 2; box-shadow: 0 0 15px var(--brand-primary); transition: width 1s cubic-bezier(0.16, 1, 0.3, 1); }
-        
-        .phase-node { position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 15px; flex: 1; text-align: center; }
-        .phase-dot { width: 42px; height: 42px; border-radius: 50%; background: var(--brand-bg); border: 2px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-family: 'Roboto Mono', monospace; font-size: 0.85rem; font-weight: bold; transition: all 0.4s ease; color: #8A9BB2; }
-        .phase-title { font-size: 0.85rem; font-weight: 700; color: #8A9BB2; text-transform: uppercase; letter-spacing: 1px; }
-        
-        .phase-node.completed .phase-dot { background: #FFFFFF; color: var(--brand-bg); border-color: #FFFFFF; box-shadow: 0 0 15px rgba(255,255,255,0.2); }
-        .phase-node.completed .phase-title { color: #FFFFFF; }
-        
-        .phase-node.active .phase-dot { background: rgba(0,229,255,0.1); border-color: var(--brand-primary); color: var(--brand-primary); box-shadow: 0 0 20px rgba(0,229,255,0.4); animation: pulseTeal 2s infinite; }
-        .phase-node.active .phase-title { color: var(--brand-primary); }
-
-        /* SPLIT GRID & TERMINAL */
-        .dash-grid { display: grid; grid-template-columns: 1fr; gap: 30px; width: 100%; align-items: stretch; }
-        .terminal-panel { background: var(--brand-panel); border: 1px solid var(--brand-border); border-radius: 4px; display: flex; flex-direction: column; height: 500px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); overflow: hidden; width: 100%; }
-        .panel-header { padding: 20px 25px; border-bottom: 1px solid rgba(255,255,255,0.05); background: rgba(0, 0, 0, 0.2); display: flex; justify-content: space-between; align-items: center; }
-        .panel-title { font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--brand-primary); letter-spacing: 2px; display: flex; align-items: center; gap: 10px; font-weight: bold; }
-        
-        .log-feed { padding: 25px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 20px; font-family: 'Roboto Mono', monospace; font-size: 0.85rem; }
-        .log-item { padding-left: 20px; border-left: 2px solid var(--brand-border); word-break: break-word; }
-        .log-time { color: var(--brand-primary); margin-bottom: 5px; font-size: 0.75rem; opacity: 0.8; letter-spacing: 1px; }
-        .log-text { color: #FFFFFF; line-height: 1.6; }
-
-        /* SPRINTS TAB STYLES */
-        .task-list { display: flex; flex-direction: column; gap: 15px; width: 100%; }
-        .task-card { background: var(--brand-panel); border: 1px solid var(--brand-border); border-left: 3px solid var(--brand-primary); padding: 20px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; transition: 0.3s; width: 100%; }
-        .task-card:hover { background: rgba(255,255,255,0.02); border-color: rgba(255,255,255,0.2); }
-        .status-badge { padding: 6px 12px; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; font-weight: bold; border-radius: 2px; border: 1px solid; text-transform: uppercase; white-space: nowrap; }
-        .status-In-Progress { color: var(--brand-accent); border-color: var(--brand-accent); background: rgba(255, 189, 46, 0.1); }
-        .status-QA_Review { color: var(--brand-secondary); border-color: var(--brand-secondary); background: rgba(255, 51, 102, 0.1); }
-        .status-Done { color: #00FF66; border-color: #00FF66; background: rgba(0, 255, 102, 0.1); }
-        .status-To-Do { color: #8A9BB2; border-color: #8A9BB2; background: rgba(255, 255, 255, 0.05); }
-        
-        /* QA HUB STYLES */
-        .qa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; width: 100%; align-items: start; }
-        
-        .sla-warning { background: rgba(255, 189, 46, 0.1); border: 1px solid var(--brand-accent); color: var(--brand-accent); padding: 15px 20px; font-family: 'Roboto Mono', monospace; font-size: 0.75rem; border-radius: 4px; display: flex; align-items: flex-start; gap: 15px; margin-bottom: 30px; box-shadow: 0 0 20px rgba(255, 189, 46, 0.1); width: 100%; }
-        .sla-warning i { animation: pulse-bg 2s infinite; }
-        
-        .qa-form-panel { background: var(--brand-panel); border: 1px solid var(--brand-border); padding: 30px; border-radius: 4px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); width: 100%; }
-        .cyber-input, .cyber-select, .cyber-textarea { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--brand-border); color: #FFF; padding: 12px; font-family: 'Inter', sans-serif; font-size: 0.85rem; border-radius: 2px; outline: none; transition: 0.3s; margin-bottom: 15px; }
-        .cyber-input:focus, .cyber-select:focus, .cyber-textarea:focus { border-color: var(--brand-primary); background: rgba(0,229,255,0.05); box-shadow: inset 2px 0 0 var(--brand-primary); }
-        .cyber-select option { background-color: var(--brand-bg); }
-        .cyber-textarea { font-family: 'Roboto Mono', monospace; min-height: 120px; resize: vertical; width: 100%; }
-
-        .ticket-list { display: flex; flex-direction: column; gap: 15px; width: 100%; }
-        .ticket-card { background: rgba(0,0,0,0.3); border: 1px solid var(--brand-border); padding: 15px; border-radius: 4px; border-left: 3px solid var(--brand-primary); cursor: pointer; width: 100%; }
-        .ticket-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; border-bottom: 1px dashed var(--brand-border); padding-bottom: 10px; flex-wrap: wrap; gap: 10px; }
-        .ticket-title { font-family: 'Inter', sans-serif; font-weight: bold; font-size: 0.9rem; color: #FFF; word-break: break-word; }
-        .ticket-meta { font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-top: 5px; }
-        .ticket-desc { font-size: 0.8rem; color: #B0B8C4; line-height: 1.5; word-break: break-word; }
-        
-        /* FINANCIALS TAB STYLES */
-        .finance-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 30px; width: 100%; align-items: start; margin-top: 20px; }
-        
-        .invoice-card { background: var(--brand-panel); border: 1px solid var(--brand-border); padding: 25px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 100%; flex-wrap: wrap; gap: 15px; }
-        .invoice-meta { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 200px; }
-        .inv-number { font-family: 'Montserrat', sans-serif; font-size: 1.2rem; font-weight: 900; color: #FFF; word-break: break-all; }
-        .inv-details { font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #8A9BB2; }
-        .inv-amount { font-family: 'Roboto Mono', monospace; font-size: 1.5rem; font-weight: bold; color: var(--brand-primary); text-align: right; }
-        
-        .bank-details-box { background: rgba(0,0,0,0.3); border: 1px dashed var(--brand-border); padding: 25px; border-radius: 4px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: #B0B8C4; line-height: 1.8; width: 100%; word-break: break-word; }
-        .bank-details-box strong { color: var(--brand-primary); }
-
-        .pop-upload-form { background: rgba(10, 17, 40, 0.9); border: 1px solid var(--brand-primary); border-top: 4px solid var(--brand-primary); padding: 30px; border-radius: 4px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); position: relative; width: 100%; }
-        
-        /* VAULT & BRAND STYLES */
-        .vault-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 30px; width: 100%; align-items: start; margin-top: 20px; }
-        
-        .vault-doc-card { background: rgba(0,0,0,0.3); border: 1px solid var(--brand-border); padding: 20px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-left: 3px solid var(--brand-primary); transition: 0.3s; width: 100%; flex-wrap: wrap; gap: 15px; }
-        .vault-doc-card:hover { background: rgba(255,255,255,0.02); }
-        .vault-doc-title { font-family: 'Inter', sans-serif; font-weight: bold; font-size: 0.95rem; color: #FFF; margin-bottom: 5px; word-break: break-word; }
-        .vault-doc-meta { font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: #8A9BB2; word-break: break-all; }
-        
-        .brand-config-panel { background: var(--brand-panel); border: 1px solid var(--brand-border); padding: 30px; border-radius: 4px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); width: 100%; }
-        .color-picker-wrap { display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.3); border: 1px solid var(--brand-border); padding: 10px 15px; margin-bottom: 15px; border-radius: 4px; gap: 10px; }
-        .color-picker { -webkit-appearance: none; -moz-appearance: none; appearance: none; width: 40px; height: 30px; background-color: transparent; border: none; cursor: pointer; padding: 0; flex-shrink: 0; }
-        .color-picker::-webkit-color-swatch { border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); }
-        
-        /* OFFCANVAS GUIDE STYLES */
-        .os-guide-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); z-index: 99999; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
-        .os-guide-overlay.open { opacity: 1; pointer-events: auto; }
-        
-        .os-guide-panel { position: fixed; top: 0; right: 0; width: 100%; max-width: 500px; height: 100vh; background: var(--brand-panel); border-left: 1px solid var(--brand-border); z-index: 100000; transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.25, 1, 0.3, 1); display: flex; flex-direction: column; box-shadow: -20px 0 50px rgba(0,0,0,0.8); }
-        .os-guide-panel.open { transform: translateX(0); }
-        
-        .guide-header { padding: 25px 30px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; background: rgba(0, 0, 0, 0.2); }
-        .guide-content { padding: 30px; overflow-y: auto; flex: 1; font-size: 0.85rem; color: #B0B8C4; line-height: 1.7; overflow-x: hidden; }
-        
-        /* Custom Scrollbar for Guide */
-        .guide-content::-webkit-scrollbar { width: 6px; }
-        .guide-content::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-        .guide-content::-webkit-scrollbar-thumb { background: var(--brand-primary); border-radius: 3px; }
-
-        .guide-section-title { font-family: 'Montserrat', sans-serif; font-size: 1rem; font-weight: 900; color: #FFF; margin: 30px 0 15px 0; border-bottom: 1px dashed var(--brand-border); padding-bottom: 10px; letter-spacing: 1px; text-transform: uppercase; }
-        .guide-module-block { margin-bottom: 25px; padding-left: 15px; border-left: 2px solid rgba(255,255,255,0.1); transition: 0.3s; }
-        .guide-module-block:hover { border-left-color: var(--brand-primary); background: rgba(255,255,255,0.02); }
-        .guide-module-title { font-family: 'Roboto Mono', monospace; font-weight: bold; color: var(--brand-primary); margin-bottom: 8px; font-size: 0.8rem; letter-spacing: 1px; }
-        
-        .faq-block { margin-bottom: 20px; background: rgba(0,0,0,0.3); border: 1px solid var(--brand-border); padding: 15px; border-radius: 4px; word-break: break-word; }
-        .faq-q { font-family: 'Inter', sans-serif; font-weight: bold; color: #FFF; margin-bottom: 10px; font-size: 0.85rem; display: flex; gap: 10px; }
-        .faq-q i { color: var(--brand-accent); flex-shrink: 0; }
-        
-        /* --- FLOATING COMM BUTTON --- */
-        .floating-comm-btn {
-            position: fixed;
-            bottom: 40px;
-            right: 40px;
-            width: 60px;
-            height: 60px;
-            background: var(--brand-primary);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--brand-bg);
-            cursor: pointer;
-            z-index: 999;
-            box-shadow: 0 10px 30px rgba(0, 229, 255, 0.4);
-            border: 2px solid rgba(255,255,255,0.2);
-            transition: all 0.3s cubic-bezier(0.25, 1, 0.3, 1);
-            animation: float 3s ease-in-out infinite;
-        }
-
-        .floating-comm-btn:hover {
-            transform: scale(1.1) translateY(-5px);
-            box-shadow: 0 15px 40px rgba(0, 229, 255, 0.6);
-            background: #FFF;
-            color: var(--brand-primary);
-        }
-
-        .floating-comm-btn i {
-            width: 28px;
-            height: 28px;
-            transition: transform 0.3s;
-        }
-
-        .floating-comm-btn:hover i {
-            transform: scale(1.1) rotate(-10deg);
-        }
-
-        @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-            100% { transform: translateY(0px); }
-        }
-
-        /* Hide the button if they are already on the QA Hub tab to avoid redundancy */
-        .qa-active-hide { display: none !important; }
-
-        /* --- MOBILE MATRIX (Max-width 1024px & 768px) --- */
-        @media (max-width: 1024px) {
-            .qa-grid, .finance-grid, .vault-grid { grid-template-columns: 1fr; }
-            .os-topbar { padding: 0 15px; }
-            .os-nav-btn { padding: 0 10px; }
-        }
-
-        /* --- DESKTOP VS MOBILE VISIBILITY UTILITIES --- */
-        .mobile-only { display: none !important; }
-        
-        @media (max-width: 768px) {
-            .desktop-only { display: none !important; }
-            .mobile-only { display: flex !important; }
-
-            /* 1. APP-STYLE TOP BAR (Row 1) */
-            .os-topbar { 
-                padding: 15px 20px; 
-                height: 70px; 
-                justify-content: space-between; 
-                position: sticky; 
-                z-index: 100;
-            }
-            .mobile-header-btn { background: transparent; border: none; color: var(--brand-primary); padding: 0; display: flex; align-items: center; justify-content: center; }
-            
-            /* Abbreviated Project Selector */
-            .project-selector.mobile-abbrev { 
-                max-width: 140px; 
-                text-align: center; 
-                padding: 6px 10px; 
-                font-size: 0.85rem; 
-                background: rgba(0,0,0,0.5); 
-                margin: 0 auto;
-            }
-
-            /* 2. THE APP DRAWER (Off-Canvas Menu) */
-            .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); z-index: 100000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
-            .drawer-overlay.open { opacity: 1; pointer-events: auto; }
-            
-            .app-drawer { position: fixed; top: 0; left: 0; width: 280px; height: 100vh; background: var(--brand-panel); border-right: 1px solid var(--brand-border); z-index: 100001; transform: translateX(-100%); transition: transform 0.4s cubic-bezier(0.25, 1, 0.3, 1); display: flex; flex-direction: column; box-shadow: 20px 0 50px rgba(0,0,0,0.8); }
-            .app-drawer.open { transform: translateX(0); }
-
-            .drawer-header { padding: 25px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); }
-            .drawer-client-logo { max-width: 140px; height: 32px; object-fit: contain; }
-            
-            .drawer-nav { flex: 1; overflow-y: auto; padding: 20px 0; display: flex; flex-direction: column; }
-            .drawer-nav-btn { width: 100%; justify-content: flex-start; padding: 18px 30px; height: auto; border: none; background: transparent; color: #8A9BB2; display: flex; align-items: center; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: bold; transition: 0.3s; }
-            .drawer-nav-btn i { margin-right: 15px; }
-            .drawer-nav-btn.active { color: var(--brand-primary); background: rgba(0, 229, 255, 0.05); border-left: 4px solid var(--brand-primary); }
-
-            .drawer-footer { padding: 20px; border-top: 1px solid rgba(255,255,255,0.05); background: rgba(0,0,0,0.3); }
-            .drawer-user-meta { font-family: 'Roboto Mono', monospace; margin-bottom: 15px; }
-            
-            /* 3. FLOATING ACTION STACK (Bottom Right) */
-            .floating-action-stack { position: fixed; bottom: 30px; right: 20px; display: flex; flex-direction: column; gap: 15px; z-index: 999; }
-            .fab-btn { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--brand-bg); box-shadow: 0 10px 20px rgba(0,0,0,0.5); border: 2px solid rgba(255,255,255,0.2); transition: 0.3s; cursor: pointer; }
-            .fab-help { background: var(--brand-primary); }
-            .fab-qa { background: #FFF; color: var(--brand-primary); }
-            .fab-redline { background: rgba(255, 51, 102, 0.1); border-color: var(--brand-secondary); color: var(--brand-secondary); animation: pulse-bg 2s infinite; }
-            
-            /* Hide the old single floating button on mobile */
-            .floating-comm-btn { display: none !important; }
-
-            /* Grid Adjustments for Content */
-            .os-content { padding: 20px 15px; }
-            .exec-summary-bar { grid-template-columns: 1fr; padding: 15px; }
-            .task-card, .invoice-card, .vault-doc-card { flex-direction: column; align-items: flex-start; gap: 15px; }
-            .status-badge { align-self: flex-start; }
-            .invoice-card > div:last-child { align-items: flex-start; text-align: left; width: 100%; }
-            .inv-amount { text-align: left; }
-            .terminal-panel { height: 400px; }
+        @media (max-width: 900px) {
+            .portal-menu-btn { display: inline-flex; }
+            .portal-app .rail:not(.is-open) .rail-nav, .portal-app .rail:not(.is-open) .rail-foot { display: none; }
+            .portal-app .rail-nav { flex-direction: column; flex-wrap: nowrap; }
+            .portal-app .topbar { height: auto; min-height: 56px; padding: 8px 16px; gap: 12px; }
+            .portal-desktop-only { display: none !important; }
+            .portal-mobile-only { display: flex; }
+            .portal-fab { right: 16px; bottom: 16px; }
+            .portal-toast { top: 16px; left: 16px; right: 16px; max-width: none; }
         }
     </style>
 
-    <!-- TOP NAVIGATION BAR -->
-    <div class="os-topbar">
-        
-        <div class="os-logo-area desktop-only">
-            @if($clientSettings && $clientSettings->logo_path)
-                <img src="{{ Storage::url($clientSettings->logo_path) }}" alt="{{ $organization->name }}" class="client-logo" title="Client Override Active">
-                <div style="height: 24px; width: 1px; background: var(--brand-border); margin: 0 20px;"></div>
-            @endif
-            <img src="/assets/img/logo_monochrome.svg" alt="JBS Praxis OS" class="jbs-logo" onerror="this.style.display='none'">
-        </div>
+    <div class="app-shell">
+        {{-- ===== Rail ===== --}}
+        <aside class="rail" :class="{ 'is-open': mobileMenuOpen }" aria-label="{{ __('portal.nav.label') }}">
+            <div class="rail-head">
+                <img src="/assets/img/logo/jbs-praxis-horizontal-reversed.svg" alt="JBS Praxis" width="147" height="28">
+                <button type="button" class="portal-menu-btn btn btn-sm" style="color: #fff; border-color: var(--color-border-on-dark);"
+                        @click="mobileMenuOpen = !mobileMenuOpen" :aria-expanded="mobileMenuOpen.toString()" aria-label="{{ __('portal.nav.label') }}">
+                    <i data-lucide="menu"></i>
+                </button>
+            </div>
 
-        <button class="mobile-header-btn mobile-only" @click="mobileMenuOpen = true">
-            <i data-lucide="menu" style="width: 24px; height: 24px;"></i>
-        </button>
+            <nav class="rail-nav">
+                @foreach ($tabs as $tab => [$permission, $icon])
+                    @if ($can[$permission] ?? false)
+                        @php $locked = $financialLockout && $tab !== 'financials'; @endphp
+                        <button type="button" wire:click="switchTab('{{ $tab }}')" @click="mobileMenuOpen = false"
+                                class="rail-link {{ $activeTab === $tab ? 'is-active' : '' }} {{ $locked ? 'is-locked' : '' }}"
+                                @if ($activeTab === $tab) aria-current="page" @endif
+                                @if ($locked) title="{{ __('portal.nav.locked') }}" @endif>
+                            <i data-lucide="{{ $icon }}"></i>
+                            <span>{{ __('portal.nav.' . $tab) }}</span>
+                            @if ($locked)
+                                <i data-lucide="lock" class="portal-lock" aria-hidden="true"></i>
+                                <span class="sr-only">{{ __('portal.nav.locked') }}</span>
+                            @endif
+                        </button>
+                    @endif
+                @endforeach
+            </nav>
 
-        <div class="desktop-only" style="display: flex; height: 100%; align-items: center;">
-            <div class="os-nav">
-                @if(($can['projects.view'] ?? false))
-                <button wire:click="switchTab('overview')" class="os-nav-btn {{ $activeTab === 'overview' ? 'active' : '' }} {{ $financialLockout ? 'locked' : '' }}">
-                    <i data-lucide="layout-dashboard" style="width: 18px; height: 18px;"></i>
-                    <span class="nav-label">OVERVIEW</span>
+            <div class="rail-foot">
+                <button type="button" class="rail-link" @click="showGuide = true; mobileMenuOpen = false">
+                    <i data-lucide="help-circle"></i> <span>{{ __('portal.nav.guide') }}</span>
                 </button>
-                @endif
-                @if(($can['projects.view'] ?? false))
-                <button wire:click="switchTab('sprints')" class="os-nav-btn {{ $activeTab === 'sprints' ? 'active' : '' }} {{ $financialLockout ? 'locked' : '' }}">
-                    <i data-lucide="git-merge" style="width: 18px; height: 18px;"></i>
-                    <span class="nav-label">SPRINTS</span>
-                </button>
-                @endif
-                @if(($can['qa.view'] ?? false))
-                <button wire:click="switchTab('qa_hub')" class="os-nav-btn {{ $activeTab === 'qa_hub' ? 'active' : '' }} {{ $financialLockout ? 'locked' : '' }}">
-                    <i data-lucide="shield-alert" style="width: 18px; height: 18px;"></i>
-                    <span class="nav-label">QA HUB</span>
-                </button>
-                @endif
-                @if(($can['billing.view'] ?? false))
-                <button wire:click="switchTab('financials')" class="os-nav-btn {{ $activeTab === 'financials' ? 'active' : '' }}" style="{{ $financialLockout ? 'color: var(--brand-secondary);' : '' }}">
-                    <i data-lucide="credit-card" style="width: 18px; height: 18px;"></i>
-                    <span class="nav-label">FINANCIALS</span>
-                </button>
-                @endif
-                @if(($can['documents.view'] ?? false))
-                <button wire:click="switchTab('vault')" class="os-nav-btn {{ $activeTab === 'vault' ? 'active' : '' }} {{ $financialLockout ? 'locked' : '' }}">
-                    <i data-lucide="folder-lock" style="width: 18px; height: 18px;"></i>
-                    <span class="nav-label">VAULT</span>
-                </button>
-                @endif
-                @if(($can['team.view'] ?? false))
-                    <button wire:click="switchTab('team')" class="os-nav-btn {{ $activeTab === 'team' ? 'active' : '' }} {{ $financialLockout ? 'locked' : '' }}">
-                        <i data-lucide="users" style="width: 18px; height: 18px;"></i>
-                        <span class="nav-label">COMMAND</span>
+                @if ($can['support.create'] ?? false)
+                    <button type="button" class="rail-link" wire:click="$set('showRedlineModal', true)" @click="mobileMenuOpen = false">
+                        <i data-lucide="triangle-alert"></i> <span>{{ __('portal.nav.urgent') }}</span>
                     </button>
                 @endif
-            </div>
-        </div>
-
-        @if(count($allProjects) > 1)
-            <select wire:model.live="activeProjectId" wire:change="switchProject($event.target.value)" class="project-selector mobile-abbrev mobile-only" title="Currently Active: {{ $activeProject->title ?? 'Select Project' }}">
-                @foreach($allProjects as $index => $proj)
-                    <option value="{{ $proj->id }}">P{{ $index + 1 }} - {{ strtoupper($proj->title) }}</option>
-                @endforeach
-            </select>
-        @endif
-
-        <img src="/assets/img/logo_monochrome.svg" alt="JBS Praxis OS" class="jbs-logo mobile-only" style="height: 28px;" onerror="this.style.display='none'">
-
-        <div class="os-actions-area desktop-only">
-            @if(count($allProjects) > 1)
-                <select wire:model.live="activeProjectId" wire:change="switchProject($event.target.value)" class="project-selector">
-                    @foreach($allProjects as $proj)
-                        <option value="{{ $proj->id }}">{{ strtoupper($proj->title) }}</option>
-                    @endforeach
-                </select>
-            @endif
-            
-            <button @click="showGuide = true" style="background: transparent; border: 1px solid var(--brand-border); color: var(--brand-primary); padding: 6px 12px; border-radius: 4px; display: flex; align-items: center;"><i data-lucide="help-circle" style="width: 14px; height: 14px;"></i></button>
-            @if(($can['support.create'] ?? false))
-            <button wire:click="$set('showRedlineModal', true)" class="btn-panic"><i data-lucide="triangle-alert" style="width: 14px; height: 14px;"></i> REDLINE</button>
-            @endif
-
-            <div style="text-align: right; font-family: 'Roboto Mono', monospace; border-left: 1px solid var(--brand-border); padding-left: 20px;">
-                <div style="font-size: 0.75rem; font-weight: bold; color: #fff;">{{ $organization->name ?? 'Unknown Org' }}</div>
-                <div style="font-size: 0.65rem; color: var(--brand-primary);">{{ $user->first_name }} {{ substr($user->last_name, 0, 1) }}.</div>
-            </div>
-            <button wire:click="executeLogout" style="background: transparent; border: none; color: #8A9BB2; cursor: pointer;"><i data-lucide="power" style="width: 18px; height: 18px;"></i></button>
-        </div>
-    </div>
-
-    <div class="drawer-overlay mobile-only" :class="{'open': mobileMenuOpen}" @click="mobileMenuOpen = false"></div>
-    <div class="app-drawer mobile-only" :class="{'open': mobileMenuOpen}">
-        <div class="drawer-header">
-            @if($clientSettings && $clientSettings->logo_path)
-                <img src="{{ Storage::url($clientSettings->logo_path) }}" alt="{{ $organization->name }}" class="drawer-client-logo">
-            @else
-                <div style="font-family: 'Montserrat', sans-serif; font-weight: bold; font-size: 1rem; color: #FFF;">{{ $organization->name ?? 'Dashboard' }}</div>
-            @endif
-            <button @click="mobileMenuOpen = false" class="mobile-header-btn"><i data-lucide="x" style="width: 24px; height: 24px; color: #8A9BB2;"></i></button>
-        </div>
-        
-        <div class="drawer-nav">
-            @if(($can['projects.view'] ?? false))
-            <button wire:click="switchTab('overview')" @click="mobileMenuOpen = false" class="drawer-nav-btn {{ $activeTab === 'overview' ? 'active' : '' }}">
-                <i data-lucide="layout-dashboard" style="width: 18px; height: 18px;"></i> OVERVIEW
-            </button>
-            @endif
-            @if(($can['projects.view'] ?? false))
-            <button wire:click="switchTab('sprints')" @click="mobileMenuOpen = false" class="drawer-nav-btn {{ $activeTab === 'sprints' ? 'active' : '' }}">
-                <i data-lucide="git-merge" style="width: 18px; height: 18px;"></i> SPRINTS
-            </button>
-            @endif
-            @if(($can['qa.view'] ?? false))
-            <button wire:click="switchTab('qa_hub')" @click="mobileMenuOpen = false" class="drawer-nav-btn {{ $activeTab === 'qa_hub' ? 'active' : '' }}">
-                <i data-lucide="shield-alert" style="width: 18px; height: 18px;"></i> QA HUB
-            </button>
-            @endif
-            @if(($can['billing.view'] ?? false))
-            <button wire:click="switchTab('financials')" @click="mobileMenuOpen = false" class="drawer-nav-btn {{ $activeTab === 'financials' ? 'active' : '' }}">
-                <i data-lucide="credit-card" style="width: 18px; height: 18px;"></i> FINANCIALS
-            </button>
-            @endif
-            @if(($can['documents.view'] ?? false))
-            <button wire:click="switchTab('vault')" @click="mobileMenuOpen = false" class="drawer-nav-btn {{ $activeTab === 'vault' ? 'active' : '' }}">
-                <i data-lucide="folder-lock" style="width: 18px; height: 18px;"></i> VAULT
-            </button>
-            @endif
-            @if(($can['team.view'] ?? false))
-                <button wire:click="switchTab('team')" @click="mobileMenuOpen = false" class="drawer-nav-btn {{ $activeTab === 'team' ? 'active' : '' }}">
-                    <i data-lucide="users" style="width: 18px; height: 18px;"></i> COMMAND
+                <button type="button" class="rail-link portal-mobile-only" wire:click="executeLogout">
+                    <i data-lucide="log-out"></i> <span>{{ __('portal.nav.sign_out') }}</span>
                 </button>
-            @endif
-        </div>
-
-        <div class="drawer-footer">
-            <div class="drawer-user-meta">
-                <div style="font-size: 0.85rem; font-weight: bold; color: #fff;">{{ $organization->name ?? 'Unknown Org' }}</div>
-                <div style="font-size: 0.75rem; color: var(--brand-primary);">{{ $user->first_name }} {{ substr($user->last_name, 0, 1) }}.</div>
             </div>
-            <button wire:click="executeLogout" class="btn-panic" style="width: 100%; justify-content: center; padding: 12px; background: transparent; color: #FF3366; border-color: #FF3366;">
-                <i data-lucide="power" style="width: 14px; height: 14px;"></i> TERMINATE SESSION
-            </button>
-        </div>
-    </div>
+        </aside>
 
-    <!-- LOCKOUT BANNER -->
-    @if($financialLockout)
-        <div class="lockout-banner">
-            <i data-lucide="lock" style="width: 18px; height: 18px;"></i>
-            {{ $lockoutReason }}
-        </div>
-    @endif
-
-    @if(session()->has('lockout_error'))
-        <div style="background: rgba(255,51,102,0.1); border-bottom: 1px solid var(--brand-secondary); color: var(--brand-secondary); padding: 10px; text-align: center; font-family: 'Roboto Mono', monospace; font-size: 0.8rem;">
-            {{ session('lockout_error') }}
-        </div>
-    @endif
-
-    <!-- CONTENT AREA -->
-    <div class="os-content" style="align-items: flex-start; justify-content: flex-start; max-width: 1400px; margin: 0 auto; width: 100%;">
-        
-        @if($activeTab === 'overview' && $activeProject)
-            <!-- EXECUTIVE SUMMARY BAR -->
-            <div class="exec-summary-bar">
-                <div class="summary-node">
-                    <span class="summary-label">Project Designation</span>
-                    <span class="summary-value highlight">{{ $activeProject->title }}</span>
-                </div>
-                <div class="summary-node">
-                    <span class="summary-label">Deployment Status</span>
-                    <span class="summary-value" style="color: {{ $activeProject->status === 'Scoping' ? 'var(--brand-accent)' : '#00FF66' }};">{{ strtoupper($activeProject->status) }}</span>
-                </div>
-                <div class="summary-node">
-                    <span class="summary-label">Structural Progress</span>
-                    <span class="summary-value">{{ $overallProgress }}% COMPLETE</span>
-                </div>
-                <div class="summary-node">
-                    <span class="summary-label">Financial Allocation</span>
-                    <span class="summary-value">{{ $activeProject->currency }} {{ number_format($activeProject->total_budget, 2) }}</span>
-                </div>
-                <div class="summary-node">
-                    <span class="summary-label">Strike Team Lead</span>
-                    <span class="summary-value">{{ $leadArchitect }}</span>
-                </div>
-            </div>
-
-            <!-- THE SPRINT TIMELINE -->
-            <div class="sprint-timeline">
-                <div class="timeline-wrapper">
-                    <div class="timeline-track"></div>
-                    <div class="timeline-progress" style="width: {{ $overallProgress }}%;"></div> 
-                    
-                    @foreach($phases as $phase)
-                        <div class="phase-node {{ $phase['status'] === 'Completed' ? 'completed' : ($phase['status'] === 'Active' ? 'active' : '') }}">
-                            <div class="phase-dot">
-                                {{ $phase['status'] === 'Completed' ? '✓' : str_pad($phase['phase_number'], 2, '0', STR_PAD_LEFT) }}
-                            </div>
-                            <span class="phase-title">{{ $phase['title'] }}</span>
-                        </div>
-                    @endforeach
-                </div>
-            </div>
-
-            <!-- LIVE ENGINEERING BACKLOG TERMINAL -->
-            <div class="dash-grid">
-                <div class="terminal-panel">
-                    <div class="panel-header">
-                        <span class="panel-title">
-                            <i data-lucide="terminal" style="width: 16px; height: 16px;"></i> > APPROVED & LOCKED ENGINEERING BACKLOG
-                        </span>
-                        <div style="width: 8px; height: 8px; background: var(--brand-secondary); border-radius: 50%; box-shadow: 0 0 10px var(--brand-secondary); animation: pulse-bg 1.5s infinite;"></div>
-                    </div>
-                    <div class="log-feed">
-                        @forelse($liveLogs as $log)
-                            <div class="log-item">
-                                <div class="log-time">[{{ $log['time'] }}] ARCHITECT: {{ $log['author'] }}</div>
-                                <div class="log-text">> {!! nl2br(e($log['text'])) !!}</div>
-                            </div>
-                        @empty
-                            <div class="log-item" style="border-left-color: var(--brand-secondary);">
-                                <div class="log-text" style="color: #8A9BB2;">> AWAITING INITIAL SPRINT TELEMETRY...</div>
-                            </div>
-                        @endforelse
+        <div class="main">
+            {{-- ===== Top bar: the organisation, language, person ===== --}}
+            <header class="topbar">
+                <div class="flex min-w-0 items-center gap-3">
+                    @if ($clientSettings && $clientSettings->logo_path)
+                        <img src="{{ Storage::url($clientSettings->logo_path) }}" alt="{{ $organization->name }}" class="h-8 w-auto max-w-[120px] object-contain">
+                    @endif
+                    <div class="topbar-title min-w-0 truncate">
+                        <span class="portal-desktop-only" style="display: inline;">{{ __('portal.app_name') }} / </span><strong>{{ $organization->name }}</strong>
                     </div>
                 </div>
-            </div>
-
-        @elseif($activeTab === 'sprints' && $activeProject)
-            
-            <div style="margin-bottom: 30px;">
-                <h2 style="font-family: 'Montserrat', sans-serif; font-size: 1.5rem; letter-spacing: 1px;">ACTIVE SPRINT MATRIX</h2>
-                <p style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: #8A9BB2;">> Live tracking of all executing and completed tasks.</p>
-            </div>
-
-            <div class="task-list">
-                @forelse($activeTasks as $task)
-                    <div class="task-card" style="border-left-color: {{ $task->status === 'Done' ? '#00FF66' : ($task->status === 'QA_Review' ? 'var(--brand-secondary)' : 'var(--brand-primary)') }};">
+                <div class="topbar-actions" style="gap: 16px;">
+                    @include('livewire.client-os.partials.language-switch')
+                    <div class="user-chip">
                         <div>
-                            <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--brand-primary); margin-bottom: 5px;">> {{ strtoupper($task->phase_title) }}</div>
-                            <div style="font-family: 'Inter', sans-serif; font-weight: bold; font-size: 1rem; color: #FFF;">{{ $task->title }}</div>
-                            
-                            @if($task->status === 'QA_Review')
-                                <div style="display: flex; gap: 10px; margin-top: 15px;">
-                                    @if(($can['projects.approve'] ?? false))
-                                    <button wire:click="approveTask('{{ $task->id }}')" class="btn-submit" style="width: auto; padding: 6px 12px; font-size: 0.7rem; border-color: #00FF66; color: #00FF66;">
-                                        <i data-lucide="check-circle" style="width: 14px; height: 14px;"></i> APPROVE & LOCK
-                                    </button>
-                                    @endif
-                                    @if(($can['qa.create'] ?? false))
-                                    <button wire:click="teleportToQa('{{ $task->id }}', '{{ addslashes($task->title) }}')" class="btn-submit" style="width: auto; padding: 6px 12px; font-size: 0.7rem; border-color: var(--brand-secondary); color: var(--brand-secondary);">
-                                        <i data-lucide="shield-alert" style="width: 14px; height: 14px;"></i> LOG VULNERABILITY
-                                    </button>
-                                    @endif
-                                </div>
-                            @endif
+                            <span class="user-chip-name">{{ $user->first_name }} {{ $user->last_name }}</span>
+                            <span class="user-chip-role">{{ $user->is_primary_client ? __('portal.nav.primary_contact') : __('portal.nav.team_member') }}</span>
                         </div>
-                        <div class="status-badge status-{{ $task->status }}">
-                            {{ str_replace('_', ' ', $task->status) }}
-                        </div>
+                        <span class="avatar" aria-hidden="true">{{ $initials }}</span>
                     </div>
-                @empty
-                    <div style="text-align: center; padding: 60px; background: var(--brand-panel); border: 1px dashed var(--brand-border); border-radius: 4px;">
-                        <i data-lucide="layers" style="width: 48px; height: 48px; color: #8A9BB2; margin-bottom: 15px; opacity: 0.5;"></i>
-                        <div style="font-family: 'Roboto Mono', monospace; color: #8A9BB2;">NO ACTIVE TASKS DETECTED IN BATTLESPACE.</div>
-                    </div>
-                @endforelse
-            </div>
-        
-        @elseif($activeTab === 'qa_hub' && $activeProject)
-            
-            <div style="width: 100%; margin-bottom: 20px;">
-                <h2 style="font-family: 'Montserrat', sans-serif; font-size: 1.5rem; letter-spacing: 1px;">QUALITY ASSURANCE & DIRECT COMMS</h2>
-                <p style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: #8A9BB2;">> Log architectural vulnerabilities or message Command directly.</p>
-            </div>
-
-            <!-- THE 5-HOUR SLA ENFORCER -->
-            <div class="sla-warning">
-                <i data-lucide="clock" style="width: 24px; height: 24px; flex-shrink: 0;"></i>
-                <div>
-                    <strong style="display: block; margin-bottom: 5px; font-size: 0.85rem;">CRITICAL SLA NOTICE: THE 5-HOUR AUTO-APPROVAL RULE</strong>
-                    Per JBS Praxis Standard Operating Procedure, any task entering 'QA Review' status requires immediate client validation. 
-                    <span style="color: #FFF; font-weight: bold;">Zero feedback submitted within 5 hours of completion mathematically constitutes structural approval.</span> Post-approval revisions incur COPQ (Cost of Poor Quality) billing rates.
+                    <button type="button" wire:click="executeLogout" class="btn btn-ghost btn-sm portal-desktop-only">
+                        <i data-lucide="log-out"></i> {{ __('portal.nav.sign_out') }}
+                    </button>
                 </div>
-            </div>
+            </header>
 
-            <div class="qa-grid">
-                
-                <!-- LEFT: FORM -->
-                <div class="qa-form-panel">
-                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--brand-primary); margin-bottom: 20px; border-bottom: 1px solid var(--brand-border); padding-bottom: 10px;">
-                        > TRANSMIT INTELLIGENCE
+            <main class="workspace" id="content">
+                {{-- Sections close while a payment is due --}}
+                @if ($financialLockout)
+                    <div class="alert alert-warning mb-4" role="status">
+                        <i data-lucide="lock"></i>
+                        <span>{{ $lockoutReason }}</span>
                     </div>
+                @endif
 
-                    @if(session()->has('qa_success'))
-                        <div style="background: rgba(0,255,102,0.1); border: 1px solid #00FF66; color: #00FF66; padding: 10px; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; margin-bottom: 15px; text-align: center;">
-                            {{ session('qa_success') }}
+                @if (session()->has('lockout_error'))
+                    <div class="alert alert-danger mb-4" role="alert">
+                        <i data-lucide="circle-alert"></i>
+                        <span>{{ session('lockout_error') }}</span>
+                    </div>
+                @endif
+
+                <div class="page-header">
+                    <div class="min-w-0">
+                        <h1 class="page-title">{{ __('portal.nav.' . $activeTab) }}</h1>
+                        <p class="page-subtitle">{{ __('portal.subtitles.' . $activeTab) }}</p>
+                    </div>
+                    @if (count($allProjects) > 1)
+                        <div class="field w-full sm:w-72">
+                            <label for="portal-project" class="label">{{ __('portal.nav.project') }}</label>
+                            <select id="portal-project" wire:model.live="activeProjectId" wire:change="switchProject($event.target.value)" class="select">
+                                @foreach ($allProjects as $proj)
+                                    <option value="{{ $proj->id }}">{{ $proj->title }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @elseif ($activeProject && $activeTab !== 'overview')
+                        <div class="sm:text-right">
+                            <div class="stat-label">{{ __('portal.nav.project') }}</div>
+                            <div class="font-semibold text-ink">{{ $activeProject->title }}</div>
                         </div>
                     @endif
+                </div>
 
-                    @if(($can['qa.create'] ?? false))
-                    <form wire:submit.prevent="submitQaTicket">
-                        <!-- Dual Purpose Dropdown -->
-                        @if($qaTaskId)
-                            <div style="background: rgba(0, 229, 255, 0.1); border: 1px solid var(--brand-primary); padding: 10px 15px; margin-bottom: 15px; border-radius: 2px; display: flex; justify-content: space-between; align-items: center;">
-                                <div>
-                                    <span style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--brand-primary); display: block;">TARGETED TASK LOCK:</span>
-                                    <span style="font-size: 0.85rem; font-weight: bold; color: #FFF;">{{ collect($activeTasks)->firstWhere('id', $qaTaskId)->title ?? 'Unknown Task' }}</span>
+                {{-- ===================== OVERVIEW ===================== --}}
+                @if ($activeTab === 'overview' && $activeProject)
+                    <section class="card mb-6" aria-label="{{ __('portal.overview.project') }}">
+                        <dl class="m-0 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-5">
+                            <div class="min-w-0">
+                                <dt class="stat-label">{{ __('portal.overview.project') }}</dt>
+                                <dd class="m-0 mt-1 truncate font-semibold text-ink" title="{{ $activeProject->title }}">{{ $activeProject->title }}</dd>
+                            </div>
+                            <div>
+                                <dt class="stat-label">{{ __('portal.overview.status') }}</dt>
+                                <dd class="m-0 mt-1"><span class="pill {{ $pill('project', $activeProject->status) }}">{{ $label('status.project', $activeProject->status) }}</span></dd>
+                            </div>
+                            <div>
+                                <dt class="stat-label">{{ __('portal.overview.progress') }}</dt>
+                                <dd class="m-0 mt-1">
+                                    <div class="font-semibold text-ink tabular-nums">{{ __('portal.overview.progress_value', ['percent' => $overallProgress]) }}</div>
+                                    <div class="portal-progress mt-2" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $overallProgress }}" aria-label="{{ __('portal.overview.progress') }}">
+                                        <span style="width: {{ min(100, max(0, (float) $overallProgress)) }}%;"></span>
+                                    </div>
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="stat-label">{{ __('portal.overview.budget') }}</dt>
+                                <dd class="m-0 mt-1 font-semibold text-ink tabular-nums">{{ PortalFormat::money($activeProject->total_budget, $activeProject->currency) }}</dd>
+                            </div>
+                            <div class="min-w-0">
+                                <dt class="stat-label">{{ __('portal.overview.lead') }}</dt>
+                                <dd class="m-0 mt-1 truncate font-semibold text-ink">{{ $leadArchitect }}</dd>
+                            </div>
+                        </dl>
+                    </section>
+
+                    <section class="card mb-6">
+                        <div class="card-header"><h2 class="card-title">{{ __('portal.overview.phases') }}</h2></div>
+                        @if (count($phases))
+                            <div class="overflow-x-auto pb-1">
+                                <div class="portal-phases-wrap" style="min-width: {{ count($phases) * 132 }}px;">
+                                <span class="portal-phases-done" style="width: {{ min(100, max(0, (float) $overallProgress)) }}%;" aria-hidden="true"></span>
+                                <ol class="portal-phases">
+                                    @foreach ($phases as $phase)
+                                        @php $phaseState = $phase['status'] === 'Completed' ? 'is-done' : ($phase['status'] === 'Active' ? 'is-active' : ''); @endphp
+                                        <li class="portal-phase {{ $phaseState }}" @if ($phase['status'] === 'Active') aria-current="step" @endif>
+                                            <span class="portal-phase-dot" aria-hidden="true">
+                                                @if ($phase['status'] === 'Completed') <i data-lucide="check"></i> @else {{ $phase['phase_number'] }} @endif
+                                            </span>
+                                            <span class="text-xs text-muted">{{ __('portal.overview.phase_number', ['number' => $phase['phase_number']]) }}</span>
+                                            <span class="text-sm font-semibold text-ink">{{ $phase['title'] }}</span>
+                                            <span class="text-xs text-muted">{{ $label('status.phase', $phase['status']) }}</span>
+                                        </li>
+                                    @endforeach
+                                </ol>
                                 </div>
-                                <button type="button" wire:click="$set('qaTaskId', '')" style="background: transparent; border: none; color: var(--brand-secondary); cursor: pointer; font-size: 0.7rem; font-family: monospace;">
-                                    [ CLEAR LOCK ]
-                                </button>
                             </div>
                         @else
-                            <div style="background: rgba(255, 255, 255, 0.05); border: 1px dashed var(--brand-border); padding: 10px 15px; margin-bottom: 15px; border-radius: 2px; font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #8A9BB2;">
-                                > TARGET MODE: GENERAL COMMUNICATION / INQUIRY
+                            <div class="empty-state">
+                                <strong>{{ __('portal.overview.no_phases') }}</strong>
+                                {{ __('portal.overview.no_phases_help') }}
                             </div>
                         @endif
+                    </section>
 
-                        <div style="display: flex; gap: 10px;">
-                            <div style="flex: 2;">
-                                <input type="text" id="qa-title-input" wire:model="qaTitle" class="cyber-input" placeholder="Vulnerability Title / Subject" required x-init="setTimeout(() => $el.focus(), 100)">
-                                @error('qaTitle') <span style="color: var(--brand-secondary); font-size: 0.65rem;">{{ $message }}</span> @enderror
-                            </div>
-                            <div style="flex: 1;">
-                                <select wire:model="qaSeverity" class="cyber-select">
-                                    <option value="Low">Low Priority</option>
-                                    <option value="Medium">Standard</option>
-                                    <option value="Critical">Critical Failure</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <textarea wire:model="qaDescription" class="cyber-textarea" placeholder="Define the exact parameters of the failure, or input your message to Command..." required></textarea>
-                        @error('qaDescription') <span style="color: var(--brand-secondary); font-size: 0.65rem; display: block; margin-top: -10px; margin-bottom: 10px;">{{ $message }}</span> @enderror
-
-                        <div style="margin-bottom: 20px;">
-                            <label style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--brand-primary); display: block; margin-bottom: 5px;">ATTACH EVIDENCE (OPTIONAL - JPG/PNG/PDF)</label>
-                            <input type="file" wire:model="initialAttachment" class="cyber-input" style="padding: 10px; margin-bottom: 0;" accept=".png,.jpg,.jpeg,.pdf">
-                            @error('initialAttachment') <span style="color: var(--brand-secondary); font-size: 0.65rem; display: block; margin-top: 5px;">{{ $message }}</span> @enderror
-                        </div>
-
-                        <button type="submit" class="btn-submit" wire:loading.attr="disabled">
-                    </form>
-                    @else
-                        <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #8A9BB2;">> Your role can follow tickets but not raise them.</p>
-                    @endif
-                </div>
-
-                <!-- RIGHT: HISTORICAL MATRIX -->
-                <div class="qa-form-panel" style="background: rgba(10, 17, 40, 0.4); border-style: dashed;">
-                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: #8A9BB2; margin-bottom: 20px; border-bottom: 1px dashed var(--brand-border); padding-bottom: 10px;">
-                        > ACTIVE TRANSMISSIONS LEDGER
-                    </div>
-
-                    <div class="ticket-list">
-                        @forelse($qaTickets as $ticket)
-                            <div class="ticket-card" wire:click="openTicket('{{ $ticket->id }}')" style="cursor: pointer; border-left-color: {{ str_contains($ticket->title, '[DIRECT COMM]') ? 'var(--brand-accent)' : 'var(--brand-secondary)' }};">
-                                <div class="ticket-header">
-                                    <div>
-                                        <div class="ticket-title">{{ $ticket->title }}</div>
-                                        <div class="ticket-meta">
-                                            {{ \Carbon\Carbon::parse($ticket->created_at)->format('M d, H:i') }} | 
-                                            STATUS: <span style="color: {{ $ticket->status === 'Resolved' ? '#00FF66' : '#FFF' }}">{{ strtoupper($ticket->status) }}</span>
-                                        </div>
-                                    </div>
-                                    <div style="background: rgba(255,255,255,0.1); padding: 4px 8px; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; border-radius: 2px;">
-                                        {{ strtoupper($ticket->severity) }}
-                                    </div>
-                                </div>
-                                <div class="ticket-desc">
-                                    {{ Str::limit($ticket->description, 100) }}
-                                </div>
-                                @if($ticket->task_title)
-                                    <div style="margin-top: 10px; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--brand-primary);">
-                                        > LINKED TO: {{ $ticket->task_title }}
-                                    </div>
-                                @endif
-                            </div>
-                        @empty
-                            <div style="text-align: center; padding: 40px 0; color: #555; font-family: 'Roboto Mono', monospace; font-size: 0.75rem;">
-                                NO ACTIVE COMMUNICATIONS LOGGED.
-                            </div>
-                        @endforelse
-                    </div>
-                </div>
-
-            </div>
-            
-        @elseif($activeTab === 'financials' && $activeProject)
-            
-            <div style="width: 100%; margin-bottom: 20px;">
-                <h2 style="font-family: 'Montserrat', sans-serif; font-size: 1.5rem; letter-spacing: 1px;">FINANCIAL LEDGER</h2>
-                <p style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: #8A9BB2;">> Cryptographically secure billing and transaction upload portal.</p>
-            </div>
-
-            @if(session()->has('finance_success'))
-                <div style="width: 100%; background: rgba(0,255,102,0.1); border: 1px solid #00FF66; color: #00FF66; padding: 15px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; margin-bottom: 20px; text-align: center; border-radius: 2px;">
-                    {{ session('finance_success') }}
-                </div>
-            @endif
-
-            <div class="finance-grid">
-                
-                <!-- LEFT: INVOICE LEDGER -->
-                <div>
-                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--brand-primary); margin-bottom: 20px; border-bottom: 1px solid var(--brand-border); padding-bottom: 10px;">
-                        > ISSUED INVOICES
-                    </div>
-
-                    @forelse($invoices as $inv)
-                        <div class="invoice-card" style="border-left: 4px solid {{ $inv->status === 'Paid' ? '#00FF66' : ($inv->status === 'Overdue' ? 'var(--brand-secondary)' : 'var(--brand-accent)') }};">
-                            <div class="invoice-meta">
-                                <div class="inv-number">{{ $inv->invoice_number }}</div>
-                                <div class="inv-details">
-                                    ISSUED: {{ \Carbon\Carbon::parse($inv->issued_at)->format('M d, Y') }}<br>
-                                    DUE: <span style="color: {{ $inv->status === 'Overdue' ? 'var(--brand-secondary)' : '#8A9BB2' }}">{{ \Carbon\Carbon::parse($inv->due_date)->format('M d, Y') }}</span>
-                                </div>
-                                <div style="margin-top: 5px;">
-                                    <span class="status-badge status-{{ $inv->status }}" style="font-size: 0.6rem; padding: 4px 8px;">{{ strtoupper($inv->status) }}</span>
-                                    @if($inv->has_pending_pop)
-                                        <span style="background: rgba(0, 229, 255, 0.1); color: var(--brand-primary); border: 1px solid var(--brand-primary); padding: 4px 8px; font-size: 0.6rem; font-family: monospace; border-radius: 2px; margin-left: 5px;">VERIFICATION IN PROGRESS</span>
-                                    @endif
-                                </div>
-                            </div>
-                            
-                            <div style="text-align: right; display: flex; flex-direction: column; gap: 15px; align-items: flex-end;">
-                                <div class="inv-amount">{{ $inv->currency }} {{ number_format($inv->total_amount, 2) }}</div>
-                                
-                                <div style="display: flex; gap: 10px;">
-                                    <button class="btn-submit" style="padding: 6px 12px; font-size: 0.7rem; width: auto;" onclick="alert('PDF Generation Engine (Phase 9) Required.')">
-                                        <i data-lucide="download" style="width: 14px; height: 14px;"></i> PDF
-                                    </button>
-                                    
-                                    @if($inv->status !== 'Paid' && !$inv->has_pending_pop)
-                                        @if(($can['billing.create'] ?? false))
-                                        <button wire:click="triggerPopUpload('{{ $inv->id }}', {{ $inv->total_amount }})" class="btn-submit" style="padding: 6px 12px; font-size: 0.7rem; width: auto; background: var(--brand-primary); color: var(--brand-bg);">
-                                            <i data-lucide="upload-cloud" style="width: 14px; height: 14px;"></i> UPLOAD POP
-                                        </button>
-                                        @endif
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-                    @empty
-                        <div style="text-align: center; padding: 40px; border: 1px dashed var(--brand-border); color: #8A9BB2; font-family: 'Roboto Mono', monospace;">
-                            NO INVOICES GENERATED FOR THIS BATTLESPACE.
-                        </div>
-                    @endforelse
-                </div>
-
-                <!-- RIGHT: REMITTANCE INFO & UPLOAD FORM -->
-                <div>
-                    @if($uploadInvoiceId)
-                        <!-- POP Upload Form -->
-                        <div class="pop-upload-form">
-                            <div style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: #FFF; margin-bottom: 20px; font-weight: bold; border-bottom: 1px dashed var(--brand-border); padding-bottom: 10px;">
-                                > SECURE POP TRANSMISSION
-                            </div>
-
-                            @if(($can['billing.create'] ?? false))
-                            <form wire:submit.prevent="submitProofOfPayment">
-                                <label style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2;">PAYMENT METHOD</label>
-                                <select wire:model="popMethod" class="cyber-select">
-                                    <option value="Bank Transfer">Bank Transfer / Wire</option>
-                                    <option value="USDT">Cryptocurrency (USDT)</option>
-                                    <option value="Campay">Mobile Money (Campay)</option>
-                                </select>
-
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                    <div>
-                                        <label style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2;">AMOUNT REMITTED</label>
-                                        <input type="number" step="0.01" wire:model="popAmount" class="cyber-input" required>
-                                    </div>
-                                    <div>
-                                        <label style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2;">TX HASH / REF ID</label>
-                                        <input type="text" wire:model="popRef" class="cyber-input" required>
-                                    </div>
-                                </div>
-
-                                <label style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2;">ATTACH CRYPTOGRAPHIC PROOF (PDF/JPG/PNG)</label>
-                                <input type="file" wire:model="popFile" class="cyber-input" style="padding: 8px;" accept=".pdf,.jpg,.jpeg,.png" required>
-                                @error('popFile') <span style="color: var(--brand-secondary); font-size: 0.65rem;">{{ $message }}</span> @enderror
-
-                                <div style="display: flex; gap: 10px; margin-top: 15px;">
-                                    <button type="button" wire:click="cancelPopUpload" class="btn-submit" style="flex: 1; border-color: #8A9BB2; color: #8A9BB2;">ABORT</button>
-                                    <button type="submit" class="btn-submit" style="flex: 2; background: var(--brand-primary); color: var(--brand-bg);" wire:loading.attr="disabled">
-                                        <span wire:loading.remove wire:target="submitProofOfPayment">TRANSMIT POP</span>
-                                        <span wire:loading wire:target="submitProofOfPayment">UPLOADING...</span>
-                                    </button>
-                                </div>
-                            </form>
-                            @endif
-                        </div>
-                    @else
-                        <!-- Remittance Instructions -->
-                        <div class="bank-details-box">
-                            <div style="color: #FFF; font-weight: bold; font-size: 1rem; margin-bottom: 15px; border-bottom: 1px solid var(--brand-border); padding-bottom: 5px;">
-                                <i data-lucide="landmark" style="width: 18px; height: 18px; display: inline-block; vertical-align: bottom;"></i> AUTHORIZED REMITTANCE
-                            </div>
-                            
-                            @forelse($remittanceAccounts as $acc)
-                                <div style="margin-bottom: 20px;">
-                                    <strong>METHOD:</strong> {{ strtoupper($acc->type) }}<br>
-                                    <strong>PROVIDER:</strong> {{ $acc->provider_name }}<br>
-                                    <strong>ACCOUNT NAME:</strong> {{ $acc->account_name }}<br>
-                                    <strong>REF / ADDRESS:</strong> <span style="color: #FFF;">{{ $acc->account_reference }}</span><br>
-                                    @if($acc->routing_code) <strong>ROUTING/SWIFT:</strong> {{ $acc->routing_code }} @endif
-                                </div>
-                            @empty
-                                <div>No active remittance accounts configured in MDM. Contact Command.</div>
-                            @endforelse
-                        </div>
-                    @endif
-                </div>
-            </div>
-            @elseif($activeTab === 'vault')
-            
-            <div style="width: 100%; margin-bottom: 20px;">
-                <h2 style="font-family: 'Montserrat', sans-serif; font-size: 1.5rem; letter-spacing: 1px;">DOCUMENT VAULT & OS CONFIG</h2>
-                <p style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: #8A9BB2;">> Immutable legal contracts and white-label branding controls.</p>
-            </div>
-
-            <div class="vault-grid">
-                
-                <!-- LEFT: SECURE DOCUMENTS -->
-                <div>
-                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--brand-primary); margin-bottom: 20px; border-bottom: 1px solid var(--brand-border); padding-bottom: 10px;">
-                        > SECURED LEGAL CONTRACTS
-                    </div>
-
-                    <div style="margin-bottom: 30px;">
-                        <h4 style="font-family: 'Montserrat', sans-serif; font-size: 0.9rem; color: #FFF; margin-bottom: 15px;">STATEMENTS OF WORK (SOW)</h4>
-                        @forelse($vaultSows as $sow)
-                            <div class="vault-doc-card">
-                                <div>
-                                    <div class="vault-doc-title">{{ $sow->title }}</div>
-                                    <div class="vault-doc-meta">REF: {{ $sow->proposal_ref }} | BIND DATE: {{ \Carbon\Carbon::parse($sow->updated_at)->format('M d, Y') }}</div>
-                                </div>
-                                <a href="{{ route('portal.proposal', ['token' => $sow->token_hash]) }}" target="_blank" class="btn-submit" style="width: auto; padding: 8px 15px; font-size: 0.7rem; text-decoration: none;">
-                                    <i data-lucide="external-link" style="width: 14px; height: 14px;"></i> VIEW
-                                </a>
-                            </div>
-                        @empty
-                            <div style="text-align: center; padding: 20px; color: #8A9BB2; font-family: 'Roboto Mono', monospace; font-size: 0.75rem;">NO SECURED SOWS FOUND.</div>
-                        @endforelse
-                    </div>
-
-                    <div>
-                        <h4 style="font-family: 'Montserrat', sans-serif; font-size: 0.9rem; color: #FFF; margin-bottom: 15px;">PROJECT HANDOVERS (CLOSURE)</h4>
-                        @forelse($vaultSignoffs as $signoff)
-                            <div class="vault-doc-card" style="border-left-color: var(--brand-accent);">
-                                <div>
-                                    <div class="vault-doc-title">{{ $signoff->project_title }}</div>
-                                    <div class="vault-doc-meta">REF: {{ substr($signoff->token, 0, 12) }} | HASH: {{ substr($signoff->client_signature_hash, 0, 10) }}...</div>
-                                </div>
-                                <a href="{{ route('portal.signoff.gateway', ['token' => $signoff->token]) }}" target="_blank" class="btn-submit" style="width: auto; padding: 8px 15px; font-size: 0.7rem; text-decoration: none; border-color: var(--brand-accent); color: var(--brand-accent);">
-                                    <i data-lucide="external-link" style="width: 14px; height: 14px;"></i> VIEW
-                                </a>
-                            </div>
-                        @empty
-                            <div style="text-align: center; padding: 20px; color: #8A9BB2; font-family: 'Roboto Mono', monospace; font-size: 0.75rem;">NO EXECUTED HANDOVERS FOUND.</div>
-                        @endforelse
-                    </div>
-                </div>
-
-                <!-- RIGHT: BRAND ENGINE CONFIG -->
-                <div class="brand-config-panel">
-                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: #FFF; margin-bottom: 20px; border-bottom: 1px dashed var(--brand-border); padding-bottom: 10px;">
-                        <i data-lucide="palette" style="width: 16px; height: 16px; display: inline-block; vertical-align: bottom;"></i> WHITE-LABEL ENGINE
-                    </div>
-
-                    @if(session()->has('brand_success'))
-                        <div style="background: rgba(0,255,102,0.1); border: 1px solid #00FF66; color: #00FF66; padding: 10px; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; margin-bottom: 20px; text-align: center; border-radius: 2px;">
-                            {{ session('brand_success') }}
-                        </div>
-                    @endif
-
-                    @if(($can['settings.edit'] ?? false))
-                    <form wire:submit.prevent="saveBrandSettings">
-                        <div class="color-picker-wrap">
-                            <div>
-                                <div style="font-family: 'Inter', sans-serif; font-size: 0.85rem; color: #FFF; font-weight: bold;">Primary Highlight</div>
-                                <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2;">Used for Active Tabs & Accents</div>
-                            </div>
-                            <input type="color" wire:model="brandPrimary" class="color-picker">
-                        </div>
-
-                        <div class="color-picker-wrap">
-                            <div>
-                                <div style="font-family: 'Inter', sans-serif; font-size: 0.85rem; color: #FFF; font-weight: bold;">Secondary (Warning)</div>
-                                <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2;">Used for Errors & Deadlines</div>
-                            </div>
-                            <input type="color" wire:model="brandSecondary" class="color-picker">
-                        </div>
-
-                        <div class="color-picker-wrap">
-                            <div>
-                                <div style="font-family: 'Inter', sans-serif; font-size: 0.85rem; color: #FFF; font-weight: bold;">Accent Color</div>
-                                <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2;">Used for Pending / Action States</div>
-                            </div>
-                            <input type="color" wire:model="brandAccent" class="color-picker">
-                        </div>
-
-                        <div style="margin-top: 25px; margin-bottom: 20px;">
-                            <label style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #8A9BB2; display: block; margin-bottom: 10px;">ENTERPRISE LOGO (PNG/SVG < 5MB)</label>
-                            <input type="file" wire:model="brandLogo" class="cyber-input" style="padding: 10px;" accept=".png,.svg">
-                            @error('brandLogo') <span style="color: var(--brand-secondary); font-size: 0.65rem;">{{ $message }}</span> @enderror
-                        </div>
-
-                        <button type="submit" class="btn-submit" style="background: var(--brand-primary); color: var(--brand-bg);" wire:loading.attr="disabled">
-                            <span wire:loading.remove wire:target="saveBrandSettings">OVERRIDE MATRIX COLORS</span>
-                            <span wire:loading wire:target="saveBrandSettings">COMPILING...</span>
-                        </button>
-                        <div style="text-align: center; margin-top: 15px; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #555;">
-                            Default Fallback: JBS Praxis Protocol
-                        </div>
-                    </form>
-                    @endif
-                </div>
-
-            </div>
-    
-    @elseif($activeTab === 'team' && ($can['team.view'] ?? false))
-            
-            <div style="width: 100%; margin-bottom: 20px;">
-                <h2 style="font-family: 'Montserrat', sans-serif; font-size: 1.5rem; letter-spacing: 1px;">TEAM COMMAND CENTER</h2>
-                <p style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; color: #8A9BB2;">> Provision and terminate secondary access nodes (Max Capacity: 3). Domain restriction active.</p>
-            </div>
-
-            <div class="finance-grid"> <!-- Reusing grid layout -->
-                
-                <!-- LEFT: ACTIVE NODES (KILL SWITCH) -->
-                <div>
-                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--brand-primary); margin-bottom: 20px; border-bottom: 1px solid var(--brand-border); padding-bottom: 10px;">
-                        > PROVISIONED NODES ({{ count($teamMembers ?? []) }} / 3)
-                    </div>
-
-                    @foreach($teamMembers ?? [] as $member)
-                        <div class="invoice-card" style="border-left: 4px solid {{ $member->status === 'Active' ? '#00FF66' : ($member->status === 'Suspended' ? 'var(--brand-secondary)' : 'var(--brand-accent)') }}; margin-bottom: 10px;">
-                            <div class="invoice-meta">
-                                <div class="inv-number" style="font-size: 1rem;">{{ $member->first_name }} {{ $member->last_name }}</div>
-                                <div class="inv-details" style="color: #FFF;">{{ $member->email }}</div>
-                                <div class="inv-details" style="margin-top: 8px;">
-                                    @if(!$member->is_primary_client && ($can['team.edit'] ?? false) && $member->id !== $this->user->id)
-                                        <label style="font-size: 0.6rem; color: #8A9BB2; display: block; margin-bottom: 3px;">PORTAL ROLE:</label>
-                                        <select wire:change="changeMemberRole('{{ $member->id }}', $event.target.value)" class="cyber-select" style="padding: 4px; font-size: 0.7rem; max-width: 250px;">
-                                            @foreach($clientRoles as $role)
-                                                <option value="{{ $role->id }}" {{ (int) $member->role_id === (int) $role->id ? 'selected' : '' }}>{{ $role->name }}</option>
-                                            @endforeach
-                                        </select>
-                                    @else
-                                        ROLE: <span style="color: var(--brand-primary);">{{ strtoupper($member->role_name) }}</span>
-                                    @endif
-                                </div>
-                                <div class="inv-details" style="margin-top: 10px;">
-                                    @if($member->is_primary_client)
-                                        ACCESS: <span style="color: var(--brand-primary);">GLOBAL (ALPHA NODE)</span>
-                                    @else
-                                        <label style="font-size: 0.6rem; color: #8A9BB2; display: block; margin-bottom: 3px;">BATTLESPACE RESTRICTION:</label>
-                                        @if(($can['team.edit'] ?? false))
-                                        <select wire:change="updateNodeAccess('{{ $member->id }}', $event.target.value)" class="cyber-select" style="padding: 4px; font-size: 0.7rem; max-width: 250px;">
-                                            <option value="">-- GLOBAL (ALL PROJECTS) --</option>
-                                            @foreach($allProjects as $proj)
-                                                <option value="{{ $proj->id }}" {{ $member->restricted_project_id === $proj->id ? 'selected' : '' }}>
-                                                    {{ strtoupper($proj->title) }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                        @else
-                                            <span style="font-size: 0.7rem;">{{ $member->restricted_project_title ? strtoupper($member->restricted_project_title) : 'ALL PROJECTS' }}</span>
-                                        @endif
-                                    @endif
-                                </div>
-                            </div>
-                            
-                            <div style="text-align: right; display: flex; flex-direction: column; gap: 10px; align-items: flex-end;">
-                                <span class="status-badge" style="font-size: 0.6rem; color: {{ $member->status === 'Active' ? '#00FF66' : '#FFF' }}; border-color: currentColor;">{{ strtoupper($member->status) }}</span>
-                                
-                                @if(!$member->is_primary_client && ($can['team.edit'] ?? false) && $member->id !== $this->user->id)
-                                    <button wire:click="toggleSuspendUser('{{ $member->id }}')" class="btn-submit" style="padding: 6px 12px; font-size: 0.65rem; width: auto; border-color: var(--brand-secondary); color: var(--brand-secondary);">
-                                        <i data-lucide="power" style="width: 12px; height: 12px;"></i> 
-                                        {{ $member->status === 'Suspended' ? 'DEFROST NODE' : 'KILL SWITCH' }}
-                                    </button>
-                                @elseif($member->is_primary_client)
-                                    <span style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; padding: 6px 0;">[ PRIMARY ALPHA ]</span>
-                                @endif
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-
-                <!-- RIGHT: INVITE FORM -->
-                <div class="pop-upload-form">
-                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: #FFF; margin-bottom: 20px; font-weight: bold; border-bottom: 1px dashed var(--brand-border); padding-bottom: 10px;">
-                        <i data-lucide="user-plus" style="width: 16px; height: 16px; display: inline-block; vertical-align: bottom;"></i> DISPATCH ACCESS LINK
-                    </div>
-
-                    @if(session()->has('team_error'))
-                        <div style="background: rgba(255,51,102,0.1); border: 1px solid var(--brand-secondary); color: var(--brand-secondary); padding: 10px; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; margin-bottom: 15px; text-align: center; border-radius: 2px;">
-                            {{ session('team_error') }}
-                        </div>
-                    @endif
-                    @if($errors->any())
-                        <div style="background: rgba(255,51,102,0.1); border: 1px solid var(--brand-secondary); color: var(--brand-secondary); padding: 15px; font-family: 'Roboto Mono', monospace; font-size: 0.75rem; margin-bottom: 15px; border-radius: 2px;">
-                            <strong style="display: block; margin-bottom: 5px;">> TRANSMISSION REJECTED:</strong>
-                            <ul style="margin: 0; padding-left: 20px;">
-                                @foreach($errors->all() as $error)
-                                    <li>{{ $error }}</li>
+                    <section class="card">
+                        <div class="card-header"><h2 class="card-title">{{ __('portal.overview.activity') }}</h2></div>
+                        @if (count($liveLogs))
+                            <ul class="m-0 max-h-[480px] list-none divide-y divide-line overflow-y-auto p-0">
+                                @foreach ($liveLogs as $log)
+                                    <li class="py-3 first:pt-0">
+                                        <div class="text-xs text-muted tabular-nums">{{ $log['time'] }} · {{ $log['author'] }}</div>
+                                        <p class="m-0 mt-1 text-sm text-slate break-words">{!! nl2br(e($activityText($log['text']))) !!}</p>
+                                    </li>
                                 @endforeach
                             </ul>
+                        @else
+                            <div class="empty-state">
+                                <strong>{{ __('portal.overview.no_activity') }}</strong>
+                                {{ __('portal.overview.no_activity_help') }}
+                            </div>
+                        @endif
+                    </section>
+
+                {{-- ===================== PROJECT PROGRESS (tasks) ===================== --}}
+                @elseif ($activeTab === 'sprints' && $activeProject)
+                    <section class="card" style="padding: 0;">
+                        @forelse ($activeTasks as $task)
+                            <div class="flex flex-wrap items-start justify-between gap-4 border-b border-line px-6 py-4 last:border-b-0">
+                                <div class="min-w-0">
+                                    <div class="text-xs text-muted">{{ $task->phase_title }}</div>
+                                    <div class="font-semibold text-ink break-words">{{ $task->title }}</div>
+
+                                    @if ($task->status === 'QA_Review')
+                                        <div class="mt-3 flex flex-wrap gap-2">
+                                            @if ($can['projects.approve'] ?? false)
+                                                <button type="button" wire:click="approveTask('{{ $task->id }}')" class="btn btn-primary btn-sm">
+                                                    <i data-lucide="check"></i> {{ __('portal.tasks.approve') }}
+                                                </button>
+                                            @endif
+                                            @if ($can['qa.create'] ?? false)
+                                                <button type="button" wire:click="teleportToQa('{{ $task->id }}', '{{ addslashes($task->title) }}')" class="btn btn-secondary btn-sm">
+                                                    <i data-lucide="shield-alert"></i> {{ __('portal.tasks.report') }}
+                                                </button>
+                                            @endif
+                                        </div>
+                                    @endif
+                                </div>
+                                <span class="pill {{ $pill('task', $task->status) }}">{{ $label('status.task', $task->status) }}</span>
+                            </div>
+                        @empty
+                            <div class="empty-state">
+                                <strong>{{ __('portal.tasks.empty') }}</strong>
+                                {{ __('portal.tasks.empty_help') }}
+                            </div>
+                        @endforelse
+                    </section>
+
+                {{-- ===================== QUALITY AND ISSUES ===================== --}}
+                @elseif ($activeTab === 'qa_hub' && $activeProject)
+                    <div class="alert alert-info mb-6" role="note">
+                        <i data-lucide="clock"></i>
+                        <div>
+                            <strong class="block">{{ __('portal.qa.sla_title') }}</strong>
+                            <span>{{ __('portal.qa.sla_body') }}</span>
                         </div>
-                    @endif
-
-                    @if(($can['team.create'] ?? false))
-                    <form wire:submit.prevent="inviteTeamMember">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <input type="text" wire:model="inviteFirstName" class="cyber-input" placeholder="First Name" required>
-                            <input type="text" wire:model="inviteLastName" class="cyber-input" placeholder="Last Name" required>
-                        </div>
-                        
-                        <input type="email" wire:model="inviteEmail" class="cyber-input" placeholder="Corporate Email (Must match Domain)" required>
-                        
-                        <label style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-top: 10px; display: block;">RESTRICT TO SPECIFIC BATTLESPACE? (OPTIONAL)</label>
-                        <select wire:model="inviteProjectId" class="cyber-select">
-                            <option value="">-- ALL PROJECTS (GLOBAL ACCESS) --</option>
-                            @foreach($allProjects as $proj)
-                                <option value="{{ $proj->id }}">{{ strtoupper($proj->title) }}</option>
-                            @endforeach
-                        </select>
-
-                        <label for="invite-role" style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-top: 10px; display: block;">PORTAL ROLE</label>
-                        <select id="invite-role" wire:model="inviteRoleId" class="cyber-select">
-                            <option value="">Client Member (default)</option>
-                            @foreach($clientRoles as $role)
-                                <option value="{{ $role->id }}">{{ $role->name }}</option>
-                            @endforeach
-                        </select>
-
-                        <button type="submit" class="btn-submit" style="background: var(--brand-primary); color: var(--brand-bg); margin-top: 15px;" wire:loading.attr="disabled">
-                            <span wire:loading.remove wire:target="inviteTeamMember">GENERATE ZERO-KNOWLEDGE LINK</span>
-                            <span wire:loading wire:target="inviteTeamMember">ENCRYPTING...</span>
-                        </button>
-                    </form>
-                    @else
-                        <p style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: #8A9BB2;">> Your role cannot invite team members.</p>
-                    @endif
-                </div>
-            </div>
-        @endif
-    
-    </div>
-    
-    <div class="floating-action-stack mobile-only">
-        @if(($can['support.create'] ?? false))
-        <div wire:click="$set('showRedlineModal', true)" class="fab-btn fab-redline" title="Initiate Redline Protocol">
-            <i data-lucide="triangle-alert" style="width: 20px; height: 20px;"></i>
-        </div>
-        @endif
-        
-        <div @click="showGuide = true" class="fab-btn fab-help" title="Executive Manual">
-            <i data-lucide="book-open" style="width: 20px; height: 20px;"></i>
-        </div>
-
-        @if(($can['qa.view'] ?? false))
-        <div wire:click="switchTab('qa_hub')" class="fab-btn fab-qa {{ $activeTab === 'qa_hub' ? 'qa-active-hide' : '' }}" title="Message Command">
-            <i data-lucide="message-square" style="width: 20px; height: 20px;"></i>
-        </div>
-        @endif
-    </div>
-
-    @if(($can['qa.view'] ?? false))
-    <button wire:click="switchTab('qa_hub')" class="floating-comm-btn desktop-only {{ $activeTab === 'qa_hub' ? 'qa-active-hide' : '' }}" title="Message Command / Report Bug">
-        <i data-lucide="message-square"></i>
-    </button>
-    @endif
-
-    @if(session()->has('global_success'))
-        <div style="position: fixed; bottom: 30px; right: 30px; background: rgba(0, 255, 102, 0.1); border: 1px solid #00FF66; color: #00FF66; padding: 15px 25px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; z-index: 9999; box-shadow: 0 0 30px rgba(0,255,102,0.2); backdrop-filter: blur(10px);" x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)">
-            {{ session('global_success') }}
-        </div>
-    @endif
-    
-    
-
-    <!-- AUTHENTICATED REDLINE MODAL -->
-    @if($showRedlineModal)
-        <div style="position: fixed; inset: 0; background: rgba(3, 5, 10, 0.95); backdrop-filter: blur(10px); z-index: 99999; display: flex; align-items: center; justify-content: center; padding: 20px;">
-            <div style="background: var(--brand-panel); border: 1px solid var(--brand-secondary); border-top: 4px solid var(--brand-secondary); border-radius: 4px; padding: 40px; box-shadow: 0 20px 50px rgba(255,51,102,0.2); max-width: 600px; width: 100%; position: relative;">
-                
-                <i data-lucide="triangle-alert" style="width: 48px; height: 48px; color: var(--brand-secondary); margin: 0 auto 20px auto; display: block;"></i>
-                <h2 style="font-family: 'Montserrat', sans-serif; font-size: 1.5rem; color: #FFF; letter-spacing: 1px; text-align: center; margin-bottom: 10px;">INITIATE REDLINE PROTOCOL</h2>
-                <p style="font-size: 0.85rem; color: #8A9BB2; text-align: center; margin-bottom: 30px;">Warning: This action bypasses standard SLA queues and directly pages Level 4/5 Command. Standard emergency engagement fees may apply depending on your SLA tier.</p>
-                
-                @if(($can['support.create'] ?? false))
-                <form wire:submit.prevent="triggerAuthenticatedRedline">
-                    <label style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--brand-secondary); display: block; margin-bottom: 10px;">DEFINE INFRASTRUCTURE FAILURE</label>
-                    <textarea wire:model="redlineAuthDescription" style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,51,102,0.3); color: #FFF; padding: 15px; font-family: 'Inter', sans-serif; font-size: 0.85rem; border-radius: 2px; outline: none; min-height: 120px; resize: vertical; margin-bottom: 20px;" required placeholder="Enter diagnostic parameters..."></textarea>
-                    
-                    <div style="display: flex; gap: 15px;">
-                        <button type="button" wire:click="$set('showRedlineModal', false)" style="flex: 1; background: transparent; border: 1px solid #8A9BB2; color: #8A9BB2; padding: 12px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: bold; cursor: pointer; border-radius: 2px;">
-                            ABORT
-                        </button>
-                        <button type="submit" style="flex: 2; background: var(--brand-secondary); color: #FFF; border: none; padding: 12px; font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: bold; cursor: pointer; border-radius: 2px; box-shadow: 0 0 20px rgba(255,51,102,0.4);" wire:loading.attr="disabled">
-                            <span wire:loading.remove wire:target="triggerAuthenticatedRedline">TRANSMIT SOS</span>
-                            <span wire:loading wire:target="triggerAuthenticatedRedline">TRANSMITTING...</span>
-                        </button>
                     </div>
-                </form>
+
+                    <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+                        <section class="card">
+                            <div class="card-header"><h2 class="card-title">{{ __('portal.qa.form_title') }}</h2></div>
+
+                            @if (session()->has('qa_success'))
+                                <div class="alert alert-success mb-4" role="status">
+                                    <i data-lucide="circle-check"></i>
+                                    <span>{{ session('qa_success') }}</span>
+                                </div>
+                            @endif
+
+                            @if ($can['qa.create'] ?? false)
+                                <form wire:submit.prevent="submitQaTicket" class="flex flex-col gap-4">
+                                    @if ($qaTaskId)
+                                        <div class="callout flex flex-wrap items-center justify-between gap-3">
+                                            <div class="min-w-0">
+                                                <div class="stat-label">{{ __('portal.qa.about_task') }}</div>
+                                                <div class="font-semibold text-ink break-words">{{ collect($activeTasks)->firstWhere('id', $qaTaskId)->title ?? __('portal.qa.unknown_task') }}</div>
+                                            </div>
+                                            <button type="button" wire:click="$set('qaTaskId', '')" class="btn btn-ghost btn-sm">
+                                                <i data-lucide="x"></i> {{ __('portal.qa.remove_task') }}
+                                            </button>
+                                        </div>
+                                    @else
+                                        <p class="help m-0">{{ __('portal.qa.general_help') }}</p>
+                                    @endif
+
+                                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                        <div class="field sm:col-span-2">
+                                            <label for="qa-title-input" class="label">{{ __('portal.qa.subject') }}</label>
+                                            <input type="text" id="qa-title-input" wire:model="qaTitle" class="input" required x-init="setTimeout(() => $el.focus(), 100)">
+                                            @error('qaTitle') <span class="field-error">{{ $message }}</span> @enderror
+                                        </div>
+                                        <div class="field">
+                                            <label for="qa-severity" class="label">{{ __('portal.qa.priority') }}</label>
+                                            <select id="qa-severity" wire:model="qaSeverity" class="select">
+                                                @foreach (['Low', 'Medium', 'Critical'] as $severity)
+                                                    <option value="{{ $severity }}">{{ $label('status.severity', $severity) }}</option>
+                                                @endforeach
+                                            </select>
+                                            @error('qaSeverity') <span class="field-error">{{ $message }}</span> @enderror
+                                        </div>
+                                    </div>
+
+                                    <div class="field">
+                                        <label for="qa-description" class="label">{{ __('portal.qa.details') }}</label>
+                                        <textarea id="qa-description" wire:model="qaDescription" class="textarea" rows="5" required aria-describedby="qa-description-help"></textarea>
+                                        <span id="qa-description-help" class="help">{{ __('portal.qa.details_help') }}</span>
+                                        @error('qaDescription') <span class="field-error">{{ $message }}</span> @enderror
+                                    </div>
+
+                                    <div class="field">
+                                        <label for="qa-attachment" class="label">{{ __('portal.qa.attachment') }} <span class="font-normal text-muted">({{ __('portal.common.optional') }})</span></label>
+                                        <input type="file" id="qa-attachment" wire:model="initialAttachment" class="input" accept=".png,.jpg,.jpeg,.pdf" aria-describedby="qa-attachment-help">
+                                        <span id="qa-attachment-help" class="help">{{ __('portal.common.file_help') }}</span>
+                                        @error('initialAttachment') <span class="field-error">{{ $message }}</span> @enderror
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary self-start" wire:loading.attr="disabled" wire:target="submitQaTicket, initialAttachment">
+                                        <span wire:loading.remove wire:target="submitQaTicket"><i data-lucide="send" class="inline h-4 w-4 align-[-3px]"></i> {{ $qaTaskId ? __('portal.qa.submit_issue') : __('portal.qa.submit_message') }}</span>
+                                        <span wire:loading wire:target="submitQaTicket">{{ __('portal.common.sending') }}</span>
+                                    </button>
+                                </form>
+                            @else
+                                <p class="help m-0">{{ __('portal.qa.no_create') }}</p>
+                            @endif
+                        </section>
+
+                        <section class="card">
+                            <div class="card-header"><h2 class="card-title">{{ __('portal.qa.list_title') }}</h2></div>
+                            <div class="flex flex-col gap-3">
+                                @forelse ($qaTickets as $ticket)
+                                    <button type="button" wire:click="openTicket('{{ $ticket->id }}')"
+                                            class="w-full cursor-pointer rounded-lg border border-line bg-paper p-4 text-left hover:bg-mist">
+                                        <span class="flex flex-wrap items-start justify-between gap-2">
+                                            <span class="min-w-0 font-semibold text-ink break-words">{{ $ticketTitle($ticket->title) }}</span>
+                                            <span class="pill {{ $pill('issue', $ticket->status) }}">{{ $label('status.issue', $ticket->status) }}</span>
+                                        </span>
+                                        <span class="mt-1 block text-xs text-muted">
+                                            {{ $ticket->task_id ? __('portal.qa.type_issue') : __('portal.qa.type_message') }}
+                                            · {{ PortalFormat::date($ticket->created_at, 'datetime') }}
+                                            · {{ __('portal.qa.priority_value', ['priority' => $label('status.severity', $ticket->severity)]) }}
+                                        </span>
+                                        <span class="mt-2 block text-sm text-slate break-words">{{ Str::limit($ticket->description, 100) }}</span>
+                                        @if ($ticket->task_title)
+                                            <span class="mt-2 block text-xs text-deep-teal">{{ __('portal.qa.linked_task', ['task' => $ticket->task_title]) }}</span>
+                                        @endif
+                                    </button>
+                                @empty
+                                    <div class="empty-state">
+                                        <strong>{{ __('portal.qa.empty') }}</strong>
+                                        {{ __('portal.qa.empty_help') }}
+                                    </div>
+                                @endforelse
+                            </div>
+                        </section>
+                    </div>
+
+                {{-- ===================== INVOICES AND PAYMENTS ===================== --}}
+                @elseif ($activeTab === 'financials' && $activeProject)
+                    @if (session()->has('finance_success'))
+                        <div class="alert alert-success mb-6" role="status">
+                            <i data-lucide="circle-check"></i>
+                            <span>{{ session('finance_success') }}</span>
+                        </div>
+                    @endif
+
+                    <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+                        <section class="card lg:col-span-2">
+                            <div class="card-header"><h2 class="card-title">{{ __('portal.finance.invoices') }}</h2></div>
+                            @forelse ($invoices as $inv)
+                                <div class="flex flex-wrap items-start justify-between gap-4 border-b border-line py-4 first:pt-0 last:border-b-0 last:pb-0">
+                                    <div class="min-w-0">
+                                        <div class="font-semibold text-ink tabular-nums">{{ $inv->invoice_number }}</div>
+                                        <div class="mt-1 text-sm text-muted tabular-nums">
+                                            {{ __('portal.finance.issued', ['date' => PortalFormat::date($inv->issued_at)]) }}
+                                            · <span class="{{ $inv->status === 'Overdue' ? 'font-semibold text-danger' : '' }}">{{ __('portal.finance.due', ['date' => PortalFormat::date($inv->due_date)]) }}</span>
+                                        </div>
+                                        <div class="mt-2 flex flex-wrap gap-2">
+                                            <span class="pill {{ $pill('invoice', $inv->status) }}">{{ $label('status.invoice', $inv->status) }}</span>
+                                            @if ($inv->has_pending_pop)
+                                                <span class="pill pill-info">{{ __('portal.status.payment_pending') }}</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-col items-end gap-3">
+                                        <div class="text-lg font-semibold text-ink num">{{ PortalFormat::money($inv->total_amount, $inv->currency) }}</div>
+                                        @if ($inv->status !== 'Paid' && !$inv->has_pending_pop)
+                                            @if ($can['billing.create'] ?? false)
+                                                <button type="button" wire:click="triggerPopUpload('{{ $inv->id }}', {{ $inv->total_amount }})" class="btn btn-primary btn-sm">
+                                                    <i data-lucide="upload"></i> {{ __('portal.finance.upload_pop') }}
+                                                </button>
+                                            @endif
+                                        @endif
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="empty-state">
+                                    <strong>{{ __('portal.finance.empty') }}</strong>
+                                    {{ __('portal.finance.empty_help') }}
+                                </div>
+                            @endforelse
+                        </section>
+
+                        @if ($uploadInvoiceId)
+                            <section class="card" style="border-color: var(--color-deep-teal);">
+                                <div class="mb-4">
+                                    <h2 class="card-title">{{ __('portal.finance.pop_title') }}</h2>
+                                    <p class="help m-0 mt-1">{{ __('portal.finance.pop_for', ['invoice' => collect($invoices)->firstWhere('id', $uploadInvoiceId)->invoice_number ?? '']) }}</p>
+                                </div>
+
+                                @if ($can['billing.create'] ?? false)
+                                    <form wire:submit.prevent="submitProofOfPayment" class="flex flex-col gap-4">
+                                        <div class="field">
+                                            <label for="pop-method" class="label">{{ __('portal.finance.method') }}</label>
+                                            <select id="pop-method" wire:model="popMethod" class="select">
+                                                @foreach (['Bank Transfer', 'USDT', 'Campay'] as $method)
+                                                    <option value="{{ $method }}">{{ $label('payment_methods', $method) }}</option>
+                                                @endforeach
+                                            </select>
+                                            @error('popMethod') <span class="field-error">{{ $message }}</span> @enderror
+                                        </div>
+
+                                        <div class="field">
+                                            <label for="pop-amount" class="label">{{ __('portal.finance.amount') }}</label>
+                                            <input type="number" id="pop-amount" step="0.01" wire:model="popAmount" class="input tabular-nums" required>
+                                            @error('popAmount') <span class="field-error">{{ $message }}</span> @enderror
+                                        </div>
+
+                                        <div class="field">
+                                            <label for="pop-ref" class="label">{{ __('portal.finance.reference') }}</label>
+                                            <input type="text" id="pop-ref" wire:model="popRef" class="input" required aria-describedby="pop-ref-help">
+                                            <span id="pop-ref-help" class="help">{{ __('portal.finance.reference_help') }}</span>
+                                            @error('popRef') <span class="field-error">{{ $message }}</span> @enderror
+                                        </div>
+
+                                        <div class="field">
+                                            <label for="pop-file" class="label">{{ __('portal.finance.proof') }}</label>
+                                            <input type="file" id="pop-file" wire:model="popFile" class="input" accept=".pdf,.jpg,.jpeg,.png" required aria-describedby="pop-file-help">
+                                            <span id="pop-file-help" class="help">{{ __('portal.finance.proof_help') }}</span>
+                                            @error('popFile') <span class="field-error">{{ $message }}</span> @enderror
+                                        </div>
+
+                                        @error('uploadInvoiceId') <div class="alert alert-danger" role="alert"><i data-lucide="circle-alert"></i><span>{{ $message }}</span></div> @enderror
+
+                                        <div class="flex flex-wrap justify-end gap-3">
+                                            <button type="button" wire:click="cancelPopUpload" class="btn btn-secondary">{{ __('portal.common.cancel') }}</button>
+                                            <button type="submit" class="btn btn-primary" wire:loading.attr="disabled" wire:target="submitProofOfPayment, popFile">
+                                                <span wire:loading.remove wire:target="submitProofOfPayment">{{ __('portal.finance.pop_submit') }}</span>
+                                                <span wire:loading wire:target="submitProofOfPayment">{{ __('portal.common.uploading') }}</span>
+                                            </button>
+                                        </div>
+                                    </form>
+                                @endif
+                            </section>
+                        @else
+                            <section class="card">
+                                <div class="card-header">
+                                    <h2 class="card-title flex items-center gap-2"><i data-lucide="landmark" class="h-4 w-4 text-deep-teal"></i> {{ __('portal.finance.pay_title') }}</h2>
+                                </div>
+                                @if (count($remittanceAccounts))
+                                    <p class="help m-0 mb-4">{{ __('portal.finance.pay_intro') }}</p>
+                                    <div class="flex flex-col gap-4">
+                                        @foreach ($remittanceAccounts as $acc)
+                                            <div class="rounded-lg bg-mist p-4 text-sm">
+                                                <div class="mb-3 font-semibold text-ink">{{ $label('account_types', $acc->type) }}</div>
+                                                <dl class="m-0 grid grid-cols-1 gap-2">
+                                                    <div>
+                                                        <dt class="text-xs text-muted">{{ __('portal.finance.pay_provider') }}</dt>
+                                                        <dd class="m-0 text-ink break-words">{{ $acc->provider_name }}</dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt class="text-xs text-muted">{{ __('portal.finance.pay_account_name') }}</dt>
+                                                        <dd class="m-0 text-ink break-words">{{ $acc->account_name }}</dd>
+                                                    </div>
+                                                    <div>
+                                                        <dt class="text-xs text-muted">{{ __('portal.finance.pay_reference') }}</dt>
+                                                        <dd class="m-0 font-semibold text-ink tabular-nums break-all">{{ $acc->account_reference }}</dd>
+                                                    </div>
+                                                    @if ($acc->routing_code)
+                                                        <div>
+                                                            <dt class="text-xs text-muted">{{ __('portal.finance.pay_routing') }}</dt>
+                                                            <dd class="m-0 text-ink tabular-nums break-all">{{ $acc->routing_code }}</dd>
+                                                        </div>
+                                                    @endif
+                                                </dl>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <p class="help m-0">{{ __('portal.finance.pay_empty') }}</p>
+                                @endif
+                            </section>
+                        @endif
+                    </div>
+
+                {{-- ===================== DOCUMENTS ===================== --}}
+                @elseif ($activeTab === 'vault')
+                    <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+                        <section class="card lg:col-span-2">
+                            <div class="card-header"><h2 class="card-title">{{ __('portal.documents.signed') }}</h2></div>
+
+                            <h3 class="section-title text-base">{{ __('portal.documents.sows') }}</h3>
+                            <div class="mb-6">
+                                @forelse ($vaultSows as $sow)
+                                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-line py-3 last:border-b-0">
+                                        <div class="min-w-0">
+                                            <div class="font-semibold text-ink break-words">{{ $sow->title }}</div>
+                                            <div class="text-xs text-muted tabular-nums">{{ __('portal.documents.sow_meta', ['ref' => $sow->proposal_ref, 'date' => PortalFormat::date($sow->updated_at)]) }}</div>
+                                        </div>
+                                        <a href="{{ route('portal.proposal', ['token' => $sow->token_hash]) }}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">
+                                            <i data-lucide="external-link"></i> {{ __('portal.documents.view') }}
+                                        </a>
+                                    </div>
+                                @empty
+                                    <div class="empty-state" style="padding: 24px;">
+                                        <strong>{{ __('portal.documents.no_sows') }}</strong>
+                                        {{ __('portal.documents.no_sows_help') }}
+                                    </div>
+                                @endforelse
+                            </div>
+
+                            <h3 class="section-title text-base">{{ __('portal.documents.handovers') }}</h3>
+                            <div>
+                                @forelse ($vaultSignoffs as $signoff)
+                                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-line py-3 last:border-b-0">
+                                        <div class="min-w-0">
+                                            <div class="font-semibold text-ink break-words">{{ $signoff->project_title }}</div>
+                                            <div class="text-xs text-muted tabular-nums break-all">{{ __('portal.documents.handover_meta', ['ref' => substr($signoff->token, 0, 12), 'hash' => substr((string) $signoff->client_signature_hash, 0, 10)]) }}</div>
+                                        </div>
+                                        <a href="{{ route('portal.signoff.gateway', ['token' => $signoff->token]) }}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">
+                                            <i data-lucide="external-link"></i> {{ __('portal.documents.view') }}
+                                        </a>
+                                    </div>
+                                @empty
+                                    <div class="empty-state" style="padding: 24px;">
+                                        <strong>{{ __('portal.documents.no_handovers') }}</strong>
+                                        {{ __('portal.documents.no_handovers_help') }}
+                                    </div>
+                                @endforelse
+                            </div>
+                        </section>
+
+                        <section class="card">
+                            <div class="card-header">
+                                <h2 class="card-title flex items-center gap-2"><i data-lucide="palette" class="h-4 w-4 text-deep-teal"></i> {{ __('portal.documents.appearance') }}</h2>
+                            </div>
+
+                            @if (session()->has('brand_success'))
+                                <div class="alert alert-success mb-4" role="status">
+                                    <i data-lucide="circle-check"></i>
+                                    <span>{{ session('brand_success') }}</span>
+                                </div>
+                            @endif
+
+                            @if ($can['settings.edit'] ?? false)
+                                <p class="help m-0 mb-4">{{ __('portal.documents.appearance_intro') }}</p>
+                                <form wire:submit.prevent="saveBrandSettings" class="flex flex-col gap-4">
+                                    @foreach ([['brandPrimary', 'primary', 'primary_help'], ['brandSecondary', 'secondary', null], ['brandAccent', 'accent', null]] as [$model, $name, $help])
+                                        <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
+                                            <div>
+                                                <label for="colour-{{ $name }}" class="label">{{ __('portal.documents.' . $name) }}</label>
+                                                <div class="help">{{ $help ? __('portal.documents.' . $help) : __('portal.documents.colours_help') }}</div>
+                                                @error($model) <div class="field-error">{{ $message }}</div> @enderror
+                                            </div>
+                                            <input type="color" id="colour-{{ $name }}" wire:model="{{ $model }}" value="{{ $this->{$model} }}" class="h-9 w-12 shrink-0 cursor-pointer rounded border border-line-strong bg-paper p-0.5">
+                                        </div>
+                                    @endforeach
+
+                                    <div class="field">
+                                        <label for="brand-logo" class="label">{{ __('portal.documents.logo') }} <span class="font-normal text-muted">({{ __('portal.common.optional') }})</span></label>
+                                        <input type="file" id="brand-logo" wire:model="brandLogo" class="input" accept=".png" aria-describedby="brand-logo-help">
+                                        <span id="brand-logo-help" class="help">{{ __('portal.documents.logo_help') }}</span>
+                                        @error('brandLogo') <span class="field-error">{{ $message }}</span> @enderror
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary self-start" wire:loading.attr="disabled" wire:target="saveBrandSettings, brandLogo">
+                                        <span wire:loading.remove wire:target="saveBrandSettings">{{ __('portal.documents.save') }}</span>
+                                        <span wire:loading wire:target="saveBrandSettings">{{ __('portal.common.saving') }}</span>
+                                    </button>
+                                </form>
+                            @else
+                                <p class="help m-0">{{ __('portal.documents.no_edit') }}</p>
+                            @endif
+                        </section>
+                    </div>
+
+                {{-- ===================== TEAM ===================== --}}
+                @elseif ($activeTab === 'team' && ($can['team.view'] ?? false))
+                    <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+                        <section class="card lg:col-span-2">
+                            <div class="card-header"><h2 class="card-title">{{ __('portal.team.members', ['count' => count($teamMembers ?? [])]) }}</h2></div>
+
+                            @if (session()->has('team_success'))
+                                <div class="alert alert-success mb-4" role="status">
+                                    <i data-lucide="circle-check"></i>
+                                    <span>{{ session('team_success') }}</span>
+                                </div>
+                            @endif
+
+                            @foreach ($teamMembers ?? [] as $member)
+                                @php $manageable = !$member->is_primary_client && ($can['team.edit'] ?? false) && $member->id !== $this->user->id; @endphp
+                                <div class="border-b border-line py-4 first:pt-0 last:border-b-0 last:pb-0">
+                                    <div class="flex flex-wrap items-start justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <span class="font-semibold text-ink">{{ $member->first_name }} {{ $member->last_name }}</span>
+                                                <span class="pill {{ $pill('account', $member->status) }}">{{ $label('status.account', $member->status) }}</span>
+                                                @if ($member->is_primary_client)
+                                                    <span class="pill pill-info">{{ __('portal.team.primary') }}</span>
+                                                @endif
+                                            </div>
+                                            <div class="text-sm text-muted break-all">{{ $member->email }}</div>
+                                        </div>
+
+                                        @if ($manageable)
+                                            @if ($member->status === 'Suspended')
+                                                <button type="button" wire:click="toggleSuspendUser('{{ $member->id }}')" class="btn btn-secondary btn-sm">
+                                                    <i data-lucide="unlock"></i> {{ __('portal.team.restore') }}
+                                                </button>
+                                            @else
+                                                <button type="button" wire:click="toggleSuspendUser('{{ $member->id }}')"
+                                                        wire:confirm="{{ __('portal.team.suspend_confirm', ['name' => trim($member->first_name . ' ' . $member->last_name)]) }}"
+                                                        class="btn btn-secondary btn-sm text-danger">
+                                                    <i data-lucide="ban"></i> {{ __('portal.team.suspend') }}
+                                                </button>
+                                            @endif
+                                        @endif
+                                    </div>
+
+                                    <div>
+                                        <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <div class="field">
+                                                @if ($manageable)
+                                                    <label for="role-{{ $member->id }}" class="label">{{ __('portal.team.role') }}</label>
+                                                    <select id="role-{{ $member->id }}" wire:change="changeMemberRole('{{ $member->id }}', $event.target.value)" class="select">
+                                                        @foreach ($clientRoles as $role)
+                                                            <option value="{{ $role->id }}" {{ (int) $member->role_id === (int) $role->id ? 'selected' : '' }}>{{ $roleLabel($role->name) }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                @else
+                                                    <span class="stat-label">{{ __('portal.team.role') }}</span>
+                                                    <span class="text-sm font-medium text-ink">{{ $roleLabel($member->role_name) }}</span>
+                                                @endif
+                                            </div>
+                                            <div class="field">
+                                                @if ($member->is_primary_client)
+                                                    <span class="stat-label">{{ __('portal.team.access') }}</span>
+                                                    <span class="text-sm font-medium text-ink">{{ __('portal.team.all_projects') }}</span>
+                                                @elseif ($can['team.edit'] ?? false)
+                                                    <label for="access-{{ $member->id }}" class="label">{{ __('portal.team.access') }}</label>
+                                                    <select id="access-{{ $member->id }}" wire:change="updateNodeAccess('{{ $member->id }}', $event.target.value)" class="select">
+                                                        <option value="">{{ __('portal.team.all_projects') }}</option>
+                                                        @foreach ($allProjects as $proj)
+                                                            <option value="{{ $proj->id }}" {{ $member->restricted_project_id === $proj->id ? 'selected' : '' }}>{{ $proj->title }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                @else
+                                                    <span class="stat-label">{{ __('portal.team.access') }}</span>
+                                                    <span class="text-sm font-medium text-ink">{{ $member->restricted_project_title ?: __('portal.team.all_projects') }}</span>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </section>
+
+                        <section class="card">
+                            <div class="card-header">
+                                <h2 class="card-title flex items-center gap-2"><i data-lucide="user-plus" class="h-4 w-4 text-deep-teal"></i> {{ __('portal.team.invite_title') }}</h2>
+                            </div>
+
+                            @if (session()->has('team_error'))
+                                <div class="alert alert-danger mb-4" role="alert">
+                                    <i data-lucide="circle-alert"></i>
+                                    <span>{{ session('team_error') }}</span>
+                                </div>
+                            @endif
+                            @if ($errors->any())
+                                <div class="alert alert-danger mb-4" role="alert">
+                                    <i data-lucide="circle-alert"></i>
+                                    <div>
+                                        <strong class="block">{{ __('portal.team.invite_errors') }}</strong>
+                                        <ul class="m-0 mt-1 list-disc pl-5">
+                                            @foreach ($errors->all() as $error)
+                                                <li>{{ $error }}</li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
+                                </div>
+                            @endif
+
+                            @if ($can['team.create'] ?? false)
+                                <form wire:submit.prevent="inviteTeamMember" class="flex flex-col gap-4">
+                                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                                        <div class="field">
+                                            <label for="invite-first" class="label">{{ __('portal.team.first_name') }}</label>
+                                            <input type="text" id="invite-first" wire:model="inviteFirstName" class="input" required autocomplete="off">
+                                        </div>
+                                        <div class="field">
+                                            <label for="invite-last" class="label">{{ __('portal.team.last_name') }}</label>
+                                            <input type="text" id="invite-last" wire:model="inviteLastName" class="input" required autocomplete="off">
+                                        </div>
+                                    </div>
+
+                                    <div class="field">
+                                        <label for="invite-email" class="label">{{ __('portal.team.email') }}</label>
+                                        <input type="email" id="invite-email" wire:model="inviteEmail" class="input" required autocomplete="off" aria-describedby="invite-email-help">
+                                        <span id="invite-email-help" class="help">{{ __('portal.team.email_help', ['domain' => $emailDomain]) }}</span>
+                                    </div>
+
+                                    <div class="field">
+                                        <label for="invite-project" class="label">{{ __('portal.team.project_optional') }} <span class="font-normal text-muted">({{ __('portal.common.optional') }})</span></label>
+                                        <select id="invite-project" wire:model="inviteProjectId" class="select">
+                                            <option value="">{{ __('portal.team.all_projects') }}</option>
+                                            @foreach ($allProjects as $proj)
+                                                <option value="{{ $proj->id }}">{{ $proj->title }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+
+                                    <div class="field">
+                                        <label for="invite-role" class="label">{{ __('portal.team.role') }}</label>
+                                        <select id="invite-role" wire:model="inviteRoleId" class="select">
+                                            <option value="">{{ __('portal.team.role_default') }}</option>
+                                            @foreach ($clientRoles as $role)
+                                                <option value="{{ $role->id }}">{{ $roleLabel($role->name) }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary self-start" wire:loading.attr="disabled" wire:target="inviteTeamMember">
+                                        <span wire:loading.remove wire:target="inviteTeamMember">{{ __('portal.team.invite_submit') }}</span>
+                                        <span wire:loading wire:target="inviteTeamMember">{{ __('portal.common.sending') }}</span>
+                                    </button>
+                                </form>
+                            @else
+                                <p class="help m-0">{{ __('portal.team.no_invite') }}</p>
+                            @endif
+                        </section>
+                    </div>
+                @endif
+            </main>
+        </div>
+    </div>
+
+    {{-- Message the delivery team from any section --}}
+    @if ($can['qa.view'] ?? false)
+        <button type="button" wire:click="switchTab('qa_hub')" class="btn btn-primary portal-fab {{ $activeTab === 'qa_hub' ? 'hidden' : '' }}"
+                aria-label="{{ __('portal.nav.message') }}" title="{{ __('portal.nav.message') }}">
+            <i data-lucide="message-square"></i> <span class="hidden sm:inline">{{ __('portal.nav.message') }}</span>
+        </button>
+    @endif
+
+    @if (session()->has('global_success'))
+        <div class="alert alert-success portal-toast" role="status" x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)">
+            <i data-lucide="circle-check"></i>
+            <span>{{ session('global_success') }}</span>
+        </div>
+    @endif
+
+    {{-- ===== Urgent support (signed-in client) ===== --}}
+    @if ($showRedlineModal)
+        <div class="modal-backdrop" style="z-index: 80;" role="dialog" aria-modal="true" aria-labelledby="urgent-title">
+            <div class="modal">
+                <h2 id="urgent-title" class="modal-title flex items-center gap-2"><i data-lucide="triangle-alert" class="h-5 w-5 text-danger"></i> {{ __('portal.urgent.title') }}</h2>
+                <p class="m-0 mb-4 text-sm text-slate">{{ __('portal.urgent.intro') }}</p>
+
+                @if ($can['support.create'] ?? false)
+                    <form wire:submit.prevent="triggerAuthenticatedRedline">
+                        <div class="field">
+                            <label for="urgent-description" class="label">{{ __('portal.urgent.description') }}</label>
+                            <textarea id="urgent-description" wire:model="redlineAuthDescription" class="textarea" rows="5" required aria-describedby="urgent-description-help"></textarea>
+                            <span id="urgent-description-help" class="help">{{ __('portal.urgent.description_help') }}</span>
+                            @error('redlineAuthDescription') <span class="field-error">{{ $message }}</span> @enderror
+                        </div>
+
+                        <div class="modal-actions">
+                            <button type="button" wire:click="$set('showRedlineModal', false)" class="btn btn-secondary">{{ __('portal.common.cancel') }}</button>
+                            <button type="submit" class="btn btn-primary" wire:loading.attr="disabled" wire:target="triggerAuthenticatedRedline">
+                                <span wire:loading.remove wire:target="triggerAuthenticatedRedline">{{ __('portal.urgent.submit') }}</span>
+                                <span wire:loading wire:target="triggerAuthenticatedRedline">{{ __('portal.common.sending') }}</span>
+                            </button>
+                        </div>
+                    </form>
                 @endif
             </div>
         </div>
     @endif
-    
-    <div class="os-guide-overlay" :class="{'open': showQaOffcanvas}" @click="showQaOffcanvas = false"></div>
-    <div class="os-guide-panel" :class="{'open': showQaOffcanvas}" style="width: 600px; max-width: 100vw;">
-        @if($selectedTicket)
-            <div class="guide-header">
-                <div>
-                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--brand-primary); margin-bottom: 5px;">> TICKET #{{ strtoupper(substr($selectedTicket->id, 0, 8)) }}</div>
-                    <h2 style="font-family: 'Montserrat', sans-serif; font-size: 1.1rem; color: #FFF;">{{ $selectedTicket->title }}</h2>
-                    <span class="status-badge" style="font-size: 0.6rem; margin-top: 5px;">{{ strtoupper($selectedTicket->status) }}</span>
+
+    {{-- ===== An issue or message: details, files, conversation ===== --}}
+    <div class="portal-overlay" :class="{ 'is-open': showQaOffcanvas }" @click="showQaOffcanvas = false"></div>
+    <aside class="portal-drawer" :class="{ 'is-open': showQaOffcanvas }" role="dialog" aria-modal="true" aria-labelledby="issue-title">
+        @if ($selectedTicket)
+            <div class="portal-drawer-head">
+                <div class="min-w-0">
+                    <div class="text-xs text-muted tabular-nums">
+                        {{ $selectedTicket->task_id ? __('portal.qa.type_issue') : __('portal.qa.type_message') }}
+                        · {{ __('portal.qa.reference', ['ref' => strtoupper(substr($selectedTicket->id, 0, 8))]) }}
+                    </div>
+                    <h2 id="issue-title" class="m-0 mt-1 text-lg font-semibold text-ink break-words">{{ $ticketTitle($selectedTicket->title) }}</h2>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <span class="pill {{ $pill('issue', $selectedTicket->status) }}">{{ $label('status.issue', $selectedTicket->status) }}</span>
+                        <span class="pill {{ $pill('severity', $selectedTicket->severity) }}">{{ __('portal.qa.priority_value', ['priority' => $label('status.severity', $selectedTicket->severity)]) }}</span>
+                    </div>
                 </div>
-                <button @click="showQaOffcanvas = false" style="background: transparent; border: none; color: #8A9BB2; cursor: pointer; padding: 5px;"><i data-lucide="x" style="width: 20px; height: 20px;"></i></button>
+                <button type="button" @click="showQaOffcanvas = false" class="btn btn-ghost btn-sm" aria-label="{{ __('portal.common.close') }}" title="{{ __('portal.common.close') }}"><i data-lucide="x"></i></button>
             </div>
 
-            <div class="guide-content">
-                <div style="background: rgba(0,0,0,0.3); border: 1px dashed var(--brand-border); padding: 15px; border-radius: 2px; color: #B0B8C4; font-size: 0.85rem; line-height: 1.6; margin-bottom: 25px;">
+            <div class="portal-drawer-body">
+                <div class="mb-6 rounded-lg bg-mist p-4 text-sm text-slate break-words">
                     {!! nl2br(e($selectedTicket->description)) !!}
                 </div>
-                
-                <div style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--brand-primary); margin-bottom: 10px;">> EVIDENCE GALLERY:</div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-bottom: 15px;">
-                    @forelse($ticketAttachments as $att)
-                        <div style="border: 1px solid var(--brand-border); padding: 10px; text-align: center; border-radius: 2px; background: rgba(0,0,0,0.5); transition: 0.3s;" onmouseover="this.style.borderColor='var(--brand-primary)'" onmouseout="this.style.borderColor='var(--brand-border)'">
-                            <i data-lucide="image" style="width: 24px; height: 24px; color: #8A9BB2; margin-bottom: 10px;"></i><br>
-                            <a href="{{ route('portal.file', ['path' => $att->file_path]) }}" target="_blank" style="color: var(--brand-primary); font-size: 0.7rem; font-family: 'Roboto Mono', monospace; text-decoration: none; word-break: break-all;">
-                                {{ Str::limit($att->file_name, 15) }}
-                            </a>
-                        </div>
+
+                <h3 class="section-title text-base">{{ __('portal.qa.attachments') }}</h3>
+                <div class="mb-4 flex flex-col gap-2">
+                    @forelse ($ticketAttachments as $att)
+                        <a href="{{ route('portal.file', ['path' => $att->file_path]) }}" target="_blank" rel="noopener"
+                           class="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-deep-teal no-underline hover:bg-mist" title="{{ $att->file_name }}">
+                            <i data-lucide="paperclip" class="h-4 w-4 text-muted"></i>
+                            <span class="min-w-0 truncate">{{ $att->file_name }}</span>
+                        </a>
                     @empty
-                        <div style="grid-column: 1 / -1; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: #8A9BB2; padding: 10px;">No attachments provided.</div>
+                        <p class="help m-0">{{ __('portal.qa.no_attachments') }}</p>
                     @endforelse
                 </div>
 
-                @if(in_array($selectedTicket->status, ['Open', 'Investigating']))
-                    <div style="display: flex; gap: 10px; margin-bottom: 30px; align-items: center;">
-                        <input type="file" wire:model="newQaAttachment" class="cyber-input" style="padding: 6px; font-size: 0.75rem; margin-bottom: 0;" accept=".png,.jpg,.jpeg,.pdf">
-                        @if(($can['qa.create'] ?? false))
-                        <button wire:click="uploadQaEvidence" class="btn-submit" style="width: auto; padding: 8px 15px;" wire:loading.attr="disabled" wire:target="newQaAttachment, uploadQaEvidence">
-                            <span wire:loading.remove wire:target="uploadQaEvidence"><i data-lucide="upload" style="width: 14px; height: 14px;"></i> UPLOAD</span>
-                            <span wire:loading wire:target="uploadQaEvidence">PROCESSING...</span>
-                        </button>
-                        @endif
+                @if (in_array($selectedTicket->status, ['Open', 'Investigating']) && ($can['qa.create'] ?? false))
+                    <div class="field mb-6">
+                        <label for="qa-new-file" class="label">{{ __('portal.qa.add_file') }}</label>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <input type="file" id="qa-new-file" wire:model="newQaAttachment" class="input min-w-0 flex-1" accept=".png,.jpg,.jpeg,.pdf" aria-describedby="qa-new-file-help">
+                            <button type="button" wire:click="uploadQaEvidence" class="btn btn-secondary" wire:loading.attr="disabled" wire:target="newQaAttachment, uploadQaEvidence">
+                                <span wire:loading.remove wire:target="uploadQaEvidence"><i data-lucide="upload" class="inline h-4 w-4 align-[-3px]"></i> {{ __('portal.qa.upload') }}</span>
+                                <span wire:loading wire:target="uploadQaEvidence">{{ __('portal.common.uploading') }}</span>
+                            </button>
+                        </div>
+                        <span id="qa-new-file-help" class="help">{{ __('portal.common.file_help') }}</span>
+                        @error('newQaAttachment') <span class="field-error">{{ $message }}</span> @enderror
                     </div>
-                    @error('newQaAttachment') <span style="color: var(--brand-secondary); font-size: 0.65rem; display: block; margin-top: -25px; margin-bottom: 20px;">{{ $message }}</span> @enderror
                 @endif
 
-                <div style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--brand-primary); margin-bottom: 15px; border-bottom: 1px dashed var(--brand-border); padding-bottom: 5px;">> COMMUNICATION THREAD</div>
-                
-                @forelse($ticketComments as $comment)
-                    <div style="padding: 15px; border-radius: 4px; margin-bottom: 15px; border: 1px solid var(--brand-border); background: rgba(0,0,0,0.3); border-left: 3px solid {{ $comment->user_id === Auth::id() ? 'var(--brand-primary)' : 'var(--brand-accent)' }};">
-                        <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #8A9BB2; margin-bottom: 10px; display: flex; justify-content: space-between;">
-                            <span><strong>{{ $comment->first_name }} {{ $comment->last_name }}</strong></span>
-                            <span>{{ \Carbon\Carbon::parse($comment->created_at)->format('M d, H:i') }}</span>
+                <h3 class="section-title text-base">{{ __('portal.qa.conversation') }}</h3>
+                <div class="flex flex-col gap-3">
+                    @forelse ($ticketComments as $comment)
+                        @php $mine = ($comment->author_type ?? null) === 'client' && $comment->user_id === $user->id; @endphp
+                        <div class="rounded-lg border border-line p-3 {{ $mine ? 'bg-teal-tint' : 'bg-paper' }}">
+                            <div class="mb-1 flex flex-wrap justify-between gap-2 text-xs text-muted">
+                                <span class="font-semibold text-ink">{{ $mine ? __('portal.common.you') : trim($comment->first_name . ' ' . $comment->last_name) }}</span>
+                                <span class="tabular-nums">{{ PortalFormat::date($comment->created_at, 'datetime') }}</span>
+                            </div>
+                            <div class="text-sm text-slate break-words">{!! nl2br(e($comment->comment_text)) !!}</div>
                         </div>
-                        <div style="color: #FFF; font-size: 0.85rem; line-height: 1.5;">
-                            {!! nl2br(e($comment->comment_text)) !!}
-                        </div>
-                    </div>
-                @empty
-                    <div style="text-align: center; padding: 20px; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: #8A9BB2;">No thread history.</div>
-                @endforelse
+                    @empty
+                        <p class="help m-0">{{ __('portal.qa.no_replies') }}</p>
+                    @endforelse
+                </div>
 
-                @if(in_array($selectedTicket->status, ['Open', 'Investigating', 'Resolved']))
-                    <div style="margin-top: 20px;">
-                        <textarea wire:model="newCommentText" class="cyber-textarea" rows="3" placeholder="Type response to HQ here..."></textarea>
-                        @if(($can['qa.create'] ?? false))
-                        <button wire:click="postTicketComment" class="btn-submit" style="padding: 8px 20px; width: 100%;">
-                            <i data-lucide="send" style="width: 14px; height: 14px;"></i> TRANSMIT RESPONSE
-                        </button>
-                        @endif
-                    </div>
-                    
-                    @if($selectedTicket->task_id && $selectedTicket->status !== 'Closed')
-                        <div style="margin-top: 20px; border-top: 1px dashed var(--brand-border); padding-top: 20px;">
-                            @if(($can['projects.approve'] ?? false))
-                            <button wire:click="approveAndLockFromQa" class="btn-submit" style="background: rgba(0,255,102,0.1); border-color: #00FF66; color: #00FF66; width: 100%;" onclick="confirm('Are you sure you want to override this ticket and permanently lock the linked task?') || event.stopImmediatePropagation()">
-                                <i data-lucide="lock" style="width: 14px; height: 14px;"></i> OVERRIDE: APPROVE & LOCK LINKED TASK
+                @if (in_array($selectedTicket->status, ['Open', 'Investigating', 'Resolved']))
+                    @if ($can['qa.create'] ?? false)
+                        <div class="field mt-6">
+                            <label for="qa-reply" class="label">{{ __('portal.qa.reply') }}</label>
+                            <textarea id="qa-reply" wire:model="newCommentText" class="textarea" rows="3"></textarea>
+                            @error('newCommentText') <span class="field-error">{{ $message }}</span> @enderror
+                            <button type="button" wire:click="postTicketComment" class="btn btn-primary mt-2 self-start" wire:loading.attr="disabled" wire:target="postTicketComment">
+                                <i data-lucide="send"></i> {{ __('portal.qa.send_reply') }}
                             </button>
-                            @endif
+                        </div>
+                    @endif
+
+                    @if ($selectedTicket->task_id && $selectedTicket->status !== 'Closed' && ($can['projects.approve'] ?? false))
+                        <div class="mt-6 border-t border-line pt-6">
+                            <button type="button" wire:click="approveAndLockFromQa" wire:confirm="{{ __('portal.qa.approve_task_confirm') }}" class="btn btn-secondary w-full whitespace-normal">
+                                <i data-lucide="check"></i> {{ __('portal.qa.approve_task') }}
+                            </button>
                         </div>
                     @endif
                 @endif
             </div>
 
-            @if($selectedTicket->status === 'Resolved')
-                <div style="padding: 20px 30px; border-top: 1px solid var(--brand-border); background: rgba(0,255,102,0.1);">
-                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.7rem; color: #00FF66; margin-bottom: 10px; text-align: center;">
-                        HQ HAS LOGGED THIS VULNERABILITY AS PATCHED.
-                    </div>
-                    @if(($can['projects.approve'] ?? false))
-                    <button wire:click="approveTicketFix" class="btn-submit" style="border-color: #00FF66; color: #00FF66; width: 100%;">
-                        <i data-lucide="check-circle" style="width: 16px; height: 16px;"></i> APPROVE FIX & CLOSE TICKET
-                    </button>
+            @if ($selectedTicket->status === 'Resolved')
+                <div class="portal-drawer-foot" style="background: var(--color-success-tint);">
+                    <p class="m-0 mb-3 text-sm text-success">{{ __('portal.qa.resolved_note') }}</p>
+                    @if ($can['projects.approve'] ?? false)
+                        <button type="button" wire:click="approveTicketFix" class="btn btn-primary w-full whitespace-normal">
+                            <i data-lucide="circle-check"></i> {{ __('portal.qa.approve_fix') }}
+                        </button>
                     @endif
                 </div>
             @endif
         @endif
-    </div>
-    
-    <div class="os-guide-overlay" :class="{'open': showGuide}" @click="showGuide = false"></div>
-    <div class="os-guide-panel" :class="{'open': showGuide}">
-        <div class="guide-header">
-            <div style="font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 1.1rem; color: #FFF; letter-spacing: 1px;">
-                <i data-lucide="book-open" style="width: 18px; height: 18px; display: inline-block; vertical-align: middle; color: var(--brand-primary); margin-right: 8px;"></i>
-                EXECUTIVE MANUAL
-            </div>
-            <button @click="showGuide = false" style="background: transparent; border: none; color: #8A9BB2; cursor: pointer; padding: 5px;">
-                <i data-lucide="x" style="width: 20px; height: 20px;"></i>
-            </button>
+    </aside>
+
+    {{-- ===== How the portal works ===== --}}
+    <div class="portal-overlay" :class="{ 'is-open': showGuide }" @click="showGuide = false"></div>
+    <aside class="portal-drawer" :class="{ 'is-open': showGuide }" role="dialog" aria-modal="true" aria-labelledby="guide-title">
+        <div class="portal-drawer-head">
+            <h2 id="guide-title" class="m-0 flex items-center gap-2 text-lg font-semibold text-ink"><i data-lucide="book-open" class="h-5 w-5 text-deep-teal"></i> {{ __('portal.guide.title') }}</h2>
+            <button type="button" @click="showGuide = false" class="btn btn-ghost btn-sm" aria-label="{{ __('portal.common.close') }}" title="{{ __('portal.common.close') }}"><i data-lucide="x"></i></button>
         </div>
-        
-        <div class="guide-content">
-            <p>Welcome to the JBS Praxis Operating System (Client Node). This secure terminal is your direct cryptographic link to the JBS engineering strike team. Below is your comprehensive operational manual for navigating the active battlespace.</p>
+        <div class="portal-drawer-body text-sm text-slate">
+            <p class="m-0 mb-6">{{ __('portal.guide.intro') }}</p>
 
-            <div class="guide-section-title">I. MODULE DIRECTORY</div>
+            <h3 class="section-title text-base">{{ __('portal.guide.sections') }}</h3>
+            <dl class="m-0 mb-6 flex flex-col gap-4">
+                @foreach (['overview', 'sprints', 'qa_hub', 'financials', 'vault', 'team'] as $section)
+                    <div class="border-l-2 border-line pl-4">
+                        <dt class="font-semibold text-ink">{{ __('portal.nav.' . $section) }}</dt>
+                        <dd class="m-0 mt-1">{{ __('portal.guide.' . $section) }}</dd>
+                    </div>
+                @endforeach
+            </dl>
 
-            <div class="guide-module-block">
-                <div class="guide-module-title">01 // OVERVIEW</div>
-                <p>Your high-level command telemetry. This module provides a macroscopic view of your active deployment. You can track exact structural progress against the timeline, monitor live capital allocation, and verify the status of the current operational phase. The 'Live Engineering Backlog' terminal acts as a direct window into the minds of your Strike Team, streaming unedited, real-time architectural logs directly from the backend as code is deployed.</p>
-            </div>
-
-            <div class="guide-module-block">
-                <div class="guide-module-title">02 // SPRINTS</div>
-                <p>The agile execution matrix. While the Overview provides the macro view, the Sprints tab tracks the granular, tactical, day-to-day execution of your Statement of Work. Every architectural deliverable is broken down into specific tasks that dynamically flow through a strict lifecycle: <strong>To-Do</strong> (pending backlog), <strong>In-Progress</strong> (active engineering), <strong>QA Review</strong> (awaiting your executive validation), and <strong>Done</strong> (locked, shipped, and immutably finalized).</p>
-            </div>
-
-            <div class="guide-module-block">
-                <div class="guide-module-title">03 // QA HUB</div>
-                <p>The centralized communication matrix and quality control gate. If a deliverable submitted for review fails to meet your specified parameters, you must log a vulnerability ticket here. You can tag a specific task, flag its severity (Low, Medium, Critical), and enforce accountability. Alternatively, you can use the Hub to send direct, tracked transmissions to Command. The historical ledger on the right maintains an immutable audit trail of all resolved and open tickets.</p>
-            </div>
-
-            <div class="guide-module-block">
-                <div class="guide-module-title">04 // FINANCIALS</div>
-                <p>The cryptographic billing and capital allocation portal. This node automatically tracks all generated tax invoices linked to your project phases. When an invoice requires clearance, you can view the active MDM remittance instructions (Bank Wire, USDT, or Campay), and upload your cryptographic Proof of Payment (POP). Uploading a valid POP automatically shifts the invoice into 'Verification in Progress' status, signaling HQ to defrost any frozen deployment phases.</p>
-            </div>
-
-            <div class="guide-module-block">
-                <div class="guide-module-title">05 // VAULT & OS CONFIG</div>
-                <p>Your immutable legal repository and enterprise customization engine. The left matrix securely stores all counter-signed Statements of Work (SOWs) and final Project Handover documents, sealed with SHA-256 client/HQ hashes. The right panel houses the White-Label Brand Engine. By inputting your corporate hex color codes and uploading an enterprise logo, you can instantly override the default JBS Praxis interface, reskinning the entire Client OS to match your brand identity.</p>
-            </div>
-
-            <div class="guide-module-block">
-                <div class="guide-module-title">06 // TEAM COMMAND</div>
-                <p><em>(Restricted to Primary Alpha Node only).</em> Your access provisioning center. You retain the authority to independently generate Zero-Knowledge setup links to onboard up to 2 additional executive nodes (e.g., your CTO or CFO). For maximum security, the system strictly enforces a domain-lock; invited emails must match your exact corporate domain. You may also assign secondary nodes global access, or restrict their visibility to a single, specific battlespace.</p>
-            </div>
-
-            <div class="guide-section-title">II. PROTOCOLS & FAQ</div>
-
-            <div class="faq-block">
-                <div class="faq-q"><i data-lucide="lock"></i> Why is my dashboard locked with an Amber/Red banner?</div>
-                <div style="font-size: 0.8rem;">The Financial Lockout mechanism automatically engages when an initial deposit is pending, or an active invoice becomes overdue. Navigate to the Financials tab and upload your Proof of Payment to initiate system defrosting.</div>
-            </div>
-
-            <div class="faq-block">
-                <div class="faq-q"><i data-lucide="clock"></i> What is the 5-Hour Auto-Approval SLA?</div>
-                <div style="font-size: 0.8rem;">To maintain agile momentum, any sprint task shifted to 'QA Review' status requires immediate validation. If zero feedback is logged in the QA Hub within 5 hours of completion, the system mathematically flags the task as approved. Post-approval revisions incur Cost of Poor Quality (COPQ) billing rates.</div>
-            </div>
-
-            <div class="faq-block">
-                <div class="faq-q"><i data-lucide="triangle-alert"></i> When should I trigger the REDLINE protocol?</div>
-                <div style="font-size: 0.8rem;">The Redline button (Top Navigation) is a panic switch for critical infrastructure failures. It bypasses standard SLA triage queues and directly pages Level 4/5 Command. <strong>Warning:</strong> Standard emergency engagement fees may apply depending on your SLA tier.</div>
-            </div>
-
-            <div style="text-align: center; margin-top: 40px; margin-bottom: 20px; opacity: 0.5;">
-                <img src="{{ asset('assets/img/logo_monochrome.svg') }}" style="height: 30px; margin-bottom: 10px;" onerror="this.style.display='none'">
-                <div style="font-family: 'Roboto Mono', monospace; font-size: 0.6rem; letter-spacing: 2px;">END OF DIRECTIVE</div>
+            <h3 class="section-title text-base">{{ __('portal.guide.questions') }}</h3>
+            <div class="flex flex-col gap-3">
+                @foreach (['locked' => 'lock', 'review' => 'clock', 'urgent' => 'triangle-alert'] as $q => $icon)
+                    <div class="rounded-lg border border-line p-4">
+                        <div class="mb-1 flex items-start gap-2 font-semibold text-ink"><i data-lucide="{{ $icon }}" class="mt-0.5 h-4 w-4 text-deep-teal"></i> {{ __('portal.guide.q_' . $q) }}</div>
+                        <p class="m-0">{{ __('portal.guide.a_' . $q) }}</p>
+                    </div>
+                @endforeach
             </div>
         </div>
-    </div>
-    
-    <script> 
-        // 1. Run on initial page load
-        document.addEventListener('DOMContentLoaded', () => { 
-            if(typeof lucide !== 'undefined') lucide.createIcons(); 
-        });
-
-        // 2. Re-run after every Livewire DOM morph (like switching tabs)
-        document.addEventListener('livewire:initialized', () => {
-            Livewire.hook('morph.updated', () => {
-                if(typeof lucide !== 'undefined') lucide.createIcons();
-            });
-        });
-    </script>
-</div>
+    </aside>
 </div>

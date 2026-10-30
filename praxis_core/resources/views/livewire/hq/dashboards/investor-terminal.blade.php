@@ -1,4 +1,9 @@
 <div>
+    @php
+        // Amounts with their currency (docs/BRAND.md section 4): ₦ and $ before the amount, FCFA after it
+        $money = fn ($currency, $amount, $decimals = 2) => \App\Livewire\Hq\HqMoney::format($currency, $amount, $decimals);
+    @endphp
+
     <style>
         /* Printing gives a clean report: the page only, without navigation */
         @media print {
@@ -25,29 +30,31 @@
         <a href="{{ route('hq.dash.admin') }}" wire:navigate class="tab">Company overview</a>
         <a href="{{ route('hq.dash.workspace') }}" wire:navigate class="tab">My workspace</a>
         <a href="{{ route('hq.dash.investor') }}" wire:navigate class="tab is-active" aria-current="page">Investor view</a>
-        <a href="{{ route('hq.dash.audit') }}" wire:navigate class="tab">Audit log</a>
+        @can('audit.view')
+            <a href="{{ route('hq.dash.audit') }}" wire:navigate class="tab">Audit log</a>
+        @endcan
     </nav>
 
     <h2 class="section-title">Money</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4" style="margin-bottom: 32px;">
         <div class="card">
             <div class="stat-label">Revenue received, {{ now()->year }}</div>
-            <div class="stat-value">${{ number_format($metrics['ytd_revenue'], 2) }}</div>
+            <x-hq.money-totals :totals="$metrics['ytd_revenue']" />
             <div class="help" style="margin-top: 4px;">Paid invoices this year</div>
         </div>
         <div class="card">
             <div class="stat-label">Receivables</div>
-            <div class="stat-value">${{ number_format($metrics['pending_revenue'], 2) }}</div>
+            <x-hq.money-totals :totals="$metrics['pending_revenue']" />
             <div class="help" style="margin-top: 4px;">Invoices awaiting payment</div>
         </div>
         <div class="card">
             <div class="stat-label">Active contract value</div>
-            <div class="stat-value">${{ number_format($metrics['active_pipeline'], 2) }}</div>
+            <x-hq.money-totals :totals="$metrics['active_pipeline']" />
             <div class="help" style="margin-top: 4px;">Budgets of active projects</div>
         </div>
         <div class="card">
             <div class="stat-label">Proposals in progress</div>
-            <div class="stat-value">${{ number_format($metrics['proposal_pipeline'], 2) }}</div>
+            <x-hq.money-totals :totals="$metrics['proposal_pipeline']" />
             <div class="help" style="margin-top: 4px;">Awaiting signature, or signed and not yet started</div>
         </div>
     </div>
@@ -61,8 +68,8 @@
         </div>
         <div class="card">
             <div class="stat-label">Average contract value</div>
-            <div class="stat-value">${{ number_format($metrics['acv'], 2) }}</div>
-            <div class="help" style="margin-top: 4px;">All projects except cancelled ones</div>
+            <x-hq.money-totals :totals="$metrics['acv']" />
+            <div class="help" style="margin-top: 4px;">Per project, all projects except cancelled ones</div>
         </div>
         <div class="card">
             <div class="stat-label">Active clients</div>
@@ -98,7 +105,7 @@
                                 <div class="text-caption text-muted" style="font-variant-numeric: tabular-nums;">Started {{ \Carbon\Carbon::parse($deployment->created_at)->format('j M Y') }}</div>
                             </td>
                             <td>{{ $deployment->industry ?? 'Not given' }}</td>
-                            <td class="num text-ink font-semibold">{{ $deployment->currency }} {{ number_format($deployment->total_budget, 2) }}</td>
+                            <td class="num text-ink font-semibold">{{ $money($deployment->currency, $deployment->total_budget) }}</td>
                         </tr>
                         @empty
                         <tr>
@@ -112,7 +119,8 @@
 
         <div class="flex flex-col gap-6">
             <section class="card">
-                <h2 class="card-title" style="margin-bottom: 12px;">Leadership team</h2>
+                <h2 class="card-title">Team</h2>
+                <p class="help" style="margin: 4px 0 12px;">Active staff members and their job titles</p>
                 <ul class="flex flex-col" style="list-style: none; padding: 0; margin: 0;">
                     @forelse($leadershipTeam as $leader)
                     <li style="padding: 10px 0; border-top: 1px solid var(--color-line);">
@@ -134,7 +142,7 @@
                             <div class="text-small text-ink">{{ \Illuminate\Support\Str::limit($proposal->title, 25) }}</div>
                             <div class="text-caption text-muted">{{ $proposal->client_name }}</div>
                         </div>
-                        <div class="text-small font-semibold text-ink" style="font-variant-numeric: tabular-nums; white-space: nowrap;">${{ number_format($proposal->total_value) }}</div>
+                        <div class="text-small font-semibold text-ink" style="font-variant-numeric: tabular-nums; white-space: nowrap;">{{ $money($proposal->currency, $proposal->total_value, 0) }}</div>
                     </li>
                     @empty
                     <li class="text-small text-muted">No proposals awaiting signature.</li>

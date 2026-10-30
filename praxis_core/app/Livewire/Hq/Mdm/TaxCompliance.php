@@ -207,11 +207,11 @@ class TaxCompliance extends Component
                     $this->showSuccessModal = true;
                     $this->loadData();
                 } else {
-                    $this->addError('api_sync', "We couldn't update the rates because the rate service sent no rates. Try again later, or enter the rates by hand.");
+                    $this->addError('api_sync', "We couldn’t update the rates because the rate service sent no rates. Try again later, or enter the rates by hand.");
                 }
             } else {
                 \Illuminate\Support\Facades\Log::warning('MDM Rate Sync Failed: HTTP ' . $response->status());
-                $this->addError('api_sync', "We couldn't reach the exchange rate service. Try again in a few minutes, or enter the rates by hand.");
+                $this->addError('api_sync', "We couldn’t reach the exchange rate service. Try again in a few minutes, or enter the rates by hand.");
             }
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('MDM Rate Sync Exception: ' . $e->getMessage());
@@ -232,6 +232,21 @@ class TaxCompliance extends Component
     public function closeSuccessModal()
     {
         $this->showSuccessModal = false;
+    }
+
+    /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
+    protected function validationAttributes(): array
+    {
+        return [
+            'region_name' => 'country or tax authority',
+            'country_code' => 'country code',
+            'tax_logic_type' => 'how VAT applies',
+            'vat_rate' => 'VAT rate',
+            'currency_code' => 'currency code',
+            'currency_name' => 'currency name',
+            'rate_to_usd' => 'rate for 1 US dollar',
+            'exchange_rate_peg' => 'invoice currency',
+        ];
     }
 
     public function render()

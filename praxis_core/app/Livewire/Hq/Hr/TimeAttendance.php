@@ -91,7 +91,7 @@ class TimeAttendance extends Component
     }
 
     /**
-     * Runs the attendance calculation service over the month's clock-in records.
+     * Runs the attendance calculation service over the month’s clock-in records.
      */
     public function runAggregationEngine()
     {
@@ -102,7 +102,7 @@ class TimeAttendance extends Component
             // Call the static engine
             TimeAggregationEngine::aggregateMonth($this->targetMonth, $this->targetYear, $this->targetRegion);
             
-            $this->successMessage = "Attendance for " . Carbon::create($this->targetYear, $this->targetMonth, 1)->format('F Y') . " calculated from the clock-in records. Overtime and absences are saved for that month's payroll.";
+            $this->successMessage = "Attendance for " . Carbon::create($this->targetYear, $this->targetMonth, 1)->format('F Y') . " calculated from the clock-in records. Overtime and absences are saved for that month’s payroll.";
             $this->showSuccessModal = true;
             
             // Reload the grid with the fresh data
@@ -110,7 +110,7 @@ class TimeAttendance extends Component
 
         } catch (Exception $e) {
             report($e);
-            session()->flash('error', "We couldn't calculate attendance, so nothing was changed. Try again, and if it still fails, ask an administrator to check the error log.");
+            session()->flash('error', "We couldn’t calculate attendance, so nothing was changed. Try again, and if it still fails, ask an administrator to check the error log.");
         }
     }
 

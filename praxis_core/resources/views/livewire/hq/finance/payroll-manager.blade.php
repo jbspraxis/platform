@@ -22,7 +22,7 @@
     <div class="page-header">
         <div>
             <h1 class="page-title">Payroll</h1>
-            <p class="page-subtitle">Prepare each month's payroll run, have a second person check it, then approve it and mark it as paid.</p>
+            <p class="page-subtitle">Prepare each month’s payroll run, have a second person check it, then approve it and mark it as paid.</p>
         </div>
     </div>
 
@@ -191,10 +191,10 @@
                         <thead>
                             <tr>
                                 <th>Staff member</th>
-                                <th class="num">Gross pay</th>
-                                <th class="num">Taxable pay (incl. benefits in kind)</th>
-                                <th class="num">Tax and pension</th>
-                                <th class="num">Net pay</th>
+                                <th class="num text-right">Gross pay</th>
+                                <th class="num text-right">Taxable pay (incl. benefits in kind)</th>
+                                <th class="num text-right">Tax and pension</th>
+                                <th class="num text-right">Net pay</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -232,7 +232,7 @@
         <div class="card">
             <div class="empty-state">
                 <strong>Payslips have their own screen</strong>
-                Open Payslips to see each staff member's payslip for a payroll run.
+                Open Payslips to see each staff member’s payslip for a payroll run.
                 <div class="mt-4"><a href="{{ route('hq.finance.payslips') }}" wire:navigate class="btn btn-primary">Open payslips</a></div>
             </div>
         </div>

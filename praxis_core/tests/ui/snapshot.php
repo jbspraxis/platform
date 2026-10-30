@@ -8,7 +8,8 @@
  *   APP_ENV=localmysql MAIL_MAILER=log php tests/ui/snapshot.php --only=finance --out=../_ui/finance [--width=1440] [--height=1200] [--list]
  *
  * --only matches route names or paths (comma-separated). Pages that need a record id are skipped.
- * Static pictures: Livewire actions don't run, but Alpine and the icons do.
+ * Static pictures: Livewire boots on each page (fields show their values, @script charts draw), but
+ * actions that call the server don't run. Alpine and the icons work.
  */
 putenv('APP_ENV=localmysql');
 $_ENV['APP_ENV'] = $_SERVER['APP_ENV'] = 'localmysql';
@@ -73,6 +74,8 @@ try {
 
     $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
     foreach ($pages as $name => $who) {
+        // The client pages' 'auth:client' middleware switches the default guard; HQ pages need it back on 'web'
+        Auth::shouldUse('web');
         Auth::guard('web')->logout();
         Auth::guard('client')->logout();
         if ($who === 'staff') Auth::guard('web')->setUser($staff);
@@ -80,6 +83,9 @@ try {
             if (!$client) { echo "skip  $name (no client account with a password in the local database)\n"; continue; }
             Auth::guard('client')->setUser($client);
         }
+        // Livewire adds its script and styles to the first page only, then remembers it has; reset that
+        // state so every page boots Livewire
+        \Livewire\trigger('flush-state');
         $url = route($name);
         try {
             $res = $kernel->handle(Request::create($url, 'GET'));

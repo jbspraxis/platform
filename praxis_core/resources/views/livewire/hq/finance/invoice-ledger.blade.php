@@ -14,13 +14,27 @@
     <div class="page-header">
         <div>
             <h1 class="page-title">Invoices</h1>
-            <p class="page-subtitle">Create invoices for client projects and follow them until they're paid.</p>
+            <p class="page-subtitle">Create invoices for client projects and follow them until they’re paid.</p>
         </div>
         <div class="flex flex-wrap gap-3">
             @can('finance.approve')
-            <button type="button" wire:click="enforceGuillotineProtocol" class="btn btn-secondary" onclick="confirm('Mark every unpaid invoice past its due date as overdue? Client Portal access for those projects goes on hold until the invoice is paid.') || event.stopImmediatePropagation()">
-                <i data-lucide="clock"></i> Check for overdue invoices
-            </button>
+            {{-- Confirmation dialog (docs/BRAND.md section 12): names the action and its consequence --}}
+            <div x-data="{ open: false }" @keydown.escape.window="open = false">
+                <button type="button" @click="open = true" class="btn btn-secondary">
+                    <i data-lucide="clock"></i> Mark overdue invoices
+                </button>
+                <div class="modal-backdrop" x-show="open" x-cloak style="display: none;" @click.self="open = false"
+                     x-effect="if (open) $nextTick(() => $refs.keepOverdue.focus())">
+                    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="overdue-confirm-title" style="max-width: 500px;">
+                        <h2 id="overdue-confirm-title" class="modal-title">Mark overdue invoices?</h2>
+                        <p class="text-small text-muted" style="margin: 0;">Unpaid invoices past their due date are marked as overdue, and those clients’ Client Portal access goes on hold until they pay.</p>
+                        <div class="modal-actions">
+                            <button type="button" x-ref="keepOverdue" @click="open = false" class="btn btn-secondary">Not now</button>
+                            <button type="button" wire:click="enforceGuillotineProtocol" @click="open = false" class="btn btn-primary">Mark as overdue</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
             @endcan
             @can('finance.create')
             <button type="button" wire:click="$set('showCreateModal', true)" class="btn btn-primary">
@@ -51,7 +65,7 @@
                     <tr>
                         <th>Invoice</th>
                         <th>Project and client</th>
-                        <th class="num">Total</th>
+                        <th class="num text-right">Total</th>
                         <th>Status and due date</th>
                         <th class="text-right">Actions</th>
                     </tr>
@@ -68,7 +82,7 @@
                                 <div class="help flex items-center gap-1"><i data-lucide="building-2" style="width: 14px; height: 14px;"></i> {{ $inv->client_name }}</div>
                             </td>
                             <td class="num">
-                                <span class="muted">{{ $inv->currency }}</span> <span class="font-semibold text-ink">{{ number_format($inv->total_amount, 2) }}</span>
+                                <span class="font-semibold text-ink">{{ \App\Livewire\Hq\HqMoney::format($inv->currency, $inv->total_amount) }}</span>
                             </td>
                             <td>
                                 <span class="pill {{ $statusPills[$inv->status] ?? 'pill-neutral' }}">{{ $statusLabels[$inv->status] ?? $inv->status }}</span>
@@ -77,13 +91,26 @@
                             <td>
                                 <div class="flex justify-end gap-2">
                                     <button type="button" class="btn btn-ghost btn-sm" onclick="alert('Invoice PDFs are not available yet.')">
-                                        <i data-lucide="file-text"></i> PDF
+                                        <i data-lucide="file-text"></i> Download PDF
                                     </button>
 
                                     @if($inv->status === 'Pending' && auth()->user()->can('finance.delete'))
-                                        <button type="button" wire:click="cancelInvoice('{{ $inv->id }}')" class="btn btn-ghost btn-sm" style="color: var(--color-danger);" onclick="confirm('Cancel this invoice? The client will no longer be asked to pay it. The cancellation stays in the audit log.') || event.stopImmediatePropagation()">
-                                            <i data-lucide="ban"></i> Cancel invoice
-                                        </button>
+                                        <div x-data="{ open: false }" @keydown.escape.window="open = false">
+                                            <button type="button" @click="open = true" class="btn btn-ghost btn-sm" style="color: var(--color-danger);">
+                                                <i data-lucide="ban"></i> Cancel invoice
+                                            </button>
+                                            <div class="modal-backdrop" x-show="open" x-cloak style="display: none; text-align: left;" @click.self="open = false"
+                                                 x-effect="if (open) $nextTick(() => $refs.keepInvoice.focus())">
+                                                <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cancel-invoice-title-{{ $inv->id }}" style="max-width: 500px; white-space: normal;">
+                                                    <h2 id="cancel-invoice-title-{{ $inv->id }}" class="modal-title">Cancel invoice {{ $inv->invoice_number }}?</h2>
+                                                    <p class="text-small text-muted" style="margin: 0;">The client will no longer be asked to pay it. This can’t be undone. The cancellation stays in the audit log.</p>
+                                                    <div class="modal-actions">
+                                                        <button type="button" x-ref="keepInvoice" @click="open = false" class="btn btn-secondary">Keep invoice</button>
+                                                        <button type="button" wire:click="cancelInvoice('{{ $inv->id }}')" @click="open = false" class="btn btn-danger">Cancel invoice</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     @endif
                                 </div>
                             </td>
@@ -156,7 +183,7 @@
                                 <option value="Net 15">15 days</option>
                                 <option value="Net 30">30 days</option>
                             </select>
-                            <span class="help">Unpaid invoices past this date put the client's portal access on hold.</span>
+                            <span class="help">Unpaid invoices past this date put the client’s portal access on hold.</span>
                         </div>
                     </div>
 
@@ -178,7 +205,7 @@
                     </div>
 
                     <div class="callout text-sm">
-                        VAT is added from the tax rules for the client's country. If the invoice isn't in USD, the exchange rate is fixed when you create it.
+                        VAT is added from the tax rules for the client’s country. If the invoice isn’t in USD, the exchange rate is fixed when you create it.
                     </div>
 
                     <div class="modal-actions">

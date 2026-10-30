@@ -2,7 +2,8 @@
      stylesheet (docs/BRAND.md section 14). $app is 'hq' or 'portal'; $title is the page name. --}}
 @php
     $app = ($app ?? 'hq') === 'portal' ? 'portal' : 'hq';
-    $appName = $app === 'portal' ? 'JBS Praxis Client Portal' : 'JBS Praxis HQ';
+    // The Client Portal's name is translated (docs/BRAND.md section 4): « Portail client JBS Praxis »
+    $appName = $app === 'portal' ? __('portal.app_full_name') : 'JBS Praxis HQ';
     $splash = [
         [1290, 2796, '(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)'],
         [1179, 2556, '(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)'],
@@ -22,7 +23,7 @@
 <meta name="theme-color" content="#0C142B">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="{{ $app === 'portal' ? 'Client Portal' : 'HQ' }}">
+<meta name="apple-mobile-web-app-title" content="{{ $app === 'portal' ? __('portal.app_name') : 'HQ' }}">
 @foreach ($splash as [$w, $h, $media])
 <link rel="apple-touch-startup-image" href="/splash/{{ $app }}-splash-{{ $w }}x{{ $h }}.png" media="{{ $media }} and (orientation: portrait)">
 @endforeach

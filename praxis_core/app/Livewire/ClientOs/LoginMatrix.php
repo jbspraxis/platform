@@ -5,6 +5,7 @@ namespace App\Livewire\ClientOs;
 use App\Support\Access;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
@@ -16,6 +17,7 @@ use Illuminate\Support\Str;
 class LoginMatrix extends Component
 {
     use \App\Livewire\Concerns\ThrottlesLogins;
+    use PortalLanguage;
 
     public $viewState = 'login'; // login, forgot_password, redline_sos, redline_success
 
@@ -35,6 +37,23 @@ class LoginMatrix extends Component
     public $sosTitle = '';
     public $sosDescription = '';
 
+    public function mount()
+    {
+        // A language the person chose, else their browser's (English or French) for this page only: the
+        // organisation's preference applies once they sign in, so nothing is stored in the session here.
+        App::setLocale($this->chosenPortalLocale() ?? (request()->getPreferredLanguage(['en', 'fr']) === 'fr' ? 'fr' : 'en'));
+    }
+
+    protected function messages(): array
+    {
+        return (array) __('portal.validation.login');
+    }
+
+    protected function languageReturnUrl(): string
+    {
+        return route('client.login');
+    }
+
     public function switchState($state)
     {
         $this->viewState = $state;
@@ -50,6 +69,10 @@ class LoginMatrix extends Component
         ]);
 
         if ($this->tooManyLoginAttempts('client')) {
+            // The shared message is English only: say the same in the page's language
+            $minutes = max(1, (int) ceil(RateLimiter::availableIn($this->loginThrottleKey('client')) / 60));
+            $this->resetErrorBag('email');
+            $this->addError('email', trans_choice('portal.login.too_many', $minutes, ['minutes' => $minutes]));
             return;
         }
 
@@ -61,7 +84,7 @@ class LoginMatrix extends Component
             return redirect()->route('client.dashboard');
         } else {
             $this->recordFailedLogin('client');
-            $this->addError('email', '> ERR: INVALID CREDENTIALS OR SUSPENDED NODE.');
+            $this->addError('email', __('portal.login.failed'));
         }
     }
 
@@ -87,8 +110,8 @@ class LoginMatrix extends Component
                 foreach (Access::staffWith('access.edit') as $adminId) {
                     $notifications[] = [
                         'id' => (string) Str::uuid(), 'user_id' => $adminId,
-                        'title' => 'CLIENT PASSWORD RESET REQUESTED',
-                        'message' => "Client {$client->first_name} {$client->last_name} ({$client->email}) asked to reset their Client OS password. Send them a new setup link.",
+                        'title' => 'Client asked for a new setup link',
+                        'message' => "{$client->first_name} {$client->last_name} ({$client->email}) forgot their Client Portal password. Send them a new setup link from Accounts.",
                         'type' => 'System', 'created_at' => now(),
                     ];
                 }
@@ -96,7 +119,7 @@ class LoginMatrix extends Component
             }
         }
 
-        $this->authMessage = '> REQUEST RECEIVED. If this email has a Client OS account, the JBS Praxis team will send you a new access link.';
+        $this->authMessage = __('portal.login.reset_done');
         $this->resetEmail = '';
     }
 
@@ -117,7 +140,7 @@ class LoginMatrix extends Component
         $rateKey = 'redline-sos-limit:' . $ip;
 
         if (RateLimiter::tooManyAttempts($rateKey, 1)) {
-            session()->flash('redline_error', '> SECURITY HALT: Redline Protocol locked. Maximum 1 transmission per 24 hours allowed from this node.');
+            session()->flash('redline_error', __('portal.sos.limit'));
             return;
         }
 
@@ -150,8 +173,8 @@ class LoginMatrix extends Component
                 $notifications[] = [
                     'id' => (string) Str::uuid(),
                     'user_id' => $adminId,
-                    'title' => 'CRITICAL: REDLINE SOS RECEIVED', 
-                    'message' => "Emergency request from {$this->sosCompany}. Priority Triage Required.",
+                    'title' => 'Urgent support request from a new organisation',
+                    'message' => "{$this->sosName} ({$this->sosTitle}, {$this->sosCompany}) asked for urgent support. Call them on {$this->sosPhone} or write to {$this->sosEmail}. The request is in Leads.",
                     'type' => 'System', 
                     'created_at' => now()
                 ];
@@ -169,6 +192,6 @@ class LoginMatrix extends Component
 
     public function render()
     {
-        return view('livewire.client-os.login-matrix');
+        return view('livewire.client-os.login-matrix')->title(__('portal.login.page_title'));
     }
 }

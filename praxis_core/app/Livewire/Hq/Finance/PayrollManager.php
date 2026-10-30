@@ -182,7 +182,7 @@ class PayrollManager extends Component
 
         } catch (Exception $e) {
             report($e);
-            session()->flash('error', "We couldn't create the draft payroll run. Try again, and if it still fails, ask an administrator to check the error log.");
+            session()->flash('error', "We couldn’t create the draft payroll run. Try again, and if it still fails, ask an administrator to check the error log.");
         }
     }
 
@@ -198,7 +198,7 @@ class PayrollManager extends Component
         $currentUserId = Auth::id() ?? 'sys-admin';
 
         if (! $run) {
-            session()->flash('error', "We couldn't find that payroll run. Refresh the page and try again.");
+            session()->flash('error', "We couldn’t find that payroll run. Refresh the page and try again.");
             return;
         }
 
@@ -219,7 +219,7 @@ class PayrollManager extends Component
             ]);
 
         if (! $updated) {
-            session()->flash('error', "This payroll run is no longer a draft, so it wasn't sent for approval. The list has been refreshed.");
+            session()->flash('error', "This payroll run is no longer a draft, so it wasn’t sent for approval. The list has been refreshed.");
             $this->loadPayrollRuns();
             $this->viewRun($runId);
             return;
@@ -243,17 +243,30 @@ class PayrollManager extends Component
         $currentUserId = Auth::id() ?? 'sys-admin';
 
         if (! $run) {
-            session()->flash('error', "We couldn't find that payroll run. Refresh the page and try again.");
+            session()->flash('error', "We couldn’t find that payroll run. Refresh the page and try again.");
             return;
         }
 
         // Segregation of duties: whoever prepared or checked the run cannot approve it
         if ((string) $run->maker_id === (string) $currentUserId) {
-            session()->flash('error', "You prepared this payroll run, so you can't approve it. Ask another approver to approve it.");
+            session()->flash('error', "You prepared this payroll run, so you can’t approve it. Ask another approver to approve it.");
             return;
         }
         if ($run->checker_id && (string) $run->checker_id === (string) $currentUserId) {
-            session()->flash('error', "You checked this payroll run, so you can't approve it. Ask another approver to approve it.");
+            session()->flash('error', "You checked this payroll run, so you can’t approve it. Ask another approver to approve it.");
+            return;
+        }
+        if (in_array($run->status, ['Approved', 'Disbursed'], true)) {
+            session()->flash('error', "This payroll run has already been approved or paid, so it wasn’t changed. The list has been refreshed.");
+            $this->loadPayrollRuns();
+            $this->viewRun($runId);
+            return;
+        }
+        // Three people: a run must be checked by someone other than the preparer before it can be approved
+        if ($run->status !== 'Pending_Review' || ! $run->checker_id) {
+            session()->flash('error', "This payroll run hasn’t been checked yet, so it can’t be approved. Someone other than the preparer must check it first.");
+            $this->loadPayrollRuns();
+            $this->viewRun($runId);
             return;
         }
 
@@ -261,7 +274,7 @@ class PayrollManager extends Component
             $approved = DB::transaction(function () use ($runId, $run, $currentUserId) {
                 $updated = DB::table('payroll_runs')
                     ->where('id', $runId)
-                    ->whereIn('status', ['Draft', 'Pending_Review'])
+                    ->where('status', 'Pending_Review')
                     ->update([
                         'status' => 'Approved',
                         'approver_id' => $currentUserId,
@@ -282,7 +295,7 @@ class PayrollManager extends Component
             });
 
             if (! $approved) {
-                session()->flash('error', "This payroll run has already been approved or paid, so it wasn't changed. The list has been refreshed.");
+                session()->flash('error', "This payroll run has already been approved or paid, so it wasn’t changed. The list has been refreshed.");
                 $this->loadPayrollRuns();
                 $this->viewRun($runId);
                 return;
@@ -295,7 +308,7 @@ class PayrollManager extends Component
 
         } catch (Exception $e) {
             report($e);
-            session()->flash('error', "We couldn't approve the payroll run. Try again, and if it still fails, ask an administrator to check the error log.");
+            session()->flash('error', "We couldn’t approve the payroll run. Try again, and if it still fails, ask an administrator to check the error log.");
         }
     }
 
@@ -339,13 +352,13 @@ class PayrollManager extends Component
         $run = DB::table('payroll_runs')->where('id', $runId)->first();
 
         if (! $run) {
-            session()->flash('error', "We couldn't find that payroll run. Refresh the page and try again.");
+            session()->flash('error', "We couldn’t find that payroll run. Refresh the page and try again.");
             return;
         }
 
         try {
-            DB::transaction(function () use ($runId, $run) {
-                DB::table('payroll_runs')
+            $returned = DB::transaction(function () use ($runId, $run) {
+                $updated = DB::table('payroll_runs')
                     ->where('id', $runId)
                     ->whereIn('status', ['Pending_Review', 'Approved'])
                     ->update([
@@ -356,12 +369,26 @@ class PayrollManager extends Component
                         'approved_at' => null,
                         'updated_at' => now()
                     ]);
-                
+
+                // A paid run (or one already in draft) stays as it is, and its month's variable pay stays locked
+                if (! $updated) {
+                    return false;
+                }
+
                 // Unlock the variables so the Maker can fix the errors
                 DB::table('monthly_payroll_variables')
                     ->where('payroll_period', $run->pay_period_start)
                     ->update(['is_processed' => 0]);
+
+                return true;
             });
+
+            if (! $returned) {
+                session()->flash('error', "Only a run awaiting approval or approved (not yet paid) can be returned to draft. The list has been refreshed.");
+                $this->loadPayrollRuns();
+                $this->viewRun($runId);
+                return;
+            }
 
             $this->successMessage = "Payroll run returned to draft. Variable pay for this month is unlocked so it can be corrected.";
             $this->showSuccessModal = true;
@@ -370,13 +397,23 @@ class PayrollManager extends Component
 
         } catch (Exception $e) {
             report($e);
-            session()->flash('error', "We couldn't return the payroll run to draft. Try again, and if it still fails, ask an administrator to check the error log.");
+            session()->flash('error', "We couldn’t return the payroll run to draft. Try again, and if it still fails, ask an administrator to check the error log.");
         }
     }
 
     public function closeSuccessModal()
     {
         $this->showSuccessModal = false;
+    }
+
+    /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
+    protected function validationAttributes(): array
+    {
+        return [
+            'draftPeriodMonth' => 'month',
+            'draftPeriodYear' => 'year',
+            'targetRegion' => 'country',
+        ];
     }
 
     public function render()

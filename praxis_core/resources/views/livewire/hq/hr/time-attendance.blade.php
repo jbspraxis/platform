@@ -84,11 +84,11 @@
                     <tr>
                         <th>Staff member</th>
                         <th>Country</th>
-                        <th class="num">Overtime at 120%</th>
-                        <th class="num">Overtime at 130%</th>
-                        <th class="num">Overtime at 140%</th>
-                        <th class="num">Night hours</th>
-                        <th class="num">Unexcused absences</th>
+                        <th class="num text-right">Overtime at 120%</th>
+                        <th class="num text-right">Overtime at 130%</th>
+                        <th class="num text-right">Overtime at 140%</th>
+                        <th class="num text-right">Night hours</th>
+                        <th class="num text-right">Unexcused absences</th>
                         <th>Status</th>
                     </tr>
                 </thead>
@@ -113,7 +113,7 @@
                             </td>
                             <td>
                                 @if($row['is_processed'] ?? false)
-                                    <span class="pill pill-neutral"><i data-lucide="lock" style="width: 12px; height: 12px;"></i> In payroll</span>
+                                    <span class="pill pill-neutral">In payroll</span>
                                 @elseif($hasAbsence)
                                     <span class="pill pill-danger">Deduction due</span>
                                 @elseif($hasOt)

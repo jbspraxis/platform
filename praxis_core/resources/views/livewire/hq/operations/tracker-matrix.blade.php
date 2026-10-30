@@ -7,6 +7,10 @@
         // Stored task statuses (database values) and what people read
         $taskStatusLabels = ['todo' => 'To do', 'in_progress' => 'In progress', 'done' => 'Done'];
         $isLead = auth('tracker')->user()->role !== 'consultant';
+        // Progress as people read it: whole per cent, and the task count behind it
+        $taskCount = $milestones->sum(fn ($m) => $m->tasks->count());
+        $doneCount = $milestones->sum(fn ($m) => $m->tasks->where('status', 'done')->count());
+        $donePercent = $taskCount ? (int) round($doneCount / $taskCount * 100) : 0;
     @endphp
 
     <!-- Messages after an action -->
@@ -32,12 +36,12 @@
 
         <div class="flex flex-wrap items-center gap-6">
             <div class="min-w-[200px]">
-                <div class="mb-1 flex justify-between text-caption text-muted">
-                    <span>Tasks done</span>
-                    <span class="num font-semibold text-ink">{{ $activeTracker->progress_percentage }}%</span>
+                <div class="mb-1 flex justify-between gap-4 text-caption text-muted">
+                    <span><span class="num">{{ $doneCount }}</span> of <span class="num">{{ $taskCount }}</span> {{ $taskCount === 1 ? 'task' : 'tasks' }} done</span>
+                    <span class="num font-semibold text-ink">{{ $donePercent }}%</span>
                 </div>
-                <div class="h-1.5 w-full overflow-hidden rounded-full bg-line" role="progressbar" aria-valuenow="{{ $activeTracker->progress_percentage }}" aria-valuemin="0" aria-valuemax="100" aria-label="Tasks done">
-                    <div class="h-full rounded-full bg-teal transition-[width] duration-500" style="width: {{ $activeTracker->progress_percentage }}%;"></div>
+                <div class="h-1.5 w-full overflow-hidden rounded-full bg-line" role="progressbar" aria-valuenow="{{ $donePercent }}" aria-valuemin="0" aria-valuemax="100" aria-label="Tasks done">
+                    <div class="h-full rounded-full bg-teal transition-[width] duration-500" style="width: {{ $donePercent }}%;"></div>
                 </div>
             </div>
 
@@ -146,9 +150,17 @@
     </button>
 
     <div class="fixed inset-0 z-40 bg-ink/50" x-show="modals.chat" x-transition.opacity @click="modals.chat = false" style="display: none;"></div>
-    <aside class="fixed inset-y-0 right-0 z-50 flex w-full max-w-[440px] flex-col bg-paper transition-transform duration-300"
-           style="box-shadow: var(--shadow-float);"
-           :class="modals.chat ? 'translate-x-0' : 'translate-x-full'" x-cloak aria-label="Messages">
+    {{-- Hidden (display: none) when closed, so it casts no shadow and keyboard focus can’t reach its fields --}}
+    <aside class="fixed inset-y-0 right-0 z-50 flex w-full max-w-[440px] flex-col bg-paper"
+           style="display: none; box-shadow: var(--shadow-float);"
+           x-show="modals.chat"
+           x-transition:enter="transition-transform duration-300"
+           x-transition:enter-start="translate-x-full"
+           x-transition:enter-end="translate-x-0"
+           x-transition:leave="transition-transform duration-300"
+           x-transition:leave-start="translate-x-0"
+           x-transition:leave-end="translate-x-full"
+           x-cloak aria-label="Messages">
         <div class="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
             <div>
                 <h2 class="text-section font-semibold text-ink">Messages</h2>

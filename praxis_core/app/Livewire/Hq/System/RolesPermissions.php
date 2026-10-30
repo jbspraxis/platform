@@ -18,10 +18,10 @@ use Livewire\Component;
  *
  * - access.view sees everything read-only; access.create / edit / delete change roles.
  * - The Owner role is protected: always every permission, never edited or deleted.
- * - Nobody but an owner can grant or remove a staff permission they don't hold themselves,
- *   so access.edit can't be used to climb.
- * - A role still assigned to someone can't be deleted; Client Admin can't be deleted
- *   because every client organisation's primary account relies on it.
+ * - Nobody but an owner can grant or remove a staff permission they don’t hold themselves,
+ *   so access.edit can’t be used to climb.
+ * - A role still assigned to someone can’t be deleted; Client Admin can’t be deleted
+ *   because every client organisation’s primary account relies on it.
  */
 #[Layout('components.layouts.hq')]
 #[Title('Roles and permissions')]
@@ -120,6 +120,16 @@ class RolesPermissions extends Component
             $this->addError('name', 'Another role already has this name.');
             return;
         }
+        // Built-in client roles are listed under their portal names (lang portal.roles), so a new
+        // client role may not take one of those names, or the list would show it twice
+        if ($this->audience === 'client') {
+            $portalNames = array_map('mb_strtolower', array_filter((array) __('portal.roles', [], 'en'), 'is_string'));
+            $ownLabel = $role ? mb_strtolower((string) __('portal.roles.' . $role->name, [], 'en')) : null;
+            if (in_array(mb_strtolower(trim($this->name)), $portalNames, true) && mb_strtolower(trim($this->name)) !== $ownLabel) {
+                $this->addError('name', 'A built-in client role already shows this name. Choose another name.');
+                return;
+            }
+        }
 
         $wanted = array_values(array_intersect($this->selected, array_keys($this->catalogue())));
 
@@ -142,7 +152,7 @@ class RolesPermissions extends Component
                 ]);
                 DB::table('roles')->where('id', $role->id)->update(['created_by' => Auth::id()]);
             } else {
-                // The slug is the role's stable key (starter roles are found by it), so renaming keeps it
+                // The slug is the role’s stable key (starter roles are found by it), so renaming keeps it
                 $role->update(['name' => $this->name, 'description' => $this->description ?: null]);
                 DB::table('roles')->where('id', $role->id)->update(['updated_by' => Auth::id()]);
             }
@@ -169,7 +179,7 @@ class RolesPermissions extends Component
             return;
         }
         if ($role->audience === 'client' && $role->slug === config('access.client_admin_role')) {
-            $this->addError('name', 'Client Admin cannot be deleted: every client organisation\'s primary account uses it.');
+            $this->addError('name', 'You can’t delete the Administrator role because every client organisation’s primary contact has it.');
             return;
         }
         $inUse = $this->memberCount($role);
@@ -188,7 +198,7 @@ class RolesPermissions extends Component
         $this->notice = 'Role deleted.';
     }
 
-    /** This audience's permissions: slug => [module, action, name]. */
+    /** This audience’s permissions: slug => [module, action, name]. */
     private function catalogue(): array
     {
         return array_filter(Access::catalogue(), fn ($p) => $p['audience'] === $this->audience);
@@ -208,6 +218,15 @@ class RolesPermissions extends Component
                     $q->orWhere('is_primary_client', 1);
                 }
             })->count();
+    }
+
+    /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
+    protected function validationAttributes(): array
+    {
+        return [
+            'name' => 'role name',
+            'description' => 'description',
+        ];
     }
 
     public function render()

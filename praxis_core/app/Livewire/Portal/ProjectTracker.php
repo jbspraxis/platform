@@ -6,9 +6,11 @@ use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
+use App\Livewire\Portal\Concerns\WithGatewayLanguage;
 use App\Models\Tracker;
 use App\Models\TrackerMessage;
 use App\Models\TrackerTask;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
@@ -18,6 +20,7 @@ use Carbon\Carbon;
 class ProjectTracker extends Component
 {
     use WithFileUploads;
+    use WithGatewayLanguage;
 
     // ============================================================================
     // CORE STATE (Primitive Types Only)
@@ -50,6 +53,12 @@ class ProjectTracker extends Component
     protected $lastMessageTime = null;
     protected const MESSAGE_COOLDOWN = 1; // seconds
 
+    // Validation messages in the page language (lang/<locale>/gateway.php)
+    protected function messages(): array
+    {
+        return (array) __('gateway.validation.tracker');
+    }
+
     // ============================================================================
     // MOUNT & INITIALIZATION
     // ============================================================================
@@ -62,7 +71,14 @@ class ProjectTracker extends Component
             
             $this->trackerId = $tracker->id;
             $this->isArchived = $tracker->status === 'archived';
-            
+
+            // A tracker stores the client's name, not a link to the organisation: use that organisation's
+            // preferred language when the name matches one, unless the person already chose a language
+            $clientName = $tracker->client_company ?: $tracker->client_name;
+            $this->useGatewayLanguage($clientName
+                ? DB::table('organizations')->where('name', $clientName)->value('preferred_language')
+                : null);
+
             // Check if already authenticated in session
             $this->isAuthorized = session()->has('tracker_auth_' . $this->trackerId);
             
@@ -75,7 +91,7 @@ class ProjectTracker extends Component
     }
 
     // ============================================================================
-    // PIN AUTHENTICATION ENGINE
+    // PIN CHECK
     // ============================================================================
 
     public function verifyPin($pinInput = null)
@@ -137,27 +153,27 @@ class ProjectTracker extends Component
 }
 
     // ============================================================================
-    // MESSAGE TRANSMISSION & VALIDATION
+    // SENDING MESSAGES & VALIDATION
     // ============================================================================
 
     public function transmitMessage()
     {
         // Security: Check authorization
         if (!$this->isAuthorized) {
-            $this->dispatch('system-alert', ['message' => 'Unauthorized']);
+            $this->dispatch('system-alert', ['message' => __('gateway.tracker.pin_needed')]);
             return;
         }
 
         // Security: Check if archived
         if ($this->isArchived) {
-            $this->dispatch('system-alert', ['message' => 'Project archived. Transmission locked.']);
+            $this->dispatch('system-alert', ['message' => __('gateway.tracker.archived_send')]);
             return;
         }
 
         // Rate limiting
         $now = now();
         if ($this->lastMessageTime && $now->diffInSeconds($this->lastMessageTime) < self::MESSAGE_COOLDOWN) {
-            $this->dispatch('system-alert', ['message' => 'Please wait before sending another message.']);
+            $this->dispatch('system-alert', ['message' => __('gateway.tracker.wait')]);
             return;
         }
 
@@ -169,7 +185,7 @@ class ProjectTracker extends Component
 
         // Cannot send empty message without media
         if (empty(trim($this->chatMessage ?? '')) && !$this->mediaUpload) {
-            $this->dispatch('system-alert', ['message' => 'Message cannot be empty.']);
+            $this->dispatch('system-alert', ['message' => __('gateway.tracker.empty_message')]);
             return;
         }
 
@@ -211,7 +227,7 @@ class ProjectTracker extends Component
                 'trackerId' => $this->trackerId,
                 'error' => $e
             ]);
-            $this->dispatch('system-alert', ['message' => 'Failed to send message. Please try again.']);
+            $this->dispatch('system-alert', ['message' => __('gateway.tracker.send_failed')]);
         }
     }
 
@@ -316,9 +332,9 @@ class ProjectTracker extends Component
         }
 
         try {
-            // Validate payload structure
+            // The browser sends a list of messages written while offline
             if (!is_array($payload) || empty($payload)) {
-                throw new \Exception('Invalid payload structure');
+                throw new \Exception('Offline sync: no list of messages received');
             }
 
             $synced = 0;
@@ -362,7 +378,7 @@ class ProjectTracker extends Component
             
         } catch (\Exception $e) {
             Log::error('Offline Sync Failed: ' . $e->getMessage());
-            $this->dispatch('system-alert', ['message' => 'Sync failed. Try again soon.']);
+            $this->dispatch('system-alert', ['message' => __('gateway.tracker.sync_failed')]);
         }
     }
 
@@ -410,12 +426,12 @@ class ProjectTracker extends Component
                 'projectDeadline' => $projectDeadline,
                 'isAuthorized' => $this->isAuthorized,
                 'isArchived' => $this->isArchived,
-            ]);
+            ])->title(__('gateway.tracker.page_title'));
             
         } catch (\Exception $e) {
             Log::error('Render Error: ' . $e->getMessage());
             // Fixed: Safely abort instead of returning a raw string which crashes Livewire
-            abort(500, 'Secure portal temporarily unavailable.');
+            abort(500, __('gateway.tracker.unavailable'));
         }
     }
 }

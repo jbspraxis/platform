@@ -405,7 +405,7 @@ class EmployeeRegistry extends Component
 
         } catch (Exception $e) {
             report($e);
-            session()->flash('error', "We couldn't save the staff record, and nothing was changed. Check the details and try again.");
+            session()->flash('error', "We couldn’t save the staff record, and nothing was changed. Check the details and try again.");
         }
     }
 
@@ -488,6 +488,21 @@ class EmployeeRegistry extends Component
     {
         $this->showSuccessModal = false;
         $this->resetForm();
+    }
+
+    /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
+    protected function validationAttributes(): array
+    {
+        return [
+            'user_id' => 'HQ account',
+            'job_classification' => 'job title and grade',
+            'hire_date' => 'start date',
+            'tax_region' => 'country for tax and payroll',
+            'marital_status' => 'marital status',
+            'dependents_count' => 'dependent children',
+            'base_salary' => 'basic salary',
+            'total_gross' => 'total gross pay a month',
+        ];
     }
 
     public function render()

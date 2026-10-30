@@ -87,7 +87,7 @@ class GeneralLedgerManager extends Component
                 $originalEntry = DB::table('journal_entries')->where('id', $this->reversalEntryId)->first();
                 
                 if ($originalEntry->is_reversal) {
-                    throw new \DomainException("This entry has already been reversed, or is itself a reversal, so it can't be reversed again.");
+                    throw new \DomainException("This entry has already been reversed, or is itself a reversal, so it can’t be reversed again.");
                 }
 
                 $originalLines = DB::table('journal_lines')->where('journal_entry_id', $this->reversalEntryId)->get();
@@ -144,7 +144,7 @@ class GeneralLedgerManager extends Component
             session()->flash('error', $e->getMessage());
         } catch (\Exception $e) {
             report($e);
-            session()->flash('error', "We couldn't post the reversing entry, so nothing was changed. Try again, and if it still fails, ask an administrator to check the error log.");
+            session()->flash('error', "We couldn’t post the reversing entry, so nothing was changed. Try again, and if it still fails, ask an administrator to check the error log.");
         }
     }
 
@@ -170,7 +170,7 @@ class GeneralLedgerManager extends Component
         // Fallback to strict code match
         $account = DB::table('chart_of_accounts')->where('account_code', $code)->first();
         if (!$account) {
-            throw new \Exception("Account {$code} isn't in the chart of accounts. Add it in Chart of accounts, then try again.");
+            throw new \Exception("Account {$code} isn’t in the chart of accounts. Add it in Chart of accounts, then try again.");
         }
         return $account->id;
     }
@@ -190,7 +190,7 @@ class GeneralLedgerManager extends Component
         
         // Strict Validation: Debits must equal Credits to the penny.
         if (abs($totalDebit - $totalCredit) > 0.01) {
-            throw new \Exception("The entry doesn't balance: debits total {$totalDebit} and credits total {$totalCredit}. Nothing was posted.");
+            throw new \Exception("The entry doesn’t balance: debits total {$totalDebit} and credits total {$totalCredit}. Nothing was posted.");
         }
 
         $entryId = (string) Str::uuid();
@@ -254,7 +254,7 @@ class GeneralLedgerManager extends Component
 
     // 1b. CASH RECEIPT (client payment verified in Payment verification)
     // Dr bank (cash received), WHT receivable (tax the client withheld) and bank fees (small
-    // shortfall written off); Cr the client's receivable, and any excess to client overpayments.
+    // shortfall written off); Cr the client’s receivable, and any excess to client overpayments.
     // Revenue was deferred when the invoice was issued: the net-of-VAT share now settled is earned.
     public static function recordInvoicePaid($transactionId)
     {

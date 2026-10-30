@@ -15,14 +15,15 @@
 
     @include('livewire.hq.mdm.partials.tabs')
 
-    <div class="flex flex-wrap gap-2" style="margin-bottom: 24px;" role="group" aria-label="Show">
-        <button type="button" wire:click="switchTab('industries')" class="btn btn-sm {{ $activeTab === 'industries' ? 'btn-primary' : 'btn-secondary' }}" aria-pressed="{{ $activeTab === 'industries' ? 'true' : 'false' }}">Industries</button>
-        <button type="button" wire:click="switchTab('architectures')" class="btn btn-sm {{ $activeTab === 'architectures' ? 'btn-primary' : 'btn-secondary' }}" aria-pressed="{{ $activeTab === 'architectures' ? 'true' : 'false' }}">Current systems</button>
-        <button type="button" wire:click="switchTab('bottlenecks')" class="btn btn-sm {{ $activeTab === 'bottlenecks' ? 'btn-primary' : 'btn-secondary' }}" aria-pressed="{{ $activeTab === 'bottlenecks' ? 'true' : 'false' }}">Departments</button>
+    {{-- A segmented choice, not a second primary button (app.css .segmented: the selected option is tinted) --}}
+    <div class="segmented" style="margin-bottom: 24px;" role="group" aria-label="Show">
+        <button type="button" wire:click="switchTab('industries')" class="segmented-item" aria-pressed="{{ $activeTab === 'industries' ? 'true' : 'false' }}">Industries</button>
+        <button type="button" wire:click="switchTab('architectures')" class="segmented-item" aria-pressed="{{ $activeTab === 'architectures' ? 'true' : 'false' }}">Current systems</button>
+        <button type="button" wire:click="switchTab('bottlenecks')" class="segmented-item" aria-pressed="{{ $activeTab === 'bottlenecks' ? 'true' : 'false' }}">Departments</button>
     </div>
 
     <div class="card" style="padding: 0; overflow: hidden;">
-        <div class="table-wrap" style="max-height: 65vh; overflow-y: auto;">
+        <div class="table-wrap">
 
         @if($activeTab === 'industries')
             <table class="table">
@@ -31,7 +32,7 @@
                         <th style="min-width: 200px;">Industry</th>
                         <th style="min-width: 240px;">Compliance standard and main risk</th>
                         <th style="min-width: 260px;">Cost context and opportunity</th>
-                        <th class="num" style="min-width: 110px;">Base error rate</th>
+                        <th class="num text-right" style="min-width: 110px;">Base error rate</th>
                         <th style="width: 90px;"><span class="sr-only">Actions</span></th>
                     </tr>
                 </thead>
@@ -78,7 +79,7 @@
                         <th style="min-width: 200px;">System</th>
                         <th style="min-width: 200px;">Main symptom</th>
                         <th style="min-width: 320px;">What we recommend</th>
-                        <th class="num" style="min-width: 120px;">Error multiplier</th>
+                        <th class="num text-right" style="min-width: 120px;">Error multiplier</th>
                         <th style="width: 90px;"><span class="sr-only">Actions</span></th>
                     </tr>
                 </thead>
@@ -116,7 +117,7 @@
                         <th style="min-width: 200px;">Department</th>
                         <th style="min-width: 320px;">Summary used in the report</th>
                         <th style="min-width: 220px;">Multipliers</th>
-                        <th class="num" style="min-width: 100px;">Risk weight</th>
+                        <th class="num text-right" style="min-width: 100px;">Risk weight</th>
                         <th style="width: 90px;"><span class="sr-only">Actions</span></th>
                     </tr>
                 </thead>
@@ -203,7 +204,7 @@
                     <div class="field">
                         <label class="label" for="ind-fallback">Standard summary</label>
                         <textarea id="ind-fallback" wire:model="fallback_diagnostic" rows="3" required class="textarea" aria-describedby="ind-fallback-help"></textarea>
-                        <span id="ind-fallback-help" class="help">Used in the report when the assistant can't write a summary. Write {COMPANY_NAME} where the company's name goes.</span>
+                        <span id="ind-fallback-help" class="help">Used in the report when the assistant can’t write a summary. Write {COMPANY_NAME} where the company’s name goes.</span>
                     </div>
                     <fieldset class="grid gap-4 sm:grid-cols-3" style="background: var(--color-mist); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; margin: 0;">
                         <legend class="label" style="padding: 0 4px;">Words used in the report</legend>
@@ -241,7 +242,7 @@
                         <div class="field">
                             <label class="label" for="arch-key">Key</label>
                             <input id="arch-key" type="text" wire:model="tech_key" required class="input" {{ $archEditMode ? 'readonly' : '' }} aria-describedby="arch-key-help">
-                            <span id="arch-key-help" class="help">Lower case, used by the calculator. It can't be changed later.</span>
+                            <span id="arch-key-help" class="help">Lower case, used by the calculator. It can’t be changed later.</span>
                             @error('tech_key') <span class="field-error">{{ $message }}</span> @enderror
                         </div>
                         <div class="field">
@@ -318,7 +319,7 @@
                     <div class="field">
                         <label class="label" for="bn-narrative">Summary used in the report</label>
                         <textarea id="bn-narrative" wire:model="bottleneck_narrative" rows="4" required class="textarea" aria-describedby="bn-narrative-help"></textarea>
-                        <span id="bn-narrative-help" class="help">Describe what poor quality in this department costs. Write {COMPANY_NAME} where the company's name goes.</span>
+                        <span id="bn-narrative-help" class="help">Describe what poor quality in this department costs. Write {COMPANY_NAME} where the company’s name goes.</span>
                         @error('bottleneck_narrative') <span class="field-error">{{ $message }}</span> @enderror
                     </div>
 

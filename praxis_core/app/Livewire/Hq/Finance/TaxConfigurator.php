@@ -126,7 +126,7 @@ class TaxConfigurator extends Component
 
             $updateData['updated_at'] = now();
 
-            // Create the row on first save; roll it back if the values can't be saved
+            // Create the row on first save; roll it back if the values can’t be saved
             DB::transaction(function () use ($updateData) {
                 DB::table('tax_configurations')
                     ->where('id', $this->savedConfigurationId())
@@ -140,7 +140,7 @@ class TaxConfigurator extends Component
 
         } catch (Exception $e) {
             report($e);
-            session()->flash('error', "We couldn't save the tax rules. Check that every field except the pension cap has a number, then save again.");
+            session()->flash('error', "We couldn’t save the tax rules. Check that every field except the pension cap has a number, then save again.");
         }
     }
 

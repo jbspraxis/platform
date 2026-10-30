@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Session;
 #[Layout('components.layouts.portal')]
 class SetupAccount extends Component
 {
+    use PortalLanguage;
+
     // Locked: the browser cannot swap the token. Only display fields are kept in
     // component state; the user row is looked up again from the token on save.
     #[Locked]
@@ -20,6 +22,9 @@ class SetupAccount extends Component
 
     #[Locked]
     public $firstName = '';
+
+    #[Locked]
+    public $lastName = '';
 
     public $password = '';
     public $passwordConfirmation = '';
@@ -30,9 +35,13 @@ class SetupAccount extends Component
 
         $user = $this->invitedUser();
         if (!$user) {
-            abort(404, 'CRYPTOGRAPHIC LINK INVALID, EXPIRED, OR ALREADY CONSUMED.');
+            abort(404, __('portal.errors.setup_link'));
         }
         $this->firstName = $user->first_name;
+        $this->lastName = (string) $user->last_name;
+
+        // The organisation's preferred language, unless the person already chose one
+        $this->applyOrganisationLocale(DB::table('organizations')->where('id', $user->organization_id)->value('preferred_language'));
     }
 
     private function invitedUser()
@@ -43,25 +52,33 @@ class SetupAccount extends Component
             ->first();
     }
 
+    protected function messages(): array
+    {
+        return (array) __('portal.validation.setup');
+    }
+
+    protected function languageReturnUrl(): string
+    {
+        return route('client.setup', ['token' => $this->token]);
+    }
+
     public function lockAndAuthenticate()
     {
         $this->validate([
             'password' => 'required|string|min:8',
             'passwordConfirmation' => 'required|same:password'
-        ], [
-            'passwordConfirmation.same' => '> ERR: Cryptographic keys do not match.'
-        ]);
+        ], $this->messages());
 
         $user = $this->invitedUser();
         if (!$user) {
-            abort(404, 'CRYPTOGRAPHIC LINK INVALID, EXPIRED, OR ALREADY CONSUMED.');
+            abort(404, __('portal.errors.setup_link'));
         }
 
         DB::transaction(function () use ($user) {
             DB::table('client_users')->where('id', $user->id)->update([
                 'password' => Hash::make($this->password),
                 'lifecycle_stage' => 'Active', // Graduate them
-                'invitation_token' => null, 
+                'invitation_token' => null,
                 'email_verified_at' => now(),
                 'updated_at' => now()
             ]);
@@ -74,8 +91,8 @@ class SetupAccount extends Component
         return redirect()->route('client.dashboard');
     }
 
-    public function render() 
-    { 
-        return view('livewire.client-os.setup-account'); 
+    public function render()
+    {
+        return view('livewire.client-os.setup-account')->title(__('portal.setup.page_title'));
     }
 }

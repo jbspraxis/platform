@@ -15,7 +15,7 @@ class SilentTimers extends Component
 {
     // What this user may do here (set in mount, see config/access.php)
     #[Locked]
-    public bool $canSeeAll = false;   // timesheets.approve or timesheets.export (Auditor): everyone's time, live burn, anomalies
+    public bool $canSeeAll = false;   // timesheets.approve or timesheets.export (Auditor): everyone’s time, live burn, anomalies
     #[Locked]
     public bool $canManage = false;   // timesheets.approve: corrections queue
     #[Locked]

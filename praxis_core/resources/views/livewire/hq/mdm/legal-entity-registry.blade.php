@@ -26,7 +26,7 @@
         <div class="alert alert-danger mb-6" role="alert">
             <i data-lucide="circle-alert"></i>
             <div>
-                <strong>We couldn't save the legal entity.</strong> Fix the following and save again:
+                <strong>We couldn’t save the legal entity.</strong> Fix the following and save again:
                 <ul class="mt-1 list-disc pl-5">
                     @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
                 </ul>
@@ -134,7 +134,7 @@
                         <tr>
                             <th style="min-width: 200px;">Country and company</th>
                             <th style="min-width: 170px;">Registration numbers</th>
-                            <th class="num" style="min-width: 150px; white-space: normal;">Active staff and monthly pay</th>
+                            <th class="num text-right" style="min-width: 150px; white-space: normal;">Active staff and monthly pay</th>
                             <th>Status</th>
                             <th><span class="sr-only">Actions</span></th>
                         </tr>
@@ -160,7 +160,7 @@
                                 <td class="num">
                                     <div class="help">{{ $entity->active_headcount }} active {{ $entity->active_headcount == 1 ? 'staff member' : 'staff members' }}</div>
                                     <div class="text-ink" style="font-weight: 600;">
-                                        {{ number_format($entity->monthly_liability, 2) }} <span class="help">{{ $entity->local_currency }} a month</span>
+                                        {{ \App\Livewire\Hq\HqMoney::format($entity->local_currency, $entity->monthly_liability) }} <span class="help">a month</span>
                                     </div>
                                     <div class="help">Gross pay and allowances</div>
                                 </td>

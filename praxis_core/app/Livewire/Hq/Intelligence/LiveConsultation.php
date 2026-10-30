@@ -66,7 +66,7 @@ class LiveConsultation extends Component
     public function approveMeeting($appointmentId, $meetingLink)
     {
         if (! Auth::user()->can('crm.approve')) {
-            session()->flash('error', "You don't have permission to approve free audits. Ask an administrator to change your role.");
+            session()->flash('error', "You don’t have permission to approve free audits. Ask an administrator to change your role.");
             return;
         }
 
@@ -75,13 +75,13 @@ class LiveConsultation extends Component
             return;
         }
 
-        // A link pasted without https:// would be a dead button in the client's confirmation
+        // A link pasted without https:// would be a dead button in the client’s confirmation
         $meetingLink = trim($meetingLink);
         if (!preg_match('~^https?://~i', $meetingLink)) {
             $meetingLink = 'https://' . ltrim($meetingLink, '/');
         }
         if (!filter_var($meetingLink, FILTER_VALIDATE_URL)) {
-            session()->flash('error', "That meeting link isn't complete. Enter the full link, for example https://meet.google.com/abc-defg-hij.");
+            session()->flash('error', "That meeting link isn’t complete. Enter the full link, for example https://meet.google.com/abc-defg-hij.");
             return;
         }
 
@@ -92,7 +92,7 @@ class LiveConsultation extends Component
             'updated_at' => now()
         ]);
 
-        // Find the client's email address and send the meeting link
+        // Find the client’s email address and send the meeting link
         $appt = DB::table('appointments')->where('id', $appointmentId)->first();
         $org = DB::table('organizations')->where('id', $appt->organization_id)->first();
         
@@ -108,14 +108,14 @@ class LiveConsultation extends Component
 
         if ($clientEmail) {
             try {
-                // Greet the contact by first name when they have a record; the organisation's stored language, else English
+                // Greet the contact by first name when they have a record; the organisation’s stored language, else English
                 $firstName = DB::table('client_users')->where('email', $clientEmail)->value('first_name');
                 Mail::to($clientEmail)
                     ->locale(MailLocale::forRecipient($org->preferred_language ?? null))
                     ->send(new MeetingApprovedMail($appt, $org->name, trim($meetingLink), $firstName));
                 session()->flash('success', "Free audit approved. We sent the meeting link to {$clientEmail}.");
             } catch (\Exception $e) {
-                session()->flash('error', "Free audit approved, but we couldn't email the meeting link to {$clientEmail}. Send it to the client yourself.");
+                session()->flash('error', "Free audit approved, but we couldn’t email the meeting link to {$clientEmail}. Send it to the client yourself.");
             }
         } else {
             session()->flash('success', 'Free audit approved. There is no client email on file, so send the meeting link to the client yourself.');
@@ -188,7 +188,7 @@ class LiveConsultation extends Component
     public function generateInlineCopq()
     {
         if (! Auth::user()->can('crm.create')) {
-            session()->flash('error', "You don't have permission to create cost of poor quality estimates. Ask an administrator to change your role.");
+            session()->flash('error', "You don’t have permission to create cost of poor quality estimates. Ask an administrator to change your role.");
             return;
         }
 
@@ -231,7 +231,7 @@ class LiveConsultation extends Component
         $aiAnalysis = str_replace('{COMPANY_NAME}', $companyName, $fallbackTemplate);
 
         // 3. The prompt (voice: docs/BRAND.md section 4)
-        $systemPrompt = "You are a senior consultant at JBS Praxis, a consulting and engineering firm for Africa's institutions. Write a plain, measured 3-sentence analysis (max 600 characters) for {$companyName}.
+        $systemPrompt = "You are a senior consultant at JBS Praxis, a consulting and engineering firm for Africa’s institutions. Write a plain, measured 3-sentence analysis (max 600 characters) for {$companyName}.
         CONTEXT: Their sector type is [{$archetype}]. They use [{$tool}] and their main bottleneck is [{$bottleneck}].
         RULE 1: Say where the bottleneck most likely costs them time or money.
         RULE 2: Recommend this approach: [{$archMandate}].
@@ -317,24 +317,24 @@ class LiveConsultation extends Component
         
         /*
         if (!$this->copqData || empty($this->copqData->corporate_email)) {
-            session()->flash('error', "We couldn't send the report because this lead has no email address. Add one, then send the report again.");
+            session()->flash('error', "We couldn’t send the report because this lead has no email address. Add one, then send the report again.");
             return;
         }
 
         try {
-            // Re-sent from HQ: the organisation's stored language, else English
+            // Re-sent from HQ: the organisation’s stored language, else English
             Mail::to($this->copqData->corporate_email)
                 ->locale(MailLocale::forRecipient($this->leadData->preferred_language ?? null))
                 ->send(new CopqReportMail($this->copqData, true));
             session()->flash('success', 'Cost of poor quality report sent to the client.');
         } catch (\Exception $e) {
-            session()->flash('error', "We couldn't send the report because email isn't set up. Check the mail settings in System Health.");
+            session()->flash('error', "We couldn’t send the report because email isn’t set up. Check the mail settings in System health.");
         }
         */
 
         // Triggering a frontend event to open the upcoming Email/WhatsApp modal
         $this->dispatch('open-transmission-modal');
-        session()->flash('success', 'Choose how to send the report. Sending by email is not available yet.');
+        session()->flash('info', 'Choose how to send the report. Sending by email is not available yet.');
     }
 
     // ==========================================
@@ -343,7 +343,7 @@ class LiveConsultation extends Component
     public function disqualifyLead($reason = '')
     {
         if (! Auth::user()->can('crm.edit')) {
-            session()->flash('error', "You don't have permission to change leads. Ask an administrator to change your role.");
+            session()->flash('error', "You don’t have permission to change leads. Ask an administrator to change your role.");
             return;
         }
 
@@ -375,7 +375,7 @@ class LiveConsultation extends Component
     {
         if (! Auth::user()->can('crm.create')) {
             $this->dispatch('consultation-error');
-            session()->flash('error', "You don't have permission to create proposals. Ask an administrator to change your role.");
+            session()->flash('error', "You don’t have permission to create proposals. Ask an administrator to change your role.");
             return;
         }
 
@@ -401,7 +401,7 @@ class LiveConsultation extends Component
 
         // 4. Who JBS Praxis is and how it writes (docs/BRAND.md sections 1, 4 and 5). Proof is limited to the approved list.
         $companyDNA = "
-COMPANY: JBS Praxis, consulting and engineering for Africa's institutions, working in Nigeria and Cameroon, in English and French, under IFRS and OHADA. We design how an institution should run, then build the system that makes it run that way and shows, every day, whether it does. We stay until the system holds, train the client's team, then hand over the keys.
+COMPANY: JBS Praxis, consulting and engineering for Africa’s institutions, working in Nigeria and Cameroon, in English and French, under IFRS and OHADA. We design how an institution should run, then build the system that makes it run that way and shows, every day, whether it does. We stay until the system holds, train the client’s team, then hand over the keys.
 
 THE PRAXIS METHOD (four stages): 1. See: map how one area of the institution really runs today, starting with the free operations audit. 2. Design: design how it should run (processes, controls, roles, the numbers that matter). 3. Build: build and configure the system that runs it and shows it. 4. Hold: stay until it holds, train the team, then hand over.
 
@@ -420,7 +420,7 @@ APPROVED PROOF (the only client work you may mention; never name a client, descr
         $prompt = "
         $companyDNA
 
-        TASK: You are a senior consultant at JBS Praxis. Read the consultant's notes from the free audit and the cost of poor quality estimate below, and write the narrative of a proposal (statement of work) as STRICT JSON.
+        TASK: You are a senior consultant at JBS Praxis. Read the consultant’s notes from the free audit and the cost of poor quality estimate below, and write the narrative of a proposal (statement of work) as STRICT JSON.
 
         CLIENT DATA:
         - Main bottleneck: $bottleneckStr
@@ -473,7 +473,7 @@ APPROVED PROOF (the only client work you may mention; never name a client, descr
             // HARD HALT: Stop execution, hide frontend modal, show styled error.
             $this->dispatch('consultation-error');
             report($e);
-            session()->flash('error', "We couldn't draft the proposal because the writing assistant didn't return a usable draft. Your notes are saved in the lead's history. Try again in a minute.");
+            session()->flash('error', "We couldn’t draft the proposal because the writing assistant didn’t return a usable draft. Your notes are saved in the lead’s history. Try again in a minute.");
             return; 
         }
 
@@ -498,7 +498,7 @@ APPROVED PROOF (the only client work you may mention; never name a client, descr
             'ai_operational_strategy' => $aiPayload['ai_operational_strategy'],
             'ai_slas_json' => isset($aiPayload['ai_slas_json']) ? json_encode($aiPayload['ai_slas_json']) : '[]',
             'ai_case_study' => $aiPayload['ai_case_study'] ?? '',
-            // ai_phases_json omitted as it wasn't requested in prompt rules, defaults to NULL based on your schema
+            // ai_phases_json omitted as it wasn’t requested in prompt rules, defaults to NULL based on your schema
             'generated_at' => now()
         ]);
 
@@ -513,6 +513,22 @@ APPROVED PROOF (the only client work you may mention; never name a client, descr
         $this->activeView = 'lobby';
         $this->loadLobby();
         session()->flash('success', 'Free audit closed. A draft proposal is ready in Proposals.');
+    }
+
+    /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
+    protected function validationAttributes(): array
+    {
+        return [
+            'inlineIndustry' => 'industry',
+            'inlineHeadcount' => 'headcount',
+            'inlineTurnover' => 'annual turnover',
+            'inlineManualHrs' => 'manual hours a week',
+            'inlineErrorRate' => 'error rate',
+            'inlineMgmtNodes' => 'managers who approve work',
+            'inlineHourlyCost' => 'hourly cost of a manager',
+            'inlineTool' => 'systems in use',
+            'inlineBottleneck' => 'main bottleneck',
+        ];
     }
 
     public function render()

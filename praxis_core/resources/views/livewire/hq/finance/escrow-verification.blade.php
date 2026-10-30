@@ -20,6 +20,9 @@
     @if(session()->has('success'))
         <div class="alert alert-success mb-6" role="status"><i data-lucide="check-circle"></i><span>{{ session('success') }}</span></div>
     @endif
+    @if(session()->has('warning'))
+        <div class="alert alert-warning mb-6" role="status"><i data-lucide="triangle-alert"></i><span>{{ session('warning') }}</span></div>
+    @endif
     @if(session()->has('error'))
         <div class="alert alert-warning mb-6" role="alert"><i data-lucide="triangle-alert"></i><span>{{ session('error') }}</span></div>
     @endif
@@ -37,7 +40,7 @@
                     <tr>
                         <th>Received and reference</th>
                         <th>Client and invoice</th>
-                        <th class="num">Amount paid</th>
+                        <th class="num text-right">Amount paid</th>
                         <th>Status</th>
                         <th class="text-right">Action</th>
                     </tr>
@@ -157,14 +160,14 @@
                                 <div class="field">
                                     <label class="label" for="pv-extend">Extra days to pay the balance</label>
                                     <input id="pv-extend" type="number" wire:model="extend_guillotine_days" step="1" min="0" class="input" style="font-variant-numeric: tabular-nums;">
-                                    <span class="help">For a part payment only. Moves the due date and lifts any hold on the client's portal access. Enter 0 to keep the due date.</span>
+                                    <span class="help">For a part payment only. Moves the due date and lifts any hold on the client’s portal access. Enter 0 to keep the due date.</span>
                                     @error('extend_guillotine_days') <span class="field-error">{{ $message }}</span> @enderror
                                 </div>
 
                                 @can('finance.approve')
                                 <div class="modal-actions">
-                                    <button type="button" wire:click="rejectTransaction" class="btn btn-secondary" onclick="confirm('Mark this payment as not verified? The invoice stays unpaid, and this can\'t be undone.') || event.stopImmediatePropagation()">
-                                        <i data-lucide="ban"></i> Don't verify
+                                    <button type="button" wire:click="rejectTransaction" class="btn btn-secondary" onclick="confirm('Mark this payment as not verified? The invoice stays unpaid, and this can’t be undone.') || event.stopImmediatePropagation()">
+                                        <i data-lucide="ban"></i> Don’t verify
                                     </button>
                                     <button type="submit" class="btn btn-primary" wire:loading.attr="disabled">
                                         <span wire:loading.remove wire:target="approveTransaction" class="inline-flex items-center gap-2"><i data-lucide="check"></i> Verify payment</span>

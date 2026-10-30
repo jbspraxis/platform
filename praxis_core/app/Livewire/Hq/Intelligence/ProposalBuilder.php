@@ -145,7 +145,7 @@ class ProposalBuilder extends Component
     public function initiateForLead()
     {
         if (! Auth::user()->can('crm.create')) {
-            session()->flash('error', "You don't have permission to create proposals. Ask an administrator to change your role.");
+            session()->flash('error', "You don’t have permission to create proposals. Ask an administrator to change your role.");
             return;
         }
         if (empty($this->selectedLeadId)) return;
@@ -154,29 +154,32 @@ class ProposalBuilder extends Component
         $ref = 'SOW-' . date('Ymd') . '-' . rand(100, 999);
         $token = 'TKN-' . strtoupper(Str::random(10));
 
-        DB::table('proposals')->insert([
-            'id' => $this->proposalId,
-            'organization_id' => $this->selectedLeadId,
-            'title' => 'Draft proposal',
-            'created_by' => Auth::id(),
-            'proposal_ref' => $ref,
-            'token_hash' => $token,
-            'subtotal' => 0.00, 
-            'total_value' => 0.00, 
-            'payment_schedule_type' => '40_30_30', 
-            'status' => 'Draft',
-            'created_at' => now(),
-            'updated_at' => now()
-        ]);
+        // Both rows or neither, so a failed insert never leaves a proposal without its narrative
+        // (exclusions live on proposals, not on the narrative)
+        DB::transaction(function () use ($ref, $token) {
+            DB::table('proposals')->insert([
+                'id' => $this->proposalId,
+                'organization_id' => $this->selectedLeadId,
+                'title' => 'Draft proposal',
+                'created_by' => Auth::id(),
+                'proposal_ref' => $ref,
+                'token_hash' => $token,
+                'subtotal' => 0.00,
+                'total_value' => 0.00,
+                'payment_schedule_type' => '40_30_30',
+                'status' => 'Draft',
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
 
-        DB::table('proposal_ai_narratives')->insert([
-            'proposal_id' => $this->proposalId,
-            'ai_executive_summary' => '',
-            'ai_operational_strategy' => '',
-            'exclusions' => '',
-            'ai_phases_json' => '[]',
-            'generated_at' => now()
-        ]);
+            DB::table('proposal_ai_narratives')->insert([
+                'proposal_id' => $this->proposalId,
+                'ai_executive_summary' => '',
+                'ai_operational_strategy' => '',
+                'ai_phases_json' => '[]',
+                'generated_at' => now()
+            ]);
+        });
 
         $this->activeTab = 'setup';
         $this->loadProposalData();
@@ -245,7 +248,7 @@ class ProposalBuilder extends Component
     {
         if ($this->isLocked || $this->proposalIsLocked()) return;
         if (! Auth::user()->can('crm.edit')) {
-            session()->flash('error', "You don't have permission to edit proposals. Ask an administrator to change your role.");
+            session()->flash('error', "You don’t have permission to edit proposals. Ask an administrator to change your role.");
             return;
         }
 
@@ -266,7 +269,7 @@ class ProposalBuilder extends Component
         $archContext = implode(', ', $this->archetype); // Join archetypes for the prompt
         
         // Voice and claims: docs/BRAND.md sections 1 and 4 (plain, measured, no guaranteed outcomes, no invented results)
-        $prompt = "You are a senior consultant at JBS Praxis, a consulting and engineering firm for Africa's institutions. Write the narrative of a proposal (statement of work) for the client '{$this->organization->name}'.
+        $prompt = "You are a senior consultant at JBS Praxis, a consulting and engineering firm for Africa’s institutions. Write the narrative of a proposal (statement of work) for the client '{$this->organization->name}'.
         Services in scope: {$archContext}.
         Technology to use: {$techNames}.
         Voice: plain, precise and measured, like a Big Four proposal. British English, short sentences, active voice, everyday business words, sentence case. Write 'we recommend' and 'we estimate'. No hype words, no metaphors from war, space or hacking, no guaranteed outcomes, and no invented clients, figures or results.
@@ -275,7 +278,7 @@ class ProposalBuilder extends Component
         {
             \"project_title\": \"A plain 4 to 6 word title that names the outcome, in sentence case\",
             \"executive_summary\": \"One paragraph: the situation, what we recommend and what it changes for the client.\",
-            \"operational_strategy\": \"Two paragraphs on how we will do the work: the system we will build, how it replaces today's tools, and the controls and compliance it supports.\",
+            \"operational_strategy\": \"Two paragraphs on how we will do the work: the system we will build, how it replaces today’s tools, and the controls and compliance it supports.\",
             \"exclusions\": \"List 3 things not included in this project (e.g. data entry of old records, cloud hosting fees).\",
             \"phases\": [
                 {\"body\": \"Describe phase 1, diagnosis and design...\", \"weight\": 1.0},
@@ -302,7 +305,7 @@ class ProposalBuilder extends Component
                 $aiPayload = json_decode($cleanJson, true);
                 
                 if (!$aiPayload) {
-                    session()->flash('error', "We couldn't read the assistant's draft. Try again, or write the narrative yourself.");
+                    session()->flash('error', "We couldn’t read the assistant’s draft. Try again, or write the narrative yourself.");
                     return;
                 }
                 
@@ -321,10 +324,10 @@ class ProposalBuilder extends Component
 
                 session()->flash('ai_success', 'Draft written. Review each section before you continue.');
             } else {
-                session()->flash('error', "We couldn't reach the writing assistant. Try again in a minute, or write the narrative yourself.");
+                session()->flash('error', "We couldn’t reach the writing assistant. Try again in a minute, or write the narrative yourself.");
             }
         } catch (\Exception $e) {
-            session()->flash('error', "We couldn't reach the writing assistant. Try again in a minute, or write the narrative yourself.");
+            session()->flash('error', "We couldn’t reach the writing assistant. Try again in a minute, or write the narrative yourself.");
         }
     }
 
@@ -402,7 +405,7 @@ class ProposalBuilder extends Component
 
     public function saveBlueprintProgress()
     {
-        // Also runs on every tab switch, so viewers without crm.edit just don't save
+        // Also runs on every tab switch, so viewers without crm.edit just don’t save
         if ($this->isLocked || $this->proposalIsLocked() || ! Auth::user()->can('crm.edit')) return;
         $this->calculateCommercials();
 
@@ -429,7 +432,8 @@ class ProposalBuilder extends Component
                 'updated_at' => now()
             ]);
 
-            DB::table('proposal_ai_narratives')->where('proposal_id', $this->proposalId)->update([
+            // Insert when missing: drafts created before the fix above have no narrative row
+            DB::table('proposal_ai_narratives')->updateOrInsert(['proposal_id' => $this->proposalId], [
                 'ai_executive_summary' => $this->aiExecutiveSummary,
                 'ai_operational_strategy' => $this->aiOperationalStrategy,
                 'ai_phases_json' => $phasesJson
@@ -459,12 +463,12 @@ class ProposalBuilder extends Component
     {
         if ($this->isLocked) return;
         if (! Auth::user()->can('crm.approve')) {
-            session()->flash('error', "You don't have permission to sign proposals. Ask an administrator to change your role.");
+            session()->flash('error', "You don’t have permission to sign proposals. Ask an administrator to change your role.");
             return;
         }
         if ($this->proposalIsLocked()) {
             $this->loadProposalData();
-            session()->flash('error', "This proposal can't be signed because it is no longer a draft. Reload the page to see its current status.");
+            session()->flash('error', "This proposal can’t be signed because it is no longer a draft. Reload the page to see its current status.");
             return;
         }
 
@@ -482,15 +486,16 @@ class ProposalBuilder extends Component
         $rawPayload = $this->proposalId . $this->grandTotal . $this->hqSignerName . $timestamp;
         $secureHash = 'SHA256-' . strtoupper(hash('sha256', $rawPayload));
 
-        DB::transaction(function () use ($timestamp, $ip, $secureHash) {
-            
+        $signed = DB::transaction(function () use ($timestamp, $ip, $secureHash) {
+
             // Use the existing token, or create one
             $currentToken = DB::table('proposals')->where('id', $this->proposalId)->value('token_hash');
             if (empty($currentToken)) {
                 $currentToken = 'TKN-' . strtoupper(Str::random(10));
             }
 
-            DB::table('proposals')->where('id', $this->proposalId)->update([
+            // Only while still unlocked: the status may have changed since the check above
+            return DB::table('proposals')->where('id', $this->proposalId)->whereNotIn('status', self::LOCKED_STATUSES)->update([
                 'status' => 'Pending Auth', 
                 'token_hash' => $currentToken,
                 'hq_signer_name' => $this->hqSignerName,
@@ -505,43 +510,56 @@ class ProposalBuilder extends Component
             // That table requires a valid `project_id` which does not exist yet.
             // The Client Gateway authenticates purely via the `token_hash` in the `proposals` table.
         });
-        
+
         $this->loadProposalData();
+        if (! $signed) {
+            session()->flash('error', "This proposal is no longer a draft, so it wasn’t signed. Its current status is shown above.");
+            return;
+        }
         session()->flash('dispatch_success', 'Proposal signed and locked. Send the client the signing link below.');
     }
     
     public function unlockProposal()
     {
         if (! Auth::user()->can('crm.approve')) {
-            session()->flash('error', "You don't have permission to unlock signed proposals. Ask an administrator to change your role.");
+            session()->flash('error', "You don’t have permission to unlock signed proposals. Ask an administrator to change your role.");
             return;
         }
 
         // Prevent unlocking if the client already signed it (status read from the database, not the page)
         $status = DB::table('proposals')->where('id', $this->proposalId)->value('status');
         if ($status === null || in_array($status, ['Authorized', 'Converted'])) {
-            session()->flash('error', "This proposal can't be unlocked because the client has already signed it.");
+            session()->flash('error', "This proposal can’t be unlocked because the client has already signed it.");
             return;
         }
 
-        DB::transaction(function () {
-            // Back to draft, and remove the HQ signature
-            DB::table('proposals')->where('id', $this->proposalId)->update([
-                'status' => 'Draft',
-                'hq_signer_name' => null,
-                'hq_signature_b64' => null,
-                'hq_signature_hash' => null,
-                'hq_ip_address' => null,
-                'hq_signed_at' => null,
-                'updated_at' => now()
-            ]);
-
-            // Remove the active signing link
-            DB::table('project_magic_links')->where('project_id', $this->proposalId)->delete();
-        });
+        // Back to draft: remove the HQ signature, any signature or code the client had started, and
+        // replace the signing link (token_hash), so the link already sent can no longer be used.
+        // The status guard covers a client who signs between the check above and this update
+        $unlocked = DB::table('proposals')->where('id', $this->proposalId)->whereNotIn('status', ['Authorized', 'Converted'])->update([
+            'status' => 'Draft',
+            'token_hash' => 'TKN-' . strtoupper(Str::random(10)),
+            'hq_signer_name' => null,
+            'hq_signature_b64' => null,
+            'hq_signature_hash' => null,
+            'hq_ip_address' => null,
+            'hq_signed_at' => null,
+            'auth_otp' => null,
+            'otp_expires_at' => null,
+            'signed_by_name' => null,
+            'client_signature_b64' => null,
+            'updated_at' => now()
+        ]);
 
         $this->loadProposalData();
-        session()->flash('success', 'Proposal unlocked and back to draft. Your signature was removed; sign it again before you send it.');
+        if (! $unlocked) {
+            $status = DB::table('proposals')->where('id', $this->proposalId)->value('status');
+            session()->flash('error', in_array($status, ['Authorized', 'Converted'], true)
+                ? "This proposal can’t be unlocked because the client has already signed it."
+                : "This proposal is already a draft.");
+            return;
+        }
+        session()->flash('success', 'Proposal unlocked and back to draft. Your signature was removed and the old signing link no longer works; sign it again to get a new link.');
     }
 
     public function render() { return view('livewire.hq.intelligence.proposal-builder'); }

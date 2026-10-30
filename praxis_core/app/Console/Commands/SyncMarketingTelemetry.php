@@ -127,8 +127,8 @@ class SyncMarketingTelemetry extends Command
             DB::table('notifications')->insert([
                 'id' => (string) Str::uuid(),
                 'user_id' => $adminId,
-                'title' => 'WARNING: CAPITAL BLEED DETECTED',
-                'message' => "Campaign '{$campaign->name}' has spent $" . number_format($spend, 2) . " with ZERO qualified opportunities. Intervention advised.",
+                'title' => 'Campaign spending with no qualified leads',
+                'message' => "‘{$campaign->name}’ has spent $" . number_format($spend, 2) . " without a single qualified lead. Review the campaign.",
                 'type' => 'System',
                 'link_url' => route('hq.marketing.campaigns', [], false),
                 'created_at' => now()
@@ -142,8 +142,8 @@ class SyncMarketingTelemetry extends Command
         DB::table('notifications')->insert([
             'id' => (string) Str::uuid(),
             'user_id' => $campaign->created_by,
-            'title' => 'BUDGET EXHAUSTED',
-            'message' => "Campaign '{$campaign->name}' has hit its budget ceiling and has been marked COMPLETED.",
+            'title' => 'Campaign budget used up',
+            'message' => "‘{$campaign->name}’ has used its whole budget and is now marked as completed.",
             'type' => 'System',
             'link_url' => route('hq.marketing.campaigns', [], false),
             'created_at' => now()

@@ -165,6 +165,11 @@
     .rail-sub a.is-active { color: var(--color-bright-teal); font-weight: 600; }
     .rail-group { margin: 10px 0 2px; padding: 0 8px; font-size: 0.75rem; line-height: 1rem; font-weight: 600; color: var(--color-fg-on-dark-muted); opacity: 0.8; }
     .rail-foot { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--color-border-on-dark); }
+    .rail :focus-visible { outline-color: var(--color-accent-on-dark); } /* focus on Ink is Bright Teal (section 7) */
+    /* Menu button: shown only on narrow screens, where the rail folds into its header (see the media query below) */
+    .rail-menu-btn { display: none; align-items: center; justify-content: center; width: 44px; height: 44px; margin-right: -6px; padding: 0; border: 1px solid var(--color-border-on-dark); border-radius: var(--radius-control); background: transparent; color: var(--color-fg-on-dark); cursor: pointer; }
+    .rail-menu-btn svg { width: 20px; height: 20px; }
+    .rail-menu-btn:hover { background: rgba(255, 255, 255, 0.06); }
     .main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
     .topbar { height: 64px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 32px; background: var(--color-paper); border-bottom: 1px solid var(--color-line); }
     .topbar-title { font-size: 0.875rem; line-height: 1.25rem; color: var(--color-muted); }
@@ -233,6 +238,10 @@
     .table-wrap { overflow-x: auto; }
     .table { width: 100%; border-collapse: collapse; font-size: 0.875rem; line-height: 1.375rem; color: var(--color-slate); }
     .table th { padding: 10px 12px; text-align: left; font-weight: 600; color: var(--color-ink); border-bottom: 1px solid var(--color-line-strong); white-space: nowrap; }
+    .table th.num { text-align: right; } /* figure columns: header right-aligned over its figures (section 8) */
+    /* A table that scrolls inside its own box keeps its header row in view; the inset shadow redraws the
+       header rule, which a sticky cell in a collapsed table would otherwise leave behind */
+    .table-wrap .table thead th { position: sticky; top: 0; z-index: 1; background: var(--color-paper); box-shadow: inset 0 -1px 0 var(--color-line-strong); }
     .table td { padding: 10px 12px; border-bottom: 1px solid var(--color-line); vertical-align: top; }
     .table tbody tr:hover { background: var(--color-mist); }
     .table tr.is-selected { background: var(--color-teal-tint); box-shadow: inset 2px 0 0 var(--color-deep-teal); }
@@ -245,6 +254,8 @@
     .pill-danger { background: var(--color-danger-tint); color: var(--color-danger); }
     .pill-info { background: var(--color-teal-tint); color: var(--color-petrol); }
     .pill-neutral { background: var(--color-mist); color: var(--color-slate); }
+    /* Plain labels that are not a state (a category, a code, a tier, a name, a count): no dot, no functional colour */
+    .tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: var(--radius-control); background: var(--color-mist); color: var(--color-slate); font-size: 0.8125rem; line-height: 1.25rem; font-weight: 500; white-space: nowrap; }
 
     /* ---- Messages (flash, errors, confirmations) ---- */
     .alert { display: flex; gap: 10px; align-items: flex-start; padding: 12px 16px; border-radius: var(--radius-card); font-size: 0.875rem; line-height: 1.375rem; }
@@ -261,6 +272,12 @@
     .tab { padding: 10px 14px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: var(--color-muted); font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none; }
     .tab:hover { color: var(--color-ink); }
     .tab.is-active { color: var(--color-ink); border-bottom-color: var(--color-deep-teal); font-weight: 600; }
+    /* Segmented control: a few views of one list inside a page (keeps btn-primary for the page's one main action) */
+    .segmented { display: inline-flex; flex-wrap: wrap; gap: 8px; }
+    .segmented-item { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border: 1px solid var(--color-line-strong); border-radius: var(--radius-control); background: var(--color-paper); color: var(--color-ink); font-family: var(--font-sans); font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; white-space: nowrap; text-decoration: none; cursor: pointer; transition: background var(--motion-instant), border-color var(--motion-instant); }
+    .segmented-item svg { width: 16px; height: 16px; }
+    .segmented-item:hover { background: var(--color-mist); }
+    .segmented-item.is-active, .segmented-item[aria-pressed="true"], .segmented-item[aria-selected="true"] { background: var(--color-teal-tint); border-color: var(--color-deep-teal); color: var(--color-petrol); font-weight: 600; }
     .modal-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: rgba(12, 20, 43, 0.5); }
     .modal { width: 100%; max-width: 560px; max-height: calc(100vh - 48px); overflow-y: auto; background: var(--color-paper); border-radius: var(--radius-dialog); box-shadow: var(--shadow-float); padding: 24px; }
     .modal-title { margin: 0 0 8px; font-size: 1.125rem; line-height: 1.625rem; font-weight: 600; color: var(--color-ink); }
@@ -278,10 +295,19 @@
 }
 
 @media (max-width: 900px) {
+    /* Phones and tablets: the rail folds into its 64px header with a menu button (.rail.is-open shows the
+       links). In HQ (.rail-hq) the menu opens as a full-height Ink panel with every second-level link. */
     .app-shell { flex-direction: column; height: auto; min-height: 100vh; overflow: visible; }
     .rail { width: 100%; }
-    .rail-nav { flex-direction: row; flex-wrap: wrap; padding: 8px 12px; }
-    .rail-sub, .rail-group { display: none; }
+    .rail-head { justify-content: space-between; gap: 12px; padding: 0 16px; }
+    .rail-menu-btn { display: inline-flex; }
+    .rail:not(.is-open) .rail-nav, .rail:not(.is-open) .rail-foot { display: none; }
+    .rail-nav { padding: 12px 16px 24px; }
+    .rail-hq.is-open { position: fixed; inset: 0; z-index: 60; overflow: hidden; }
+    .rail-hq.is-open .rail-nav { overscroll-behavior: contain; }
+    .rail-hq .rail-link, .rail-hq .rail-sub a { min-height: 44px; } /* touch targets (section 9) */
+    .rail-hq .rail-sub a { display: flex; align-items: center; }
+    body.rail-menu-open { overflow: hidden; }
     .main { overflow: visible; }
     .workspace { padding: 20px 16px; overflow: visible; }
     .topbar { padding: 0 16px; }

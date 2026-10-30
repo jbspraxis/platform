@@ -17,7 +17,7 @@
                 @if(strtolower($p->status) === 'locked')
                     <span class="pill pill-warning w-fit">On hold</span>
                 @else
-                    <span class="pill pill-info w-fit">Active</span>
+                    <span class="pill pill-success w-fit">Active</span>
                 @endif
 
                 <div class="mt-auto flex items-center justify-between border-t border-line pt-3 text-ui font-medium text-deep-teal">

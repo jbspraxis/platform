@@ -9,11 +9,7 @@
             default => [$status ?: 'Draft', 'pill-neutral'],
         };
         $orgStatus = fn ($status) => match ($status) { 'Lead' => 'lead', 'Active Client' => 'client', 'Lost' => 'lost', default => strtolower((string) $status) };
-        $money = fn ($currency, $amount, $decimals = 2) => match ($currency) {
-            'NGN' => '₦' . number_format((float) $amount, $decimals),
-            'XAF', 'XOF' => number_format((float) $amount, $decimals) . ' FCFA',
-            default => trim($currency . ' ' . number_format((float) $amount, $decimals)),
-        };
+        $money = fn ($currency, $amount, $decimals = 2) => \App\Livewire\Hq\HqMoney::format($currency, $amount, $decimals);
         $scheduleLabels = [
             '40_30_30' => '40% at the start, 30% midway, 30% at handover',
             '50_50' => '50% at the start, 50% at handover',
@@ -90,10 +86,10 @@
         <div class="alert alert-warning" style="margin-bottom: 16px; justify-content: space-between; align-items: center; flex-wrap: wrap;">
             <div class="flex items-center gap-2">
                 <i data-lucide="lock"></i>
-                <span>This proposal is signed and locked, so it can't be edited.</span>
+                <span>This proposal is signed and locked, so it can’t be edited.</span>
             </div>
             @if($proposal->status === 'Pending Auth')
-                <button type="button" wire:click="unlockProposal" wire:confirm="Unlock this proposal? Your signature is removed and the proposal goes back to draft. You'll need to sign it again before you send it." class="btn btn-secondary btn-sm" wire:loading.attr="disabled" wire:target="unlockProposal">
+                <button type="button" wire:click="unlockProposal" class="btn btn-secondary btn-sm" wire:loading.attr="disabled" wire:target="unlockProposal">
                     <span wire:loading.remove wire:target="unlockProposal">Unlock and edit</span>
                     <span wire:loading wire:target="unlockProposal">Unlocking…</span>
                 </button>
@@ -183,7 +179,7 @@
                 <div class="field">
                     <label class="label" for="pb-validity">Valid for (days)</label>
                     <input id="pb-validity" type="number" wire:model.blur="validityDays" class="input" {{ $isLocked ? 'disabled' : '' }}>
-                    <span class="help">The client's signing link stops working after this.</span>
+                    <span class="help">The client’s signing link stops working after this.</span>
                 </div>
             </div>
         </section>
@@ -236,7 +232,7 @@
                             <th style="width: 15%;">Code</th>
                             <th style="width: 45%;">Description</th>
                             <th style="width: 15%;">Quantity</th>
-                            <th style="width: 20%;" class="num">Unit price</th>
+                            <th style="width: 20%; text-align: right;" class="num">Unit price</th>
                             <th style="width: 5%;"><span class="sr-only">Remove</span></th>
                         </tr>
                     </thead>
@@ -263,11 +259,11 @@
             </div>
             <button type="button" wire:click="addLineItem()" class="btn btn-secondary" style="margin-top: 12px;" {{ $isLocked ? 'disabled' : '' }}><i data-lucide="plus"></i> Add blank line</button>
 
-            <dl class="text-small" style="display: grid; grid-template-columns: 1fr auto; gap: 4px 24px; margin: 20px 0 0 auto; max-width: 360px; font-variant-numeric: tabular-nums;">
-                <dt class="text-muted">Subtotal</dt><dd style="margin: 0; text-align: right;">{{ $money($currency, $subtotal) }}</dd>
-                <dt class="text-muted">VAT ({{ $vatRate }}%)</dt><dd style="margin: 0; text-align: right;">{{ $money($currency, $taxAmount) }}</dd>
+            <dl class="text-small" style="display: grid; grid-template-columns: 1fr auto; gap: 4px 0; margin: 20px 0 0 auto; max-width: 360px; font-variant-numeric: tabular-nums;">
+                <dt class="text-muted">Subtotal</dt><dd style="margin: 0; padding-left: 24px; text-align: right;">{{ $money($currency, $subtotal) }}</dd>
+                <dt class="text-muted">VAT ({{ $vatRate }}%)</dt><dd style="margin: 0; padding-left: 24px; text-align: right;">{{ $money($currency, $taxAmount) }}</dd>
                 <dt class="font-semibold text-ink" style="padding-top: 8px; border-top: 1px solid var(--color-line);">Total</dt>
-                <dd class="font-semibold text-ink" style="margin: 0; text-align: right; padding-top: 8px; border-top: 1px solid var(--color-line); font-size: 1.125rem;">{{ $money($currency, $grandTotal) }}</dd>
+                <dd class="font-semibold text-ink" style="margin: 0; padding-left: 24px; text-align: right; padding-top: 8px; border-top: 1px solid var(--color-line); font-size: 1.125rem;">{{ $money($currency, $grandTotal) }}</dd>
             </dl>
         </section>
 
@@ -349,7 +345,7 @@
 
         <section class="card" style="margin-bottom: 24px;">
             <h2 class="card-title">Phases</h2>
-            <p class="help" style="margin: 4px 0 16px;">The weight (0 to 4) sets each phase's share of the timeline.</p>
+            <p class="help" style="margin: 4px 0 16px;">The weight (0 to 4) sets each phase’s share of the timeline.</p>
 
             @foreach([1, 2, 3, 4] as $n)
                 <div class="grid gap-4" style="grid-template-columns: 96px 1fr; align-items: start; margin-bottom: 16px;">
@@ -499,21 +495,25 @@
 
                 <h1>{{ $title }}</h1>
 
+                @php
+                    // Same headings as the document the client receives (lang/en/gateway.php), so staff check what the client reads
+                    $doc = fn ($key, $replace = []) => __('gateway.proposal.' . $key, $replace, 'en');
+                @endphp
                 <dl style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 24px; margin: 0 0 8px; padding: 16px; background: var(--color-mist); border-radius: var(--radius-card); font-size: 0.8125rem;">
-                    <div><dt class="text-muted">Client</dt><dd style="margin: 0;" class="text-ink font-semibold">{{ $organization->name ?? 'Unknown organisation' }}</dd></div>
-                    <div><dt class="text-muted">Currency</dt><dd style="margin: 0;" class="text-ink font-semibold">{{ $currency }}</dd></div>
-                    <div><dt class="text-muted">Valid for</dt><dd style="margin: 0;" class="text-ink font-semibold">{{ $validityDays }} days</dd></div>
-                    <div><dt class="text-muted">Payment plan</dt><dd style="margin: 0;" class="text-ink font-semibold">{{ $scheduleLabels[$paymentSchedule] ?? str_replace('_', '/', $paymentSchedule) }}</dd></div>
+                    <div><dt class="text-muted">{{ $doc('doc.organisation') }}</dt><dd style="margin: 0;" class="text-ink font-semibold">{{ $organization->name ?? 'Unknown organisation' }}</dd></div>
+                    <div><dt class="text-muted">{{ $doc('doc.currency') }}</dt><dd style="margin: 0;" class="text-ink font-semibold">{{ $currency }}</dd></div>
+                    <div><dt class="text-muted">{{ $doc('validity') }}</dt><dd style="margin: 0;" class="text-ink font-semibold">{{ trans_choice('gateway.proposal.validity_days', (int) $validityDays, ['days' => (int) $validityDays], 'en') }}</dd></div>
+                    <div><dt class="text-muted">{{ $doc('payment_terms') }}</dt><dd style="margin: 0;" class="text-ink font-semibold">{{ $scheduleLabels[$paymentSchedule] ?? str_replace('_', '/', $paymentSchedule) }}</dd></div>
                 </dl>
 
-                <h2>Executive summary</h2>
+                <h2>{{ $doc('doc.executive_summary') }}</h2>
                 <p>{{ $aiExecutiveSummary ?: 'Not written yet.' }}</p>
 
-                <h2>How we will do the work</h2>
+                <h2>{{ $doc('approach_title') }}</h2>
                 <p>{{ $aiOperationalStrategy ?: 'Not written yet.' }}</p>
 
                 @if(count($selectedTech) > 0)
-                    <h2>Technology</h2>
+                    <h2>{{ $doc('tech_title') }}</h2>
                     @php
                         // Flatten and match tech names for the preview
                         $flatTech = collect($techCatalog)->flatten(1);
@@ -526,14 +526,27 @@
                     </ul>
                 @endif
 
-                <h2>Price</h2>
+                <h2>{{ $doc('plan_title') }}</h2>
+                @php $previewPhases = [$p1Content, $p2Content, $p3Content, $p4Content]; @endphp
+                @if(collect($previewPhases)->filter(fn ($body) => trim((string) $body) !== '')->isNotEmpty())
+                    @foreach($previewPhases as $i => $body)
+                        <div style="margin-bottom: 10px;">
+                            <div class="text-ink font-semibold">{{ $phaseTitles[$i] }}</div>
+                            <p>{{ trim((string) $body) !== '' ? $body : 'Not written yet.' }}</p>
+                        </div>
+                    @endforeach
+                @else
+                    <p>Not written yet.</p>
+                @endif
+
+                <h2>{{ $doc('fees_title') }}</h2>
                 <table class="table" style="font-size: 0.8125rem;">
                     <thead>
                         <tr>
-                            <th>Code</th>
-                            <th>Description</th>
-                            <th style="text-align: center;">Quantity</th>
-                            <th class="num" style="text-align: right;">Total</th>
+                            <th>{{ $doc('code') }}</th>
+                            <th>{{ $doc('description') }}</th>
+                            <th style="text-align: center;">{{ $doc('quantity') }}</th>
+                            <th class="num" style="text-align: right;">{{ $doc('amount') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -542,25 +555,25 @@
                                 <td class="text-ink" style="font-variant-numeric: tabular-nums;">{{ $line['code'] }}</td>
                                 <td>{{ $line['description'] }}</td>
                                 <td style="text-align: center;">{{ $line['quantity'] }}</td>
-                                <td class="num text-ink">{{ number_format((float) $line['total_price'], 2) }}</td>
+                                <td class="num text-ink">{{ $money($currency, $line['total_price']) }}</td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
 
-                <dl style="display: grid; grid-template-columns: 1fr auto; gap: 4px 24px; margin: 12px 0 0 auto; max-width: 320px; font-size: 0.8125rem; font-variant-numeric: tabular-nums;">
-                    <dt class="text-muted">Subtotal</dt><dd style="margin: 0; text-align: right;">{{ $money($currency, $subtotal) }}</dd>
-                    <dt class="text-muted">VAT ({{ $vatRate }}%)</dt><dd style="margin: 0; text-align: right;">{{ $money($currency, $taxAmount) }}</dd>
-                    <dt class="text-ink font-semibold" style="padding-top: 6px; border-top: 1px solid var(--color-line);">Total</dt>
-                    <dd class="text-ink font-semibold" style="margin: 0; text-align: right; padding-top: 6px; border-top: 1px solid var(--color-line);">{{ $money($currency, $grandTotal) }}</dd>
+                <dl style="display: grid; grid-template-columns: 1fr auto; gap: 4px 0; margin: 12px 0 0 auto; max-width: 320px; font-size: 0.8125rem; font-variant-numeric: tabular-nums;">
+                    <dt class="text-muted">{{ $doc('subtotal') }}</dt><dd style="margin: 0; padding-left: 24px; text-align: right;">{{ $money($currency, $subtotal) }}</dd>
+                    <dt class="text-muted">VAT ({{ $vatRate }}%)</dt><dd style="margin: 0; padding-left: 24px; text-align: right;">{{ $money($currency, $taxAmount) }}</dd>
+                    <dt class="text-ink font-semibold" style="padding-top: 6px; border-top: 1px solid var(--color-line);">{{ $doc('total') }}</dt>
+                    <dd class="text-ink font-semibold" style="margin: 0; padding-left: 24px; text-align: right; padding-top: 6px; border-top: 1px solid var(--color-line);">{{ $money($currency, $grandTotal) }}</dd>
                 </dl>
 
                 @if($exclusions)
-                    <h2>What is not included</h2>
+                    <h2>{{ $doc('doc.exclusions') }}</h2>
                     <p>{{ $exclusions }}</p>
                 @endif
 
-                <h2>Signatures</h2>
+                <h2>{{ $doc('doc.signatures') }}</h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {{-- JBS Praxis --}}
                     <div class="pb-sign {{ $isLocked ? 'is-signed' : '' }}">
@@ -581,13 +594,16 @@
                     </div>
 
                     {{-- Client --}}
-                    @php $clientSigned = $isLocked && $proposal->status === 'Converted'; @endphp
+                    {{-- The client signing page stores 'Authorized' (ProposalGateway); 'Converted' is kept for older records --}}
+                    @php $clientSigned = in_array($proposal->status, ['Authorized', 'Converted'], true); @endphp
                     <div class="pb-sign {{ $clientSigned ? 'is-signed' : '' }}">
                         <div class="font-semibold text-ink">{{ $clientSigned ? 'Signed by the client' : 'Not signed by the client yet' }}</div>
                         @if($clientSigned)
-                            <div style="height: 60px; display: flex; justify-content: center;">
-                                <img src="{{ $proposal->client_signature_b64 ?? '' }}" alt="Signature of {{ $proposal->signed_by_name }}" style="max-height: 100%; object-fit: contain;">
-                            </div>
+                            @if(!empty($proposal->client_signature_b64))
+                                <div style="height: 60px; display: flex; justify-content: center;">
+                                    <img src="{{ $proposal->client_signature_b64 }}" alt="Signature of {{ $proposal->signed_by_name }}" style="max-height: 100%; object-fit: contain;">
+                                </div>
+                            @endif
                             <dl>
                                 <dt class="text-muted">Signatory</dt><dd>{{ $proposal->signed_by_name }}</dd>
                                 <dt class="text-muted">Signed on</dt><dd>{{ \Carbon\Carbon::parse($proposal->signed_at)->format('j M Y, H:i') }}</dd>
@@ -608,7 +624,7 @@
                         <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{ urlencode($qrData) }}&color=0C142B&bgcolor=FFFFFF" alt="QR code to check this proposal" style="width: 80px; height: 80px; border: 1px solid var(--color-line); padding: 4px; background: #fff;">
                         <div>
                             <div class="font-semibold text-ink">Signed in JBS Praxis HQ</div>
-                            <div class="text-caption text-muted">Scan the code to check this proposal against the copy held by JBS Praxis.</div>
+                            <div class="text-caption text-muted">The code holds the document fingerprint (SHA-256) recorded when JBS Praxis signed.</div>
                         </div>
                     </div>
                 @endif

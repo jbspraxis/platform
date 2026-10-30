@@ -74,7 +74,7 @@ class PayslipInspector extends Component
 
         // The staff record may have been removed since the run
         if (!$emp) {
-            session()->flash('error', "We couldn't show this payslip because the staff member's record is no longer in the staff directory. Ask HR to restore the record, then try again.");
+            session()->flash('error', "We couldn’t show this payslip because the staff member’s record is no longer in the staff directory. Ask HR to restore the record, then try again.");
             $this->payslipData = null;
             return;
         }

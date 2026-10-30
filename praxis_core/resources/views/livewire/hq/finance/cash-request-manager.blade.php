@@ -44,7 +44,7 @@
                     <tr>
                         <th>Reference</th>
                         <th>Requested by and purpose</th>
-                        <th class="num">Amount</th>
+                        <th class="num text-right">Amount</th>
                         <th>{{ $activeTab === 'history' ? 'Status' : 'Action' }}</th>
                     </tr>
                 </thead>
@@ -58,10 +58,10 @@
                         <td>
                             <div class="font-medium text-ink">{{ $req->first_name }} {{ $req->last_name }}</div>
                             <div class="help">{{ \Illuminate\Support\Str::limit($req->purpose, 50) }}</div>
-                            <span class="pill pill-neutral mt-2"><span class="num">{{ $req->item_code }}</span> · {{ $req->category }}</span>
+                            <span class="tag mt-2"><span class="num">{{ $req->item_code }}</span> · {{ $req->category }}</span>
                         </td>
                         <td class="num">
-                            <div class="font-semibold text-ink">{{ $req->currency }} {{ number_format($req->amount_requested, 2) }}</div>
+                            <div class="font-semibold text-ink">{{ \App\Livewire\Hq\HqMoney::format($req->currency, $req->amount_requested) }}</div>
                             <div class="help">{{ $methodLabels[$req->disbursement_method] ?? explode(' |', $req->disbursement_details)[0] }}</div>
                         </td>
                         <td>
@@ -75,7 +75,11 @@
                                 @endcan
                             @elseif($activeTab === 'pending_clearance')
                                 @can('expenses.approve')
-                                    <button type="button" wire:click="openClearanceModal('{{ $req->id }}')" class="btn btn-secondary btn-sm">Check receipt</button>
+                                    @if((string) $req->requester_id === (string) auth()->id())
+                                        <span class="help">Your request. Another approver closes it.</span>
+                                    @else
+                                        <button type="button" wire:click="openClearanceModal('{{ $req->id }}')" class="btn btn-secondary btn-sm">Check receipt</button>
+                                    @endif
                                 @endcan
                             @else
                                 <span class="pill {{ $statusPills[$req->status] ?? 'pill-neutral' }}">{{ $statusLabels[$req->status] ?? $req->status }}</span>
@@ -117,7 +121,7 @@
                 <dl class="callout mb-5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
                     <dt class="muted">Requested by</dt><dd>{{ $selectedRequest->first_name }} {{ $selectedRequest->last_name }}</dd>
                     <dt class="muted">Purpose</dt><dd>{{ $selectedRequest->purpose }}</dd>
-                    <dt class="muted">Amount</dt><dd class="font-semibold" style="font-variant-numeric: tabular-nums;">{{ $selectedRequest->currency }} {{ number_format($selectedRequest->amount_requested, 2) }}</dd>
+                    <dt class="muted">Amount</dt><dd class="font-semibold" style="font-variant-numeric: tabular-nums;">{{ \App\Livewire\Hq\HqMoney::format($selectedRequest->currency, $selectedRequest->amount_requested) }}</dd>
                     <dt class="muted">Pay by</dt><dd>{{ $methodLabels[$selectedRequest->disbursement_method] ?? $selectedRequest->disbursement_method }}</dd>
                     <dt class="muted">Payment details</dt><dd class="break-words" style="font-variant-numeric: tabular-nums;">{{ $selectedRequest->disbursement_details }}</dd>
                 </dl>
@@ -172,12 +176,12 @@
                     <div class="alert alert-danger mb-4" role="alert"><i data-lucide="circle-alert"></i><span>{{ $errors->first('decision') }}</span></div>
                 @endif
 
-                <p class="mb-4 text-sm text-slate">Amount paid out: <strong class="text-ink" style="font-variant-numeric: tabular-nums;">{{ $selectedRequest->currency }} {{ number_format($selectedRequest->amount_requested, 2) }}</strong></p>
+                <p class="mb-4 text-sm text-slate">Amount paid out: <strong class="text-ink" style="font-variant-numeric: tabular-nums;">{{ \App\Livewire\Hq\HqMoney::format($selectedRequest->currency, $selectedRequest->amount_requested) }}</strong></p>
 
                 <div class="mb-5 rounded-lg border border-line bg-mist p-4">
                     @if($selectedRequest->receipt_url)
                         <div class="flex items-center justify-between gap-3">
-                            <span class="pill pill-success"><i data-lucide="check"></i> Receipt attached</span>
+                            <span class="pill pill-success">Receipt attached</span>
                             <a href="{{ route('hq.file', ['path' => $selectedRequest->receipt_url]) }}" target="_blank" class="btn btn-ghost btn-sm"><i data-lucide="file-text"></i> View receipt</a>
                         </div>
                     @else
@@ -194,7 +198,7 @@
 
                 <div class="alert alert-warning" role="note">
                     <i data-lucide="triangle-alert"></i>
-                    <span>Closing the request adds the amount to the project budget's spending and can't be undone. Check that the receipt matches the amount paid out.</span>
+                    <span>Closing the request adds the amount to the project budget’s spending and can’t be undone. Check that the receipt matches the amount paid out.</span>
                 </div>
 
                 <div class="modal-actions">

@@ -146,7 +146,7 @@ class BroadcastLedger extends Component
 
         if ($activeSending) {
             $this->activeLock = true;
-            // Stored in the app's time zone (UTC); shown in Lagos time
+            // Stored in the app’s time zone (UTC); shown in Lagos time
             $this->lockEta = \Carbon\Carbon::parse($activeSending->estimated_completion_time)->timezone('Africa/Lagos')->format('H:i') . ' WAT';
         } else {
             $this->activeLock = false;
@@ -163,7 +163,7 @@ class BroadcastLedger extends Component
     public function enhanceWithGemini()
     {
         if (! Auth::user()->can('broadcasts.create')) {
-            session()->flash('error', "You don't have permission to write broadcasts. Ask an administrator to change your role.");
+            session()->flash('error', "You don’t have permission to write broadcasts. Ask an administrator to change your role.");
             return;
         }
 
@@ -175,7 +175,7 @@ class BroadcastLedger extends Component
         // Brand voice for client emails: docs/BRAND.md sections 4 and 13. The email layout adds the sign-off.
         $prompt = "You write emails for JBS Praxis, a consulting and engineering firm in Lagos and Douala. Rewrite the draft below in a '{$this->selectedTone}' tone that stays plain, precise, warm and measured.
         RULES:
-        1. Write in the draft's language: British English, or French (courant soigné, vouvoiement).
+        1. Write in the draft’s language: British English, or French (courant soigné, vouvoiement).
         2. Two or three short paragraphs, short sentences, sentence case. No exclamation marks, no hype (revolutionary, cutting-edge, seamless, robust, unlock, leverage, elite), no guaranteed outcomes.
         3. Output HTML using only <p>, <strong>, <ul> and <li>. No <html> or <body> tags.
         4. Open with 'Hello {{ first_name }},' in English or 'Bonjour,' in French. Do not add a sign-off or signature: the email adds one.
@@ -196,10 +196,10 @@ class BroadcastLedger extends Component
                 session()->flash('success', 'Draft rewritten. Read the email text and edit it before you send it.');
             } else {
                 logger()->warning('Broadcast rewrite failed', ['status' => $response->status()]);
-                session()->flash('error', "We couldn't rewrite the draft because the writing assistant returned an error. Try again in a minute, or write the email text yourself.");
+                session()->flash('error', "We couldn’t rewrite the draft because the writing assistant returned an error. Try again in a minute, or write the email text yourself.");
             }
         } catch (\Exception $e) {
-            session()->flash('error', "The writing assistant didn't reply in time. Try again in a minute, or write the email text yourself.");
+            session()->flash('error', "The writing assistant didn’t reply in time. Try again in a minute, or write the email text yourself.");
         }
     }
 
@@ -208,7 +208,7 @@ class BroadcastLedger extends Component
     {
         // Sending to clients authorises the broadcast
         if (! Auth::user()->can('broadcasts.approve')) {
-            session()->flash('error', "You don't have permission to send broadcasts. Ask an administrator to change your role.");
+            session()->flash('error', "You don’t have permission to send broadcasts. Ask an administrator to change your role.");
             return;
         }
 

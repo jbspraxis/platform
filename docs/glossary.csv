@@ -46,3 +46,4 @@ predictive framework,\bpredictive\b,the Praxis Method,la méthode Praxis,
 grid,\bthe grid\b,—,—,"""Welcome to the grid"""
 error prefix,(^|\s)(>\s*)?ERR:|^\s*>\s,plain sentence,phrase simple,"""> ERR:"" and ""> "" prompt prefixes"
 hype,\b(elite|cutting-edge|world-class|seamless|robust|revolutionary|next-generation|game-changing|supercharge|deterministic|immutable|forensic|zero-defect|unbreakable|tier-1)\b,say what is true,dire ce qui est vrai,section 4
+user,(?<![$>])\b(users?|utilisat(eur|eurs|rice|rices))\b(?!->),team member (client side); staff member (JBS Praxis side); person,membre de l’équipe ; collaborateur ; la personne,never in interface text (section 5)

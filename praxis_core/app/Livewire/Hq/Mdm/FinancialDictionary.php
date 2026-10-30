@@ -105,7 +105,7 @@ class FinancialDictionary extends Component
                 $incomeId = null;
                 if ($categoryData['income']) {
                     $incomeAccount = DB::table('chart_of_accounts')->where('account_code', $categoryData['income'])->first();
-                    if (!$incomeAccount) throw new Exception("We couldn't save the item because income account {$categoryData['income']} isn't in the chart of accounts. Add it in Chart of accounts, then save again.");
+                    if (!$incomeAccount) throw new Exception("We couldn’t save the item because income account {$categoryData['income']} isn’t in the chart of accounts. Add it in Chart of accounts, then save again.");
                     $incomeId = $incomeAccount->id;
                 }
 
@@ -113,7 +113,7 @@ class FinancialDictionary extends Component
                 $expenseId = null;
                 if ($categoryData['expense']) {
                     $expenseAccount = DB::table('chart_of_accounts')->where('account_code', $categoryData['expense'])->first();
-                    if (!$expenseAccount) throw new Exception("We couldn't save the item because expense account {$categoryData['expense']} isn't in the chart of accounts. Add it in Chart of accounts, then save again.");
+                    if (!$expenseAccount) throw new Exception("We couldn’t save the item because expense account {$categoryData['expense']} isn’t in the chart of accounts. Add it in Chart of accounts, then save again.");
                     $expenseId = $expenseAccount->id;
                 }
 
@@ -182,6 +182,18 @@ class FinancialDictionary extends Component
         $this->category = 'Consulting';
         $this->uom = '1 Phase';
         $this->generateItemCode();
+    }
+
+    /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
+    protected function validationAttributes(): array
+    {
+        return [
+            'item_code' => 'item code',
+            'category' => 'category',
+            'description' => 'description',
+            'uom' => 'unit',
+            'default_unit_rate_usd' => 'base rate (USD)',
+        ];
     }
 
     public function render()

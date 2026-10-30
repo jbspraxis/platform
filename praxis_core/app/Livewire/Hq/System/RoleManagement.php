@@ -20,9 +20,9 @@ use Exception;
  * portal accounts (client_users, any other organisation, one client role) from one screen.
  *
  * access.view lists accounts; access.create invites; access.edit changes, suspends and
- * re-sends invites. Only an owner can give or take the Owner role or change an owner's
- * account, nobody else can hand out a role with permissions they don't hold themselves,
- * and the last active owner can't be suspended or lose the role.
+ * re-sends invites. Only an owner can give or take the Owner role or change an owner’s
+ * account, nobody else can hand out a role with permissions they don’t hold themselves,
+ * and the last active owner can’t be suspended or lose the role.
  */
 #[Layout('components.layouts.hq')]
 #[Title('Accounts')]
@@ -151,7 +151,7 @@ class RoleManagement extends Component
         $this->validate([
             'first_name' => 'required|string|max:50',
             'last_name' => 'required|string|max:50',
-            // Dynamically ignore the current user's email if in edit mode
+            // Dynamically ignore the current user’s email if in edit mode
             'email' => "required|email|unique:{$table},email," . ($this->editingUserId ?? 'NULL') . ',id',
             'role_ids' => $isClient ? 'nullable|array' : 'required|array|min:1',
             'role_ids.*' => 'integer',
@@ -229,7 +229,7 @@ class RoleManagement extends Component
                         'updated_at' => now()
                     ];
                     if ($isClient) {
-                        // The organisation's first portal account is its primary (admin) account
+                        // The organisation’s first portal account is its primary (admin) account
                         $isPrimary = DB::table('client_users')->where('organization_id', $finalOrgId)
                             ->where('is_primary_client', 1)->whereNull('deleted_at')->doesntExist();
                         $record['is_primary_client'] = $isPrimary ? 1 : 0;
@@ -244,7 +244,7 @@ class RoleManagement extends Component
                     Mail::to($this->email)->locale($this->invitationLocale($isClient, $finalOrgId))
                         ->send(new \App\Mail\UserInvitation($this->first_name, $invitationToken, $isClient));
 
-                    $this->successMessage = "Account created. We've sent {$this->first_name} an invitation to set a password.";
+                    $this->successMessage = "Account created. We’ve sent {$this->first_name} an invitation to set a password.";
                 }
 
                 if (!$isClient) {
@@ -260,13 +260,13 @@ class RoleManagement extends Component
 
         } catch (Exception $e) {
             report($e);
-            session()->flash('error', "We couldn't save the account, and nothing was changed. Check the details and try again.");
+            session()->flash('error', "We couldn’t save the account, and nothing was changed. Check the details and try again.");
         }
     }
 
     /**
      * Checks the staff roles being given. Only an owner may give or remove the Owner role or
-     * change an owner's account; others may only give roles whose permissions they hold;
+     * change an owner’s account; others may only give roles whose permissions they hold;
      * the last active owner keeps the role.
      */
     private function staffRolesAllowed(): bool
@@ -285,12 +285,12 @@ class RoleManagement extends Component
         $givesOwner = $roles->contains(fn ($r) => (bool) $r->is_protected);
 
         if (!$iAmOwner && ($givesOwner || $targetIsOwner)) {
-            $this->addError('role_ids', 'Only an owner can give the Owner role or change an owner\'s account.');
+            $this->addError('role_ids', 'Only an owner can give the Owner role or change an owner’s account.');
             return false;
         }
 
         if ($target && $this->outranksMe($target)) {
-            $this->addError('role_ids', 'You can\'t change an account that has more access than yours.');
+            $this->addError('role_ids', 'You can’t change an account that has more access than yours.');
             return false;
         }
 
@@ -301,7 +301,7 @@ class RoleManagement extends Component
                     ->where('role_permissions.role_id', $role->id)->pluck('permissions.slug')
                     ->reject(fn ($p) => $me->can($p));
                 if ($missing->isNotEmpty()) {
-                    $this->addError('role_ids', "You can't give the role {$role->name}: it has permissions you don't have.");
+                    $this->addError('role_ids', "You can’t give the role {$role->name}: it has permissions you don’t have.");
                     return false;
                 }
             }
@@ -315,7 +315,7 @@ class RoleManagement extends Component
         return true;
     }
 
-    /** True when $target (staff) holds a permission the signed-in non-owner doesn't. */
+    /** True when $target (staff) holds a permission the signed-in non-owner doesn’t. */
     private function outranksMe(User $target): bool
     {
         $me = Auth::user();
@@ -346,7 +346,7 @@ class RoleManagement extends Component
             ->distinct()->count('users.id');
     }
 
-    /** Invitation language: staff get English; a client gets their organisation's preferred language (else English). */
+    /** Invitation language: staff get English; a client gets their organisation’s preferred language (else English). */
     private function invitationLocale(bool $isClient, $organizationId): string
     {
         return MailLocale::forRecipient($isClient
@@ -423,12 +423,12 @@ class RoleManagement extends Component
         }
 
         if (!$isClient && $this->outranksMe(User::find($user->id))) {
-            session()->flash('error', 'You can\'t suspend an account that has more access than yours.');
+            session()->flash('error', 'You can’t suspend an account that has more access than yours.');
             return;
         }
         if (!$isClient && Access::isOwner(User::find($user->id))) {
             if ($user->status === 'Active' && $this->activeOwnerCount() <= 1) {
-                session()->flash('error', "This is the only active owner, so the account can't be suspended. Make someone else an owner first.");
+                session()->flash('error', "This is the only active owner, so the account can’t be suspended. Make someone else an owner first.");
                 return;
             }
         }

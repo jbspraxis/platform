@@ -112,7 +112,7 @@
                         <span class="bl-placeholder">@{{ company_name }}</span>
                         <span class="bl-placeholder">@{{ industry }}</span>
                         <span class="bl-placeholder">@{{ pipeline_stage }}</span>
-                        <div class="help">Select a placeholder to copy it. Each one is replaced with the recipient's details.</div>
+                        <div class="help">Select a placeholder to copy it. Each one is replaced with the recipient’s details.</div>
                     </div>
 
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -207,7 +207,7 @@
 
             @if(!$activeLock)
                 <div class="flex flex-wrap items-center gap-4">
-                    <button type="button" wire:click="dispatchCampaign" wire:confirm="Send this broadcast to {{ $recipientCount }} recipients? Sending starts straight away and can't be stopped." class="btn btn-primary" @if($recipientCount === 0 || empty($enhancedBody)) disabled @endif>
+                    <button type="button" wire:click="dispatchCampaign" class="btn btn-primary" @if($recipientCount === 0 || empty($enhancedBody)) disabled @endif>
                         <i data-lucide="send"></i> Send to {{ $recipientCount }} {{ $recipientCount === 1 ? 'recipient' : 'recipients' }}
                     </button>
                     <div class="help">
@@ -358,7 +358,7 @@
                                 <td colspan="4">
                                     <div class="empty-state">
                                         <strong>No failed emails</strong>
-                                        Emails that bounce or can't be sent appear here with the reason.
+                                        Emails that bounce or can’t be sent appear here with the reason.
                                     </div>
                                 </td>
                             </tr>

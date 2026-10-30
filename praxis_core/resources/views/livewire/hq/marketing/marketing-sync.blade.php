@@ -361,7 +361,7 @@
         </aside>
     @endif
 
-    {{-- Manage an account's login --}}
+    {{-- Manage an account’s login --}}
     @if($showCredentialModal && $selectedAsset)
         <div class="mk-backdrop" wire:click="$set('showCredentialModal', false)"></div>
         <aside class="mk-panel" role="dialog" aria-modal="true" aria-labelledby="mk-cred-title">

@@ -52,11 +52,7 @@
      }"
 >
     @php
-        $money = fn ($currency, $amount) => match ($currency) {
-            'NGN' => '₦' . number_format($amount),
-            'XAF', 'XOF' => number_format($amount) . ' FCFA',
-            default => trim($currency . ' ' . number_format($amount)),
-        };
+        $money = fn ($currency, $amount) => \App\Livewire\Hq\HqMoney::format($currency, $amount, 0);
         // Appointment times are stored as Lagos wall-clock time (WAT)
         $when = fn ($time) => \Carbon\Carbon::parse($time)->format('D j M Y, H:i') . ' WAT';
     @endphp
@@ -105,6 +101,11 @@
             <i data-lucide="check-circle"></i><span>{{ session('success') }}</span>
         </div>
     @endif
+    @if (session()->has('info'))
+        <div class="alert alert-info" role="status" style="margin-bottom: 20px;">
+            <i data-lucide="info"></i><span>{{ session('info') }}</span>
+        </div>
+    @endif
     @if (session()->has('error'))
         <div class="alert alert-danger" role="alert" style="margin-bottom: 20px;">
             <i data-lucide="circle-alert"></i><span>{{ session('error') }}</span>
@@ -116,7 +117,7 @@
             <section class="card">
                 <div class="card-header">
                     <h2 class="card-title">Requests to approve</h2>
-                    <span class="pill pill-neutral num">{{ count($requestedAppointments) }}</span>
+                    <span class="tag num">{{ count($requestedAppointments) }}</span>
                 </div>
                 <div class="table-wrap">
                     <table class="table">
@@ -149,7 +150,7 @@
             <section class="card">
                 <div class="card-header">
                     <h2 class="card-title">Scheduled</h2>
-                    <span class="pill pill-neutral num">{{ count($scheduledAppointments) }}</span>
+                    <span class="tag num">{{ count($scheduledAppointments) }}</span>
                 </div>
                 <div class="table-wrap">
                     <table class="table">
@@ -318,7 +319,7 @@
                     <h2 class="card-title">Notes from the free audit</h2>
                     <button type="button" @click="clearNotes" class="btn btn-ghost btn-sm" style="color: var(--color-danger);">Clear notes</button>
                 </div>
-                <p class="text-small text-muted" style="margin: 0 0 20px;">Write freely; the formatting doesn't matter. Notes are saved in this browser as you type. When you close the free audit, the assistant drafts a proposal from them.</p>
+                <p class="text-small text-muted" style="margin: 0 0 20px;">Write freely; the formatting doesn’t matter. Notes are saved in this browser as you type. When you close the free audit, the assistant drafts a proposal from them.</p>
 
                 <div class="flex flex-col gap-5">
                     <div class="field">
@@ -353,7 +354,7 @@
     <div class="modal-backdrop" id="approveModal" style="display: none;">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="approve-title" style="max-width: 500px;">
             <h2 id="approve-title" class="modal-title">Approve free audit</h2>
-            <p class="text-small text-muted" style="margin: 0 0 16px;">Approve the free audit for <strong id="appClientName" class="text-ink"></strong>. Paste the meeting link and we'll email it to the client.</p>
+            <p class="text-small text-muted" style="margin: 0 0 16px;">Approve the free audit for <strong id="appClientName" class="text-ink"></strong>. Paste the meeting link and we’ll email it to the client.</p>
             <input type="hidden" id="appIdInput">
             <div class="field">
                 <label class="label" for="appLinkInput">Meeting link</label>

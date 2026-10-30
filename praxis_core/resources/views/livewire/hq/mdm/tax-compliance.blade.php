@@ -37,9 +37,10 @@
 
     @include('livewire.hq.mdm.partials.tabs')
 
-    <div class="flex flex-wrap gap-2" style="margin-bottom: 24px;" role="group" aria-label="Show">
-        <button type="button" wire:click="switchTab('tax')" class="btn btn-sm {{ $activeTab === 'tax' ? 'btn-primary' : 'btn-secondary' }}" aria-pressed="{{ $activeTab === 'tax' ? 'true' : 'false' }}">VAT by country</button>
-        <button type="button" wire:click="switchTab('currency')" class="btn btn-sm {{ $activeTab === 'currency' ? 'btn-primary' : 'btn-secondary' }}" aria-pressed="{{ $activeTab === 'currency' ? 'true' : 'false' }}">Exchange rates</button>
+    {{-- A segmented choice, not a second primary button (app.css .segmented: the selected option is tinted) --}}
+    <div class="segmented" style="margin-bottom: 24px;" role="group" aria-label="Show">
+        <button type="button" wire:click="switchTab('tax')" class="segmented-item" aria-pressed="{{ $activeTab === 'tax' ? 'true' : 'false' }}">VAT by country</button>
+        <button type="button" wire:click="switchTab('currency')" class="segmented-item" aria-pressed="{{ $activeTab === 'currency' ? 'true' : 'false' }}">Exchange rates</button>
     </div>
 
     @error('api_sync')
@@ -130,7 +131,7 @@
                         <input type="checkbox" wire:model="is_manual_override" id="manual_override" class="checkbox" style="margin-top: 3px;">
                         <label for="manual_override" style="cursor: pointer;">
                             <strong class="text-ink" style="display: block; margin-bottom: 2px;">Keep this rate fixed</strong>
-                            <span class="help" style="color: var(--color-slate);">Rate updates from the rate service won't change it. Use this for a parallel market or agreed company rate.</span>
+                            <span class="help" style="color: var(--color-slate);">Rate updates from the rate service won’t change it. Use this for a parallel market or agreed company rate.</span>
                         </label>
                     </div>
 
@@ -154,7 +155,7 @@
                             <tr>
                                 <th>Country</th>
                                 <th>How VAT applies</th>
-                                <th class="num">VAT rate</th>
+                                <th class="num text-right">VAT rate</th>
                                 <th>Currency</th>
                                 <th>Status</th>
                                 <th><span class="sr-only">Actions</span></th>
@@ -209,7 +210,7 @@
                         <thead>
                             <tr>
                                 <th>Currency</th>
-                                <th class="num">Rate for 1 USD</th>
+                                <th class="num text-right">Rate for 1 USD</th>
                                 <th>How it updates</th>
                                 <th style="width: 100px;"><span class="sr-only">Actions</span></th>
                             </tr>

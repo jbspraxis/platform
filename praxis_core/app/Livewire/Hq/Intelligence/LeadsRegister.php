@@ -275,7 +275,7 @@ class LeadsRegister extends Component
                 'updated_at' => now()
             ]);
         } else {
-            // Create new organization if it truly doesn't exist
+            // Create new organization if it truly doesn’t exist
             $orgId = (string) Str::uuid();
             DB::table('organizations')->insert([
                 'id' => $orgId, 

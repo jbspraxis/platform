@@ -54,8 +54,8 @@ class IdleTimerKillswitch extends Command
                 DB::table('notifications')->insert([
                     'id' => (string) Str::uuid(),
                     'user_id' => $log->user_id,
-                    'title' => 'TIMER GUILLOTINE EXECUTED',
-                    'message' => 'Your active timer exceeded 120 idle minutes and was forcefully terminated. Unverified time must be requested via Level 4 Time Correction.',
+                    'title' => 'Your timer was stopped',
+                    'message' => 'Your timer stopped after 120 minutes without activity. To add time that wasn’t recorded, use Manual time entry in Time tracking.',
                     'type' => 'System_Alert',
                     'created_at' => now()
                 ]);

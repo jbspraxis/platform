@@ -2,7 +2,7 @@
     @php
         // Stored project statuses (database values) and what people read
         $statusLabels = ['Active' => 'Active', 'Scoping' => 'Scoping', 'Locked' => 'On hold', 'Completed' => 'Completed', 'Cancelled' => 'Cancelled'];
-        $statusPills = ['Active' => 'pill-info', 'Scoping' => 'pill-neutral', 'Locked' => 'pill-warning', 'Completed' => 'pill-success', 'Cancelled' => 'pill-neutral'];
+        $statusPills = ['Active' => 'pill-success', 'Scoping' => 'pill-neutral', 'Locked' => 'pill-warning', 'Completed' => 'pill-success', 'Cancelled' => 'pill-neutral'];
         // The sprint board opens for managers and auditors, and for people with a task on the project (SprintBoard::maySeeBoard)
         $canOpenAnyBoard = auth()->user()->can('projects.approve') || auth()->user()->can('projects.export') || ! $canSeeAll;
     @endphp
@@ -99,7 +99,7 @@
                 @if($canSeeMoney)
                     <div class="card">
                         <div class="stat-label">Unpaid invoices on active projects</div>
-                        <div class="stat-value {{ $kpiCapitalAtRisk > 0 ? 'text-warning' : '' }}">${{ number_format($kpiCapitalAtRisk, 2) }}</div>
+                        <x-hq.money-totals :totals="$kpiCapitalAtRisk" class="{{ !empty($kpiCapitalAtRisk) ? 'text-warning' : '' }}" />
                     </div>
                     <div class="card">
                         <div class="stat-label">Projects spending ahead of progress</div>
@@ -127,7 +127,7 @@
                                     @if($p['is_financially_locked'])
                                         <span class="pill pill-danger">On hold: unpaid invoice</span>
                                     @else
-                                        <span class="pill pill-info">Active</span>
+                                        <span class="pill pill-success">Active</span>
                                     @endif
 
                                     @if($p['needs_midpoint_funds'] && !$p['is_financially_locked'])
@@ -158,7 +158,8 @@
                                 <div class="text-right">
                                     <div class="stat-label">Budget used</div>
                                     <div class="text-small font-semibold num {{ $p['is_bleeding'] ? 'text-danger' : ($p['burn_percent'] > $p['progress_percent'] ? 'text-warning' : 'text-success') }}">
-                                        {{ $p['burn_percent'] }}% (${{ number_format($p['spent_amount'], 0) }})
+                                        {{-- Spend is hours × the firm hourly rate, which is in US dollars --}}
+                                        {{ $p['burn_percent'] }}% ({{ \App\Livewire\Hq\HqMoney::format('USD', $p['spent_amount'], 0) }})
                                     </div>
                                 </div>
                             @endif
@@ -211,7 +212,7 @@
                             <th>Client</th>
                             <th>Project</th>
                             <th>Hold</th>
-                            <th class="num">Budget</th>
+                            <th class="num text-right">Budget</th>
                             <th>Dates</th>
                             <th><span class="sr-only">Actions</span></th>
                         </tr>
@@ -231,7 +232,7 @@
                                 </td>
                                 <td class="num">
                                     @if($canSeeMoney)
-                                        {{ number_format($p['total_budget'], 2) }} <span class="muted">{{ $p['currency'] }}</span>
+                                        {{ \App\Livewire\Hq\HqMoney::format($p['currency'], $p['total_budget']) }}
                                     @else
                                         <span class="muted" title="Shown to people with finance access">Not shown</span>
                                     @endif
@@ -269,9 +270,16 @@
     <!-- Create project panel -->
     <div x-cloak x-show="openCreateDrawer" class="fixed inset-0 z-40 bg-ink/50" style="display: none;" @click="openCreateDrawer = false" x-transition.opacity></div>
 
-    <div class="fixed inset-y-0 right-0 z-50 flex w-full max-w-[480px] flex-col bg-paper transition-transform duration-300"
-         style="box-shadow: var(--shadow-float);"
-         :class="openCreateDrawer ? 'translate-x-0' : 'translate-x-full'"
+    {{-- Hidden (display: none) when closed, so it casts no shadow and keyboard focus can’t reach its fields --}}
+    <div class="fixed inset-y-0 right-0 z-50 flex w-full max-w-[480px] flex-col bg-paper"
+         style="display: none; box-shadow: var(--shadow-float);"
+         x-show="openCreateDrawer"
+         x-transition:enter="transition-transform duration-300"
+         x-transition:enter-start="translate-x-full"
+         x-transition:enter-end="translate-x-0"
+         x-transition:leave="transition-transform duration-300"
+         x-transition:leave-start="translate-x-0"
+         x-transition:leave-end="translate-x-full"
          x-cloak role="dialog" aria-modal="true" aria-labelledby="create-project-title">
         <div class="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
             <div>

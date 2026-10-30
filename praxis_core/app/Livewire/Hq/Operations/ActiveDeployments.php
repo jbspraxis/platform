@@ -8,6 +8,7 @@ use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use App\Livewire\Hq\HqMoney;
 
 #[Layout('components.layouts.hq')]
 class ActiveDeployments extends Component
@@ -41,7 +42,7 @@ class ActiveDeployments extends Component
     // KPIs (For Matrix Tab)
     public $kpiActiveDeployments = 0;
     public $kpiSprintVelocity = 0;
-    public $kpiCapitalAtRisk = 0;
+    public $kpiCapitalAtRisk = []; // per currency: ['NGN' => 537.5, 'USD' => 322.5]
     public $kpiBleedingProjects = 0;
 
     // Configuration
@@ -205,6 +206,7 @@ class ActiveDeployments extends Component
                 'progress_percent' => $progressPercent,
                 // Money stays on the server without finance.view
                 'total_budget' => $this->canSeeMoney ? $project->total_budget : null,
+                'currency' => $project->currency,
                 'spent_amount' => $this->canSeeMoney ? $spentAmount : null,
                 'burn_percent' => $this->canSeeMoney ? $burnPercent : null,
                 'unpaid_invoices' => $this->canSeeMoney ? $unpaidInvoices : null,
@@ -225,11 +227,10 @@ class ActiveDeployments extends Component
             ->sum('story_points');
 
         if ($this->canSeeMoney) {
-            $this->kpiCapitalAtRisk = DB::table('invoices')
+            $this->kpiCapitalAtRisk = HqMoney::sumByCurrency(DB::table('invoices')
                 ->join('projects', 'invoices.project_id', '=', 'projects.id')
                 ->whereIn('projects.status', ['Active', 'Locked'])
-                ->whereIn('invoices.status', ['Pending', 'Overdue'])
-                ->sum('invoices.total_amount');
+                ->whereIn('invoices.status', ['Pending', 'Overdue']), 'invoices.total_amount', 'invoices.currency');
         }
     }
 

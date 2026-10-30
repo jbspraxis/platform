@@ -2,7 +2,7 @@
     <div class="page-header">
         <div>
             <h1 class="page-title">Project budgets</h1>
-            <p class="page-subtitle">How each project's budget is split into lines, and how much of each line is spent or held by open cash requests.</p>
+            <p class="page-subtitle">How each project’s budget is split into lines, and how much of each line is spent or held by open cash requests.</p>
         </div>
         <div class="flex flex-wrap items-end gap-3">
             @if(count($allProjects))
@@ -37,23 +37,23 @@
         <div class="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <div class="card">
                 <div class="stat-label">Contract value</div>
-                <div class="stat-value"><span class="text-sm font-medium muted">{{ $cur }}</span> {{ number_format($metrics['total_budget'], 2) }}</div>
+                <div class="stat-value">{{ \App\Livewire\Hq\HqMoney::format($cur, $metrics['total_budget']) }}</div>
             </div>
             <div class="card">
                 <div class="stat-label">Allocated to lines</div>
-                <div class="stat-value"><span class="text-sm font-medium muted">{{ $cur }}</span> {{ number_format($metrics['total_allocated'], 2) }}</div>
+                <div class="stat-value">{{ \App\Livewire\Hq\HqMoney::format($cur, $metrics['total_allocated']) }}</div>
             </div>
             <div class="card">
                 <div class="stat-label">Held by open cash requests</div>
-                <div class="stat-value"><span class="text-sm font-medium muted">{{ $cur }}</span> {{ number_format($metrics['total_accrued'], 2) }}</div>
+                <div class="stat-value">{{ \App\Livewire\Hq\HqMoney::format($cur, $metrics['total_accrued']) }}</div>
             </div>
             <div class="card">
                 <div class="stat-label">Spent</div>
-                <div class="stat-value"><span class="text-sm font-medium muted">{{ $cur }}</span> {{ number_format($metrics['total_spent'], 2) }}</div>
+                <div class="stat-value">{{ \App\Livewire\Hq\HqMoney::format($cur, $metrics['total_spent']) }}</div>
             </div>
             <div class="card">
                 <div class="stat-label">Not yet allocated</div>
-                <div class="stat-value" @if($metrics['remaining_pool'] < 0) style="color: var(--color-danger);" @endif><span class="text-sm font-medium muted">{{ $cur }}</span> {{ $metrics['remaining_pool'] < 0 ? '−' : '' }}{{ number_format(abs($metrics['remaining_pool']), 2) }}</div>
+                <div class="stat-value" @if($metrics['remaining_pool'] < 0) style="color: var(--color-danger);" @endif>{{ \App\Livewire\Hq\HqMoney::format($cur, $metrics['remaining_pool']) }}</div>
                 @if($metrics['remaining_pool'] < 0)
                     <span class="pill pill-danger mt-2">Over-allocated</span>
                 @endif
@@ -69,10 +69,10 @@
                     <thead>
                         <tr>
                             <th style="min-width: 220px;">Budget line</th>
-                            <th class="num">Allocated</th>
-                            <th class="num">Spent</th>
-                            <th class="num">Held by requests</th>
-                            <th class="num">Available</th>
+                            <th class="num text-right">Allocated</th>
+                            <th class="num text-right">Spent</th>
+                            <th class="num text-right">Held by requests</th>
+                            <th class="num text-right">Available</th>
                             <th style="width: 160px;">Used</th>
                         </tr>
                     </thead>
@@ -122,7 +122,7 @@
         <div class="card">
             <div class="empty-state">
                 <strong>No projects yet</strong>
-                Each project's budget appears here once the project is created.
+                Each project’s budget appears here once the project is created.
             </div>
         </div>
     @endif
@@ -136,7 +136,7 @@
                 </div>
 
                 <div class="callout mb-4 text-sm">
-                    This changes how the budget is split; the project's total stays the same. You can't move money that is already spent or held by open cash requests.
+                    This changes how the budget is split; the project’s total stays the same. You can’t move money that is already spent or held by open cash requests.
                 </div>
 
                 <form wire:submit.prevent="executeSweep" class="flex flex-col gap-4">

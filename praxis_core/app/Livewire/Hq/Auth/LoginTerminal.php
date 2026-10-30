@@ -88,7 +88,7 @@ class LoginTerminal extends Component
 
         // Brute force is handled by the rate limit above (5 tries per email and IP per 15 minutes)
         $this->recordFailedLogin('hq');
-        $this->addError('auth', "That email address and password don't match. Check them and try again.");
+        $this->addError('auth', "That email address and password don’t match. Check them and try again.");
     }
 
     /**
@@ -115,7 +115,7 @@ class LoginTerminal extends Component
 
         // The same message whether or not the address has an account, so nobody can test which emails exist.
         // No email is sent yet, so the message says so plainly instead of promising a link.
-        $this->recoveryMessage = "Thank you. Password reset by email isn't available yet, so ask an administrator to reset your password.";
+        $this->recoveryMessage = "Thank you. Password reset by email isn’t available yet, so ask an administrator to reset your password.";
     }
 
     /** Plain validation messages (docs/BRAND.md section 12). */
@@ -125,6 +125,15 @@ class LoginTerminal extends Component
             'email.required' => 'Enter your email address.',
             'email.email' => 'Enter an email address in the format name@example.com.',
             'password.required' => 'Enter your password.',
+        ];
+    }
+
+    /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
+    protected function validationAttributes(): array
+    {
+        return [
+            'email' => 'email address',
+            'password' => 'password',
         ];
     }
 

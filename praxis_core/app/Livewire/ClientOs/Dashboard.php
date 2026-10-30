@@ -21,6 +21,7 @@ use Carbon\Carbon;
 class Dashboard extends Component
 {
     use WithFileUploads;
+    use PortalLanguage;
 
     // Everything that identifies this client (organisation, projects, tickets,
     // invoices, lockout) is #[Locked]: set on the server only. Actions that take
@@ -93,7 +94,7 @@ class Dashboard extends Component
     public $popRef = '';
     public $popAmount = '';
     public $popFile;
-    public $popWhtAmount = 0.00;
+    public $popWhtAmount = null; // empty unless withholding tax is declared (0 counted as "present" and made the certificate required)
     public $popWhtFile;
 
     // Vault & Team State
@@ -115,10 +116,10 @@ class Dashboard extends Component
     #[Locked]
     public $clientRoles = [];
 
-    // Brand Config State
-    public $brandPrimary = '#00E5FF';
-    public $brandSecondary = '#FF3366';
-    public $brandAccent = '#FFBD2E';
+    // Portal appearance (the organisation's logo and colours); defaults are the JBS Praxis colours (docs/BRAND.md section 7)
+    public $brandPrimary = '#08707C';
+    public $brandSecondary = '#B3261E';
+    public $brandAccent = '#8A5700';
     public $brandLogo; 
 
     // Each tab needs this portal permission (config/access.php, "portal.<module>.<action>")
@@ -132,6 +133,17 @@ class Dashboard extends Component
         return Access::allows($this->user, Access::CLIENT_PREFIX . $permission);
     }
 
+    // Validation messages in the page's language (lang/<locale>/portal.php)
+    protected function messages(): array
+    {
+        return (array) __('portal.validation.dashboard');
+    }
+
+    protected function languageReturnUrl(): string
+    {
+        return route('client.dashboard');
+    }
+
     public function mount()
     {
         // Client accounts only (guard 'client', client_users); staff use HQ
@@ -139,14 +151,17 @@ class Dashboard extends Component
 
         if (!$this->user || $this->user->status !== 'Active') {
             Auth::guard('client')->logout();
-            abort(403, 'UNAUTHORIZED NODE: Access restricted to Client Level Clearance.');
+            abort(403, __('portal.errors.not_client'));
         }
 
         $this->organization = DB::table('organizations')->where('id', $this->user->organization_id)->first();
         if (!$this->organization) {
             Auth::guard('client')->logout();
-            abort(404, 'CRITICAL ERROR: No organization linked to this node.');
+            abort(404, __('portal.errors.no_organisation'));
         }
+
+        // The organisation's preferred language, unless the person already chose one
+        $this->applyOrganisationLocale($this->organization->preferred_language ?? null);
 
         $this->loadBrandSettings();
 
@@ -164,7 +179,7 @@ class Dashboard extends Component
         $this->allProjects = $projectQuery->get()->toArray();
 
         if (empty($this->allProjects)) {
-            abort(403, 'NO ACTIVE BATTLESPACE DETECTED. Awaiting HQ provisioning.');
+            abort(403, __('portal.errors.no_projects'));
         }
 
         $defaultProject = collect($this->allProjects)->firstWhere('status', 'Active') 
@@ -178,9 +193,9 @@ class Dashboard extends Component
     {
         $this->clientSettings = DB::table('client_portal_settings')->where('organization_id', $this->organization->id)->first();
         if ($this->clientSettings) {
-            $this->brandPrimary = $this->clientSettings->primary_color ?? '#00E5FF';
-            $this->brandSecondary = $this->clientSettings->secondary_color ?? '#FF3366';
-            $this->brandAccent = $this->clientSettings->accent_color ?? '#FFBD2E';
+            $this->brandPrimary = $this->clientSettings->primary_color ?? '#08707C';
+            $this->brandSecondary = $this->clientSettings->secondary_color ?? '#B3261E';
+            $this->brandAccent = $this->clientSettings->accent_color ?? '#8A5700';
         }
     }
 
@@ -241,9 +256,9 @@ class Dashboard extends Component
         if ($blockingInvoice) {
             $this->financialLockout = true;
             $hasPendingTx = DB::table('transactions')->where('invoice_id', $blockingInvoice->id)->where('status', 'Pending Verification')->exists();
-            $this->lockoutReason = $hasPendingTx 
-                ? 'PAYMENT VERIFICATION IN PROGRESS: HQ is cryptographically verifying your Proof of Payment.' 
-                : ($blockingInvoice->status === 'Overdue' ? 'ACCOUNT DELINQUENT: Overdue invoice detected.' : 'AWAITING INITIAL DEPOSIT: Please upload Proof of Payment to commence execution.');
+            $this->lockoutReason = $hasPendingTx
+                ? __('portal.lockout.verifying')
+                : ($blockingInvoice->status === 'Overdue' ? __('portal.lockout.overdue') : __('portal.lockout.deposit'));
         } else {
             $this->financialLockout = false;
         }
@@ -256,7 +271,7 @@ class Dashboard extends Component
         if (!$this->activeProject || !$this->allowed('projects.view')) return;
 
         $architect = DB::table('users')->where('id', $this->activeProject->created_by)->first();
-        $this->leadArchitect = $architect ? strtoupper($architect->first_name . ' ' . substr($architect->last_name, 0, 1) . '.') : 'PRAXIS COMMAND';
+        $this->leadArchitect = $architect ? trim($architect->first_name . ' ' . mb_substr((string) $architect->last_name, 0, 1) . '.') : __('portal.overview.lead_fallback');
         
         $rawPhases = DB::table('project_phases')->where('project_id', $this->activeProject->id)->orderBy('phase_number', 'asc')->get();
         $completedWeight = 0;
@@ -268,7 +283,7 @@ class Dashboard extends Component
 
         $logs = DB::table('task_comments')->join('tasks', 'task_comments.task_id', '=', 'tasks.id')->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')->where('project_phases.project_id', $this->activeProject->id)->orderBy('task_comments.created_at', 'desc')->limit(15)->select('task_comments.comment_text', 'task_comments.created_at');
         $this->liveLogs = People::joinAuthor($logs, 'task_comments.user_id', 'task_comments.author_type')->get()->map(function($log) {
-            return ['time' => Carbon::parse($log->created_at)->format('M d - H:i'), 'author' => strtoupper(substr($log->first_name, 0, 1) . '. ' . $log->last_name), 'text' => $log->comment_text];
+            return ['time' => PortalFormat::date($log->created_at, 'datetime'), 'author' => trim(mb_substr((string) $log->first_name, 0, 1) . '. ' . $log->last_name), 'text' => $log->comment_text];
         })->toArray();
 
         $this->activeTasks = DB::table('tasks')->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')->where('project_phases.project_id', $this->activeProject->id)->select('tasks.*', 'project_phases.title as phase_title')->orderByRaw("FIELD(tasks.status, 'QA_Review', 'In-Progress', 'To-Do', 'Done')")->orderBy('tasks.updated_at', 'desc')->get()->toArray();
@@ -332,12 +347,12 @@ class Dashboard extends Component
     public function switchTab($tab)
     {
         if ($this->financialLockout && $tab !== 'financials') {
-            session()->flash('lockout_error', '> ACCESS DENIED: ' . $this->lockoutReason);
+            session()->flash('lockout_error', __('portal.lockout.tab_closed') . ' ' . $this->lockoutReason);
             return;
         }
         $needs = self::TAB_PERMISSIONS[$tab] ?? null;
         if (!$needs || !$this->allowed($needs)) {
-            session()->flash('lockout_error', '> ACCESS DENIED: Your portal role does not include this section.');
+            session()->flash('lockout_error', __('portal.lockout.no_permission'));
             return;
         }
         $this->activeTab = $tab;
@@ -369,7 +384,9 @@ class Dashboard extends Component
         DB::transaction(function () {
             $ticketId = (string) Str::uuid(); 
             $isGeneralMessage = empty($this->qaTaskId);
-            $finalTitle = ($isGeneralMessage ? '[DIRECT COMM] ' : '[BUG REPORT] ') . $this->qaTitle;
+            // The title is what the client typed; a general message has no task (older tickets carry a
+            // "[DIRECT COMM] " or "[BUG REPORT] " prefix, which the portal hides)
+            $finalTitle = $this->qaTitle;
             
             DB::table('qa_tickets')->insert([
                 'id' => $ticketId, 'project_id' => $this->activeProject->id, 'task_id' => $isGeneralMessage ? null : $this->qaTaskId,
@@ -394,14 +411,15 @@ class Dashboard extends Component
 
             $notifications = [];
             foreach (Access::staffWith('qa.edit') as $adminId) {
-                $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => $isGeneralMessage ? 'CLIENT COMMUNICATION RECEIVED' : 'QA BUG REPORT LOGGED', 'message' => "Project: {$this->activeProject->title} | By: {$this->user->first_name}", 'type' => 'Project', 'created_at' => now()];
+                $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => $isGeneralMessage ? 'Message from a client' : 'Issue reported by a client', 'message' => "{$this->user->first_name} {$this->user->last_name} ({$this->organization->name}) " . ($isGeneralMessage ? 'sent a message' : 'reported an issue') . " on {$this->activeProject->title}: “{$this->qaTitle}”. Reply in Quality and issues.", 'type' => 'Project', 'created_at' => now()];
             }
             if(!empty($notifications)) DB::table('notifications')->insert($notifications);
         });
         
+        $sentKey = empty($this->qaTaskId) ? 'portal.qa.sent_message' : 'portal.qa.sent_issue';
         $this->reset(['qaTitle', 'qaDescription', 'qaTaskId', 'qaSeverity', 'initialAttachment']); 
         $this->loadQaHub(); 
-        session()->flash('qa_success', '> INTELLIGENCE TRANSMITTED TO COMMAND MATRIX.');
+        session()->flash('qa_success', __($sentKey));
     }
     
     // --- DIRECT SPRINT APPROVALS ---
@@ -414,11 +432,11 @@ class Dashboard extends Component
         
         DB::table('task_comments')->insert([
             'task_id' => $taskId, 'user_id' => $this->user->id, 'author_type' => 'client',
-            'comment_text' => '[CLIENT VERIFICATION] Deliverable approved and structurally locked.', 'created_at' => now()
+            'comment_text' => __('portal.tasks.approved_comment', [], 'en'), 'created_at' => now()
         ]);
 
         $this->loadProjectTelemetry();
-        session()->flash('global_success', '> DELIVERABLE APPROVED AND SECURED.');
+        session()->flash('global_success', __('portal.tasks.approved'));
     }
 
     public function teleportToQa($taskId, $taskTitle)
@@ -426,7 +444,7 @@ class Dashboard extends Component
         abort_unless($this->allowed('qa.create'), 403);
         if (!$this->ownsTask($taskId)) return;
         $this->qaTaskId = $taskId;
-        $this->qaTitle = "VULNERABILITY: " . strtoupper($taskTitle);
+        $this->qaTitle = __('portal.qa.prefill', ['task' => $taskTitle]);
         $this->switchTab('qa_hub');
     }
 
@@ -498,7 +516,7 @@ class Dashboard extends Component
         // Notify HQ
         $notifications = [];
         foreach (Access::staffWith('qa.edit') as $adminId) {
-            $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => 'CLIENT RESPONSE LOGGED', 'message' => "Ticket: {$this->selectedTicket->title}", 'type' => 'Project', 'created_at' => now()];
+            $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => 'Client replied to an issue', 'message' => "{$this->user->first_name} {$this->user->last_name} ({$this->organization->name}) replied on “{$this->selectedTicket->title}”. Read it in Quality and issues.", 'type' => 'Project', 'created_at' => now()];
         }
         if(!empty($notifications)) DB::table('notifications')->insert($notifications);
 
@@ -518,7 +536,7 @@ class Dashboard extends Component
         
         $this->dispatch('close-qa');
         $this->loadQaHub();
-        session()->flash('global_success', '> FIX VERIFIED. TASK CLOSED.');
+        session()->flash('global_success', __('portal.qa.fix_approved'));
     }
     
     public function approveAndLockFromQa()
@@ -544,7 +562,7 @@ class Dashboard extends Component
                 'task_id' => $this->selectedTicket->task_id, 
                 'user_id' => $this->user->id,
                 'author_type' => 'client',
-                'comment_text' => '[CLIENT VERIFICATION] Deliverable verified and locked directly from QA Hub override.', 
+                'comment_text' => __('portal.tasks.approved_from_issue_comment', [], 'en'),
                 'created_at' => now()
             ]);
         }
@@ -552,7 +570,7 @@ class Dashboard extends Component
         $this->dispatch('close-qa');
         $this->loadQaHub();
         $this->loadProjectTelemetry(); // Refreshes the Sprints tab in the background
-        session()->flash('global_success', '> VULNERABILITY OVERRIDDEN. TASK SECURED & LOCKED.');
+        session()->flash('global_success', __('portal.qa.task_approved_from_issue'));
     }
     
     public function triggerPopUpload($invoiceId, $amountDue) {
@@ -561,7 +579,7 @@ class Dashboard extends Component
         $this->uploadInvoiceId = $invoiceId;
         $this->popAmount = $amountDue; 
         $this->popRef = ''; 
-        $this->popWhtAmount = 0.00;
+        $this->popWhtAmount = null;
     }
     
     public function cancelPopUpload() { 
@@ -592,7 +610,9 @@ class Dashboard extends Component
             $whtFilePath = $this->popWhtFile->store('pop_receipts_wht', 'local');
         }
 
-        DB::transaction(function () use ($filePath, $whtFilePath) {
+        $invoiceNumber = DB::table('invoices')->where('id', $this->uploadInvoiceId)->value('invoice_number');
+
+        DB::transaction(function () use ($filePath, $whtFilePath, $invoiceNumber) {
             $txId = (string) Str::uuid();
             DB::table('transactions')->insert([
                 'id' => $txId, 
@@ -612,8 +632,8 @@ class Dashboard extends Component
             $notifications = [];
             foreach (Access::staffWith('finance.approve') as $adminId) {
                 $notifications[] = [
-                    'id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => 'FINANCIAL: POP UPLOADED', 
-                    'message' => "Client {$this->organization->name} uploaded POP for {$this->activeProject->currency} {$this->popAmount} (+ {$this->popWhtAmount} WHT).", 'type' => 'Financial', 'created_at' => now()
+                    'id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => 'Proof of payment uploaded',
+                    'message' => "{$this->organization->name} uploaded proof of a {$this->activeProject->currency} " . number_format((float) $this->popAmount, 2) . " payment for invoice {$invoiceNumber}" . ($this->popWhtAmount > 0 ? ' (withholding tax ' . number_format((float) $this->popWhtAmount, 2) . ')' : '') . '. Verify it in Payment verification.', 'type' => 'Financial', 'created_at' => now()
                 ];
             }
             if(!empty($notifications)) DB::table('notifications')->insert($notifications);
@@ -622,7 +642,7 @@ class Dashboard extends Component
         $this->cancelPopUpload(); 
         $this->loadFinancials(); 
         $this->enforceFinancialLockout();
-        session()->flash('finance_success', '> PROOF OF PAYMENT TRANSMITTED. AWAITING HQ CLEARANCE.');
+        session()->flash('finance_success', __('portal.finance.pop_sent'));
     }
 
     public function saveBrandSettings()
@@ -630,7 +650,7 @@ class Dashboard extends Component
         abort_unless($this->allowed('settings.edit'), 403);
         $this->validate([
             'brandPrimary' => 'required|string|size:7', 'brandSecondary' => 'required|string|size:7',
-            'brandAccent' => 'required|string|size:7', 'brandLogo' => 'nullable|image|mimes:png,svg|max:5120',
+            'brandAccent' => 'required|string|size:7', 'brandLogo' => 'nullable|image|mimes:png|max:5120',
         ]);
 
         $logoPath = $this->clientSettings->logo_path ?? null;
@@ -648,7 +668,7 @@ class Dashboard extends Component
         );
 
         $this->loadBrandSettings(); 
-        session()->flash('brand_success', '> BRAND MATRIX OVERRIDE SUCCESSFUL.');
+        session()->flash('brand_success', __('portal.documents.saved'));
     }
 
     public function inviteTeamMember()
@@ -666,23 +686,23 @@ class Dashboard extends Component
 
             $roleId = $this->inviteRoleId ?: DB::table('roles')->where('audience', 'client')->where('slug', 'client-member')->value('id');
             if (!$roleId || !$this->mayAssignRole($roleId)) {
-                session()->flash('team_error', 'You don’t have permission to give that role. Choose another role.'); return;
+                session()->flash('team_error', __('portal.team.role_forbidden')); return;
             }
 
             if (!empty($this->inviteProjectId) && !$this->ownsProject($this->inviteProjectId)) {
-                session()->flash('team_error', 'We couldn’t find that project. Choose a project from the list.'); return;
+                session()->flash('team_error', __('portal.team.project_unknown')); return;
             }
 
             $portalAccounts = DB::table('client_users')->where('organization_id', $this->organization->id)
                 ->whereIn('lifecycle_stage', ['Onboarding', 'Active'])->whereNull('deleted_at')->count();
             if ($portalAccounts >= 3) {
-                session()->flash('team_error', 'You can’t invite anyone else: your organisation already has the maximum of 3 Client Portal accounts.'); return;
+                session()->flash('team_error', __('portal.team.limit_reached')); return;
             }
 
             $primaryDomain = substr(strrchr($this->user->email, "@"), 1);
             $inviteDomain = substr(strrchr($this->inviteEmail, "@"), 1);
             if (strtolower($primaryDomain) !== strtolower($inviteDomain)) {
-                session()->flash('team_error', 'Use an email address ending in @' . strtolower($primaryDomain) . '. Team members must use your organisation’s email domain.'); return;
+                session()->flash('team_error', __('portal.team.wrong_domain', ['domain' => strtolower($primaryDomain)])); return;
             }
 
             $token = Str::random(60);
@@ -710,7 +730,7 @@ class Dashboard extends Component
 
             $this->reset(['inviteFirstName', 'inviteLastName', 'inviteEmail', 'inviteProjectId']);
             $this->loadTeamCommand();
-            session()->flash('team_success', "Invitation sent to {$invitedEmail}.");
+            session()->flash('team_success', __('portal.team.invited', ['email' => $invitedEmail]));
 
         } catch (\Illuminate\Validation\ValidationException $e) {
             // Livewire will catch this and display it via the frontend @errors block
@@ -718,11 +738,10 @@ class Dashboard extends Component
         } catch (\Exception $e) {
             // Catch DB constraint errors (like UUID mismatches) so it doesn't fail silently
             Log::error('Client team invite failed', ['organization_id' => $this->organization->id, 'message' => $e->getMessage()]);
-            session()->flash('team_error', 'We couldn’t complete the invitation. Contact JBS Praxis for help.');
+            session()->flash('team_error', __('portal.team.invite_failed'));
         }
     }
 
-    // NEW: Allow Primary Alpha to edit node access on the fly
     // A member this account may manage: same organisation, not itself, not the primary account
     private function manageableMember($userId)
     {
@@ -745,12 +764,12 @@ class Dashboard extends Component
     public function changeMemberRole($userId, $roleId)
     {
         if (!$this->manageableMember($userId) || !$this->mayAssignRole($roleId)) {
-            session()->flash('team_error', '> ERR: You cannot give that role.'); return;
+            session()->flash('team_error', __('portal.team.role_forbidden')); return;
         }
         DB::table('client_users')->where('id', $userId)->update(['role_id' => (int) $roleId, 'updated_at' => now()]);
 
         $this->loadTeamCommand();
-        session()->flash('team_success', '> ROLE UPDATED.');
+        session()->flash('team_success', __('portal.team.role_updated'));
     }
 
     public function updateNodeAccess($userId, $projectId)
@@ -764,7 +783,7 @@ class Dashboard extends Component
         ]);
         
         $this->loadTeamCommand();
-        session()->flash('team_success', '> NODE ACCESS PROTOCOLS RECONFIGURED.');
+        session()->flash('team_success', __('portal.team.access_updated'));
     }
 
     public function toggleSuspendUser($userId)
@@ -790,12 +809,12 @@ class Dashboard extends Component
             ]);
             $notifications = [];
             foreach (Access::staffWith('projects.approve') as $adminId) {
-                $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => 'CRITICAL: AUTHENTICATED REDLINE TRIGGERED', 'message' => "Active client {$this->organization->name} initiated Redline.", 'type' => 'System', 'created_at' => now()];
+                $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => 'Urgent support requested by a client', 'message' => "{$this->user->first_name} {$this->user->last_name} ({$this->organization->name}) asked for urgent support: “" . Str::limit($this->redlineAuthDescription, 120) . '”. Contact them as soon as possible.', 'type' => 'System', 'created_at' => now()];
             }
             if(!empty($notifications)) DB::table('notifications')->insert($notifications);
         });
         $this->showRedlineModal = false; $this->redlineAuthDescription = '';
-        session()->flash('global_success', '> REDLINE PROTOCOL ENGAGED. STRIKE TEAM PAGED.');
+        session()->flash('global_success', __('portal.urgent.sent'));
     }
 
     public function executeLogout()
@@ -806,6 +825,6 @@ class Dashboard extends Component
 
     public function render()
     {
-        return view('livewire.client-os.dashboard');
+        return view('livewire.client-os.dashboard')->title($this->organization->name ?? __('portal.app_name'));
     }
 }

@@ -108,7 +108,7 @@ class InvoiceLedger extends Component
         $project = DB::table('projects')->where('id', $this->new_project_id)->first();
         $org = DB::table('organizations')->where('id', $project->organization_id)->first();
         
-        // 1. Tax: match the tax jurisdiction to the client's country
+        // 1. Tax: match the tax jurisdiction to the client’s country
         $taxData = DB::table('mdm_tax_compliance')
             ->where('is_active', 1)
             ->where(function($query) use ($org) {
@@ -202,13 +202,13 @@ class InvoiceLedger extends Component
         // Only an invoice that is neither paid nor already cancelled can be cancelled
         $invoice = DB::table('invoices')->where('id', $invoiceId)->first();
         if (! $invoice) {
-            session()->flash('error', "We couldn't find that invoice. Refresh the page and try again.");
+            session()->flash('error', "We couldn’t find that invoice. Refresh the page and try again.");
             $this->loadInvoices();
             return;
         }
         if (in_array($invoice->status, ['Paid', 'Cancelled'], true)) {
             session()->flash('error', $invoice->status === 'Paid'
-                ? "Invoice {$invoice->invoice_number} is paid, so it can't be cancelled."
+                ? "Invoice {$invoice->invoice_number} is paid, so it can’t be cancelled."
                 : "Invoice {$invoice->invoice_number} is already cancelled.");
             $this->loadInvoices();
             return;
@@ -224,7 +224,7 @@ class InvoiceLedger extends Component
             ]);
 
         if (! $updated) {
-            session()->flash('error', "Invoice {$invoice->invoice_number} changed while you were working, so it wasn't cancelled. Check its status and try again.");
+            session()->flash('error', "Invoice {$invoice->invoice_number} changed while you were working, so it wasn’t cancelled. Check its status and try again.");
             $this->loadInvoices();
             return;
         }
@@ -245,7 +245,7 @@ class InvoiceLedger extends Component
 
     /**
      * Overdue check: marks unpaid invoices past their due date as overdue,
-     * which puts the client's portal access for that project on hold.
+     * which puts the client’s portal access for that project on hold.
      * In production this runs daily via the Laravel scheduler; staff with
      * finance.approve can also run it from the Invoices screen.
      */
@@ -279,7 +279,7 @@ class InvoiceLedger extends Component
                     $notifications[] = [
                         'id' => (string) Str::uuid(), 'user_id' => $adminId,
                         'title' => 'Invoice overdue', 
-                        'message' => "Invoice {$invoice->invoice_number} is past its due date. The client's portal access for this project is on hold until it is paid. Decide whether work on the project should pause.", 
+                        'message' => "Invoice {$invoice->invoice_number} is past its due date. The client’s portal access for this project is on hold until it is paid. Decide whether work on the project should pause.", 
                         'type' => 'System', 'created_at' => now()
                     ];
                 }
@@ -299,8 +299,29 @@ class InvoiceLedger extends Component
 
         $this->loadInvoices();
         $count = $expiredInvoices->count();
-        session()->flash('error', $count . ($count === 1 ? ' invoice was' : ' invoices were') . " marked overdue. Client Portal access for those projects is on hold until they're paid.");
+        session()->flash('error', $count . ($count === 1 ? ' invoice was' : ' invoices were') . " marked overdue. Client Portal access for those projects is on hold until they’re paid.");
     }
+    /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
+    protected function validationAttributes(): array
+    {
+        return [
+            'new_project_id' => 'project',
+            'new_phase_id' => 'phase',
+            'new_amount_due' => 'amount before VAT',
+            'new_payment_terms' => 'payment terms',
+            'new_remittance_id' => 'account to pay into',
+            'new_description' => 'description',
+        ];
+    }
+
+    /** Validation messages that say what to enter instead */
+    public function messages(): array
+    {
+        return [
+            'new_amount_due.min' => 'Enter an amount of 1 or more.',
+        ];
+    }
+
     public function render()
     {
         return view('livewire.hq.finance.invoice-ledger');

@@ -46,8 +46,8 @@
                             <tr>
                                 <th style="width: 160px;">Code</th>
                                 <th>Account name</th>
-                                <th>Status</th>
-                                <th class="text-right">Action</th>
+                                <th style="width: 200px;">Status</th>
+                                <th class="text-right" style="width: 180px;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -81,7 +81,7 @@
                                             @endif
 
                                             @if($acc->is_system_locked)
-                                                <span class="pill pill-neutral" title="Built into the system; can't be deactivated"><i data-lucide="lock" style="width: 12px; height: 12px;"></i> Built in</span>
+                                                <span class="pill pill-neutral" title="Built into the system; can’t be deactivated">Built in</span>
                                             @endif
                                         </div>
                                     </td>

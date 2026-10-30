@@ -1,4 +1,14 @@
 <div>
+    @php
+        // Client Portal roles are shown with the names clients see in the portal (lang/en/portal.php, roles); stored names stay as they are.
+        // Staff role names are not in that list and are shown as stored.
+        $roleLabel = function ($name) {
+            $primary = str_ends_with((string) $name, ' (primary)'); // 'Client Admin (primary)' from RoleManagement
+            $base = $primary ? substr($name, 0, -strlen(' (primary)')) : (string) $name;
+            $label = \Illuminate\Support\Facades\Lang::has('portal.roles.' . $base, 'en') ? __('portal.roles.' . $base, [], 'en') : $base;
+            return $label . ($primary ? ' (primary contact)' : '');
+        };
+    @endphp
     @if($showSuccessModal)
         <div class="modal-backdrop">
             <div class="modal" role="dialog" aria-modal="true" aria-labelledby="account-saved-title">
@@ -14,7 +24,7 @@
     <div class="page-header">
         <div>
             <h1 class="page-title">Accounts</h1>
-            <p class="page-subtitle">Invite staff and Client Portal users, change their roles, and suspend or restore their access.</p>
+            <p class="page-subtitle">Invite staff members and Client Portal team members, change their roles, and suspend or restore their access.</p>
         </div>
     </div>
 
@@ -45,7 +55,7 @@
                 @endif
             </div>
             @unless($editMode)
-                <p class="help" style="margin: -8px 0 16px;">We'll email the person an invitation to choose a password. Staff sign in to HQ; clients sign in to the Client Portal.</p>
+                <p class="help" style="margin: -8px 0 16px;">We’ll email the person an invitation to choose a password. Staff sign in to HQ; clients sign in to the Client Portal.</p>
             @endunless
 
             <form wire:submit.prevent="saveUser" class="flex flex-col gap-6">
@@ -103,15 +113,15 @@
 
                         <div class="field">
                             @if($editingIsClient || $this->isClientForm())
-                                {{-- One portal role; the organisation's first account is its primary account and always Client Admin --}}
+                                {{-- One portal role; the organisation’s first account is its primary account and always Client Admin --}}
                                 <label for="client-role" class="label">Client Portal role</label>
                                 <select id="client-role" wire:model="client_role_id" class="select" aria-describedby="client-role-help">
-                                    <option value="">Client Member (default)</option>
+                                    <option value="">{{ $roleLabel('Client Member') }} (default)</option>
                                     @foreach($clientRoles as $role)
-                                        <option value="{{ $role->id }}">{{ $role->name }}</option>
+                                        <option value="{{ $role->id }}">{{ $roleLabel($role->name) }}</option>
                                     @endforeach
                                 </select>
-                                <span id="client-role-help" class="help">The organisation's first account becomes its primary contact and always has the Client Admin role.</span>
+                                <span id="client-role-help" class="help">The organisation’s first account becomes its primary contact and always has the Administrator role.</span>
                             @else
                                 <span class="label" id="staff-roles-label">Staff roles</span>
                                 <div role="group" aria-labelledby="staff-roles-label" class="flex flex-col gap-2" style="padding: 12px; border: 1px solid var(--color-line-strong); border-radius: var(--radius-control);">
@@ -199,7 +209,7 @@
                                     @endif
                                 </td>
 
-                                <td class="text-ink">{{ $user->role_name ?: 'No role' }}</td>
+                                <td class="text-ink">{{ $user->role_name ? $roleLabel($user->role_name) : 'No role' }}</td>
 
                                 <td>
                                     @if($user->lifecycle_stage === 'Onboarding')
@@ -221,7 +231,7 @@
 
                                     @if($user->status === 'Active')
                                         <button type="button" wire:click="toggleUserStatus('{{ $user->id }}', '{{ $user->status }}')"
-                                                wire:confirm="Suspend access for {{ $user->first_name }} {{ $user->last_name }}? They will be signed out and can't sign in until you restore access."
+                                                wire:confirm="Suspend access for {{ $user->first_name }} {{ $user->last_name }}? They will be signed out and can’t sign in until you restore access."
                                                 class="btn btn-ghost btn-sm" style="color: var(--color-danger);">Suspend access</button>
                                     @else
                                         <button type="button" wire:click="toggleUserStatus('{{ $user->id }}', '{{ $user->status }}')" class="btn btn-ghost btn-sm">Restore access</button>

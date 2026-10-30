@@ -124,7 +124,7 @@ class ExecutiveBiDashboard extends Component
             SUM(journal_lines.credit_amount) as total_credit
         ')->groupBy('sub_category')->get()->keyBy('sub_category');
 
-        // Accounts Receivable (11) Change: Increase in AR is a NEGATIVE cash adjustment (Money we haven't received yet)
+        // Accounts Receivable (11) Change: Increase in AR is a NEGATIVE cash adjustment (Money we haven’t received yet)
         $ar = $changes->get('11');
         $changeInAR = $ar ? ($ar->total_credit - $ar->total_debit) : 0; 
 
@@ -132,7 +132,7 @@ class ExecutiveBiDashboard extends Component
         $prepaid = $changes->get('12');
         $changeInPrepaid = $prepaid ? ($prepaid->total_credit - $prepaid->total_debit) : 0;
 
-        // Deferred Revenue (21) Change: Increase is a POSITIVE cash adjustment (Received cash but haven't earned it)
+        // Deferred Revenue (21) Change: Increase is a POSITIVE cash adjustment (Received cash but haven’t earned it)
         $defRev = $changes->get('21');
         $changeInDefRev = $defRev ? ($defRev->total_credit - $defRev->total_debit) : 0;
 
@@ -253,7 +253,16 @@ class ExecutiveBiDashboard extends Component
         abort_unless(Auth::user()->can('finance.export'), 403);
 
         // Statement downloads are not built yet (planned PDF export)
-        session()->flash('success', "Statement downloads aren't available yet. The figures on this page are up to date for the dates you chose.");
+        session()->flash('info', "Statement downloads aren’t available yet. The figures on this page are up to date for the dates you chose.");
+    }
+
+    /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
+    protected function validationAttributes(): array
+    {
+        return [
+            'startDate' => 'from date',
+            'endDate' => 'to date',
+        ];
     }
 
     public function render()

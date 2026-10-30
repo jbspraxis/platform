@@ -188,12 +188,19 @@ class CashRequestManager extends Component
     {
         $this->selectedRequest = collect($this->requests)->firstWhere('id', $id);
         $this->receipt_file = null;
+        if (! $this->ensureClearable()) {
+            return;
+        }
         $this->showClearanceModal = true;
     }
 
     public function uploadReceipt()
     {
         abort_unless(Auth::user()->can('expenses.approve'), 403);
+
+        if (! $this->ensureClearable()) {
+            return;
+        }
 
         $this->validate([
             'receipt_file' => 'required|image|max:5120', // 5MB max
@@ -216,12 +223,8 @@ class CashRequestManager extends Component
 
         $userId = Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c';
 
-        // Only an approved request can be closed, and only once
-        $current = DB::table('cash_requests')->where('id', $this->selectedRequest->id)->first();
-        if (! $current || $current->status !== 'Authorized') {
-            $this->addError('decision', 'Only an approved request can be closed. This one has changed since you opened it; the list has been refreshed.');
-            $this->showClearanceModal = false;
-            $this->loadRequests();
+        // Only an approved request can be closed, only once, and not by the person who raised it
+        if (! $this->ensureClearable()) {
             return;
         }
 
@@ -235,7 +238,7 @@ class CashRequestManager extends Component
                 'updated_at' => now(),
             ]);
 
-            // 2. Add the amount to the project budget's spending (once, only if this call closed it)
+            // 2. Add the amount to the project budget’s spending (once, only if this call closed it)
             if ($closed && $this->selectedRequest->project_id && $this->selectedRequest->financial_dictionary_id) {
                 DB::table('project_budgets')
                     ->where('project_id', $this->selectedRequest->project_id)
@@ -268,7 +271,33 @@ class CashRequestManager extends Component
         }
 
         if ((string) $current->requester_id === (string) Auth::id()) {
-            $this->addError('decision', "You can't approve or reject your own cash request. Ask another approver to review it.");
+            $this->addError('decision', "You can’t approve or reject your own cash request. Ask another approver to review it.");
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Checking the receipt and closing a request needs an approved request, and the person who
+     * spent the money may not sign off their own receipt (separation of duties).
+     */
+    private function ensureClearable(): bool
+    {
+        $current = $this->selectedRequest
+            ? DB::table('cash_requests')->where('id', $this->selectedRequest->id)->first()
+            : null;
+
+        if (! $current || $current->status !== 'Authorized') {
+            $this->addError('decision', 'Only an approved request can be closed. This one has changed since you opened it; the list has been refreshed.');
+            $this->showClearanceModal = false;
+            $this->loadRequests();
+            return false;
+        }
+
+        if ((string) $current->requester_id === (string) Auth::id()) {
+            $this->addError('decision', "You can’t check the receipt for your own cash request. Ask another approver to close it.");
+            $this->showClearanceModal = false;
             return false;
         }
 

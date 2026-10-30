@@ -27,7 +27,7 @@ class SprintBoard extends Component
     #[Locked]
     public bool $canMoveOwn = false; // projects.edit: check out and move own tasks
     #[Locked]
-    public bool $canMoveAny = false; // projects.approve: move anyone's task
+    public bool $canMoveAny = false; // projects.approve: move anyone’s task
 
     // Board State
     public $activeSprintId = null;
@@ -81,7 +81,7 @@ class SprintBoard extends Component
             ->exists();
     }
 
-    /** A task on this board's project, or null (task ids come from the browser) */
+    /** A task on this board’s project, or null (task ids come from the browser) */
     private function boardTask($taskId)
     {
         return DB::table('tasks')
@@ -166,7 +166,7 @@ class SprintBoard extends Component
         // Only a task on this board
         if (! $this->boardTask($taskId)) return;
 
-        // Only an unassigned task, unless the user may move anyone's task
+        // Only an unassigned task, unless the user may move anyone’s task
         $updated = DB::table('tasks')->where('id', $taskId)
             ->when(! Auth::user()->can('projects.approve'), fn ($q) => $q->whereNull('assigned_to'))
             ->update([
@@ -181,11 +181,11 @@ class SprintBoard extends Component
     // --- KANBAN DRAG & DROP + SILENT TIMER LOGIC ---
     public function updateTaskStatus($taskId, $newStatus)
     {
-        // Only a task on this board, and only into one of the board's columns
+        // Only a task on this board, and only into one of the board’s columns
         $task = $this->boardTask($taskId);
         if (!$task || $task->status === $newStatus || ! in_array($newStatus, self::COLUMNS, true)) return;
 
-        // Security Gate: own tasks need projects.edit; someone else's (or unassigned) need projects.approve
+        // Security Gate: own tasks need projects.edit; someone else’s (or unassigned) need projects.approve
         $isOwn = $task->assigned_to === Auth::id();
         if (! Auth::user()->can($isOwn ? 'projects.edit' : 'projects.approve')) {
             session()->flash('error', 'You can only move tasks assigned to you. Ask a project lead to move this one.');
@@ -199,7 +199,7 @@ class SprintBoard extends Component
             // 1. The 5-Hour Client QA SLA (Rule 6)
             if ($newStatus === 'QA_Review') {
                 $updateData['qa_sla_expires_at'] = now()->addHours(5);
-                $this->notifyAdmins("‘{$task->title}’ is ready for QA review. Review it within 5 hours.");
+                $this->notifyAdmins("‘{$task->title}’ is waiting for the client’s review. If the client doesn’t respond within 5 hours, it’s approved automatically.");
             }
 
             // 2. Clear SLA if pulled out of QA
@@ -237,7 +237,7 @@ class SprintBoard extends Component
                     $endTime = now();
                     $durationMinutes = Carbon::parse($openLog->start_time)->diffInMinutes($endTime);
                     
-                    // Fetch Engineer's Hourly Rate for Live Margin Deduction (Fallback to $50/hr if unset)
+                    // Fetch Engineer’s Hourly Rate for Live Margin Deduction (Fallback to $50/hr if unset)
                     $rate = DB::table('compensation_history')
                                 ->where('user_id', Auth::id())
                                 ->orderBy('effective_from', 'desc')
@@ -265,12 +265,12 @@ class SprintBoard extends Component
 
     private function notifyAdmins($message)
     {
-        // QA approvers (they verify what lands in QA review)
+        // QA approvers (they follow what lands in client review)
         $inserts = [];
         foreach(Access::staffWith('qa.approve') as $adminId) {
             $inserts[] = [
                 'id' => (string) Str::uuid(), 'user_id' => $adminId,
-                'title' => 'Task ready for QA review', 'message' => $message,
+                'title' => 'Task ready for client review', 'message' => $message,
                 'type' => 'Project', 'created_at' => now()
             ];
         }

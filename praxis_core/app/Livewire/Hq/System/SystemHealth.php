@@ -18,7 +18,7 @@ use Livewire\Component;
  * The data comes from app/Support/Monitor (monitor:run every 5 minutes).
  */
 #[Layout('components.layouts.hq')]
-#[Title('System Health')]
+#[Title('System health')]
 class SystemHealth extends Component
 {
     private const STATUSES = ['new', 'investigating', 'fixed', 'ignored'];
@@ -112,7 +112,7 @@ class SystemHealth extends Component
         $groups = $query->orderByDesc('last_seen_at')->limit(30)->get();
 
         $md = "# jbspraxis.com: " . $groups->count() . " error type(s) to fix\n\n"
-            . "Exported " . now('Africa/Lagos')->format('Y-m-d H:i') . " (Lagos time) from HQ → System Health.\n"
+            . "Exported " . now('Africa/Lagos')->format('Y-m-d H:i') . " (Lagos time) from HQ → System health.\n"
             . "Work through them one by one. For each, find the root cause and propose the smallest safe fix.\n\n";
         foreach ($groups as $i => $g) {
             $md .= "\n---\n\n## " . ($i + 1) . ". " . mb_substr(trim($g->message), 0, 120) . "\n\n" . preg_replace('/^# .*\n/', '', ErrorMonitor::brief($g));
@@ -120,6 +120,14 @@ class SystemHealth extends Component
 
         $this->selected = [];
         return response()->streamDownload(fn () => print($md), 'jbspraxis-errors-' . now()->format('Y-m-d-His') . '.md', ['Content-Type' => 'text/markdown; charset=UTF-8']);
+    }
+
+    /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
+    protected function validationAttributes(): array
+    {
+        return [
+            'noteText' => 'note',
+        ];
     }
 
     public function render()

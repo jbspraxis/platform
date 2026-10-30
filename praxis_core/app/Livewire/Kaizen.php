@@ -132,8 +132,8 @@ class Kaizen extends Component
                 foreach (Access::staffWith('kaizen.approve') as $adminId) {
                     $notifications[] = [
                         'id' => (string) Str::uuid(), 'user_id' => $adminId,
-                        'title' => 'KAIZEN ARTICLE AWAITING MODERATION',
-                        'message' => "'{$this->articleTitle}' was submitted by {$this->fullName}.",
+                        'title' => 'Kaizen article waiting for review',
+                        'message' => "‘{$this->articleTitle}’ was sent by {$this->fullName}.",
                         'type' => 'System', 'created_at' => now(),
                     ];
                 }

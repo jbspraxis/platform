@@ -3,7 +3,7 @@
         // Display labels for stored values (docs/BRAND.md section 12); the stored values stay as they are.
         $invoiceStatus = fn ($s) => match ($s) {
             'Paid' => ['Paid', 'pill-success'],
-            'Pending' => ['Sent', 'pill-warning'],
+            'Pending' => ['Sent', 'pill-info'],
             'Overdue' => ['Overdue', 'pill-danger'],
             'Draft' => ['Draft', 'pill-neutral'],
             default => [\Illuminate\Support\Str::ucfirst(strtolower((string) $s)), 'pill-neutral'],
@@ -26,6 +26,11 @@
             'ASSET_REGISTERED' => 'Social account added', 'CREDENTIAL_UPDATED' => 'Social account password changed',
         ];
         $actionLabel = fn ($a) => $actionLabels[$a] ?? \Illuminate\Support\Str::ucfirst(strtolower(str_replace('_', ' ', (string) $a)));
+        // Stored payment methods => sentence-case labels
+        $methodLabels = ['Bank Transfer' => 'Bank transfer', 'Mobile Money' => 'Mobile money', 'Campay' => 'Mobile money (Campay)', 'Crypto Wallet' => 'Crypto wallet'];
+        $methodLabel = fn ($m) => $methodLabels[$m] ?? $m;
+        // Amounts with their currency (docs/BRAND.md section 4): ₦ and $ before the amount, FCFA after it
+        $money = fn ($currency, $amount) => \App\Livewire\Hq\HqMoney::format($currency, $amount);
     @endphp
 
     <div class="page-header">
@@ -43,20 +48,24 @@
     </div>
 
     <nav class="tabs" aria-label="Overviews">
-        <a href="{{ route('hq.dash.admin') }}" wire:navigate class="tab">Company overview</a>
+        @can('dashboard.view')
+            <a href="{{ route('hq.dash.admin') }}" wire:navigate class="tab">Company overview</a>
+        @endcan
         <a href="{{ route('hq.dash.workspace') }}" wire:navigate class="tab">My workspace</a>
-        <a href="{{ route('hq.dash.investor') }}" wire:navigate class="tab">Investor view</a>
+        @can('dashboard.view')
+            <a href="{{ route('hq.dash.investor') }}" wire:navigate class="tab">Investor view</a>
+        @endcan
         <a href="{{ route('hq.dash.audit') }}" wire:navigate class="tab is-active" aria-current="page">Audit log</a>
     </nav>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4" style="margin-bottom: 24px;">
         <div class="card">
             <div class="stat-label">Revenue received, {{ now()->year }}</div>
-            <div class="stat-value">${{ number_format($kpis['ytd_cleared_revenue'], 2) }}</div>
+            <x-hq.money-totals :totals="$kpis['ytd_cleared_revenue']" />
         </div>
         <div class="card">
             <div class="stat-label">VAT on paid invoices, {{ now()->year }}</div>
-            <div class="stat-value">${{ number_format($kpis['ytd_vat_liability'], 2) }}</div>
+            <x-hq.money-totals :totals="$kpis['ytd_vat_liability']" />
         </div>
         <div class="card">
             <div class="stat-label">Payments verified, {{ now()->year }}</div>
@@ -98,7 +107,7 @@
                                 <div class="text-caption text-muted" style="font-variant-numeric: tabular-nums;">{{ \Carbon\Carbon::parse($inv->created_at)->format('j M Y') }}</div>
                             </td>
                             <td>{{ $inv->client_name }}</td>
-                            <td class="num text-ink">{{ $inv->currency }} {{ number_format($inv->total_amount, 2) }}</td>
+                            <td class="num text-ink">{{ $money($inv->currency, $inv->total_amount) }}</td>
                         </tr>
                         @empty
                         <tr><td colspan="3"><div class="empty-state">No invoices yet.</div></td></tr>
@@ -127,8 +136,8 @@
                         <tr>
                             <td style="font-variant-numeric: tabular-nums; white-space: nowrap;">{{ \Carbon\Carbon::parse($tx->created_at)->format('j M Y, H:i') }}</td>
                             <td class="num">
-                                <div class="text-ink font-semibold">{{ $tx->currency ?? 'USD' }} {{ number_format($tx->amount_claimed, 2) }}</div>
-                                <div class="text-caption text-muted">{{ $tx->method }}</div>
+                                <div class="text-ink font-semibold">{{ $money($tx->currency ?? 'USD', $tx->amount_claimed) }}</div>
+                                <div class="text-caption text-muted">{{ $methodLabel($tx->method) }}</div>
                             </td>
                             <td style="text-align: right;"><span class="pill {{ $txPill }}">{{ $txText }}</span></td>
                         </tr>
@@ -144,13 +153,16 @@
     <section class="card" style="padding: 0;">
         <div class="card-header" style="padding: 20px 24px 0;">
             <h2 class="card-title">Activity log</h2>
-            <span class="help">The latest 8 events</span>
+            @php $eventCount = count($systemLogs); @endphp
+            @if ($eventCount > 0)
+                <span class="help">{{ $eventCount === 1 ? 'The latest event' : 'The latest ' . $eventCount . ' events' }}</span>
+            @endif
         </div>
         <div class="table-wrap">
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Time (UTC)</th>
+                        <th>Time (WAT)</th>
                         <th>Who</th>
                         <th>Action</th>
                         <th style="text-align: right;">IP address</th>
@@ -159,7 +171,7 @@
                 <tbody>
                     @forelse($systemLogs as $log)
                     <tr>
-                        <td style="font-variant-numeric: tabular-nums; white-space: nowrap;">{{ \Carbon\Carbon::parse($log->created_at)->format('j M Y, H:i:s') }}</td>
+                        <td style="font-variant-numeric: tabular-nums; white-space: nowrap;">{{ \Carbon\Carbon::parse($log->created_at, config('app.timezone'))->setTimezone('Africa/Lagos')->format('j M Y, H:i:s') }}</td>
                         <td class="text-ink">{{ $log->user_email ?? 'System (no one signed in)' }}</td>
                         <td>{{ $actionLabel($log->action) }}</td>
                         <td style="text-align: right; font-variant-numeric: tabular-nums;">{{ $log->ip_address ?? 'Not recorded' }}</td>

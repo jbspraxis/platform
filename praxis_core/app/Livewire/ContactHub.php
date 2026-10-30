@@ -177,7 +177,7 @@ class ContactHub extends Component
             foreach (Access::staffWith('crm.edit') as $adminId) {
                 $notifications[] = [
                     'id' => (string) Str::uuid(), 'user_id' => $adminId,
-                    'title' => 'NEW WEBSITE ENQUIRY',
+                    'title' => 'New website enquiry',
                     'message' => "{$this->fullName} ({$cleanOrgName}) sent a message through the contact form.",
                     'type' => 'System', 'created_at' => now(),
                 ];

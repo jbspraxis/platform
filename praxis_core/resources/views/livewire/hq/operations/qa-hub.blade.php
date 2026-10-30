@@ -1,10 +1,24 @@
 <div x-data="{ showOffcanvas: false }" @open-offcanvas.window="showOffcanvas = true" @close-offcanvas.window="showOffcanvas = false">
     @php
-        // Stored ticket statuses and severities (database values) and what people read (BRAND.md section 12)
+        // Stored ticket statuses and severities (database values) and what people read (BRAND.md section 12).
+        // Same words and colours as the Client Portal: the client sets the stored severity as its 'Priority'.
         $statusLabels = ['Open' => 'Open', 'Investigating' => 'In progress', 'Resolved' => 'Resolved'];
-        $statusPills = ['Open' => 'pill-danger', 'Investigating' => 'pill-warning', 'Resolved' => 'pill-success'];
-        $severityPills = ['Critical' => 'pill-danger', 'Medium' => 'pill-warning', 'Low' => 'pill-neutral'];
+        $statusPills = ['Open' => 'pill-warning', 'Investigating' => 'pill-info', 'Resolved' => 'pill-success'];
+        $severityLabels = ['Low' => 'Low', 'Medium' => 'Normal', 'Critical' => 'Critical'];
+        $severityPills = ['Critical' => 'pill-danger', 'Medium' => 'pill-info', 'Low' => 'pill-neutral'];
         $isWorkable = $selectedTicket && in_array($selectedTicket['status'], ['Open', 'Investigating']);
+        // The kind of report, as a word. Older client tickets carry it as a title prefix; newer ones are
+        // told apart by the row: from a client with a task is an issue report, without one a message
+        $splitTitle = function (array $ticket) {
+            $title = (string) ($ticket['title'] ?? '');
+            foreach (['[DIRECT COMM] ' => 'Message', '[BUG REPORT] ' => 'Issue report'] as $prefix => $kind) {
+                if (str_starts_with($title, $prefix)) return [$kind, substr($title, strlen($prefix))];
+            }
+            if (($ticket['submitted_by_type'] ?? null) === 'client') {
+                return [! empty($ticket['task_id']) ? 'Issue report' : 'Message', $title];
+            }
+            return [null, $title];
+        };
     @endphp
 
     <div class="page-header">
@@ -37,7 +51,7 @@
                         <th>Reference</th>
                         <th>Client and project</th>
                         <th>Issue</th>
-                        <th>Severity</th>
+                        <th>Priority</th>
                         <th>Status</th>
                         <th>Response time</th>
                     </tr>
@@ -50,11 +64,12 @@
                                 <div class="font-medium text-ink">{{ $t['client_name'] }}</div>
                                 <div class="help">{{ Str::limit($t['project_title'], 35) }}</div>
                             </td>
+                            @php [$kind, $plainTitle] = $splitTitle((array) $t); @endphp
                             <td>
-                                <div class="font-medium text-ink">{{ Str::limit($t['title'], 50) }}</div>
-                                <div class="help">Reported by {{ $t['first_name'] }} {{ $t['last_name'] }}</div>
+                                <div class="font-medium text-ink">{{ Str::limit($plainTitle, 50) }}</div>
+                                <div class="help">{{ $kind === 'Message' ? 'Message from' : 'Reported by' }} {{ $t['first_name'] }} {{ $t['last_name'] }}</div>
                             </td>
-                            <td><span class="pill {{ $severityPills[$t['severity']] ?? 'pill-neutral' }}">{{ $t['severity'] }}</span></td>
+                            <td><span class="pill {{ $severityPills[$t['severity']] ?? 'pill-neutral' }}">{{ $severityLabels[$t['severity']] ?? $t['severity'] }}</span></td>
                             <td><span class="pill {{ $statusPills[$t['status']] ?? 'pill-neutral' }}">{{ $statusLabels[$t['status']] ?? $t['status'] }}</span></td>
                             <td>
                                 @if(in_array($t['status'], ['Open', 'Investigating']))
@@ -86,18 +101,29 @@
     <!-- Issue panel -->
     <div class="fixed inset-0 z-40 bg-ink/50" x-show="showOffcanvas" x-transition.opacity @click="showOffcanvas = false" style="display: none;"></div>
 
-    <div class="fixed inset-y-0 right-0 z-50 flex w-full max-w-[720px] flex-col bg-paper transition-transform duration-300"
-         style="box-shadow: var(--shadow-float);"
-         :class="showOffcanvas ? 'translate-x-0' : 'translate-x-full'"
+    {{-- Hidden (display: none) when closed, so it casts no shadow and keyboard focus can’t reach its fields --}}
+    <div class="fixed inset-y-0 right-0 z-50 flex w-full max-w-[720px] flex-col bg-paper"
+         style="display: none; box-shadow: var(--shadow-float);"
+         x-show="showOffcanvas"
+         x-transition:enter="transition-transform duration-300"
+         x-transition:enter-start="translate-x-full"
+         x-transition:enter-end="translate-x-0"
+         x-transition:leave="transition-transform duration-300"
+         x-transition:leave-start="translate-x-0"
+         x-transition:leave-end="translate-x-full"
          x-cloak role="dialog" aria-modal="true" aria-labelledby="qa-ticket-title">
         @if($selectedTicket)
+            @php [$selectedKind, $selectedTitle] = $splitTitle((array) $selectedTicket); @endphp
             <div class="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
                 <div>
                     <div class="text-caption text-muted"><span class="num">{{ substr($selectedTicket['id'], 0, 8) }}</span> · {{ $selectedTicket['client_name'] }}</div>
-                    <h2 id="qa-ticket-title" class="mt-1 mb-2 text-section font-semibold text-ink">{{ $selectedTicket['title'] }}</h2>
+                    <h2 id="qa-ticket-title" class="mt-1 mb-2 text-section font-semibold text-ink">{{ $selectedTitle }}</h2>
                     <div class="flex flex-wrap gap-2">
+                        @if($selectedKind)
+                            <span class="pill pill-neutral">{{ $selectedKind }}</span>
+                        @endif
                         <span class="pill {{ $statusPills[$selectedTicket['status']] ?? 'pill-neutral' }}">{{ $statusLabels[$selectedTicket['status']] ?? $selectedTicket['status'] }}</span>
-                        <span class="pill {{ $severityPills[$selectedTicket['severity']] ?? 'pill-neutral' }}">Severity: {{ $selectedTicket['severity'] }}</span>
+                        <span class="pill {{ $severityPills[$selectedTicket['severity']] ?? 'pill-neutral' }}">Priority: {{ $severityLabels[$selectedTicket['severity']] ?? $selectedTicket['severity'] }}</span>
                     </div>
                 </div>
                 <button type="button" @click="showOffcanvas = false" class="btn btn-ghost btn-sm" aria-label="Close">

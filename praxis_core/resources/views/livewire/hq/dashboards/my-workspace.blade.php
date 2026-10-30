@@ -3,9 +3,14 @@
         $taskStatus = fn ($s) => match ($s) {
             'To-Do' => ['To do', 'pill-neutral'],
             'In-Progress' => ['In progress', 'pill-info'],
-            'Failed' => ['Failed review', 'pill-danger'],
+            'QA_Review' => ['Client review', 'pill-warning'],
+            'Failed' => ['Changes requested', 'pill-danger'],
             default => [\Illuminate\Support\Str::ucfirst(strtolower(str_replace('-', ' ', (string) $s))), 'pill-neutral'],
         };
+        // Amounts with their currency (docs/BRAND.md section 4): ₦ and $ before the amount, FCFA after it
+        $money = fn ($currency, $amount) => \App\Livewire\Hq\HqMoney::format($currency, $amount, 0);
+        // Stored appointment titles from the website ('Executive Consultation: …') and HQ ('Free audit (booked from HQ)') are both free audits
+        $apptLabel = fn ($title) => (str_starts_with((string) $title, 'Executive Consultation') || str_starts_with((string) $title, 'Free audit')) ? 'Free audit' : $title;
     @endphp
 
     <div class="page-header">
@@ -109,7 +114,7 @@
                                     <div class="font-semibold text-ink text-small">{{ \Illuminate\Support\Str::limit($approval->title, 40) }}</div>
                                 </div>
                                 <div class="flex items-center gap-3">
-                                    <span class="text-small text-ink" style="font-variant-numeric: tabular-nums;">{{ $approval->currency }} {{ number_format($approval->total_value) }}</span>
+                                    <span class="text-small text-ink" style="font-variant-numeric: tabular-nums;">{{ $money($approval->currency, $approval->total_value) }}</span>
                                     @can('crm.view')
                                         <a href="{{ route('hq.crm.proposal', ['id' => $approval->id]) }}" wire:navigate class="btn btn-secondary btn-sm">Open</a>
                                     @endcan
@@ -149,7 +154,7 @@
                 @forelse($upcomingAppointments as $appt)
                     <div style="padding: 10px 0; border-top: 1px solid var(--color-line);">
                         <div class="text-caption" style="color: var(--color-deep-teal); font-variant-numeric: tabular-nums;">{{ \Carbon\Carbon::parse($appt->start_time)->format('D j M, H:i') }} WAT</div>
-                        <div class="font-semibold text-ink text-small">{{ $appt->title }}</div>
+                        <div class="font-semibold text-ink text-small">{{ $apptLabel($appt->title) }}</div>
                         <div class="text-caption text-muted">{{ $appt->client_name ?? 'Internal' }}</div>
                     </div>
                 @empty

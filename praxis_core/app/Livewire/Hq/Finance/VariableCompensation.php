@@ -163,7 +163,7 @@ class VariableCompensation extends Component
 
         } catch (Exception $e) {
             report($e);
-            session()->flash('error', "We couldn't save variable pay, so nothing was changed. Check that every amount is a number, then save again.");
+            session()->flash('error', "We couldn’t save variable pay, so nothing was changed. Check that every amount is a number, then save again.");
         }
     }
 

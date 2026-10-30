@@ -6,6 +6,7 @@ use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use App\Livewire\Hq\HqMoney;
 
 #[Layout('components.layouts.hq')]
 class InvestorTerminal extends Component
@@ -22,14 +23,15 @@ class InvestorTerminal extends Component
 
     public function loadInvestorMetrics()
     {
-        // THE SAFETY NET: Pre-fill all keys to guarantee zero crashes
+        // THE SAFETY NET: Pre-fill all keys to guarantee zero crashes.
+        // Money figures are kept per currency (['NGN' => 3332.5, 'USD' => 322.5]), never added across currencies.
         $this->metrics = [
-            'ytd_revenue' => 0,
-            'pending_revenue' => 0,
-            'active_pipeline' => 0,
-            'proposal_pipeline' => 0,
+            'ytd_revenue' => [],
+            'pending_revenue' => [],
+            'active_pipeline' => [],
+            'proposal_pipeline' => [],
             'active_deployments' => 0,
-            'acv' => 0,
+            'acv' => [],
             'active_clients' => 0,
             'strike_team_size' => 0,
         ];
@@ -39,25 +41,21 @@ class InvestorTerminal extends Component
 
             // --- FINANCIALS ---
             // 1. YTD Cleared Revenue
-            $this->metrics['ytd_revenue'] = DB::table('invoices')
+            $this->metrics['ytd_revenue'] = HqMoney::sumByCurrency(DB::table('invoices')
                 ->where('status', 'Paid')
-                ->whereYear('paid_at', $currentYear)
-                ->sum('total_amount');
+                ->whereYear('paid_at', $currentYear), 'total_amount');
 
             // 2. Pending Receivables (Money owed to the company)
-            $this->metrics['pending_revenue'] = DB::table('invoices')
-                ->where('status', 'Pending')
-                ->sum('total_amount');
+            $this->metrics['pending_revenue'] = HqMoney::sumByCurrency(DB::table('invoices')
+                ->whereIn('status', ['Pending', 'Overdue']), 'total_amount'); // unpaid, overdue or not
 
             // 3. Active Contract Value
-            $this->metrics['active_pipeline'] = DB::table('projects')
-                ->where('status', 'Active')
-                ->sum('total_budget');
+            $this->metrics['active_pipeline'] = HqMoney::sumByCurrency(DB::table('projects')
+                ->where('status', 'Active'), 'total_budget');
 
             // 4. Future Money (Proposals Pending Authorization)
-            $this->metrics['proposal_pipeline'] = DB::table('proposals')
-                ->whereIn('status', ['Pending Auth', 'Authorized'])
-                ->sum('total_value');
+            $this->metrics['proposal_pipeline'] = HqMoney::sumByCurrency(DB::table('proposals')
+                ->whereIn('status', ['Pending Auth', 'Authorized']), 'total_value');
 
             // --- OPERATIONS ---
             $this->metrics['active_deployments'] = DB::table('projects')
@@ -72,10 +70,15 @@ class InvestorTerminal extends Component
                 ->where('status', 'Active')
                 ->count();
 
-            // ACV Calculation
-            $totalProjects = DB::table('projects')->where('status', '!=', 'Cancelled')->count();
-            $totalValue = DB::table('projects')->where('status', '!=', 'Cancelled')->sum('total_budget');
-            $this->metrics['acv'] = $totalProjects > 0 ? ($totalValue / $totalProjects) : 0;
+            // ACV Calculation: the average per currency
+            $this->metrics['acv'] = DB::table('projects')
+                ->where('status', '!=', 'Cancelled')
+                ->selectRaw("UPPER(COALESCE(currency, '')) as cur, AVG(total_budget) as average")
+                ->groupBy('cur')
+                ->get()
+                ->sortByDesc(fn ($row) => (float) $row->average)
+                ->mapWithKeys(fn ($row) => [(string) $row->cur => (float) $row->average])
+                ->all();
 
             // --- DATA GRIDS ---
             

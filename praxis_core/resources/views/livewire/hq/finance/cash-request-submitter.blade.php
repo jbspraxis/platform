@@ -12,7 +12,7 @@
         <div class="modal-backdrop">
             <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cash-request-sent-title">
                 <h2 id="cash-request-sent-title" class="modal-title">Cash request sent</h2>
-                <p class="muted">Your reference is <strong class="num text-ink">{{ $generatedReference }}</strong>. Finance will review it, and you'll get a notification when it is approved or rejected.</p>
+                <p class="muted">Your reference is <strong class="num text-ink">{{ $generatedReference }}</strong>. Finance will review it, and you’ll get a notification when it is approved or rejected.</p>
                 <div class="modal-actions">
                     <button type="button" wire:click="closeSuccessModal" class="btn btn-primary">View my requests</button>
                 </div>
@@ -36,7 +36,7 @@
         <div class="alert alert-danger mb-6" role="alert">
             <i data-lucide="circle-alert"></i>
             <div>
-                <strong>We couldn't send the request.</strong> Fix the following and try again:
+                <strong>We couldn’t send the request.</strong> Fix the following and try again:
                 <ul class="mt-1 list-disc pl-5">
                     @foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach
                 </ul>
@@ -45,7 +45,8 @@
     @endif
 
     @if($activeTab === 'request')
-        <div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        {{-- One column that reads top to bottom: details, how to pay you, signature, then Send request --}}
+        <div style="max-width: 760px;">
             <div class="card">
                 <h2 class="card-title mb-4">Request details</h2>
 
@@ -138,19 +139,21 @@
                 @else
                     <p class="help">Collect the cash from the office once the request is approved.</p>
                 @endif
-            </div>
 
-            <div class="card" x-data="signaturePad()">
-                <h2 class="card-title">Your signature</h2>
-                <p class="help mt-1 mb-4">Sign in the box with your mouse or finger. Your signature, IP address and the time are recorded with the request.</p>
-                <canvas x-ref="canvas" class="signature-pad" aria-label="Signature pad" @mousedown="startDrawing" @mousemove="draw" @mouseup="stopDrawing" @mouseleave="stopDrawing" @touchstart.prevent="startDrawing" @touchmove.prevent="draw" @touchend.prevent="stopDrawing"></canvas>
-                <div class="mt-2 flex justify-end">
-                    <button type="button" @click="clearCanvas" class="btn btn-ghost btn-sm">Clear signature</button>
+                <hr class="divider my-6">
+
+                <div x-data="signaturePad()" style="max-width: 480px;">
+                    <h2 class="card-title">Your signature</h2>
+                    <p class="help mt-1 mb-4">Sign in the box with your mouse or finger. Your signature, IP address and the time are recorded with the request.</p>
+                    <canvas x-ref="canvas" class="signature-pad" aria-label="Signature pad" @mousedown="startDrawing" @mousemove="draw" @mouseup="stopDrawing" @mouseleave="stopDrawing" @touchstart.prevent="startDrawing" @touchmove.prevent="draw" @touchend.prevent="stopDrawing"></canvas>
+                    <div class="mt-2 flex justify-end">
+                        <button type="button" @click="clearCanvas" class="btn btn-ghost btn-sm">Clear signature</button>
+                    </div>
+                    <button type="button" wire:click="submitRequest" wire:loading.attr="disabled" class="btn btn-primary mt-4 w-full">
+                        <span wire:loading.remove wire:target="submitRequest">Send request</span>
+                        <span wire:loading wire:target="submitRequest">Sending…</span>
+                    </button>
                 </div>
-                <button type="button" wire:click="submitRequest" wire:loading.attr="disabled" class="btn btn-primary mt-4 w-full">
-                    <span wire:loading.remove wire:target="submitRequest">Send request</span>
-                    <span wire:loading wire:target="submitRequest">Sending…</span>
-                </button>
             </div>
         </div>
 
@@ -182,7 +185,7 @@
                         <tr>
                             <th>Reference</th>
                             <th>Category and purpose</th>
-                            <th class="num">Amount</th>
+                            <th class="num text-right">Amount</th>
                             <th>Status</th>
                             <th>Receipt</th>
                         </tr>
@@ -198,7 +201,7 @@
                                 <div class="font-medium text-ink">{{ $req->category }}</div>
                                 <div class="help">{{ \Illuminate\Support\Str::limit($req->purpose, 50) }}</div>
                             </td>
-                            <td class="num">{{ $req->currency }} {{ number_format($req->amount_requested, 2) }}</td>
+                            <td class="num">{{ \App\Livewire\Hq\HqMoney::format($req->currency, $req->amount_requested) }}</td>
                             <td><span class="pill {{ $statusPills[$req->status] ?? 'pill-neutral' }}">{{ $statusLabels[$req->status] ?? $req->status }}</span></td>
                             <td>
                                 @if($req->status === 'Authorized' && !$req->receipt_url)
@@ -223,7 +226,7 @@
                                 <div class="empty-state">
                                     <strong>No cash requests yet</strong>
                                     Requests you send appear here with their status and receipt.
-                                    <div class="mt-4"><button type="button" wire:click="setTab('request')" class="btn btn-primary">New request</button></div>
+                                    <div class="mt-4"><button type="button" wire:click="setTab('request')" class="btn btn-primary">Request cash</button></div>
                                 </div>
                             </td>
                         </tr>

@@ -98,7 +98,7 @@ class MarketingSync extends Component
         // 1. Load Campaigns
         $query = DB::table('marketing_campaigns')->orderBy('created_at', 'desc');
         
-        // Isolation: someone who submits campaigns but can't approve them (e.g. an agency) only sees their own
+        // Isolation: someone who submits campaigns but can’t approve them (e.g. an agency) only sees their own
         if (! Auth::user()->can('marketing.approve') && Auth::user()->can('marketing.create')) {
             $query->where('created_by', Auth::id());
         }
@@ -364,7 +364,7 @@ class MarketingSync extends Component
             try {
                 $this->decryptedPassword = Crypt::decryptString($this->selectedAsset->encrypted_password);
             } catch (\Exception $e) {
-                $this->decryptedPassword = "This password couldn't be decrypted. Set a new one.";
+                $this->decryptedPassword = "This password couldn’t be decrypted. Set a new one.";
             }
             
             $this->credentialHistory = json_decode(json_encode(

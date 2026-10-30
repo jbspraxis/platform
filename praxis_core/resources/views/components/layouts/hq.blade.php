@@ -8,21 +8,37 @@
     // The rail: each link shows only when the person can open that screen (roles & permissions, config/access.php).
     // Names follow docs/BRAND.md section 5: plain module names, sentence case.
     $on = fn (...$routes) => request()->routeIs(...$routes) ? 'is-active' : '';
-    $section = [
-        'dash' => 'Overview', 'mdm' => 'Master data', 'hr' => 'Team', 'crm' => 'Leads and proposals',
-        'ops' => 'Projects', 'finance' => 'Finance', 'marketing' => 'Marketing', 'system' => 'Settings and access',
-    ][explode('.', (string) request()->route()?->getName())[1] ?? ''] ?? null;
+    // The top bar names the rail entry that is highlighted: two screens sit under a different rail entry
+    // than their route group (My workspace; Staff directory under Team)
+    $section = match (true) {
+        request()->routeIs('hq.dash.workspace') => 'My workspace',
+        request()->routeIs('hq.mdm.employees') => 'Team',
+        default => [
+            'dash' => 'Overview', 'mdm' => 'Master data', 'hr' => 'Team', 'crm' => 'Leads and proposals',
+            'ops' => 'Projects', 'finance' => 'Finance', 'marketing' => 'Marketing', 'system' => 'Settings and access',
+        ][explode('.', (string) request()->route()?->getName())[1] ?? ''] ?? null,
+    };
     $user = auth()->user();
 @endphp
 <div class="app-shell">
-    <aside class="rail" aria-label="HQ navigation">
+    {{-- On phones and tablets the rail folds into its header; the menu button opens it as a full-height panel (app.css) --}}
+    <aside class="rail rail-hq" aria-label="HQ navigation"
+           x-data="{ menuOpen: false }" :class="{ 'is-open': menuOpen }"
+           x-effect="document.body.classList.toggle('rail-menu-open', menuOpen)"
+           @keydown.escape.window="if (menuOpen) { menuOpen = false; $refs.menuBtn.focus() }">
         <div class="rail-head">
             <a href="{{ route('hq.dash.workspace') }}" wire:navigate aria-label="JBS Praxis HQ home">
                 <img src="/assets/img/logo/jbs-praxis-horizontal-reversed.svg" alt="JBS Praxis" width="147" height="28">
             </a>
+            <button type="button" class="rail-menu-btn" x-ref="menuBtn" @click="menuOpen = !menuOpen"
+                    aria-controls="hq-rail-nav" aria-expanded="false" :aria-expanded="menuOpen.toString()"
+                    aria-label="Open menu" :aria-label="menuOpen ? 'Close menu' : 'Open menu'">
+                <span x-show="!menuOpen"><i data-lucide="menu"></i></span>
+                <span x-show="menuOpen" x-cloak><i data-lucide="x"></i></span>
+            </button>
         </div>
 
-        <nav class="rail-nav">
+        <nav class="rail-nav" id="hq-rail-nav">
             <a href="{{ route('hq.dash.workspace') }}" class="rail-link {{ $on('hq.dash.workspace') }}" wire:navigate>
                 <i data-lucide="user-round"></i> My workspace
             </a>
@@ -178,7 +194,7 @@
                                 <a href="{{ route('hq.system.permissions') }}" class="{{ $on('hq.system.permissions') }}" wire:navigate>Roles and permissions</a>
                             @endcan
                             @can('system.view')
-                                <a href="{{ route('hq.system.health') }}" class="{{ $on('hq.system.health') }}" wire:navigate>System Health</a>
+                                <a href="{{ route('hq.system.health') }}" class="{{ $on('hq.system.health') }}" wire:navigate>System health</a>
                             @endcan
                         </div>
                     @endif

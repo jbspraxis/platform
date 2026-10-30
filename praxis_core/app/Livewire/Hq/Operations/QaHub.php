@@ -251,7 +251,7 @@ class QaHub extends Component
         }
 
         if ($this->activeTimerId) {
-            // Stop Timer (only this user's own open log)
+            // Stop Timer (only this user’s own open log)
             $openLog = DB::table('task_time_logs')->where('id', $this->activeTimerId)
                 ->where('user_id', Auth::id())->whereNull('end_time')->first();
             if ($openLog) {

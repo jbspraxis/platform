@@ -39,8 +39,8 @@
                             <th>Staff member</th>
                             <th>Project and task</th>
                             <th>Started</th>
-                            <th class="num">Running for</th>
-                            @if($canSeeMoney) <th class="num">Cost so far</th> @endif
+                            <th class="num text-right">Running for</th>
+                            @if($canSeeMoney) <th class="num text-right">Cost so far</th> @endif
                             <th>Type</th>
                         </tr>
                     </thead>
@@ -88,8 +88,8 @@
                         <tr>
                             <th>Staff member</th>
                             <th>Task</th>
-                            <th class="num">Estimate</th>
-                            <th class="num">Logged</th>
+                            <th class="num text-right">Estimate</th>
+                            <th class="num text-right">Logged</th>
                             <th>Why it’s here</th>
                         </tr>
                     </thead>
@@ -144,8 +144,8 @@
                             <th>{{ $ledgerGroupBy === 'engineer' ? 'Project and task' : 'Staff member and task' }}</th>
                             <th>Started</th>
                             <th>Ended</th>
-                            <th class="num">Duration</th>
-                            @if($canSeeMoney) <th class="num">Cost</th> @endif
+                            <th class="num text-right">Duration</th>
+                            @if($canSeeMoney) <th class="num text-right">Cost</th> @endif
                             <th>Notes</th>
                         </tr>
                     </thead>

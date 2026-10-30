@@ -20,7 +20,7 @@
     <div class="page-header">
         <div>
             <h1 class="page-title">Contracts and appraisals</h1>
-            <p class="page-subtitle">Set each staff member's employment contract terms and record their performance appraisals.</p>
+            <p class="page-subtitle">Set each staff member’s employment contract terms and record their performance appraisals.</p>
         </div>
     </div>
 
@@ -61,7 +61,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="2"><div class="empty-state"><strong>No active staff members</strong>Staff members appear here once they're active in the staff directory.</div></td></tr>
+                                <tr><td colspan="2"><div class="empty-state"><strong>No active staff members</strong>Staff members appear here once they’re active in the staff directory.</div></td></tr>
                             @endforelse
                         @else
                             @forelse($appraisals as $emp)
@@ -75,7 +75,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="2"><div class="empty-state"><strong>No active staff members</strong>Staff members appear here once they're active in the staff directory.</div></td></tr>
+                                <tr><td colspan="2"><div class="empty-state"><strong>No active staff members</strong>Staff members appear here once they’re active in the staff directory.</div></td></tr>
                             @endforelse
                         @endif
                     </tbody>
@@ -165,7 +165,7 @@
                     <form wire:submit.prevent="submitAppraisal">
                         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                             <h2 class="section-title mb-0">Performance appraisal</h2>
-                            <span class="help">Submitted by the staff member's line manager</span>
+                            <span class="help">Submitted by the staff member’s line manager</span>
                         </div>
 
                         <div class="grid gap-4 sm:grid-cols-2">
@@ -185,7 +185,7 @@
                                 @error('kpi_score_overall') <span class="field-error">{{ $message }}</span> @enderror
                             </div>
                             <div class="field sm:col-span-2">
-                                <label class="label" for="ap-comments">Line manager's comments (optional)</label>
+                                <label class="label" for="ap-comments">Line manager’s comments (optional)</label>
                                 <textarea id="ap-comments" wire:model="manager_comments" class="textarea" placeholder="What went well, what to improve, and why you gave this score"></textarea>
                                 @error('manager_comments') <span class="field-error">{{ $message }}</span> @enderror
                             </div>
@@ -201,19 +201,19 @@
                     </form>
 
                     <div class="mt-8">
-                        <h3 class="label mb-3">Appraisals awaiting sign-off</h3>
+                        <h3 class="label mb-3">Appraisals on record</h3>
                         @php
                             $userAppraisals = collect($appraisals)->where('id', $selectedEmployeeId)->whereNotNull('appraisal_id');
                         @endphp
                         @if($userAppraisals->isEmpty())
-                            <p class="help">No appraisals are waiting for sign-off for this staff member.</p>
+                            <p class="help">No appraisals recorded for this staff member yet. Submit the first one above.</p>
                         @else
                             <div class="table-wrap rounded-lg border border-line">
                                 <table class="table">
                                     <thead>
                                         <tr>
                                             <th>Period ending</th>
-                                            <th class="num">Score</th>
+                                            <th class="num text-right">Score</th>
                                             <th>Status</th>
                                             <th class="text-right">Action</th>
                                         </tr>
@@ -226,7 +226,7 @@
                                                 <td><span class="pill {{ $app->status === 'Finalized' ? 'pill-success' : 'pill-warning' }}">{{ $appraisalStatuses[$app->status] ?? str_replace('_', ' ', $app->status) }}</span></td>
                                                 <td class="text-right">
                                                     @if($app->status !== 'Finalized')
-                                                        <button type="button" wire:click="finalizeAppraisal('{{ $app->appraisal_id }}')" class="btn btn-secondary btn-sm" onclick="confirm('Finalise this appraisal? The score can no longer be changed afterwards.') || event.stopImmediatePropagation()">Finalise</button>
+                                                        <button type="button" wire:click="finalizeAppraisal('{{ $app->appraisal_id }}')" class="btn btn-secondary btn-sm" wire:confirm="Finalise this appraisal? The score can no longer be changed afterwards.">Finalise</button>
                                                     @endif
                                                 </td>
                                             </tr>

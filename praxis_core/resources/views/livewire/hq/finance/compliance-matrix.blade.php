@@ -5,15 +5,22 @@
             <p class="page-subtitle">Net pay, income tax and pension owed for a payroll run, with the bank and tax files to pay them.</p>
         </div>
         @can('payroll.export')
-        <div class="flex flex-wrap gap-3">
-            <button type="button" wire:click="exportStatutoryRemittance" class="btn btn-secondary" wire:loading.attr="disabled">
-                <span wire:loading.remove wire:target="exportStatutoryRemittance" class="inline-flex items-center gap-2"><i data-lucide="landmark"></i> Download tax and pension file</span>
-                <span wire:loading wire:target="exportStatutoryRemittance">Preparing…</span>
-            </button>
-            <button type="button" wire:click="exportBankRemittance" class="btn btn-primary" wire:loading.attr="disabled">
-                <span wire:loading.remove wire:target="exportBankRemittance" class="inline-flex items-center gap-2"><i data-lucide="download"></i> Download net pay bank file</span>
-                <span wire:loading wire:target="exportBankRemittance">Preparing…</span>
-            </button>
+        @php $isForecast = $matrix_run_filter === 'live'; @endphp
+        <div class="flex flex-col items-end gap-2">
+            <div class="flex flex-wrap gap-3">
+                <button type="button" wire:click="exportStatutoryRemittance" class="btn btn-secondary" wire:loading.attr="disabled">
+                    <span wire:loading.remove wire:target="exportStatutoryRemittance" class="inline-flex items-center gap-2"><i data-lucide="landmark"></i> {{ $isForecast ? 'Download forecast tax and pension file' : 'Download tax and pension file' }}</span>
+                    <span wire:loading wire:target="exportStatutoryRemittance">Preparing…</span>
+                </button>
+                {{-- A forecast file is for planning only, so it is never the page’s main action --}}
+                <button type="button" wire:click="exportBankRemittance" class="btn {{ $isForecast ? 'btn-secondary' : 'btn-primary' }}" wire:loading.attr="disabled">
+                    <span wire:loading.remove wire:target="exportBankRemittance" class="inline-flex items-center gap-2"><i data-lucide="download"></i> {{ $isForecast ? 'Download forecast net pay file' : 'Download net pay bank file' }}</span>
+                    <span wire:loading wire:target="exportBankRemittance">Preparing…</span>
+                </button>
+            </div>
+            @if($isForecast)
+                <span class="help">Forecast files are for planning only. To pay salaries or tax, choose an approved payroll run.</span>
+            @endif
         </div>
         @endcan
     </div>
@@ -48,7 +55,7 @@
         @if($matrix_run_filter === 'live')
             <div class="alert alert-warning mt-4" role="note">
                 <i data-lucide="triangle-alert"></i>
-                <span>This is a forecast, calculated from current staff records and tax rules. Don't use it to pay tax or salaries; choose an approved payroll run instead.</span>
+                <span>This is a forecast, calculated from current staff records and tax rules. Don’t use it to pay tax or salaries; choose an approved payroll run instead.</span>
             </div>
         @else
             <div class="alert alert-success mt-4" role="note">
@@ -101,7 +108,7 @@
                             <th>Staff member</th>
                             <th>Bank</th>
                             <th>Account number</th>
-                            <th class="num">Net pay</th>
+                            <th class="num text-right">Net pay</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -140,8 +147,8 @@
                             <th>Staff member</th>
                             <th>Tax ID (TIN)</th>
                             <th>Social security ID (CNPS, RSA)</th>
-                            <th class="num">Income tax</th>
-                            <th class="num">Pension, employee and employer</th>
+                            <th class="num text-right">Income tax</th>
+                            <th class="num text-right">Pension, employee and employer</th>
                         </tr>
                     </thead>
                     <tbody>

@@ -1,13 +1,13 @@
 <div>
     @php
-        // Stored task statuses (database values) and what people read
-        $columnLabels = ['To-Do' => 'To do', 'In-Progress' => 'In progress', 'QA_Review' => 'QA review', 'Failed' => 'Failed QA', 'Done' => 'Done'];
+        // Stored task statuses (database values) and what people read; QA_Review is the client’s 5-hour review, as named in the Client Portal
+        $columnLabels = ['To-Do' => 'To do', 'In-Progress' => 'In progress', 'QA_Review' => 'Client review', 'Failed' => 'Changes requested', 'Done' => 'Done'];
     @endphp
 
     <div class="page-header">
         <div>
-            <h1 class="page-title">Sprint boards</h1>
-            <p class="page-subtitle">{{ $project->title }}. Drag a task to change its status; moving it into In progress starts your timer.</p>
+            <h1 class="page-title">Sprint board: {{ $project->title }}</h1>
+            <p class="page-subtitle">Drag a task to change its status; moving it into In progress starts your timer.</p>
         </div>
 
         <div class="flex flex-wrap items-end gap-3">
@@ -104,7 +104,7 @@
                                     $isExpired = $expires->isPast();
                                 @endphp
                                 <span class="pill {{ $isExpired ? 'pill-danger' : 'pill-warning' }} mb-3">
-                                    {{ $isExpired ? 'Review window passed' : 'Review due ' . $expires->diffForHumans() }}
+                                    {{ $isExpired ? 'Client review window passed' : 'Client review due ' . $expires->diffForHumans() }}
                                 </span>
                             @endif
 
@@ -131,7 +131,7 @@
                                     </a>
 
                                     <div class="pointer-events-none invisible absolute bottom-full left-1/2 z-10 mb-2 w-[240px] -translate-x-1/2 rounded-lg border border-line bg-paper p-3 text-left opacity-0 transition-opacity group-hover:visible group-hover:opacity-100" style="box-shadow: var(--shadow-float);">
-                                        <div class="text-caption font-semibold text-danger">{{ $task['qa_ticket_title'] ?? 'Issue reported' }}</div>
+                                        <div class="text-caption font-semibold text-danger">{{ isset($task['qa_ticket_title']) ? preg_replace('/^\[(DIRECT COMM|BUG REPORT)\]\s*/', '', $task['qa_ticket_title']) : 'Issue reported' }}</div>
                                         <div class="mt-1 text-caption text-slate">{{ $task['qa_ticket_description'] ?? 'No description yet.' }}</div>
                                         <div class="mt-2 text-caption text-muted">Select to open it in Quality and issues.</div>
                                     </div>
@@ -181,7 +181,7 @@
                         // 5 minutes to answer = 300000 ms
                         this.warningTimeout = setTimeout(() => {
                             this.showPresenceModal = false;
-                            @this.call('forcePauseTimers'); // pauses this person's open timers
+                            @this.call('forcePauseTimers'); // pauses this person’s open timers
                         }, 300000);
 
                     }, 2700000);

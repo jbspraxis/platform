@@ -41,8 +41,8 @@ class QAAutoApprove extends Command
                     $notifications[] = [
                         'id' => (string) Str::uuid(),
                         'user_id' => $adminId,
-                        'title' => 'SLA AUTO-APPROVAL',
-                        'message' => "Client failed to respond within 5 hours. Task '{$task->title}' force-moved to Done.",
+                        'title' => 'Task approved automatically',
+                        'message' => "The client didn’t review ‘{$task->title}’ within 5 hours, so it was approved automatically and moved to Done.",
                         'type' => 'Project',
                         'created_at' => now()
                     ];

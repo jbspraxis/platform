@@ -72,12 +72,13 @@ class ScrumMaster extends Component
 
         $this->isGenerating = true;
 
-        $prompt = "You are the elite AI Scrum Master for JBS Praxis. Analyze the following Scope of Work.
-        Break this project down into logical 14-day Sprints. Inside each sprint, define the specific Tasks required.
-        Every task MUST belong to a logical Phase (e.g., 'Phase 1: Discovery', 'Phase 2: Execution').
+        $prompt = "You are the delivery planner at JBS Praxis. Read the following scope of work.
+        Break this project down into logical 14-day sprints. Inside each sprint, define the specific tasks required.
+        Every task MUST belong to a logical phase (e.g. 'Phase 1: Discovery', 'Phase 2: Delivery').
         Assign a Fibonacci story point value (1, 2, 3, 5, 8, 13) to each task based on complexity.
-        Generate a 3-point 'Acceptance Criteria' checklist in HTML <ul> format for the task description.
-        
+        Write a 3-point acceptance criteria checklist in HTML <ul> format for the task description.
+        Write every title and criterion in plain British English and sentence case, with no hype and no military or technical jargon.
+
         You must return ONLY a valid JSON array with this exact structure, nothing else:
         [
           {
@@ -85,9 +86,9 @@ class ScrumMaster extends Component
             \"tasks\": [
               {
                 \"phase_title\": \"Phase 1: Discovery\",
-                \"title\": \"Conduct Stakeholder Interviews\",
+                \"title\": \"Interview the finance team\",
                 \"story_points\": 5,
-                \"description\": \"<ul><li>Interview CEO</li><li>Draft initial architecture</li><li>Obtain sign-off</li></ul>\"
+                \"description\": \"<ul><li>Interview the finance director</li><li>Map the month-end close</li><li>Agree the findings with the primary contact</li></ul>\"
               }
             ]
           }
@@ -170,7 +171,7 @@ class ScrumMaster extends Component
                     
                     $phaseTitle = $taskData['phase_title'] ?? 'General phase';
                     
-                    // Generate Phase dynamically if it doesn't exist in our map
+                    // Generate Phase dynamically if it doesn’t exist in our map
                     if (!isset($phaseMap[$phaseTitle])) {
                         $phaseId = (string) Str::uuid();
                         DB::table('project_phases')->insert([

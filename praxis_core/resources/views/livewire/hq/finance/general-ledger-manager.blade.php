@@ -79,8 +79,8 @@
                         <thead>
                             <tr>
                                 <th style="width: 60%;">Account and memo</th>
-                                <th class="num" style="width: 20%;">Debit</th>
-                                <th class="num" style="width: 20%;">Credit</th>
+                                <th class="num text-right" style="width: 20%;">Debit</th>
+                                <th class="num text-right" style="width: 20%;">Credit</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -155,7 +155,7 @@
 
                 <div class="alert alert-warning mb-4" role="note">
                     <i data-lucide="triangle-alert"></i>
-                    <span>Journal entries can't be deleted under IFRS. Reversing posts a new entry that swaps the debits and credits, so the original no longer counts. This can't be undone.</span>
+                    <span>Journal entries can’t be deleted under IFRS. Reversing posts a new entry that swaps the debits and credits, so the original no longer counts. This can’t be undone.</span>
                 </div>
 
                 <form wire:submit.prevent="executeReversingEntry" class="flex flex-col gap-4">

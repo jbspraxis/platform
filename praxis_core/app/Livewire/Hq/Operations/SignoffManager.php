@@ -37,7 +37,7 @@ class SignoffManager extends Component
 
     public $selectedSignoffForMarketing = '';
     public $marketingTone = 'Clinical & Authoritative'; 
-    public $marketingSanitizationRules = 'Strip all raw financial data and exact company names. Retain percentages.';
+    public $marketingSanitizationRules = 'Leave out all financial figures and the client’s name. Keep percentages.';
     
     public $generatedTitle = '';
     public $generatedNarrative = '';
@@ -140,19 +140,20 @@ class SignoffManager extends Component
         $reworkHours = $timeLogs->where('is_rework', 1)->sum('duration_minutes') / 60;
         $bugsReported = $qaTickets->count();
 
-        $prompt = "You are an elite Enterprise Architect generating a legal Project Signoff Document.
-        Analyze this project execution data:
-        - Project Title: {$project->title}
-        - Total Story Points Delivered: {$totalPoints}
-        - Total Hours Executed: {$totalHours}
-        - COPQ Rework Hours: {$reworkHours}
-        - QA Bugs Patched: {$bugsReported}
-        
+        $prompt = "You are a senior consultant at JBS Praxis writing a project sign-off document that the client will read and sign.
+        Write in plain, measured British English, in sentence case, with no hype, no exclamation marks and no military or technical jargon.
+        Use only the project data below. Do not invent any figure, outcome or saving.
+        - Project: {$project->title}
+        - Story points delivered: {$totalPoints}
+        - Hours worked: {$totalHours}
+        - Rework hours (cost of poor quality): {$reworkHours}
+        - Issues reported and resolved: {$bugsReported}
+
         Generate ONLY a valid JSON response with this exact structure:
         {
-            \"executive_summary\": \"A highly professional, 2-paragraph summary of what was built and delivered, focusing on architectural stability.\",
+            \"executive_summary\": \"Two short paragraphs: what was delivered, and how the work was checked and accepted.\",
             \"roi_metrics\": [
-                {\"metric\": \"Metric Name (e.g., Latency Reduction)\", \"value\": \"85%\", \"description\": \"Short context\"}
+                {\"metric\": \"Metric name in sentence case (e.g. Story points delivered)\", \"value\": \"A figure taken from the data above\", \"description\": \"One short sentence of context\"}
             ]
         }";
 
@@ -212,10 +213,12 @@ class SignoffManager extends Component
 
         $isPortfolio = $this->marketingTab === 'portfolio_gen';
         
-        $prompt = "You are the Chief Marketing Architect for JBS Praxis. 
-        Sanitize this project into a public " . ($isPortfolio ? "Portfolio Case Study" : "Kaizen Blog Article") . ".
+        $prompt = "You are the editor of JBS Praxis Insights.
+        Turn this project into a public " . ($isPortfolio ? "case study for the JBS Praxis website" : "JBS Praxis Insights article") . ".
+        Write in plain, measured British English, in sentence case, with no hype, no exclamation marks and no military or technical jargon.
+        Use only the facts below. Do not invent any figure, outcome or saving.
         Tone: {$this->marketingTone}.
-        Sanitization Rule: {$this->marketingSanitizationRules}.
+        Confidentiality rules: {$this->marketingSanitizationRules}.
         
         Original Data: Client: {$signoff->name} | Industry: {$signoff->industry} | Project: {$signoff->title}
         Exec Summary: {$signoff->executive_summary}
@@ -291,7 +294,8 @@ class SignoffManager extends Component
             $signoff = DB::table('project_signoffs')->where('id', $signoffId)->first();
             if (!$signoff) return;
 
-            DB::table('project_signoffs')->where('id', $signoffId)->update(['status' => 'Signed', 'frozen_at' => null, 'updated_at' => now()]);
+            // project_signoffs has no updated_at column (live schema)
+            DB::table('project_signoffs')->where('id', $signoffId)->update(['status' => 'Signed', 'frozen_at' => null]);
             DB::table('projects')->where('id', $signoff->project_id)->update(['status' => 'Active', 'updated_at' => now()]);
         });
         $this->loadLedgers();

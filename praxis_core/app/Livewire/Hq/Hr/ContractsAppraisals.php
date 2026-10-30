@@ -55,7 +55,7 @@ class ContractsAppraisals extends Component
     public function loadGridData()
     {
         if ($this->activeTab === 'contracts') {
-            // Join only the latest contract per staff member, so renewed contracts don't duplicate rows
+            // Join only the latest contract per staff member, so renewed contracts don’t duplicate rows
             $latestContracts = DB::table('employment_contracts')
                 ->select('mdm_employee_id', DB::raw('MAX(created_at) as max_created_at'))
                 ->groupBy('mdm_employee_id');
@@ -127,7 +127,7 @@ class ContractsAppraisals extends Component
         // The route needs hr.view; issuing a contract needs hr.create, changing one needs hr.edit
         $hasContract = DB::table('employment_contracts')->where('mdm_employee_id', $this->selectedEmployeeId)->exists();
         if (!Auth::user()->can($hasContract ? 'hr.edit' : 'hr.create')) {
-            session()->flash('error', "You don't have permission to issue or change employment contracts. Ask an administrator to change your role.");
+            session()->flash('error', "You don’t have permission to issue or change employment contracts. Ask an administrator to change your role.");
             return;
         }
 
@@ -184,7 +184,7 @@ class ContractsAppraisals extends Component
 
         } catch (Exception $e) {
             report($e);
-            session()->flash('error', "We couldn't save the contract, so nothing was changed. Try again, and if it still fails, ask an administrator to check the error log.");
+            session()->flash('error', "We couldn’t save the contract, so nothing was changed. Try again, and if it still fails, ask an administrator to check the error log.");
         }
     }
 
@@ -226,7 +226,7 @@ class ContractsAppraisals extends Component
         $currentUserId = Auth::id() ?? null;
         
         if ($employee->line_manager_id !== $currentUserId && $currentUserId !== null) {
-            session()->flash('error', "Only this staff member's line manager can submit their appraisal.");
+            session()->flash('error', "Only this staff member’s line manager can submit their appraisal.");
             return;
         }
 
@@ -251,18 +251,18 @@ class ContractsAppraisals extends Component
 
         } catch (Exception $e) {
             report($e);
-            session()->flash('error', "We couldn't submit the appraisal, so nothing was saved. Try again, and if it still fails, ask an administrator to check the error log.");
+            session()->flash('error', "We couldn’t submit the appraisal, so nothing was saved. Try again, and if it still fails, ask an administrator to check the error log.");
         }
     }
 
     public function finalizeAppraisal($appraisalId)
     {
         if (!Auth::user()->can('hr.approve')) {
-            session()->flash('error', "You don't have permission to finalise appraisals. Ask an administrator to change your role.");
+            session()->flash('error', "You don’t have permission to finalise appraisals. Ask an administrator to change your role.");
             return;
         }
 
-        // Only an appraisal that isn't final yet can be finalised
+        // Only an appraisal that isn’t final yet can be finalised
         DB::table('performance_appraisals')->where('id', $appraisalId)->where('status', '!=', 'Finalized')->update([
             'status' => 'Finalized',
             'updated_at' => now()
@@ -276,6 +276,19 @@ class ContractsAppraisals extends Component
     public function closeSuccessModal()
     {
         $this->showSuccessModal = false;
+    }
+
+    /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
+    protected function validationAttributes(): array
+    {
+        return [
+            'contract_type' => 'contract type',
+            'standard_weekly_hours' => 'weekly hours',
+            'notice_period_days' => 'notice period',
+            'review_period_start' => 'review period start',
+            'review_period_end' => 'review period end',
+            'kpi_score_overall' => 'overall score',
+        ];
     }
 
     public function render()

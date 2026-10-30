@@ -1,487 +1,600 @@
-<div style="background-color: var(--erp-bg-base); min-height: 100vh; font-family: 'Inter', sans-serif; color: #fff; overflow-x: hidden;" 
-     x-data="{ isExecMode: true, step: {{ $viewState === 'review' ? 0 : 4 }} }" 
+@use('App\Livewire\Portal\Concerns\GatewayFormat', 'F')
+@php
+    $company = $organization->name ?? '';
+    $currency = $proposal->currency ?? 'USD';
+    $ref = filled($proposal->proposal_ref ?? null) ? $proposal->proposal_ref : 'PRX-' . strtoupper(substr($token ?? '', 0, 8));
+    $isSigned = ($viewState ?? '') === 'completed';
+    $vatAmount = ($proposal->total_value ?? 0) - ($proposal->subtotal ?? 0);
+    $validityDays = (int) ($proposal->validity_days ?? 7);
+
+    // Payment terms: a custom deposit, or instalments stored as "50_50" / "40_30_30"
+    $scheduleType = (string) ($proposal->payment_schedule_type ?? '');
+    $splitParts = array_values(array_filter(explode('_', $scheduleType), 'is_numeric'));
+    if ($scheduleType === 'custom') {
+        $schedule = __('gateway.proposal.schedule_custom', ['percent' => F::percent($proposal->custom_deposit_percent ?? 0)]);
+    } elseif ($splitParts) {
+        $schedule = __('gateway.proposal.schedule_split', ['split' => implode(' / ', array_map(fn ($p) => F::percent($p), $splitParts))]);
+    } elseif ($scheduleType !== '') {
+        $schedule = $scheduleType;
+    } else {
+        $schedule = __('gateway.proposal.schedule_standard');
+    }
+
+    $steps = ['summary', 'approach', 'plan', 'fees', 'sign'];
+    $stepCount = count($steps);
+@endphp
+{{-- The proposal a client opens from the email: a five-step summary that ends in signing, and the full document
+     (paged as A4 in the browser, downloadable as PDF). Behaviour lives in App\Livewire\Portal\ProposalGateway. --}}
+<div class="gateway proposal-gateway"
+     x-data="{ isExecMode: true, step: {{ $viewState === 'review' ? 0 : 4 }} }"
      @reinit-deck.window="step = 4">
-    
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = { theme: { extend: { colors: { erp: { base: '#03050A', main: '#0A1128', surface: '#141E3C', teal: '#00E5FF', red: '#FF3366', amber: '#FFBD2E', muted: '#8A9BB2', success: '#00FF66' } }, fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['Roboto Mono', 'monospace'] } } } }
-    </script>
 
     <style>
-        :root { --erp-bg-base: #03050A; --erp-bg-main: #0A1128; --erp-teal: #00E5FF; --erp-red: #FF3366; --erp-amber: #FFBD2E; --erp-success: #00FF66; --erp-muted: #8A9BB2; --stark-white: #FFFFFF; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        .pulse-dot { width: 6px; height: 6px; background-color: var(--erp-teal); border-radius: 50%; box-shadow: 0 0 10px var(--erp-teal); animation: pulse 2s infinite; display: inline-block; }
-        
-        /* 3D DECK STYLES */
-        #executive-summary-view { display: flex; position: fixed; inset: 0; z-index: 9000; justify-content: center; align-items: center; background-image: url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2500&auto=format&fit=crop'); background-size: cover; background-position: center; perspective: 1500px; overflow: hidden; transition: opacity 0.6s ease; }
-        #executive-summary-view::before { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(5, 9, 20, 0.85) 0%, rgba(10, 17, 40, 0.95) 100%); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); z-index: 0; }
-        .deck-container { position: relative; width: 100%; max-width: 1200px; height: 600px; display: flex; justify-content: center; align-items: center; z-index: 2; }
-        .exec-card { position: absolute; width: 100%; max-width: 500px; height: 580px; background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(30px); border: 1px solid rgba(255, 255, 255, 0.1); border-top: 4px solid var(--erp-teal); border-radius: 8px; padding: 40px 30px; display: flex; flex-direction: column; box-shadow: 0 40px 80px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.02); transition: transform 0.6s cubic-bezier(0.25, 1, 0.3, 1), opacity 0.6s; pointer-events: none; overflow-y: auto; opacity: 0; }
-        
-        .exec-card.active { transform: translateX(0) scale(1) translateZ(0); opacity: 1; z-index: 10; pointer-events: auto; border-color: rgba(0, 229, 255, 0.3); }
-        .exec-card.prev { transform: translateX(-65%) scale(0.85) rotateY(15deg); opacity: 0.3; z-index: 5; filter: blur(3px); }
-        .exec-card.next { transform: translateX(65%) scale(0.85) rotateY(-15deg); opacity: 0.3; z-index: 5; filter: blur(3px); }
-        .exec-card.hidden-left { transform: translateX(-120%) scale(0.7); opacity: 0; z-index: 1; }
-        .exec-card.hidden-right { transform: translateX(120%) scale(0.7); opacity: 0; z-index: 1; }
+        .gateway-main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 48px; }
+        @media (min-width: 768px) { .gateway-main { padding: 32px 32px 64px; } }
+        .gateway .btn { white-space: normal; text-align: center; }
 
-        .card-meta { font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-teal); letter-spacing: 3px; margin-bottom: 20px; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
-        .card-btn { flex: 1; padding: 15px; background: var(--erp-teal); color: #0A1128; font-family: 'Inter', sans-serif; font-weight: 800; cursor: pointer; transition: all 0.3s; border-radius: 4px; text-align: center; text-transform: uppercase; font-size: 0.8rem; border: none; letter-spacing: 1px; }
-        .card-btn:hover:not(:disabled) { background: #FFF; box-shadow: 0 10px 25px rgba(0, 229, 255, 0.4); transform: translateY(-2px); }
-        .card-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .card-btn-outline { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); color: #FFF; backdrop-filter: blur(10px); }
-        .card-btn-outline:hover { background: rgba(255,255,255,0.1); border-color: var(--stark-white); transform: translateY(-2px); }
+        /* Steps */
+        .stepper { display: flex; gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; }
+        .stepper li { flex: 1; display: flex; flex-direction: column; gap: 6px; font-size: 0.8125rem; line-height: 1.125rem; color: var(--color-muted); }
+        .stepper li::before { content: ""; height: 4px; border-radius: 2px; background: var(--color-line); }
+        .stepper li.is-done::before { background: var(--color-teal); }
+        .stepper li.is-current::before { background: var(--color-deep-teal); }
+        .stepper li.is-current { color: var(--color-ink); font-weight: 600; }
+        @media (max-width: 640px) { .stepper li span { display: none; } }
+        .step-card { max-width: 760px; }
+        .step-count { margin: 0 0 4px; font-size: 0.8125rem; line-height: 1.125rem; color: var(--color-muted); }
+        .step-body { color: var(--color-slate); font-size: 1rem; line-height: 1.625rem; }
+        .step-body p { margin: 0 0 16px; }
+        .step-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--color-line); }
+        .step-actions .btn-primary { margin-left: auto; }
+        .summary-grid { display: grid; gap: 16px; grid-template-columns: 1fr; margin-top: 8px; }
+        @media (min-width: 640px) { .summary-grid { grid-template-columns: 1fr 1fr; } }
+        .summary-box { background: var(--color-mist); border-radius: var(--radius-card); padding: 16px 20px; }
+        .summary-total { font-size: clamp(1.75rem, 6vw, 2.5rem); line-height: 1.15; overflow-wrap: anywhere; margin-top: 4px; }
+        .summary-value { margin-top: 4px; font-size: 1rem; line-height: 1.5rem; font-weight: 600; color: var(--color-ink); }
+        .tag-list { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tag { padding: 2px 10px; border: 1px solid var(--color-line); border-radius: var(--radius-control); background: var(--color-paper); color: var(--color-slate); font-size: 0.8125rem; line-height: 1.25rem; }
+        .phase-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
+        .phase-list li { padding: 12px 16px; border: 1px solid var(--color-line); border-left: 2px solid var(--color-teal); border-radius: var(--radius-control); }
+        .phase-list strong { display: block; color: var(--color-ink); font-weight: 600; font-size: 0.9375rem; }
+        .phase-list span { display: block; margin-top: 2px; color: var(--color-slate); font-size: 0.875rem; line-height: 1.375rem; }
+        .table th.num, .doc-table th.num, .doc-table td.num { text-align: right; }
+        .totals { margin-left: auto; width: 100%; max-width: 360px; font-size: 0.875rem; line-height: 1.375rem; }
+        .totals div { display: flex; justify-content: space-between; gap: 16px; padding: 6px 12px; color: var(--color-slate); }
+        .totals .totals-grand { border-top: 1px solid var(--color-line-strong); margin-top: 4px; padding-top: 10px; color: var(--color-ink); font-weight: 600; font-size: 1rem; }
 
-        .cyber-input { width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: #FFF; padding: 12px; font-family: 'Inter', sans-serif; font-size: 0.85rem; border-radius: 2px; outline: none; margin-bottom: 15px; transition: 0.3s; }
-        .cyber-input:focus { border-color: var(--erp-teal); background: rgba(0, 229, 255, 0.05); }
-        .sig-canvas-container { border: 1px dashed var(--erp-teal); background: rgba(0, 0, 0, 0.6); border-radius: 4px; position: relative; flex-grow: 1; min-height: 120px; margin-bottom: 15px; }
-        canvas#signaturePad { width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+        /* Signing */
+        .sig-canvas-container { position: relative; height: 180px; border: 1px solid var(--color-line-strong); border-radius: var(--radius-control); background: var(--color-paper); }
+        .sig-canvas-container::after { content: ""; position: absolute; left: 16px; right: 16px; bottom: 40px; border-bottom: 1px solid var(--color-line); pointer-events: none; }
+        canvas#signaturePad { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+        .otp-input { max-width: 220px; font-size: 1.5rem; line-height: 2rem; font-variant-numeric: tabular-nums; text-align: center; }
 
-        .tier1-dock { position: fixed; top: 50%; right: 20px; transform: translateY(-50%); display: flex; flex-direction: column; gap: 12px; background: rgba(10, 17, 40, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(0, 229, 255, 0.15); padding: 15px 12px; border-radius: 40px; z-index: 9999; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
-        .dock-btn { background: transparent; border: none; color: rgba(255,255,255,0.5); cursor: pointer; padding: 12px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: 0.3s; position: relative; }
-        .dock-btn:hover { color: var(--erp-teal); background: rgba(0, 229, 255, 0.1); }
-        .dock-btn::after { content: attr(data-tooltip); position: absolute; right: 130%; background: var(--erp-main); color: var(--erp-teal); padding: 8px 12px; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; font-weight: bold; border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 3px; opacity: 0; pointer-events: none; white-space: nowrap; transition: 0.3s; transform: translateX(10px); text-transform: uppercase; }
-        .dock-btn:hover::after { opacity: 1; transform: translateX(0); }
-
-        /* A4 EXPLICIT PAGING SYSTEM */
-        .a4-wrapper { display: flex; flex-direction: column; gap: 40px; align-items: center; padding: 40px 20px; width: 100%; overflow-y: auto; background: var(--erp-bg-base); }
-        .a4-page { width: 210mm; height: 297mm; background-color: #0A1128; position: relative; box-shadow: 0 25px 50px -12px rgba(0, 229, 255, 0.15); border: 1px solid rgba(0, 229, 255, 0.05); flex-shrink: 0; overflow: hidden; margin: 0 auto; box-sizing: border-box; }
-        .page-content { padding: 50px 60px; height: 100%; display: flex; flex-direction: column; position: relative; z-index: 10; box-sizing: border-box; }
-        .sow-section { page-break-inside: avoid; break-inside: avoid; }
-        
-        .dual-signature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 10px; }
-        .sig-box { border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); padding: 25px; display: flex; flex-direction: column; position: relative; z-index: 10; }
-        .sig-box.hq-stamp { border-color: rgba(0, 229, 255, 0.4); background: rgba(0, 229, 255, 0.02); }
-        .sig-box.client-stamp { border-color: #00FF66; background: rgba(0, 255, 102, 0.05); }
-        .sig-box.pending-stamp { border-color: var(--erp-amber); background: rgba(255, 189, 46, 0.05); }
+        /* The full document, paged as A4 */
+        .a4-wrapper { display: flex; flex-direction: column; align-items: center; gap: 32px; padding: 8px 0 32px; width: 100%; overflow-x: auto; }
+        #pdf-render-zone { display: flex; flex-direction: column; gap: 32px; }
+        .a4-page { width: 210mm; height: 297mm; background: #FFFFFF; position: relative; border: 1px solid var(--color-line); border-radius: 2px; flex-shrink: 0; overflow: hidden; margin: 0 auto; box-sizing: border-box; color: var(--color-slate); }
+        .page-content { padding: 56px 64px 80px; height: 100%; display: flex; flex-direction: column; box-sizing: border-box; }
+        .page-footer { position: absolute; bottom: 28px; left: 64px; right: 64px; display: flex; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--color-line); font-size: 0.6875rem; line-height: 1rem; color: var(--color-muted); font-variant-numeric: tabular-nums; }
+        .sow-section { page-break-inside: avoid; break-inside: avoid; margin-bottom: 24px; }
+        .doc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding-bottom: 16px; }
+        .doc-logo { height: 32px; width: auto; }
+        .doc-meta { text-align: right; font-size: 0.75rem; line-height: 1.125rem; color: var(--color-muted); font-variant-numeric: tabular-nums; }
+        .doc-meta strong { color: var(--color-ink); font-weight: 600; }
+        .doc-kicker { font-size: 0.8125rem; font-weight: 600; color: var(--color-deep-teal); margin-bottom: 4px; }
+        .doc-title { font-family: var(--font-serif); font-weight: 500; font-size: 1.75rem; line-height: 2.25rem; color: var(--color-ink); margin: 0 0 16px; text-wrap: balance; }
+        .doc-h2 { font-family: var(--font-serif); font-weight: 500; font-size: 1.125rem; line-height: 1.5rem; color: var(--color-ink); margin: 0 0 8px; }
+        .doc-text { font-size: 0.8125rem; line-height: 1.375rem; color: var(--color-slate); white-space: pre-wrap; margin: 0; }
+        .doc-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; padding: 12px 16px; background: var(--color-mist); border-radius: 4px; font-size: 0.75rem; line-height: 1.125rem; }
+        .doc-facts span { color: var(--color-muted); }
+        .doc-facts strong { color: var(--color-ink); font-weight: 600; }
+        .doc-list { margin: 0; padding-left: 18px; columns: 2; font-size: 0.75rem; line-height: 1.25rem; color: var(--color-slate); }
+        .doc-phase { padding: 8px 0 8px 12px; border-left: 2px solid var(--color-teal); margin-bottom: 8px; }
+        .doc-phase strong { display: block; font-size: 0.8125rem; color: var(--color-ink); font-weight: 600; }
+        .doc-phase span { font-size: 0.75rem; line-height: 1.25rem; color: var(--color-slate); }
+        .doc-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; line-height: 1.125rem; margin-bottom: 12px; }
+        .doc-table th { text-align: left; font-weight: 600; color: var(--color-ink); padding: 6px 8px; border-bottom: 1px solid var(--color-line-strong); }
+        .doc-table td { padding: 6px 8px; border-bottom: 1px solid var(--color-line); color: var(--color-slate); vertical-align: top; }
+        .doc-table .num, .doc-totals { font-variant-numeric: tabular-nums; }
+        .doc-totals { margin-left: auto; width: 60%; font-size: 0.75rem; line-height: 1.125rem; }
+        .doc-totals div { display: flex; justify-content: space-between; padding: 3px 8px; }
+        .doc-totals .grand { border-top: 1px solid var(--color-line-strong); margin-top: 4px; padding-top: 6px; font-size: 0.875rem; font-weight: 600; color: var(--color-ink); }
+        .doc-sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .doc-sig { border: 1px solid var(--color-line); border-radius: 4px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+        .doc-sig-head { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; font-size: 0.8125rem; font-weight: 600; color: var(--color-ink); }
+        .doc-sig-img { height: 56px; display: flex; align-items: center; border-bottom: 1px solid var(--color-line); }
+        .doc-sig-img img { max-height: 52px; max-width: 100%; object-fit: contain; }
+        .doc-dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; font-size: 0.6875rem; line-height: 1rem; }
+        .doc-dl dt { color: var(--color-muted); }
+        .doc-dl dd { margin: 0; color: var(--color-ink); text-align: right; font-variant-numeric: tabular-nums; }
+        .doc-hash { font-size: 0.625rem; line-height: 0.875rem; color: var(--color-muted); word-break: break-all; font-variant-numeric: tabular-nums; }
+        .doc-hash span { display: block; color: var(--color-slate); font-weight: 600; }
+        .doc-note { font-size: 0.75rem; color: var(--color-muted); }
+        .doc-verify { display: flex; gap: 16px; align-items: center; margin-top: 16px; padding: 12px 16px; border: 1px solid var(--color-line); border-radius: 4px; }
+        .doc-verify img { width: 72px; height: 72px; }
 
         @media print {
-            body { background: #0A1128 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            #executive-summary-view, .tier1-dock { display: none !important; }
-            .a4-wrapper { padding: 0 !important; gap: 0 !important; background: transparent !important; }
-            .a4-page { box-shadow: none !important; border: none !important; margin: 0 !important; }
-        }
-        
-        @media (max-width: 850px) {
-            .exec-card.prev { transform: translateX(-40%) scale(0.85); opacity: 0; }
-            .exec-card.next { transform: translateX(40%) scale(0.85); opacity: 0; }
-            .exec-card { padding: 30px 20px; max-width: 90%; height: 540px; }
-            .tier1-dock { top: 20px; right: 50%; transform: translateX(50%); flex-direction: row; padding: 10px 20px; width: max-content; }
-            .dock-btn::after { right: auto; top: 140%; left: 50%; transform: translate(-50%, -10px); }
-            .dock-btn:hover::after { transform: translate(-50%, 0); }
-            .deck-container { margin-top: 80px; }
-            .a4-wrapper { padding-top: 100px; justify-content: flex-start; overflow-x: auto; align-items: flex-start; }
+            .gateway-main > :not(#full-document-wrapper) { display: none !important; }
+            .a4-wrapper { padding: 0 !important; gap: 0 !important; }
+            .a4-page { border: none !important; margin: 0 !important; }
         }
     </style>
 
-    <div class="tier1-dock">
-        <button @click="isExecMode = !isExecMode; if(!isExecMode) { $nextTick(() => paginateSOW()); } else { setTimeout(initSignaturePad, 100); }" class="dock-btn" data-tooltip="Toggle Document Mode">
-            <i data-lucide="layers" class="w-5 h-5"></i>
-        </button>
-        <div style="width: 100%; height: 1px; background: rgba(255,255,255,0.1); margin: 5px 0;"></div>
-        <button onclick="triggerPdfDownload()" id="downloadPdfBtn" class="dock-btn" data-tooltip="Secure PDF Download">
-            <i data-lucide="download-cloud" class="w-5 h-5"></i>
-        </button>
-        
-        <button x-show="!isExecMode" 
-                @click="isExecMode = true; if(step === 4) setTimeout(initSignaturePad, 100);" 
-                class="dock-btn" 
-                style="background: rgba(255, 189, 46, 0.15); border: 1px solid var(--erp-amber); color: var(--erp-amber); margin-top: 10px; animation: pulse 2s infinite;" 
-                data-tooltip="Sign Document">
-            <i data-lucide="pen-tool" class="w-5 h-5"></i>
-        </button>
-    </div>
+    <x-portal.gateway-header :kicker="__('gateway.proposal.kicker')" />
 
-    <div id="executive-summary-view" x-show="isExecMode" x-transition.opacity.duration.600ms>
-        <div class="deck-container">
-            
-            <div class="exec-card" :class="{ 'active': step === 0, 'prev': step === -1, 'hidden-left': step < -1, 'next': step === 1, 'hidden-right': step > 1 }">
-                <div class="card-meta"><span>01 // 05</span> <span class="pulse-dot"></span></div>
-                <h3 class="text-2xl font-black uppercase tracking-tighter mb-4 text-white">STATEMENT OF WORK</h3>
-                <p class="text-sm text-erp-muted leading-relaxed mb-6">Prepared exclusively for <strong>{{ strtoupper($organization->name ?? 'CLIENT') }}</strong>. This document outlines the architectural parameters, financial allocation, and execution phases required to deploy the JBS Praxis Operating System.</p>
-                
-                <div class="bg-black/40 border border-white/5 p-4 border-l-4 border-erp-teal mb-4">
-                    <span class="block font-mono text-[10px] text-erp-muted mb-1 uppercase">Total Capital Allocation</span>
-                    <span class="font-mono text-2xl font-black text-white">{{ $proposal->currency ?? 'USD' }} {{ number_format($proposal->total_value ?? 0, 2) }}</span>
-                </div>
-                
-                <div class="bg-black/40 border border-white/5 p-4 border-l-4 border-erp-amber mb-auto">
-                    <span class="block font-mono text-[10px] text-erp-muted mb-1 uppercase">Agile Payment Structure</span>
-                    <span class="font-mono text-sm font-bold text-white">
-                        @if(($proposal->payment_schedule_type ?? '') === 'custom')
-                            {{ (float)($proposal->custom_deposit_percent ?? 0) }}% Upfront Deposit
-                        @else
-                            {{ str_replace('_', '/', $proposal->payment_schedule_type ?? 'Standard') }} Split
-                        @endif
-                    </span>
-                </div>
-
-                <div class="flex gap-4 mt-6">
-                    <button @click="step++" class="card-btn w-full">REVIEW ARCHITECTURE ➔</button>
-                </div>
+    <main class="gateway-main">
+        <div class="page-header">
+            <div class="min-w-0">
+                <h1 class="page-title">{{ __('gateway.proposal.heading', ['company' => $company]) }}</h1>
+                <p class="page-subtitle">
+                    {{ $proposal->title ?? '' }}@if (filled($proposal->title ?? null)) · @endif<span class="num">{{ $ref }}</span>
+                </p>
             </div>
+            <div class="flex flex-wrap items-center gap-2">
+                @if ($isSigned)
+                    <span class="pill pill-success">{{ __('gateway.status.proposal_signed') }}</span>
+                @else
+                    <span class="pill pill-warning">{{ __('gateway.status.proposal_awaiting') }}</span>
+                @endif
+                <button type="button" class="btn btn-secondary"
+                        @click="isExecMode = !isExecMode; if(!isExecMode) { $nextTick(() => paginateSOW()); } else { setTimeout(initSignaturePad, 100); }">
+                    <span x-show="isExecMode" class="inline-flex items-center gap-2"><i data-lucide="file-text"></i> {{ __('gateway.proposal.read_document') }}</span>
+                    <span x-show="!isExecMode" x-cloak class="inline-flex items-center gap-2"><i data-lucide="arrow-left"></i> {{ __('gateway.proposal.back_to_summary') }}</span>
+                </button>
+                <button type="button" onclick="triggerPdfDownload()" id="downloadPdfBtn" class="btn btn-secondary">
+                    <i data-lucide="download"></i>
+                    <span class="pdf-label">{{ __('gateway.common.download_pdf') }}</span>
+                </button>
+                @unless ($isSigned)
+                    <button type="button" class="btn btn-primary" x-show="!isExecMode" x-cloak
+                            @click="isExecMode = true; step = 4; setTimeout(initSignaturePad, 100);">
+                        <i data-lucide="pen-line"></i> {{ __('gateway.proposal.go_to_sign') }}
+                    </button>
+                @endunless
+            </div>
+        </div>
 
-            <div class="exec-card" :class="{ 'active': step === 1, 'prev': step === 0, 'hidden-left': step < 0, 'next': step === 2, 'hidden-right': step > 2 }">
-                <div class="card-meta"><span>02 // 05</span> <span class="pulse-dot"></span></div>
-                <h3 class="text-2xl font-black uppercase tracking-tighter mb-4 text-white">THE ARCHITECTURE</h3>
-                <p class="text-xs text-erp-muted leading-relaxed mb-4 text-justify">{{ Str::limit($narrative->ai_operational_strategy ?? 'Executing systemic overhaul.', 350) }}</p>
-                
-                <div class="mb-auto">
-                    <div class="font-mono text-[10px] text-erp-teal mb-2 uppercase">> Technology & Compliance Stack</div>
-                    <div class="flex flex-wrap gap-2">
-                        @if(!empty($selectedTech))
-                            @foreach($selectedTech as $tech)
-                                <span class="bg-white/5 border border-white/10 px-2 py-1 font-mono text-[9px] text-white rounded-sm">{{ $tech }}</span>
-                            @endforeach
-                        @else
-                            <span class="text-xs text-erp-muted">Architecture loosely coupled. Custom stack pending.</span>
-                        @endif
+        {{-- The five steps --}}
+        <div id="executive-summary-view" x-show="isExecMode">
+            <ol class="stepper" aria-hidden="true">
+                @foreach ($steps as $i => $name)
+                    <li :class="{ 'is-current': step === {{ $i }}, 'is-done': step > {{ $i }} }"><span>{{ __('gateway.proposal.steps.' . $name) }}</span></li>
+                @endforeach
+            </ol>
+
+            {{-- 1. Summary --}}
+            <section class="card step-card" x-show="step === 0" @if ($viewState !== 'review') x-cloak @endif>
+                <p class="step-count">{{ __('gateway.proposal.step_of', ['step' => 1, 'total' => $stepCount]) }}</p>
+                <h2 class="section-title">{{ __('gateway.proposal.steps.summary') }}</h2>
+                <div class="step-body">
+                    <p>{{ __('gateway.proposal.summary_intro', ['title' => $proposal->title ?? $ref]) }}</p>
+                </div>
+                <div class="summary-grid">
+                    <div class="summary-box">
+                        <div class="stat-label">{{ __('gateway.proposal.total_incl_vat') }}</div>
+                        <div class="headline-number summary-total">{{ F::money($proposal->total_value ?? 0, $currency) }}</div>
+                    </div>
+                    <div class="summary-box">
+                        <div class="stat-label">{{ __('gateway.proposal.payment_terms') }}</div>
+                        <div class="summary-value">{{ $schedule }}</div>
+                        <div class="stat-label" style="margin-top: 12px;">{{ __('gateway.proposal.validity') }}</div>
+                        <div class="summary-value">{{ trans_choice('gateway.proposal.validity_days', $validityDays, ['days' => $validityDays]) }}</div>
                     </div>
                 </div>
-
-                <div class="flex gap-4 mt-6">
-                    <button @click="step--" class="card-btn card-btn-outline w-1/3">BACK</button>
-                    <button @click="step++" class="card-btn w-2/3">REVIEW SPRINTS ➔</button>
+                <div class="step-actions">
+                    <button type="button" @click="step++" class="btn btn-primary">{{ __('gateway.proposal.next_approach') }} <i data-lucide="arrow-right"></i></button>
                 </div>
-            </div>
+            </section>
 
-            <div class="exec-card" :class="{ 'active': step === 2, 'prev': step === 1, 'hidden-left': step < 1, 'next': step === 3, 'hidden-right': step > 3 }">
-                <div class="card-meta"><span>03 // 05</span> <span class="pulse-dot"></span></div>
-                <h3 class="text-2xl font-black uppercase tracking-tighter mb-4 text-white">EXECUTION MATRIX</h3>
-                
-                <div class="space-y-3 mb-auto overflow-y-auto pr-2 max-h-[350px]">
-                    @if(!empty($phases))
-                        @foreach($phases as $phase)
-                            <div class="bg-erp-surface p-3 border border-white/5 border-l-2 border-erp-teal">
-                                <strong class="font-mono text-[10px] text-erp-teal block mb-1">{{ current(explode(':', $phase['title'] ?? 'Phase')) }}</strong>
-                                <span class="text-[10px] text-erp-muted block">{{ $phase['body'] ?? '' }}</span>
-                            </div>
-                        @endforeach
+            {{-- 2. Approach --}}
+            <section class="card step-card" x-show="step === 1" x-cloak>
+                <p class="step-count">{{ __('gateway.proposal.step_of', ['step' => 2, 'total' => $stepCount]) }}</p>
+                <h2 class="section-title">{{ __('gateway.proposal.approach_title') }}</h2>
+                <div class="step-body">
+                    @if (filled($narrative->ai_operational_strategy ?? null))
+                        <p style="white-space: pre-line;">{{ Str::limit($narrative->ai_operational_strategy, 600) }}</p>
                     @else
-                        <div class="text-xs text-erp-muted">Phases pending definition.</div>
+                        <p class="muted">{{ __('gateway.proposal.approach_empty') }}</p>
                     @endif
                 </div>
 
-                <div class="flex gap-4 mt-6">
-                    <button @click="step--" class="card-btn card-btn-outline w-1/3">BACK</button>
-                    <button @click="step++" class="card-btn w-2/3">REVIEW COMMERCIALS ➔</button>
-                </div>
-            </div>
-
-            <div class="exec-card" :class="{ 'active': step === 3, 'prev': step === 2, 'hidden-left': step < 2, 'next': step === 4, 'hidden-right': step > 4 }">
-                <div class="card-meta"><span>04 // 05</span> <span class="pulse-dot"></span></div>
-                <h3 class="text-2xl font-black uppercase tracking-tighter mb-4 text-white">COMMERCIALS</h3>
-                
-                <div class="space-y-2 mb-4 max-h-[200px] overflow-y-auto pr-2">
-                    @if(!empty($lineItems))
-                        @foreach($lineItems as $line)
-                            <div class="flex justify-between items-center border-b border-white/10 pb-2">
-                                <div>
-                                    <div class="font-mono text-[10px] text-white font-bold">{{ $line->code ?? '-' }}</div>
-                                    <div class="text-[9px] text-erp-muted">{{ Str::limit($line->description ?? '', 35) }}</div>
-                                </div>
-                                <div class="font-mono text-[11px] font-bold text-erp-teal">{{ $proposal->currency ?? 'USD' }} {{ number_format($line->total_price ?? 0, 2) }}</div>
-                            </div>
+                <h3 class="card-title" style="margin: 8px 0 12px;">{{ __('gateway.proposal.tech_title') }}</h3>
+                @if (!empty($selectedTech))
+                    <div class="tag-list">
+                        @foreach ($selectedTech as $tech)
+                            <span class="tag">{{ $tech }}</span>
                         @endforeach
-                    @endif
+                    </div>
+                @else
+                    <p class="muted" style="margin: 0;">{{ __('gateway.proposal.tech_empty') }}</p>
+                @endif
+
+                <div class="step-actions">
+                    <button type="button" @click="step--" class="btn btn-secondary"><i data-lucide="arrow-left"></i> {{ __('gateway.common.back') }}</button>
+                    <button type="button" @click="step++" class="btn btn-primary">{{ __('gateway.proposal.next_plan') }} <i data-lucide="arrow-right"></i></button>
+                </div>
+            </section>
+
+            {{-- 3. Plan --}}
+            <section class="card step-card" x-show="step === 2" x-cloak>
+                <p class="step-count">{{ __('gateway.proposal.step_of', ['step' => 3, 'total' => $stepCount]) }}</p>
+                <h2 class="section-title">{{ __('gateway.proposal.plan_title') }}</h2>
+                @if (!empty($phases))
+                    <ol class="phase-list">
+                        @foreach ($phases as $phase)
+                            <li>
+                                <strong>{{ $phase['short'] ?? '' }}</strong>
+                                @if (filled($phase['body'] ?? null))<span>{{ $phase['body'] }}</span>@endif
+                            </li>
+                        @endforeach
+                    </ol>
+                @else
+                    <p class="muted" style="margin: 0;">{{ __('gateway.proposal.plan_empty') }}</p>
+                @endif
+
+                <div class="step-actions">
+                    <button type="button" @click="step--" class="btn btn-secondary"><i data-lucide="arrow-left"></i> {{ __('gateway.common.back') }}</button>
+                    <button type="button" @click="step++" class="btn btn-primary">{{ __('gateway.proposal.next_fees') }} <i data-lucide="arrow-right"></i></button>
+                </div>
+            </section>
+
+            {{-- 4. Fees --}}
+            <section class="card step-card" x-show="step === 3" x-cloak>
+                <p class="step-count">{{ __('gateway.proposal.step_of', ['step' => 4, 'total' => $stepCount]) }}</p>
+                <h2 class="section-title">{{ __('gateway.proposal.fees_title') }}</h2>
+                @if (count($lineItems))
+                    <div class="table-wrap">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>{{ __('gateway.proposal.description') }}</th>
+                                    <th class="num">{{ __('gateway.proposal.amount') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($lineItems as $line)
+                                    <tr>
+                                        <td>
+                                            <span style="color: var(--color-ink); font-weight: 500;">{{ $line->description ?? '' }}</span>
+                                            @if (filled($line->code ?? null))<span class="muted num" style="display: block; text-align: left; font-size: 0.8125rem;">{{ $line->code }}</span>@endif
+                                        </td>
+                                        <td class="num">{{ F::money($line->total_price ?? 0, $currency) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <p class="muted">{{ __('gateway.proposal.fees_empty') }}</p>
+                @endif
+                <div class="totals" style="margin-top: 12px;">
+                    <div><span>{{ __('gateway.proposal.subtotal') }}</span><span class="num">{{ F::money($proposal->subtotal ?? 0, $currency) }}</span></div>
+                    <div><span>{{ __('gateway.proposal.vat', ['rate' => F::percent($proposal->vat_rate ?? 0)]) }}</span><span class="num">{{ F::money($vatAmount, $currency) }}</span></div>
+                    <div class="totals-grand"><span>{{ __('gateway.proposal.total') }}</span><span class="num">{{ F::money($proposal->total_value ?? 0, $currency) }}</span></div>
                 </div>
 
-                <div class="mt-auto border-t border-white/10 pt-4 font-mono text-[10px] text-erp-muted text-right">
-                    <div class="mb-1">SUBTOTAL: {{ $proposal->currency ?? 'USD' }} {{ number_format($proposal->subtotal ?? 0, 2) }}</div>
-                    <div class="mb-3">VAT ({{ $proposal->vat_rate ?? 0 }}%): {{ $proposal->currency ?? 'USD' }} {{ number_format(($proposal->total_value ?? 0) - ($proposal->subtotal ?? 0), 2) }}</div>
+                <div class="step-actions">
+                    <button type="button" @click="step--" class="btn btn-secondary"><i data-lucide="arrow-left"></i> {{ __('gateway.common.back') }}</button>
+                    <button type="button" @click="step++; setTimeout(initSignaturePad, 100);" class="btn btn-primary">{{ __('gateway.proposal.next_sign') }} <i data-lucide="arrow-right"></i></button>
                 </div>
+            </section>
 
-                <div class="bg-erp-teal/10 border border-erp-teal p-3 text-center mb-6">
-                    <span class="font-mono text-[10px] text-erp-teal uppercase block mb-1">Total Investment</span>
-                    <span class="font-mono text-xl font-black text-white">{{ $proposal->currency ?? 'USD' }} {{ number_format($proposal->total_value ?? 0, 2) }}</span>
-                </div>
+            {{-- 5. Sign --}}
+            <section class="card step-card" x-show="step === 4" x-cloak>
+                <p class="step-count">{{ __('gateway.proposal.step_of', ['step' => 5, 'total' => $stepCount]) }}</p>
 
-                <div class="flex gap-4">
-                    <button @click="step--" class="card-btn card-btn-outline w-1/3">BACK</button>
-                    <button @click="step++; setTimeout(initSignaturePad, 100);" class="card-btn w-2/3" style="background: var(--erp-amber); color: #000;">AUTHORIZATION ➔</button>
-                </div>
-            </div>
-
-            <div class="exec-card" :class="{ 'active': step === 4, 'prev': step === 3, 'hidden-left': step < 3 }" style="border-top-color: {{ ($viewState ?? '') === 'completed' ? 'var(--erp-success)' : 'var(--erp-amber)' }};">
-                <div class="card-meta"><span style="color: {{ ($viewState ?? '') === 'completed' ? 'var(--erp-success)' : 'var(--erp-amber)' }};">05 // 05</span> <span class="pulse-dot" style="background: {{ ($viewState ?? '') === 'completed' ? 'var(--erp-success)' : 'var(--erp-amber)' }}; box-shadow: none;"></span></div>
-                
-                @if(($viewState ?? '') === 'completed')
-                    <div class="flex flex-col items-center justify-center h-full text-center">
-                        <i data-lucide="shield-check" style="width: 80px; height: 80px; color: var(--erp-success); margin-bottom: 20px;"></i>
-                        <h3 class="text-3xl font-black text-white uppercase tracking-widest mb-2">SOW SECURED</h3>
-                        <p class="text-sm text-erp-muted mb-6">Cryptographic binding confirmed. Initializing Client OS.</p>
-                        <p class="text-xs font-mono text-erp-teal mb-6">A secure access link has been dispatched to your email.</p>
-                        <button @click="isExecMode = false; $nextTick(() => paginateSOW());" class="card-btn w-full" style="background: transparent; border: 1px solid var(--erp-teal); color: var(--erp-teal);">VIEW IMMUTABLE DOCUMENT</button>
+                @if (($viewState ?? '') === 'completed')
+                    <h2 class="section-title">{{ __('gateway.proposal.signed_title') }}</h2>
+                    <div class="alert alert-success" role="status">
+                        <i data-lucide="circle-check"></i>
+                        <span>{{ __('gateway.proposal.signed_body') }}</span>
+                    </div>
+                    <p class="muted" style="margin: 16px 0 0;">{{ __('gateway.proposal.setup_note') }}</p>
+                    <div class="step-actions">
+                        <button type="button" @click="isExecMode = false; $nextTick(() => paginateSOW());" class="btn btn-secondary">
+                            <i data-lucide="file-text"></i> {{ __('gateway.proposal.view_signed') }}
+                        </button>
                     </div>
 
-                @elseif(($viewState ?? '') === 'otp_verification')
-                    <h3 class="text-xl font-black uppercase tracking-tighter mb-2 text-white text-center">MULTI-FACTOR AUTHORIZATION</h3>
-                    <p class="text-[11px] text-erp-muted mb-6 text-center">A cryptographic OTP has been transmitted to <strong>{{ $signerEmail ?? '' }}</strong> to verify node authority.</p>
-                    
-                    @if(session()->has('error'))
-                        <div style="background: rgba(255,51,102,0.1); border: 1px solid #FF3366; color: #FF3366; padding: 10px; font-family: 'Roboto Mono'; font-size: 0.7rem; margin-bottom: 15px; text-align: center;">{{ session('error') }}</div>
+                @elseif (($viewState ?? '') === 'otp_verification')
+                    <h2 class="section-title">{{ __('gateway.proposal.code_title') }}</h2>
+                    <p class="step-body" style="margin: 0 0 16px;">{{ filled($signerEmail ?? null) ? __('gateway.proposal.code_sent', ['email' => $signerEmail]) : __('gateway.proposal.code_sent_generic') }}</p>
+
+                    @if (session()->has('error'))
+                        <div class="alert alert-danger" role="alert" style="margin-bottom: 16px;">
+                            <i data-lucide="circle-alert"></i>
+                            <span>{{ session('error') }}</span>
+                        </div>
                     @endif
 
-                    <form wire:submit.prevent="verifyOtpAndExecuteLaunch" class="flex flex-col h-full">
-                        <div class="mb-auto mt-4">
-                            <label style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-amber); display: block; margin-bottom: 10px; text-align: center;">ENTER 6-DIGIT PROTOCOL</label>
-                            <input type="text" wire:model.defer="otpInput" class="cyber-input" placeholder="• • • • • •" required maxlength="6" style="text-align: center; font-size: 1.5rem; letter-spacing: 8px; border-color: var(--erp-amber); height: 70px; font-weight: bold;">
-                            @error('otpInput') <span style="color: #FF3366; font-family: 'Roboto Mono', monospace; font-size: 0.7rem; text-align: center; display: block;">{{ $message }}</span> @enderror
+                    <form wire:submit.prevent="verifyOtpAndExecuteLaunch">
+                        <div class="field">
+                            <label for="proposal-otp" class="label">{{ __('gateway.common.code_label') }}</label>
+                            <input type="text" id="proposal-otp" wire:model.defer="otpInput" class="input otp-input" inputmode="numeric" autocomplete="one-time-code" required maxlength="6" aria-describedby="proposal-otp-help">
+                            <span id="proposal-otp-help" class="help">{{ __('gateway.common.code_help') }}</span>
+                            @error('otpInput') <span class="field-error" role="alert">{{ $message }}</span> @enderror
                         </div>
 
-                        <div class="flex flex-col gap-3 mt-auto">
-                            <button type="submit" class="card-btn w-full" style="background: var(--erp-success); color: #000;" wire:loading.attr="disabled">
-                                <span wire:loading.remove wire:target="verifyOtpAndExecuteLaunch">VERIFY & BIND ➔</span>
-                                <span wire:loading wire:target="verifyOtpAndExecuteLaunch">EXECUTING MATRICES...</span>
+                        <div class="step-actions">
+                            <button type="button" @click="isExecMode = false; $nextTick(() => paginateSOW());" class="btn btn-secondary">
+                                <i data-lucide="file-text"></i> {{ __('gateway.proposal.read_document') }}
                             </button>
-                            <button type="button" @click="isExecMode = false; $nextTick(() => paginateSOW());" class="card-btn card-btn-outline w-full" style="padding: 10px; font-size: 0.7rem;">REVIEW A4 DOCUMENT</button>
+                            <button type="submit" class="btn btn-primary" wire:loading.attr="disabled">
+                                <span wire:loading.remove wire:target="verifyOtpAndExecuteLaunch">{{ __('gateway.proposal.confirm_sign') }}</span>
+                                <span wire:loading wire:target="verifyOtpAndExecuteLaunch">{{ __('gateway.proposal.signing') }}</span>
+                            </button>
                         </div>
                     </form>
 
                 @else
-                    <h3 class="text-xl font-black uppercase tracking-tighter mb-2 text-white">EXECUTIVE BINDING</h3>
-                    
-                    <div style="background: rgba(0, 229, 255, 0.05); border: 1px solid rgba(0, 229, 255, 0.2); padding: 12px; margin-bottom: 15px; text-align: center;">
-                        <p class="text-[10px] text-erp-muted mb-2">Ensure you have reviewed the full immutable legal document before applying your cryptographic seal.</p>
-                        <button type="button" @click="isExecMode = false; $nextTick(() => paginateSOW());" style="background: transparent; border: none; color: var(--erp-teal); font-family: 'Roboto Mono', monospace; font-size: 0.75rem; text-decoration: underline; cursor: pointer;">[ READ FULL DOCUMENT ]</button>
-                    </div>
-                    
+                    <h2 class="section-title">{{ __('gateway.proposal.sign_title') }}</h2>
+                    <p class="step-body" style="margin: 0 0 8px;">{{ __('gateway.proposal.sign_intro') }}</p>
+                    <button type="button" @click="isExecMode = false; $nextTick(() => paginateSOW());" class="btn btn-ghost" style="margin: 0 0 16px -8px;">
+                        <i data-lucide="file-text"></i> {{ __('gateway.proposal.read_document') }}
+                    </button>
+
                     @error('signerEmail')
-                        <div style="background: rgba(255,51,102,0.15); border-left: 4px solid #FF3366; color: #FF3366; padding: 12px 15px; font-family: 'Roboto Mono', monospace; font-size: 0.75rem; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; animation: pulse 2s infinite;">
-                            <i data-lucide="alert-triangle" style="width: 16px; height: 16px;"></i>
-                            {{ $message }}
+                        <div class="alert alert-danger" role="alert" style="margin-bottom: 16px;">
+                            <i data-lucide="circle-alert"></i>
+                            <span>{{ $message }}</span>
+                        </div>
+                    @enderror
+                    @error('signingCode')
+                        <div class="alert alert-warning" role="alert" style="margin-bottom: 16px;">
+                            <i data-lucide="clock"></i>
+                            <span>{{ $message }}</span>
                         </div>
                     @enderror
 
-                    <form id="signature-form" class="flex flex-col h-full">
-                        <div class="grid grid-cols-2 gap-3 mb-3">
-                            <input type="text" wire:model.defer="signerName" class="cyber-input !mb-0" placeholder="Full Legal Name" required>
-                            <input type="text" wire:model.defer="signerTitle" class="cyber-input !mb-0" placeholder="Corporate Title" required>
+                    <form id="signature-form" class="flex flex-col gap-4" @submit.prevent="submitSignature()">
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div class="field">
+                                <label for="signer-name" class="label">{{ __('gateway.proposal.full_name') }}</label>
+                                <input type="text" id="signer-name" wire:model.defer="signerName" class="input" autocomplete="name" required>
+                                @error('signerName') <span class="field-error">{{ $message }}</span> @enderror
+                            </div>
+                            <div class="field">
+                                <label for="signer-title" class="label">{{ __('gateway.proposal.job_title') }}</label>
+                                <input type="text" id="signer-title" wire:model.defer="signerTitle" class="input" autocomplete="organization-title" required>
+                                @error('signerTitle') <span class="field-error">{{ $message }}</span> @enderror
+                            </div>
                         </div>
-                        <input type="email" wire:model.defer="signerEmail" class="cyber-input" placeholder="Authorized Executive Email" required>
-                        
-                        <div class="sig-canvas-container flex-grow" wire:ignore>
-                            <span class="absolute top-2 left-2 font-mono text-[8px] text-erp-teal uppercase pointer-events-none">Sign Below:</span>
-                            <button type="button" onclick="clearCanvas()" class="absolute top-2 right-2 font-mono text-[8px] text-erp-muted hover:text-white uppercase z-10">CLEAR</button>
-                            <canvas id="signaturePad"></canvas>
+                        <div class="field">
+                            <label for="signer-email" class="label">{{ __('gateway.proposal.email') }}</label>
+                            <input type="email" id="signer-email" wire:model.defer="signerEmail" class="input" autocomplete="email" required>
                         </div>
 
-                        <div class="flex gap-4 mt-auto">
-                            <button type="button" @click="step--" class="card-btn card-btn-outline prev-card-btn w-1/3">BACK</button>
-                            <button type="button" onclick="submitSignature()" class="card-btn w-2/3" style="background: var(--erp-amber); color: #000;" wire:loading.attr="disabled">
-                                <span wire:loading.remove wire:target="requestAuthorizationOtp">AUTHORIZE ➔</span>
-                                <span wire:loading wire:target="requestAuthorizationOtp">SECURING...</span>
+                        <div class="field">
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="label" id="signature-label">{{ __('gateway.proposal.signature') }}</span>
+                                <button type="button" onclick="clearCanvas()" class="btn btn-ghost btn-sm">{{ __('gateway.common.clear') }}</button>
+                            </div>
+                            <div class="sig-canvas-container" wire:ignore>
+                                <canvas id="signaturePad" role="img" aria-labelledby="signature-label"></canvas>
+                            </div>
+                            <span class="help">{{ __('gateway.proposal.signature_help') }}</span>
+                            <span id="signature-missing" class="field-error" role="alert" hidden>{{ __('gateway.proposal.signature_missing') }}</span>
+                            @error('signatureBase64') <span class="field-error">{{ __('gateway.proposal.signature_missing') }}</span> @enderror
+                        </div>
+
+                        <div class="step-actions">
+                            <button type="button" @click="step--" class="btn btn-secondary"><i data-lucide="arrow-left"></i> {{ __('gateway.common.back') }}</button>
+                            <button type="button" onclick="submitSignature()" class="btn btn-primary" wire:loading.attr="disabled">
+                                <span wire:loading.remove wire:target="requestAuthorizationOtp">{{ __('gateway.proposal.send_code') }}</span>
+                                <span wire:loading wire:target="requestAuthorizationOtp">{{ __('gateway.proposal.sending_code') }}</span>
                             </button>
                         </div>
                     </form>
                 @endif
-            </div>
-
+            </section>
         </div>
-    </div>
 
-
-    <div id="sow-raw-content" style="display: none;">
-        
-        <div class="sow-section w-full mb-8" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <div style="font-family: 'Montserrat'; font-weight: 900; letter-spacing: 2px; font-size: 1.2rem; color: #FFF;">JBS PRAXIS</div>
-                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-teal); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; margin-bottom: 10px;">
-                        Intelligence Desk &bull; intelligence@jbspraxis.com
+        {{-- The document's content: paginateSOW() copies these sections into A4 pages --}}
+        <div id="sow-raw-content" style="display: none;">
+            <div class="sow-section">
+                <div class="doc-head">
+                    <img class="doc-logo" src="/assets/img/logo/jbs-praxis-horizontal-colour.svg" alt="JBS Praxis">
+                    <div class="doc-meta">
+                        <div>{{ __('gateway.common.reference') }}{{ __('gateway.common.colon') }} <strong>{{ $ref }}</strong></div>
+                        <div>{{ __('gateway.common.date') }}{{ __('gateway.common.colon') }} <strong>{{ F::date($proposal->updated_at ?? now()) }}</strong></div>
                     </div>
                 </div>
-                <img src="{{ asset('assets/img/logo_monochrome.svg') }}" style="height: 40px; opacity: 0.9;" alt="JBS Logo" onerror="this.style.display='none'">
+                <hr class="praxis-rule" style="margin: 0;">
             </div>
-            
-            <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: var(--erp-muted); margin-top: 10px;">
-                <span style="margin-right: 20px;">REF: <span style="color: #FFF; font-weight: bold;">PRX-{{ strtoupper(substr($token ?? 'DRAFT', 0, 8)) }}</span></span>
-                <span>DATE: <span style="color: #FFF;">{{ \Carbon\Carbon::parse($proposal->updated_at ?? now())->format('F j, Y') }}</span></span>
-            </div>
-        </div>
 
-        <div class="sow-section mb-8">
-            <h1 style="font-family: 'Montserrat'; font-size: 1.8rem; font-weight: 900; color: #FFF; text-transform: uppercase; border-bottom: 2px solid var(--erp-teal); padding-bottom: 15px; margin-bottom: 20px; letter-spacing: -0.5px;">{{ $proposal->title ?? 'DOCUMENT TITLE' }}</h1>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; background: rgba(255,255,255,0.02); padding: 20px; border: 1px solid rgba(255,255,255,0.05); font-family: 'Roboto Mono', monospace; font-size: 0.7rem;">
-                <div><span style="color: var(--erp-muted);">CLIENT:</span> <span style="color: #FFF; font-weight: bold;">{{ strtoupper($organization->name ?? 'UNKNOWN') }}</span></div>
-                <div><span style="color: var(--erp-muted);">CURRENCY:</span> <span style="color: var(--erp-teal); font-weight: bold;">{{ $proposal->currency ?? 'USD' }}</span></div>
-                <div><span style="color: var(--erp-muted);">VALIDITY:</span> <span style="color: #FFF; font-weight: bold;">{{ $proposal->validity_days ?? 7 }} DAYS</span></div>
-                <div>
-                    <span style="color: var(--erp-muted);">PAYMENT PLAN:</span> 
-                    <span style="color: #FFF; font-weight: bold;">
-                        @if(($proposal->payment_schedule_type ?? '') === 'custom')
-                            {{ (float)($proposal->custom_deposit_percent ?? 0) }}% Upfront Deposit
-                        @else
-                            {{ str_replace('_', '/', $proposal->payment_schedule_type ?? 'Standard') }} Split
-                        @endif
-                    </span>
+            <div class="sow-section">
+                <div class="doc-kicker">{{ __('gateway.proposal.kicker') }}</div>
+                <h1 class="doc-title">{{ $proposal->title ?? '' }}</h1>
+                <div class="doc-facts">
+                    <div><span>{{ __('gateway.proposal.doc.organisation') }}{{ __('gateway.common.colon') }}</span> <strong>{{ $company }}</strong></div>
+                    <div><span>{{ __('gateway.proposal.doc.currency') }}{{ __('gateway.common.colon') }}</span> <strong>{{ $currency }}</strong></div>
+                    <div><span>{{ __('gateway.proposal.validity') }}{{ __('gateway.common.colon') }}</span> <strong>{{ trans_choice('gateway.proposal.validity_days', $validityDays, ['days' => $validityDays]) }}</strong></div>
+                    <div><span>{{ __('gateway.proposal.payment_terms') }}{{ __('gateway.common.colon') }}</span> <strong>{{ $schedule }}</strong></div>
                 </div>
             </div>
-        </div>
 
-        <div class="sow-section mb-6">
-            <h2 style="font-family: 'Montserrat'; font-size: 0.9rem; font-weight: 900; color: var(--erp-teal); margin-bottom: 10px; text-transform: uppercase;">I. EXECUTIVE SUMMARY</h2>
-            <p style="font-size: 0.8rem; color: #B0B8C4; line-height: 1.6; white-space: pre-wrap; text-align: justify;">{{ $narrative->ai_executive_summary ?? 'Pending...' }}</p>
-        </div>
-
-        <div class="sow-section mb-6">
-            <h2 style="font-family: 'Montserrat'; font-size: 0.9rem; font-weight: 900; color: var(--erp-teal); margin-bottom: 10px; text-transform: uppercase;">II. OPERATIONAL STRATEGY</h2>
-            <p style="font-size: 0.8rem; color: #B0B8C4; line-height: 1.6; white-space: pre-wrap; text-align: justify;">{{ $narrative->ai_operational_strategy ?? 'Pending...' }}</p>
-        </div>
-
-        @if(!empty($selectedTech) && count($selectedTech) > 0)
-        <div class="sow-section mb-8">
-            <div style="background: rgba(0,229,255,0.02); border-left: 2px solid var(--erp-teal); padding: 15px; font-family: 'Roboto Mono', monospace; font-size: 0.65rem;">
-                <strong style="color: var(--erp-teal); display: block; margin-bottom: 10px; text-transform: uppercase;">> ARCHITECTURE & COMPLIANCE STACK:</strong>
-                <ul style="list-style-type: none; padding: 0; margin: 0; color: #E2E8F0; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
-                    @foreach($selectedTech as $tech)
-                        <li>- {{ $tech }}</li>
-                    @endforeach
-                </ul>
+            <div class="sow-section">
+                <h2 class="doc-h2">{{ __('gateway.proposal.doc.executive_summary') }}</h2>
+                <p class="doc-text">{{ $narrative->ai_executive_summary ?? __('gateway.proposal.doc.pending_text') }}</p>
             </div>
-        </div>
-        @endif
 
-        <div class="sow-section mb-8">
-            <h2 style="font-family: 'Montserrat'; font-size: 0.9rem; font-weight: 900; color: var(--erp-teal); margin-bottom: 15px; text-transform: uppercase;">III. DEPLOYMENT SPRINTS</h2>
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-                @if(!empty($phases))
-                    @foreach($phases as $phase)
-                        <div style="background: rgba(255,255,255,0.02); border-left: 2px solid var(--erp-teal); padding: 15px;">
-                            <strong style="font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-teal); display: block; margin-bottom: 5px;">{{ $phase['title'] ?? '' }}</strong>
-                            <span style="font-size: 0.8rem; color: #B0B8C4;">{{ $phase['body'] ?? '' }}</span>
+            <div class="sow-section">
+                <h2 class="doc-h2">{{ __('gateway.proposal.approach_title') }}</h2>
+                <p class="doc-text">{{ $narrative->ai_operational_strategy ?? __('gateway.proposal.doc.pending_text') }}</p>
+            </div>
+
+            @if (!empty($selectedTech) && count($selectedTech) > 0)
+                <div class="sow-section">
+                    <h2 class="doc-h2">{{ __('gateway.proposal.tech_title') }}</h2>
+                    <ul class="doc-list">
+                        @foreach ($selectedTech as $tech)
+                            <li>{{ $tech }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            <div class="sow-section">
+                <h2 class="doc-h2">{{ __('gateway.proposal.plan_title') }}</h2>
+                @if (!empty($phases))
+                    @foreach ($phases as $phase)
+                        <div class="doc-phase">
+                            <strong>{{ $phase['label'] ?? '' }}</strong>
+                            <span>{{ $phase['body'] ?? '' }}</span>
                         </div>
                     @endforeach
                 @else
-                    <div style="font-size: 0.8rem; color: var(--erp-muted);">Sprint definitions pending...</div>
+                    <p class="doc-note">{{ __('gateway.proposal.doc.pending_text') }}</p>
                 @endif
             </div>
-        </div>
 
-        <div class="sow-section mb-8">
-            <h2 style="font-family: 'Montserrat'; font-size: 0.9rem; font-weight: 900; color: var(--erp-teal); margin-bottom: 15px; text-transform: uppercase;">IV. COMMERCIAL BLUEPRINT</h2>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; font-family: 'Roboto Mono', monospace; font-size: 0.7rem;">
-                <thead>
-                    <tr style="background: rgba(0, 229, 255, 0.1); color: var(--erp-teal);">
-                        <th style="padding: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: left;">CODE</th>
-                        <th style="padding: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: left;">DESCRIPTION</th>
-                        <th style="padding: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: center;">QTY</th>
-                        <th style="padding: 10px; border: 1px solid rgba(255,255,255,0.1); text-align: right;">TOTAL</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if(!empty($lineItems))
-                        @foreach($lineItems as $line)
+            <div class="sow-section">
+                <h2 class="doc-h2">{{ __('gateway.proposal.fees_title') }}</h2>
+                <table class="doc-table">
+                    <thead>
+                        <tr>
+                            <th>{{ __('gateway.proposal.code') }}</th>
+                            <th>{{ __('gateway.proposal.description') }}</th>
+                            <th class="num">{{ __('gateway.proposal.quantity') }}</th>
+                            <th class="num">{{ __('gateway.proposal.amount') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($lineItems as $line)
                             <tr>
-                                <td style="padding: 10px; border: 1px solid rgba(255,255,255,0.05); color: #FFF; font-weight: bold;">{{ $line->code ?? '-' }}</td>
-                                <td style="padding: 10px; border: 1px solid rgba(255,255,255,0.05); color: var(--erp-muted);">{{ $line->description ?? '-' }}</td>
-                                <td style="padding: 10px; border: 1px solid rgba(255,255,255,0.05); color: #FFF; text-align: center;">{{ $line->quantity ?? '-' }}</td>
-                                <td style="padding: 10px; border: 1px solid rgba(255,255,255,0.05); color: #FFF; text-align: right;">{{ number_format($line->total_price ?? 0, 2) }}</td>
+                                <td style="color: var(--color-ink); font-weight: 600;">{{ $line->code ?? '' }}</td>
+                                <td>{{ $line->description ?? '' }}</td>
+                                <td class="num">{{ $line->quantity ?? '' }}</td>
+                                <td class="num">{{ F::money($line->total_price ?? 0, $currency) }}</td>
                             </tr>
                         @endforeach
-                    @endif
-                </tbody>
-            </table>
-            <div style="text-align: right; font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-muted);">
-                <div style="margin-bottom: 5px;">SUBTOTAL: {{ $proposal->currency ?? 'USD' }} {{ number_format($proposal->subtotal ?? 0, 2) }}</div>
-                <div style="margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">TAX ({{ $proposal->vat_rate ?? 0 }}%): {{ $proposal->currency ?? 'USD' }} {{ number_format(($proposal->total_value ?? 0) - ($proposal->subtotal ?? 0), 2) }}</div>
-                <div style="font-size: 1.1rem; font-weight: bold; color: var(--erp-teal);">TOTAL: {{ $proposal->currency ?? 'USD' }} {{ number_format($proposal->total_value ?? 0, 2) }}</div>
+                    </tbody>
+                </table>
+                <div class="doc-totals">
+                    <div><span>{{ __('gateway.proposal.subtotal') }}</span><span>{{ F::money($proposal->subtotal ?? 0, $currency) }}</span></div>
+                    <div><span>{{ __('gateway.proposal.vat', ['rate' => F::percent($proposal->vat_rate ?? 0)]) }}</span><span>{{ F::money($vatAmount, $currency) }}</span></div>
+                    <div class="grand"><span>{{ __('gateway.proposal.total') }}</span><span>{{ F::money($proposal->total_value ?? 0, $currency) }}</span></div>
+                </div>
             </div>
-        </div>
 
-        @if(!empty($proposal->exclusions))
-        <div class="sow-section mb-6">
-            <h2 style="font-family: 'Montserrat'; font-size: 0.9rem; font-weight: 900; color: var(--erp-red); margin-bottom: 10px; text-transform: uppercase;">V. BOUNDARIES & EXCLUSIONS</h2>
-            <p style="font-size: 0.75rem; color: #FF8A8A; line-height: 1.6; white-space: pre-wrap;">{{ $proposal->exclusions }}</p>
-        </div>
-        @endif
+            @if (!empty($proposal->exclusions))
+                <div class="sow-section">
+                    <h2 class="doc-h2">{{ __('gateway.proposal.doc.exclusions') }}</h2>
+                    <p class="doc-text">{{ $proposal->exclusions }}</p>
+                </div>
+            @endif
 
-        <div class="sow-section mb-8">
-            <h2 style="font-family: 'Montserrat'; font-size: 0.9rem; font-weight: 900; color: var(--erp-teal); margin-bottom: 15px; text-transform: uppercase;">{{ !empty($proposal->exclusions) ? 'VI.' : 'V.' }} EXECUTIVE AUTHORIZATION</h2>
-            
-            <div class="dual-signature-grid">
-                <div class="sig-box hq-stamp">
-                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: bold; margin-bottom: 15px; border-bottom: 1px dashed rgba(255,255,255,0.2); padding-bottom: 10px; color: var(--erp-teal); text-align: center;">✓ ORIGINATOR SECURED</div>
-                    <div style="height: 60px; margin-bottom: 10px; display: flex; justify-content: center;">
-                        <img src="{{ $proposal->hq_signature_b64 ?? '' }}" style="max-height: 100%; object-fit: contain;">
+            <div class="sow-section">
+                <h2 class="doc-h2">{{ __('gateway.proposal.doc.signatures') }}</h2>
+                <div class="doc-sig-grid">
+                    <div class="doc-sig">
+                        <div class="doc-sig-head">{{ __('gateway.proposal.doc.for_praxis') }}</div>
+                        <div class="doc-sig-img">
+                            @if (filled($proposal->hq_signature_b64 ?? null))
+                                <img src="{{ $proposal->hq_signature_b64 }}" alt="">
+                            @endif
+                        </div>
+                        <dl class="doc-dl">
+                            <dt>{{ __('gateway.proposal.doc.name') }}</dt><dd>{{ $proposal->hq_signer_name ?? '—' }}</dd>
+                            <dt>{{ __('gateway.common.signed_on') }}</dt><dd>{{ filled($proposal->hq_signed_at ?? null) ? F::dateTime($proposal->hq_signed_at) : '—' }}</dd>
+                            <dt>{{ __('gateway.common.ip_address') }}</dt><dd>{{ $proposal->hq_ip_address ?? '—' }}</dd>
+                        </dl>
+                        <div class="doc-hash"><span>{{ __('gateway.common.fingerprint') }}</span>{{ $proposal->hq_signature_hash ?? __('gateway.proposal.doc.not_signed') }}</div>
                     </div>
-                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #FFF; margin-bottom: 5px; display: flex; justify-content: space-between;"><span>DISPATCHER:</span><span>{{ strtoupper($proposal->hq_signer_name ?? 'SYSTEM') }}</span></div>
-                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #FFF; margin-bottom: 5px; display: flex; justify-content: space-between;"><span>TIMESTAMP:</span><span>{{ !empty($proposal->hq_signed_at) ? \Carbon\Carbon::parse($proposal->hq_signed_at)->format('Y-m-d H:i:s') : '-' }}</span></div>
-                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #FFF; margin-bottom: 5px; display: flex; justify-content: space-between;"><span>NODE IP:</span><span>{{ $proposal->hq_ip_address ?? '-' }}</span></div>
-                    <div style="font-family: 'Roboto Mono', monospace; font-size: 0.55rem; color: var(--erp-teal); font-weight: bold; word-break: break-all; margin-top: 10px; border-top: 1px dashed rgba(0,229,255,0.3); padding-top: 10px; text-align: center;">
-                        {{ $proposal->hq_signature_hash ?? 'PRX-AUTH-PENDING' }}
-                    </div>
+
+                    @if (($viewState ?? '') === 'completed')
+                        <div class="doc-sig">
+                            <div class="doc-sig-head">
+                                <span>{{ __('gateway.proposal.doc.for_client', ['company' => $company]) }}</span>
+                                <span class="pill pill-success">{{ __('gateway.status.proposal_signed') }}</span>
+                            </div>
+                            <div class="doc-sig-img">
+                                @if (filled($proposal->client_signature_b64 ?? null))
+                                    <img src="{{ $proposal->client_signature_b64 }}" alt="">
+                                @endif
+                            </div>
+                            <dl class="doc-dl">
+                                <dt>{{ __('gateway.proposal.doc.name') }}</dt><dd>{{ $proposal->signed_by_name ?? '' }}</dd>
+                                <dt>{{ __('gateway.common.signed_on') }}</dt><dd>{{ filled($proposal->signed_at ?? null) ? F::dateTime($proposal->signed_at) : '—' }}</dd>
+                                <dt>{{ __('gateway.common.ip_address') }}</dt><dd>{{ $proposal->client_ip_address ?? '—' }}</dd>
+                            </dl>
+                            <div class="doc-hash"><span>{{ __('gateway.common.fingerprint') }}</span>{{ $proposal->client_signature_hash ?? '' }}</div>
+                        </div>
+                    @elseif (($viewState ?? '') === 'otp_verification')
+                        <div class="doc-sig">
+                            <div class="doc-sig-head">
+                                <span>{{ __('gateway.proposal.doc.for_client', ['company' => $company]) }}</span>
+                                <span class="pill pill-warning">{{ __('gateway.proposal.doc.awaiting_code') }}</span>
+                            </div>
+                            <div class="doc-sig-img">
+                                @if (filled($proposal->client_signature_b64 ?? null))
+                                    <img src="{{ $proposal->client_signature_b64 }}" alt="" style="opacity: 0.6;">
+                                @endif
+                            </div>
+                            <dl class="doc-dl">
+                                <dt>{{ __('gateway.proposal.doc.name') }}</dt><dd>{{ explode(' (', $proposal->signed_by_name ?? '')[0] ?? '' }}</dd>
+                                <dt>{{ __('gateway.common.signed_on') }}</dt><dd>—</dd>
+                            </dl>
+                        </div>
+                    @else
+                        <div class="doc-sig">
+                            <div class="doc-sig-head">
+                                <span>{{ __('gateway.proposal.doc.for_client', ['company' => $company]) }}</span>
+                                <span class="pill pill-warning">{{ __('gateway.proposal.doc.awaiting_you') }}</span>
+                            </div>
+                            <div class="doc-sig-img"></div>
+                            <p class="doc-note" style="margin: 0;">{{ __('gateway.proposal.doc.sign_from_summary') }}</p>
+                        </div>
+                    @endif
                 </div>
 
-                @if(($viewState ?? '') === 'completed')
-                    <div class="sig-box client-stamp">
-                        <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: bold; margin-bottom: 15px; border-bottom: 1px dashed rgba(255,255,102,0.2); padding-bottom: 10px; color: #00FF66; text-align: center;">✓ COUNTER-SIGNED</div>
-                        <div style="height: 60px; margin-bottom: 10px; display: flex; justify-content: center;">
-                            <img src="{{ $proposal->client_signature_b64 ?? '' }}" style="max-height: 100%; object-fit: contain;">
-                        </div>
-                        <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #FFF; margin-bottom: 5px; display: flex; justify-content: space-between;"><span>SIGNATORY:</span><span>{{ strtoupper($proposal->signed_by_name ?? '') }}</span></div>
-                        <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #FFF; margin-bottom: 5px; display: flex; justify-content: space-between;"><span>TIMESTAMP:</span><span>{{ !empty($proposal->signed_at) ? \Carbon\Carbon::parse($proposal->signed_at)->format('Y-m-d H:i:s') : '-' }}</span></div>
-                        <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #FFF; margin-bottom: 5px; display: flex; justify-content: space-between;"><span>NODE IP:</span><span>{{ $proposal->client_ip_address ?? '-' }}</span></div>
-                        <div style="font-family: 'Roboto Mono', monospace; font-size: 0.55rem; color: #00FF66; font-weight: bold; word-break: break-all; margin-top: 10px; border-top: 1px dashed rgba(0,255,102,0.3); padding-top: 10px; text-align: center;">
-                            {{ $proposal->client_signature_hash ?? 'HASH_PENDING' }}
-                        </div>
-                    </div>
-                @elseif(($viewState ?? '') === 'otp_verification')
-                    <div class="sig-box pending-stamp">
-                        <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: bold; margin-bottom: 15px; border-bottom: 1px dashed rgba(255,189,46,0.3); padding-bottom: 10px; color: var(--erp-amber); text-align: center; animation: pulse 2s infinite;">PENDING OTP VERIFICATION</div>
-                        <div style="height: 60px; margin-bottom: 10px; display: flex; justify-content: center; opacity: 0.7;">
-                            <img src="{{ $proposal->client_signature_b64 ?? '' }}" style="max-height: 100%; object-fit: contain;">
-                        </div>
-                        <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #FFF; margin-bottom: 5px; display: flex; justify-content: space-between;"><span>SIGNATORY:</span><span>{{ strtoupper(explode(' (', $proposal->signed_by_name ?? '')[0] ?? 'PENDING') }}</span></div>
-                        <div style="font-family: 'Roboto Mono', monospace; font-size: 0.65rem; color: #FFF; margin-bottom: 5px; display: flex; justify-content: space-between;"><span>TIMESTAMP:</span><span>AWAITING OTP</span></div>
-                        <div style="font-family: 'Roboto Mono', monospace; font-size: 0.55rem; color: var(--erp-amber); font-weight: bold; word-break: break-all; margin-top: 10px; border-top: 1px dashed rgba(255,189,46,0.3); padding-top: 10px; text-align: center;">AUTHORIZATION PAUSED</div>
-                    </div>
-                @else
-                    <div class="sig-box" style="border-color: rgba(255,255,255,0.1); background: rgba(0,0,0,0.2);">
-                        <div style="font-family: 'Roboto Mono', monospace; font-size: 0.8rem; font-weight: bold; margin-bottom: 15px; border-bottom: 1px dashed rgba(255,255,255,0.2); padding-bottom: 10px; color: var(--erp-muted); text-align: center;">AWAITING CLIENT BINDING</div>
-                        <div style="flex: 1; display: flex; align-items: center; justify-content: center; color: var(--erp-muted); font-size: 0.7rem; font-family: 'Roboto Mono'; text-align: center;">Return to Executive Deck to sign.</div>
-                    </div>
-                @endif
-            </div>
-            
-            @if(($viewState ?? '') === 'completed')
-                <div style="margin-top: 30px; padding: 20px; border: 1px dashed rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); display: flex; gap: 20px; align-items: center;">
+                @if (($viewState ?? '') === 'completed')
                     @php
                         $baseUrl = str(route('portal.verify.contract', ['hash' => 'HASH']))->beforeLast('/HASH')->toString();
                         $hqHash = $proposal->hq_signature_hash ?? '';
                         $cliHash = $proposal->client_signature_hash ?? '';
                         $qrData = "URL:{$baseUrl}/{$cliHash} | ORG:{$hqHash} | CLT:{$cliHash}";
                     @endphp
-                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{ urlencode($qrData) }}&color=00FF66&bgcolor=03050A" style="width: 80px; height: 80px; border: 2px solid #00FF66; padding: 4px; background: #03050A;">
-                    <div style="font-family: 'Roboto Mono', monospace;">
-                        <div style="font-size: 1rem; font-weight: bold; color: var(--erp-white); letter-spacing: 2px;">JBS PRAXIS HQ</div>
-                        <div style="font-size: 0.7rem; color: #00FF66; margin-bottom: 5px;">✓ DUAL-NODE CRYPTOGRAPHY VERIFIED</div>
-                        <div style="font-size: 0.6rem; color: var(--erp-muted);">Scan cryptographic matrix to verify origin immutability on Praxis servers.</div>
+                    <div class="doc-verify">
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data={{ urlencode($qrData) }}&color=0C142B&bgcolor=FFFFFF" alt="">
+                        <div>
+                            <div style="font-size: 0.8125rem; font-weight: 600; color: var(--color-ink);">{{ __('gateway.proposal.doc.verify_title') }}</div>
+                            <div class="doc-note">{{ __('gateway.proposal.doc.verify_body') }}</div>
+                        </div>
                     </div>
-                </div>
-            @endif
-        </div>
-    </div>
-
-    <div id="full-dossier-wrapper" class="a4-wrapper" x-show="!isExecMode" style="display: none;">
-        <div id="pdf-render-zone" style="display: flex; flex-direction: column; gap: 40px;">
+                @endif
             </div>
-    </div>
+        </div>
+
+        <div id="full-document-wrapper" class="a4-wrapper" x-show="!isExecMode" style="display: none;">
+            <div id="pdf-render-zone"></div>
+        </div>
+    </main>
 
     <script>
-        document.addEventListener("DOMContentLoaded", () => { if(typeof lucide !== 'undefined') lucide.createIcons(); initSignaturePad(); });
-        document.addEventListener("livewire:navigated", () => { if(typeof lucide !== 'undefined') lucide.createIcons(); initSignaturePad(); });
+        document.addEventListener("DOMContentLoaded", () => { initSignaturePad(); });
+        document.addEventListener("livewire:navigated", () => { initSignaturePad(); });
 
-        // --- CLIENT SIGNATURE PAD ENGINE ---
+        const gatewayText = {
+            preparing: @js(__('gateway.common.preparing_pdf')),
+            pdfFailed: @js(__('gateway.common.pdf_failed')),
+            pageOf: @js(__('gateway.common.page_of')),
+            footer: @js(__('gateway.proposal.doc.footer', ['ref' => $ref])),
+            filename: @js(__('gateway.proposal.pdf_filename', ['ref' => Str::slug($ref)])),
+        };
+
+        // --- Signature pad ---
         let canvas, ctx, isDrawing = false;
         function initSignaturePad() {
             canvas = document.getElementById('signaturePad');
-            if(!canvas) return;
+            if (!canvas) return;
             ctx = canvas.getContext('2d');
             setTimeout(() => {
-                canvas.width = canvas.parentElement.offsetWidth;
-                canvas.height = canvas.parentElement.offsetHeight;
-                ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#00E5FF'; 
+                canvas.width = canvas.parentElement.clientWidth;
+                canvas.height = canvas.parentElement.clientHeight;
+                ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#0C142B';
             }, 100);
 
             const startPosition = (e) => { isDrawing = true; draw(e); };
@@ -499,42 +612,41 @@
             canvas.addEventListener('mousemove', draw); canvas.addEventListener('touchstart', startPosition, {passive: false});
             canvas.addEventListener('touchend', finishPosition); canvas.addEventListener('touchmove', draw, {passive: false});
         }
-        function clearCanvas() { if(ctx && canvas) { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.beginPath(); } }
+        function clearCanvas() { if (ctx && canvas) { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.beginPath(); } }
         function submitSignature() {
-            if(!canvas) return;
+            if (!canvas) return;
+            const missing = document.getElementById('signature-missing');
             const dataUrl = canvas.toDataURL('image/png');
             const blank = document.createElement('canvas'); blank.width = canvas.width; blank.height = canvas.height;
-            if(dataUrl === blank.toDataURL()) { alert("SYSTEM HALT: Please provide your cryptographic signature."); return; }
+            if (dataUrl === blank.toDataURL()) { if (missing) missing.hidden = false; return; }
+            if (missing) missing.hidden = true;
             @this.call('requestAuthorizationOtp', dataUrl);
         }
 
-        // --- DOM PAGINATOR (Builds beautiful on-screen A4 pages) ---
+        // --- Pages the document into A4 sheets on screen ---
         function paginateSOW() {
             const rawContent = document.getElementById('sow-raw-content');
             const renderZone = document.getElementById('pdf-render-zone');
             if (!rawContent || !renderZone) return;
 
-            // Optional Loader
-            renderZone.innerHTML = '<div style="text-align:center; padding: 40px; font-family: \'Roboto Mono\'; color: #00E5FF;">Compiling Cryptographic Matrix...</div>';
-            
+            renderZone.innerHTML = '';
             setTimeout(() => {
                 renderZone.innerHTML = '';
                 let pageNum = 1;
                 let currentPage = createA4Page(pageNum);
                 renderZone.appendChild(currentPage);
-                
+
                 let contentArea = currentPage.querySelector('.page-content');
-                // 1012px is roughly the inner available height of 297mm A4 with 110px total vertical padding
-                const MAX_HEIGHT = contentArea.clientHeight || 1012; 
+                // The writing area ends where the bottom padding (which keeps clear of the footer) begins
+                const limit = () => (contentArea.clientHeight || 1123) - parseFloat(getComputedStyle(contentArea).paddingBottom || 0);
 
                 Array.from(rawContent.children).forEach((child) => {
                     const clone = child.cloneNode(true);
                     contentArea.appendChild(clone);
-                    
-                    // If adding this section caused an overflow, move it to a new page
-                    if (contentArea.scrollHeight > MAX_HEIGHT) {
+
+                    // A section that runs past the writing area moves to a new page
+                    if (contentArea.children.length > 1 && clone.offsetTop + clone.offsetHeight > limit()) {
                         contentArea.removeChild(clone);
-                        
                         pageNum++;
                         currentPage = createA4Page(pageNum);
                         renderZone.appendChild(currentPage);
@@ -542,8 +654,7 @@
                         contentArea.appendChild(clone);
                     }
                 });
-                
-                // Inject the final total page count across all footers
+
                 document.querySelectorAll('.total-pages').forEach(el => el.innerText = pageNum);
             }, 50);
         }
@@ -551,80 +662,65 @@
         function createA4Page(num) {
             const page = document.createElement('div');
             page.className = 'a4-page';
-            
-            // The SVG Background String
-            const bgSvg = "data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h40v40H0V0zm20 20h20v20H20V20zM0 20h20v20H0V20z' fill='%23ffffff' fill-opacity='0.01' fill-rule='evenodd'/%3E%3C/svg%3E";
-            
+            const pageLabel = gatewayText.pageOf.replace(':page', num).replace(':total', '<span class="total-pages"></span>');
             page.innerHTML = `
-                <div style="position: absolute; inset: 0; background-image: url(\"${bgSvg}\"); pointer-events: none; z-index: 0;"></div>
-                <div class="doc-watermark" style="top: 40px; right: -30px; font-family: 'Roboto Mono', monospace; font-size: 8rem; color: rgba(255,255,255,0.015); font-weight: 900; pointer-events: none; transform: rotate(-90deg); transform-origin: top right; position: absolute; letter-spacing: -2px; z-index: 1;">SOW.BINDING</div>
-                
                 <div class="page-content"></div>
-                
-                <div style="position: absolute; bottom: 30px; left: 60px; right: 60px; display: flex; justify-content: space-between; font-family: 'Roboto Mono', monospace; font-size: 0.6rem; color: var(--erp-muted); border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px; z-index: 10;">
-                    <div>JBS PRAXIS // ENTERPRISE ARCHITECTURE</div>
-                    <div>PAGE ${num} OF <span class="total-pages"></span></div>
+                <div class="page-footer">
+                    <div></div>
+                    <div>${pageLabel}</div>
                 </div>
             `;
+            page.querySelector('.page-footer div').textContent = gatewayText.footer;
             return page;
         }
 
-        // --- PDF GENERATOR (Flawless 1:1 Rendering) ---
+        // --- PDF download (the A4 pages, one to one) ---
         async function triggerPdfDownload() {
             const btn = document.getElementById('downloadPdfBtn');
             if (!btn) return;
-            const origHTML = btn.innerHTML;
-            const origTooltip = btn.getAttribute('data-tooltip');
-            
-            btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="w-5 h-5 animate-spin" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="4.93" x2="19.07" y2="7.76"></line></svg>`;
-            btn.setAttribute('data-tooltip', 'GENERATING PDF...');
-            btn.style.pointerEvents = "none";
-            
+            const label = btn.querySelector('.pdf-label');
+            const original = label ? label.textContent : '';
+            if (label) label.textContent = gatewayText.preparing;
+            btn.disabled = true;
+
             await new Promise(r => setTimeout(r, 100));
 
             try {
-                const wrapper = document.getElementById('full-dossier-wrapper');
+                const wrapper = document.getElementById('full-document-wrapper');
                 const renderZone = document.getElementById('pdf-render-zone');
-                
+
                 const wasHidden = wrapper.style.display === 'none';
-                if(wasHidden) {
+                if (wasHidden) {
                     wrapper.style.display = 'flex';
-                    paginateSOW(); 
-                    await new Promise(r => setTimeout(r, 200)); // wait for DOM paginator
+                    paginateSOW();
+                    await new Promise(r => setTimeout(r, 200));
                 }
 
-                // 1. Temporarily strip visual UI gaps/borders so the PDF engine joins the pages seamlessly
+                // Join the pages without the on-screen gaps and borders
                 const origGap = renderZone.style.gap;
-                renderZone.style.gap = '0px'; 
+                renderZone.style.gap = '0px';
                 const pages = document.querySelectorAll('.a4-page');
-                pages.forEach(p => { p.style.border = 'none'; p.style.boxShadow = 'none'; });
+                pages.forEach(p => { p.style.border = 'none'; });
 
-                // 2. Format Client Name dynamically
-                const clientName = "{{ strtoupper(str_replace(' ', '_', $organization->name ?? 'CLIENT')) }}";
-
-                // 3. Command html2pdf
                 const opt = {
-                    margin: 0, // NO margins. Allows the #0A1128 background to reach the true edge.
-                    filename: `SOW_JBS_PRAXIS_${clientName}.pdf`,
+                    margin: 0,
+                    filename: gatewayText.filename + '.pdf',
                     image: { type: 'jpeg', quality: 1.0 },
-                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#0A1128' },
+                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#FFFFFF' },
                     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
                 };
 
                 await html2pdf().set(opt).from(renderZone).save();
-                
-                // 4. Restore UI
+
                 renderZone.style.gap = origGap;
-                pages.forEach(p => { p.style.border = ''; p.style.boxShadow = ''; });
-                if(wasHidden) wrapper.style.display = 'none';
-                
-            } catch (err) { 
+                pages.forEach(p => { p.style.border = ''; });
+                if (wasHidden) wrapper.style.display = 'none';
+            } catch (err) {
                 console.error(err);
-                alert("PDF Engine Failed."); 
+                alert(gatewayText.pdfFailed);
             } finally {
-                btn.innerHTML = origHTML; 
-                btn.setAttribute('data-tooltip', origTooltip);
-                btn.style.pointerEvents = "auto";
+                if (label) label.textContent = original;
+                btn.disabled = false;
             }
         }
     </script>

@@ -29,7 +29,7 @@
     <div class="page-header">
         <div>
             <h1 class="page-title">Staff directory</h1>
-            <p class="page-subtitle">Each staff member's role, tax and social security numbers, and pay. Payroll uses these records.</p>
+            <p class="page-subtitle">Each staff member’s role, tax and social security numbers, and pay. Payroll uses these records.</p>
         </div>
     </div>
 
@@ -323,13 +323,13 @@
         </div>
 
         <div class="card" style="padding: 0; overflow: hidden;">
-            <div class="table-wrap" style="max-height: 85vh; overflow-y: auto;">
+            <div class="table-wrap">
                 <table class="table">
                     <thead>
                         <tr>
                             <th style="min-width: 180px;">Staff member and role</th>
                             <th style="min-width: 170px;">Tax and social security</th>
-                            <th class="num" style="min-width: 150px;">Gross pay a month</th>
+                            <th class="num text-right" style="min-width: 150px;">Gross pay a month</th>
                             <th>Status</th>
                             <th><span class="sr-only">Actions</span></th>
                         </tr>

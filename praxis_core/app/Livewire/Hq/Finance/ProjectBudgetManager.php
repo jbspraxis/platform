@@ -143,7 +143,7 @@ class ProjectBudgetManager extends Component
                 $sweepAmountFloat = (float) $this->sweepAmount;
 
                 if ($sweepAmountFloat > $available) {
-                    throw new \DomainException("That's more than the line has available. Money already spent or held by open cash requests can't be moved.");
+                    throw new \DomainException("That’s more than the line has available. Money already spent or held by open cash requests can’t be moved.");
                 }
 
                 // 3. Move the budget
@@ -152,7 +152,7 @@ class ProjectBudgetManager extends Component
                 
                 // 4. Audit log (null user for system actions, to respect UUID foreign keys)
                 DB::table('system_audit_logs')->insert([
-                    // Assuming id is auto-increment or UUID, ensure it's handled. If UUID: 'id' => str()->uuid(),
+                    // Assuming id is auto-increment or UUID, ensure it’s handled. If UUID: 'id' => str()->uuid(),
                     'user_id' => Auth::check() ? Auth::id() : null, // Use null instead of 'SYSTEM' to respect UUID FKs
                     'action' => 'BUDGET_SWEEP_EXECUTED',
                     'description' => "Moved {$this->activeProject->currency} {$sweepAmountFloat} of budget from {$fromLine->description} to {$toLine->description} on project {$this->activeProject->title}",
@@ -167,10 +167,10 @@ class ProjectBudgetManager extends Component
             session()->flash('success', 'Budget moved. The line totals below are updated.');
 
         } catch (\DomainException $e) {
-            session()->flash('error', "We couldn't move the budget. " . $e->getMessage());
+            session()->flash('error', "We couldn’t move the budget. " . $e->getMessage());
         } catch (\Exception $e) {
             report($e);
-            session()->flash('error', "We couldn't move the budget, so nothing was changed. Try again, and if it still fails, ask an administrator to check the error log.");
+            session()->flash('error', "We couldn’t move the budget, so nothing was changed. Try again, and if it still fails, ask an administrator to check the error log.");
         }
     }
 

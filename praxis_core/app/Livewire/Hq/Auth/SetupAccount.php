@@ -64,7 +64,7 @@ class SetupAccount extends Component
             'password.required' => 'Choose a password.',
             'password.min' => 'Use at least 8 characters.',
             'passwordConfirmation.required' => 'Type your password again to confirm it.',
-            'passwordConfirmation.same' => "The two passwords don't match. Type the same password in both fields.",
+            'passwordConfirmation.same' => "The two passwords don’t match. Type the same password in both fields.",
         ]);
 
         $user = $this->invitedUser();

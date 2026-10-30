@@ -176,6 +176,21 @@ class LegalEntityRegistry extends Component
         $this->resetForm();
     }
 
+    /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
+    protected function validationAttributes(): array
+    {
+        return [
+            'legal_name' => 'registered company name',
+            'region_code' => 'country',
+            'registration_number' => 'company registration number (RC)',
+            'tax_identification_number' => 'tax ID (NIU or TIN)',
+            'employer_social_security_code' => 'employer social security number',
+            'registered_address' => 'registered office address',
+            'legal_representative_name' => 'legal representative’s name',
+            'legal_representative_title' => 'legal representative’s job title',
+        ];
+    }
+
     public function render()
     {
         return view('livewire.hq.mdm.legal-entity-registry');

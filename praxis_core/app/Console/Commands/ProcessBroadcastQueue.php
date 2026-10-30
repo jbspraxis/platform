@@ -32,7 +32,7 @@ class ProcessBroadcastQueue extends Command
                 $campaign = DB::table('broadcast_campaigns')->where('id', $log->campaign_id)->first();
 
                 if (!$user || !$campaign) {
-                    throw new \Exception("Missing User or Campaign Data.");
+                    throw new \Exception("The recipient or the campaign no longer exists.");
                 }
                 // They may have unsubscribed or been removed after the campaign was queued
                 if (!$user->is_subscribed || $user->deleted_at) {

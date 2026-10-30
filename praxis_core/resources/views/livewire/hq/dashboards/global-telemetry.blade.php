@@ -1,4 +1,9 @@
 <div>
+    @php
+        // Amounts with their currency (docs/BRAND.md section 4): ₦ and $ before the amount, FCFA after it
+        $money = fn ($currency, $amount) => \App\Livewire\Hq\HqMoney::format($currency, $amount);
+    @endphp
+
     <div class="page-header">
         <div>
             <h1 class="page-title">Company overview</h1>
@@ -17,17 +22,19 @@
         <a href="{{ route('hq.dash.admin') }}" wire:navigate class="tab is-active" aria-current="page">Company overview</a>
         <a href="{{ route('hq.dash.workspace') }}" wire:navigate class="tab">My workspace</a>
         <a href="{{ route('hq.dash.investor') }}" wire:navigate class="tab">Investor view</a>
-        <a href="{{ route('hq.dash.audit') }}" wire:navigate class="tab">Audit log</a>
+        @can('audit.view')
+            <a href="{{ route('hq.dash.audit') }}" wire:navigate class="tab">Audit log</a>
+        @endcan
     </nav>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4" style="margin-bottom: 24px;">
         <div class="card">
             <div class="stat-label">Paid invoices, total</div>
-            <div class="stat-value">${{ number_format($kpis['capital_cleared'], 2) }}</div>
+            <x-hq.money-totals :totals="$kpis['capital_cleared']" />
         </div>
         <div class="card">
             <div class="stat-label">Unpaid invoices</div>
-            <div class="stat-value">${{ number_format($kpis['ar_pipeline'], 2) }}</div>
+            <x-hq.money-totals :totals="$kpis['ar_pipeline']" />
         </div>
         <div class="card">
             <div class="stat-label">Active projects</div>
@@ -63,7 +70,7 @@
                     <div style="padding: 12px 0; border-top: 1px solid var(--color-line);">
                         <div class="text-caption text-muted" style="font-variant-numeric: tabular-nums;">{{ $alert->invoice_number }} · {{ $alert->client_name }}</div>
                         <div class="flex justify-between items-center gap-3" style="margin-top: 4px;">
-                            <div class="font-semibold text-ink" style="font-variant-numeric: tabular-nums;">{{ $alert->currency }} {{ number_format($alert->total_amount, 2) }}</div>
+                            <div class="font-semibold text-ink" style="font-variant-numeric: tabular-nums;">{{ $money($alert->currency, $alert->total_amount) }}</div>
                             <span class="pill pill-danger">{{ (int) \Carbon\Carbon::parse($alert->due_date)->diffInDays(now()) }} days overdue</span>
                         </div>
                     </div>
@@ -115,7 +122,9 @@
         </div>
     </section>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    @assets
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    @endassets
 
     @script
     <script>
@@ -137,17 +146,22 @@
                     Chart.defaults.color = '#5E6679';
                     Chart.defaults.font.family = "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', 'Segoe UI', Arial, sans-serif";
 
+                    // Revenue is one series per currency: amounts in different currencies are never added together
+                    const symbols = { NGN: '₦', USD: '$', XAF: 'FCFA', XOF: 'FCFA' };
+                    const revenueColours = ['#044B6A', '#0C142B', '#08707C'];
+                    const revenueSets = Object.entries($wire.chartRevenue || {}).map(([currency, data], i) => ({
+                        label: 'Revenue received (' + (symbols[currency] || currency || 'no currency') + ')',
+                        data: data,
+                        backgroundColor: revenueColours[i % revenueColours.length],
+                        borderRadius: 2
+                    }));
+
                     window.telemetryChartInstance = new Chart(ctx.getContext('2d'), {
                         type: 'bar',
                         data: {
                             labels: $wire.chartLabels,
                             datasets: [
-                                {
-                                    label: 'Revenue received ($)',
-                                    data: $wire.chartRevenue,
-                                    backgroundColor: '#044B6A',
-                                    borderRadius: 2
-                                },
+                                ...revenueSets,
                                 {
                                     label: 'Staff time cost ($)',
                                     data: $wire.chartBurn,
@@ -164,7 +178,8 @@
                                 y: {
                                     beginAtZero: true,
                                     grid: { color: '#D8DEE6' },
-                                    ticks: { callback: function(value) { return '$' + value / 1000 + 'k'; } }
+                                    // Amounts of 1,000 or more read as 'k'; the currency is named in each series
+                                    ticks: { callback: function(value) { return Math.abs(value) >= 1000 ? (value / 1000).toLocaleString('en-GB') + 'k' : value.toLocaleString('en-GB'); } }
                                 },
                                 x: { grid: { display: false } }
                             }

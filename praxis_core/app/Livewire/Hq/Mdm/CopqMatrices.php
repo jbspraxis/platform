@@ -253,6 +253,34 @@ class CopqMatrices extends Component
         $this->appraisal_multiplier = 1.00; $this->failure_multiplier = 1.00; $this->opportunity_multiplier = 1.00; $this->risk_weight = 10;
     }
 
+    /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
+    protected function validationAttributes(): array
+    {
+        return [
+            'industry_name' => 'industry name',
+            'organization_type' => 'organisation type',
+            'error_floor' => 'base error rate',
+            'compliance_standard' => 'compliance standard',
+            'value_term' => 'value term',
+            'multiplier_term' => 'multiplier term',
+            'erosion_target' => 'what the cost reduces',
+            'deficit_context' => 'cost context',
+            'symptom_title' => 'main symptom',
+            'intervention_strategy' => 'what we recommend',
+            'opportunity_focus' => 'where the opportunity is',
+            'tech_key' => 'key',
+            'display_name' => 'name shown',
+            'error_multiplier' => 'error multiplier',
+            'risk_type' => 'main risk',
+            'bottleneck_name' => 'department',
+            'bottleneck_narrative' => 'summary used in the report',
+            'appraisal_multiplier' => 'appraisal (time) multiplier',
+            'failure_multiplier' => 'failure (rework) multiplier',
+            'opportunity_multiplier' => 'opportunity (lost revenue) multiplier',
+            'risk_weight' => 'risk weight',
+        ];
+    }
+
     public function render()
     {
         return view('livewire.hq.mdm.copq-matrices');
