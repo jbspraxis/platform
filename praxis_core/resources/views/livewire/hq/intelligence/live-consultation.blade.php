@@ -128,7 +128,8 @@
                                     <div class="font-semibold text-ink">{{ $req->company_name }}</div>
                                     <div class="text-caption text-muted" style="font-variant-numeric: tabular-nums;">{{ $when($req->start_time) }}</div>
                                 </td>
-                                <td style="text-align: right; vertical-align: middle;">
+                                <td style="text-align: right; vertical-align: middle; white-space: nowrap;">
+                                    <button type="button" onclick="openDeclineModal(@js($req->id), @js($req->company_name), @js($when($req->start_time)))" class="btn btn-ghost btn-sm">Decline</button>
                                     <button type="button" onclick="openApproveModal(@js($req->id), @js($req->company_name))" class="btn btn-secondary btn-sm">Approve</button>
                                 </td>
                             </tr>
@@ -367,6 +368,28 @@
         </div>
     </div>
 
+    {{-- Decline a request --}}
+    <div class="modal-backdrop" id="declineModal" style="display: none;">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="decline-title" style="max-width: 500px;">
+            <h2 id="decline-title" class="modal-title">Decline this request?</h2>
+            <p class="text-small text-muted" style="margin: 0 0 16px;">Decline the free audit for <strong id="decClientName" class="text-ink"></strong> on <span id="decWhen"></span>. The time becomes free again on the website.</p>
+            <input type="hidden" id="decIdInput">
+            <div class="field">
+                <label class="label" for="decReasonInput">Reason</label>
+                <textarea id="decReasonInput" class="textarea" maxlength="500" style="min-height: 80px;" placeholder="e.g. Test booking, spam, the client asked to cancel"></textarea>
+                <span class="help">For the team only. The client never sees it.</span>
+            </div>
+            <label class="flex items-start gap-2" style="margin-top: 12px;">
+                <input type="checkbox" id="decNotifyInput" checked style="margin-top: 3px;">
+                <span class="text-small">Email the client to offer another time<br><span class="text-muted">Untick for spam or test bookings.</span></span>
+            </label>
+            <div class="modal-actions">
+                <button type="button" onclick="document.getElementById('declineModal').style.display = 'none'" class="btn btn-secondary">Keep request</button>
+                <button type="button" onclick="submitDecline()" class="btn btn-danger">Decline request</button>
+            </div>
+        </div>
+    </div>
+
     {{-- Mark the lead as lost --}}
     <div class="modal-backdrop" id="disqualifyModal" style="display: none;">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="lost-title" style="max-width: 500px;">
@@ -430,6 +453,24 @@
             const link = document.getElementById('appLinkInput').value;
             @this.approveMeeting(id, link);
             document.getElementById('approveModal').style.display = 'none';
+        }
+
+        // 1b. Decline a request (the reason stays with the team; the email is optional)
+        function openDeclineModal(id, name, when) {
+            document.getElementById('decIdInput').value = id;
+            document.getElementById('decClientName').innerText = name;
+            document.getElementById('decWhen').innerText = when;
+            document.getElementById('decReasonInput').value = '';
+            document.getElementById('decNotifyInput').checked = true;
+            document.getElementById('declineModal').style.display = 'grid';
+            document.getElementById('decReasonInput').focus();
+        }
+        function submitDecline() {
+            const id = document.getElementById('decIdInput').value;
+            const reason = document.getElementById('decReasonInput').value;
+            const notify = document.getElementById('decNotifyInput').checked;
+            @this.declineRequest(id, reason, notify);
+            document.getElementById('declineModal').style.display = 'none';
         }
 
         // 2. Mark the lead as lost

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
+use App\Mail\FreeAuditDeclinedMail;
 use App\Mail\MeetingApprovedMail;
 // use App\Mail\CopqReportMail; // Commented out for now until logic is finalized
 use App\Support\MailLocale;
@@ -95,16 +96,7 @@ class LiveConsultation extends Component
         // Find the client’s email address and send the meeting link
         $appt = DB::table('appointments')->where('id', $appointmentId)->first();
         $org = DB::table('organizations')->where('id', $appt->organization_id)->first();
-        
-        // The person who booked first (website bookings store them in created_by), then the latest report contact, then the primary contact
-        $bookerEmail = $appt->created_by ? DB::table('client_users')->where('id', $appt->created_by)->whereNull('deleted_at')->value('email') : null;
-        $copq = DB::table('copq_assessments')->where('organization_id', $org->id)->orderBy('created_at', 'desc')->first();
-        $clientEmail = $bookerEmail ?: ($copq ? $copq->corporate_email : null);
-
-        if (!$clientEmail) {
-            $user = DB::table('client_users')->where('organization_id', $org->id)->whereNull('deleted_at')->orderByDesc('is_primary_client')->first();
-            $clientEmail = $user ? $user->email : null;
-        }
+        $clientEmail = $this->clientEmail($appt, $org);
 
         if ($clientEmail) {
             try {
@@ -122,6 +114,95 @@ class LiveConsultation extends Component
         }
 
         $this->loadLobby();
+    }
+
+    /**
+     * Decline a request that can't go ahead (wrong time, spam, a test): the appointment is Cancelled, so the
+     * time is free again on the website and the visitor can book another. The reason stays with the team (audit
+     * log); when $notify is on, the visitor gets a short, polite email offering another time, without the reason.
+     */
+    public function declineRequest($appointmentId, $reason = '', $notify = true)
+    {
+        if (! Auth::user()->can('crm.approve')) {
+            session()->flash('error', "You don’t have permission to decline free audits. Ask an administrator to change your role.");
+            return;
+        }
+
+        $notify = filter_var($notify, FILTER_VALIDATE_BOOLEAN);
+        $reason = Str::limit(trim((string) $reason), 500, '');
+        if ($reason === '') {
+            session()->flash('error', 'Give a reason for declining, so the team knows why.');
+            return;
+        }
+
+        $appt = DB::table('appointments')->where('id', $appointmentId)->first();
+        // Only a request still waiting: someone may have approved or declined it a moment ago
+        $declined = $appt && $appt->status === 'Requested'
+            && DB::table('appointments')->where('id', $appt->id)->where('status', 'Requested')->update([
+                'status' => 'Cancelled',
+                'updated_by' => Auth::id() ?? 'system',
+                'updated_at' => now(),
+            ]) === 1;
+        if (! $declined) {
+            session()->flash('error', 'This request was already approved or declined, so nothing changed. The list is up to date now.');
+            $this->loadLobby();
+            return;
+        }
+
+        $org = DB::table('organizations')->where('id', $appt->organization_id)->first();
+        $companyName = $org->name ?? 'your organisation';
+        $clientEmail = $notify ? $this->clientEmail($appt, $org) : null;
+        $emailed = false;
+
+        if (! $notify) {
+            session()->flash('success', 'Request declined. The time is free again on the website, and the client wasn’t emailed.');
+        } elseif ($clientEmail) {
+            try {
+                $firstName = DB::table('client_users')->where('email', $clientEmail)->value('first_name');
+                Mail::to($clientEmail)
+                    ->locale(MailLocale::forRecipient($org->preferred_language ?? null))
+                    ->send(new FreeAuditDeclinedMail($appt, $companyName, $firstName));
+                $emailed = true;
+                session()->flash('success', "Request declined. We emailed {$clientEmail} to offer another time.");
+            } catch (\Exception $e) {
+                session()->flash('error', "Request declined, but we couldn’t email {$clientEmail}. Let the client know yourself.");
+            }
+        } else {
+            session()->flash('success', 'Request declined. There is no client email on file, so no one was emailed.');
+        }
+
+        DB::table('system_audit_logs')->insert([
+            'user_id' => Auth::id(),
+            'action' => 'FREE_AUDIT_DECLINED',
+            'description' => "Declined the free audit request from {$companyName} for {$appt->start_time} WAT. Reason: {$reason}",
+            'target_table' => 'appointments',
+            'target_id' => $appt->id,
+            'old_values' => json_encode(['status' => 'Requested']),
+            'new_values' => json_encode(['status' => 'Cancelled', 'reason' => $reason, 'client_emailed' => $emailed], JSON_UNESCAPED_UNICODE),
+            'ip_address' => request()?->ip(),
+            'created_at' => now(),
+        ]);
+
+        $this->loadLobby();
+    }
+
+    /** The person who booked first (website bookings store them in created_by), then the latest report contact, then the primary contact */
+    private function clientEmail($appt, $org): ?string
+    {
+        if (! $org) {
+            return null;
+        }
+
+        $bookerEmail = $appt->created_by ? DB::table('client_users')->where('id', $appt->created_by)->whereNull('deleted_at')->value('email') : null;
+        $copq = DB::table('copq_assessments')->where('organization_id', $org->id)->orderBy('created_at', 'desc')->first();
+        $clientEmail = $bookerEmail ?: ($copq ? $copq->corporate_email : null);
+
+        if (!$clientEmail) {
+            $user = DB::table('client_users')->where('organization_id', $org->id)->whereNull('deleted_at')->orderByDesc('is_primary_client')->first();
+            $clientEmail = $user ? $user->email : null;
+        }
+
+        return $clientEmail ?: null;
     }
 
     // ==========================================
