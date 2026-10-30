@@ -224,7 +224,7 @@ class NotificationSettingsTest extends TestCase
 
         // A new visit shows what was saved, and turning a group back on saves too
         Livewire::actingAs($me)->test(NotificationSettings::class)->call('open')
-            ->assertSet('groups', ['leads' => true, 'projects' => true, 'finance' => false, 'team' => true, 'marketing' => false, 'system' => true, 'other' => true])
+            ->assertSet('groups', ['leads' => true, 'projects' => true, 'finance' => false, 'team' => true, 'marketing' => false, 'mail' => true, 'system' => true, 'other' => true])
             ->set('groups.finance', true)
             ->assertSet('groups.finance', true);
 
