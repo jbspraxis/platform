@@ -51,7 +51,7 @@ final class MailPresence
     /**
      * Everyone else on this conversation now, those replying first.
      *
-     * @return list<array{user_id: string, name: string, state: string}>
+     * @return list<array{user_id: string, name: string, state: string, avatar: array}> avatar: what <x-hq.avatar> takes
      */
     public static function others(User $user, MailThread $thread): array
     {
@@ -61,11 +61,14 @@ final class MailPresence
 
         $rows = DB::table('mail_presence')->where('thread_id', $thread->id)->where('user_id', '!=', $user->id)
             ->where('expires_at', '>', now())->get();
-        $names = User::whereIn('id', $rows->pluck('user_id'))->get()->mapWithKeys(fn (User $u) => [$u->id => $u->name]);
+        $people = User::whereIn('id', $rows->pluck('user_id'))->get()->keyBy('id');
 
-        return $rows->filter(fn ($r) => isset($names[$r->user_id]))
-            ->sortBy(fn ($r) => ($r->state === 'replying' ? '0' : '1') . $names[$r->user_id])
-            ->map(fn ($r) => ['user_id' => $r->user_id, 'name' => $names[$r->user_id], 'state' => $r->state])
+        return $rows->filter(fn ($r) => isset($people[$r->user_id]))
+            ->sortBy(fn ($r) => ($r->state === 'replying' ? '0' : '1') . $people[$r->user_id]->name)
+            ->map(fn ($r) => [
+                'user_id' => $r->user_id, 'name' => $people[$r->user_id]->name, 'state' => $r->state,
+                'avatar' => $people[$r->user_id]->only(['id', 'first_name', 'last_name', 'avatar_path']),
+            ])
             ->values()->all();
     }
 }

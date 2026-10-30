@@ -209,8 +209,13 @@
                         @forelse($users as $user)
                             <tr>
                                 <td>
-                                    <div class="text-ink" style="font-weight: 600;">{{ $user->first_name }} {{ $user->last_name }}</div>
-                                    <div class="help" style="margin-top: 2px;">{{ $user->email }}</div>
+                                    <div class="flex items-center gap-3">
+                                        <x-hq.avatar :user="$user" :size="32" />
+                                        <div style="min-width: 0;">
+                                            <div class="text-ink" style="font-weight: 600;">{{ $user->first_name }} {{ $user->last_name }}</div>
+                                            <div class="help" style="margin-top: 2px;">{{ $user->email }}</div>
+                                        </div>
+                                    </div>
                                 </td>
 
                                 <td>

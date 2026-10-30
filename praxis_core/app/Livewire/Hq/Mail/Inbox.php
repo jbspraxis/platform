@@ -22,6 +22,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -654,12 +655,20 @@ class Inbox extends Component
     {
         $user = $this->user();
         $messages = $this->threadMessages();
-        $people = User::whereIn('id', $messages->pluck('seen_by')->merge($messages->pluck('sent_by'))->filter()->unique())
-            ->get(['id', 'first_name', 'last_name'])->keyBy('id');
+        // Colleagues' photos on their messages: who sent it from HQ, else the owner of the personal mailbox it came
+        // from, else the staff member with that address. Everyone else keeps their initials.
+        $emails = $messages->pluck('from_email')->filter()->map(fn ($e) => strtolower($e))->unique()->values();
+        $byMailbox = $emails->isEmpty() ? collect() : MailAccount::where('kind', 'personal')->whereIn('email', $emails)
+            ->pluck('owner_user_id', 'email')->mapWithKeys(fn ($id, $e) => [strtolower($e) => $id]);
+        $byEmail = $emails->isEmpty() ? collect() : User::whereIn('email', $emails)->whereIn('id', DB::table('staff_roles')->select('user_id'))
+            ->pluck('id', 'email')->mapWithKeys(fn ($id, $e) => [strtolower($e) => $id]);
+        $senderOf = fn (MailMessage $m) => $m->sent_by ?: ($byMailbox[strtolower((string) $m->from_email)] ?? $byEmail[strtolower((string) $m->from_email)] ?? null);
+        $people = User::whereIn('id', $messages->pluck('seen_by')->merge($messages->pluck('sent_by'))->merge($messages->map($senderOf))->filter()->unique())
+            ->get(['id', 'first_name', 'last_name', 'avatar_path'])->keyBy('id');
         $trusted = ImageTrust::trusted($user, $messages->pluck('from_email')->all());
         $current = $this->currentFolder?->id;
 
-        return $messages->map(function (MailMessage $m) use ($people, $trusted, $current) {
+        return $messages->map(function (MailMessage $m) use ($people, $trusted, $current, $senderOf) {
             $open = in_array($m->id, $this->expanded, true);
             $remote = in_array((string) $m->id, $this->images, true) || in_array(strtolower((string) $m->from_email), $trusted, true);
 
@@ -676,6 +685,7 @@ class Inbox extends Component
                 'folder' => $m->folder_id !== $current ? $m->folder?->label() : null,
                 'opened_by' => $m->seen_by ? trim(($people->get($m->seen_by)?->first_name ?: 'Someone') . ', ' . self::when($m->seen_at, true), ', ') : null,
                 'sent_by' => $m->sent_by ? $people->get($m->sent_by)?->name : null,
+                'sender' => ($sender = $people->get($senderOf($m))) ? $sender->only(['id', 'first_name', 'last_name', 'avatar_path']) : null,
                 'attachments' => $m->attachments->filter(fn ($a) => ! $a->is_inline || ! $a->content_id)->values(),
                 'is_draft' => $m->is_draft || $m->folder?->role === 'drafts',
                 'remote' => $remote,

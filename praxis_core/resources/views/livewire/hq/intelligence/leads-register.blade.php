@@ -107,7 +107,7 @@
                             <td onclick="event.stopPropagation();">
                                 @if($lead->owner_id)
                                     <div class="flex items-center gap-2">
-                                        <span class="avatar" style="width: 28px; height: 28px; font-size: 0.75rem;" aria-hidden="true">{{ substr($lead->owner_first, 0, 1) }}{{ substr($lead->owner_last, 0, 1) }}</span>
+                                        <x-hq.avatar :user="['id' => $lead->owner_id, 'first_name' => $lead->owner_first, 'last_name' => $lead->owner_last, 'avatar_path' => $lead->owner_avatar ?? null]" :size="28" />
                                         <span class="text-ink">{{ $lead->owner_first }}</span>
                                     </div>
                                 @else

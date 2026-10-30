@@ -346,11 +346,17 @@
                             @endphp
                             <tr>
                                 <td>
+                                  <div class="flex items-start gap-3">
+                                    {{-- The photo belongs to the person's account (users.id), not the HR row --}}
+                                    <x-hq.avatar :user="['id' => $emp->user_id, 'first_name' => $emp->first_name, 'last_name' => $emp->last_name, 'avatar_path' => $emp->avatar_path]" :size="32" />
+                                    <div style="min-width: 0;">
                                     <div class="text-ink" style="font-weight: 600;">{{ $emp->first_name }} {{ $emp->last_name }}</div>
                                     <div style="margin-top: 2px;">{{ $emp->job_classification }}</div>
                                     @if($emp->manager_first)
                                         <div class="help" style="margin-top: 4px;">Reports to {{ $emp->manager_first }} {{ $emp->manager_last }}</div>
                                     @endif
+                                    </div>
+                                  </div>
                                 </td>
 
                                 <td>

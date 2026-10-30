@@ -274,9 +274,12 @@
                 <ul class="mb-people mt-4" aria-label="People with access">
                     @foreach ($members as $member)
                         <li wire:key="member-{{ $member->id }}">
-                            <div class="mb-person">
-                                <strong>{{ $member->user?->name ?? 'Former staff member' }} @if ($member->user_id === auth()->id()) <span class="text-muted">(you)</span> @endif</strong>
-                                <span class="help">{{ $member->user?->email }}</span>
+                            <div class="flex items-center gap-3" style="min-width: 0;">
+                                <x-hq.avatar :user="$member->user" :size="32" />
+                                <div class="mb-person">
+                                    <strong>{{ $member->user?->name ?? 'Former staff member' }} @if ($member->user_id === auth()->id()) <span class="text-muted">(you)</span> @endif</strong>
+                                    <span class="help">{{ $member->user?->email }}</span>
+                                </div>
                             </div>
                             <div class="mb-person-controls">
                                 <label class="sr-only" for="level-{{ $member->id }}">Access for {{ $member->user?->name }}</label>

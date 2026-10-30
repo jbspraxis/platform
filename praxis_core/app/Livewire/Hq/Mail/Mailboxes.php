@@ -326,7 +326,7 @@ class Mailboxes extends Component
 
         $modalAccount = $this->modalAccountId ? $accounts->firstWhere('id', $this->modalAccountId) : null;
         $members = $modalAccount && $modalAccount->isShared()
-            ? MailAccountMember::with('user:id,first_name,last_name,email')->where('account_id', $modalAccount->id)->get()
+            ? MailAccountMember::with('user:id,first_name,last_name,email,avatar_path')->where('account_id', $modalAccount->id)->get()
                 ->sortBy(fn ($m) => (3 - MailAccess::RANK[$m->level]) . ($m->user?->name ?? ''))->values()
             : collect();
 

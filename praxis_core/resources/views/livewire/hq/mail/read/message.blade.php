@@ -6,7 +6,12 @@
 @endphp
 <article class="mr-msg {{ $m['open'] ? 'is-open' : '' }} {{ $m['model']->is_seen ? '' : 'is-unread' }}" wire:key="m-{{ $m['id'] }}" aria-label="Message from {{ $m['from'] }}">
     <button type="button" class="mr-msg-head" wire:click="toggleMessage({{ $m['id'] }})" aria-expanded="{{ $m['open'] ? 'true' : 'false' }}">
-        <span class="mr-avatar" aria-hidden="true">{{ $initials }}</span>
+        @if (! empty($m['sender']['avatar_path']))
+            {{-- A colleague with a photo (HQ only) --}}
+            <x-hq.avatar :user="$m['sender']" class="mr-avatar" />
+        @else
+            <span class="mr-avatar" aria-hidden="true">{{ $initials }}</span>
+        @endif
         <span class="mr-msg-from"><strong>{{ $m['from'] }}</strong>@if ($m['open'] && $m['from_email'] && $m['from_email'] !== $m['from']) <span>&lt;{{ $m['from_email'] }}&gt;</span>@endif</span>
         <span class="mr-msg-date" title="{{ $m['date_full'] }}">
             @if ($m['model']->is_flagged)@include('livewire.hq.mail.read.icon', ['name' => 'flag'])<span class="sr-only">Flagged</span>@endif

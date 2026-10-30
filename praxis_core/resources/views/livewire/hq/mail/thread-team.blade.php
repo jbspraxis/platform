@@ -61,6 +61,7 @@
             <div class="mt-assign">
                 @if ($canSend)
                     <label for="mt-assign-{{ $thread->id }}" class="mt-label">Assigned to</label>
+                    @if ($assignee) <x-hq.avatar :user="$assignee" :size="24" /> @endif
                     <select id="mt-assign-{{ $thread->id }}" class="select" wire:change="assign($event.target.value)" wire:loading.attr="disabled" wire:target="assign,assignToMe">
                         <option value="" @selected(! $thread->assigned_to)>Nobody</option>
                         @foreach ($assignees as $person)
@@ -75,6 +76,7 @@
                     @endif
                 @else
                     <span class="mt-label">Assigned to</span>
+                    @if ($assignee) <x-hq.avatar :user="$assignee" :size="24" /> @endif
                     <span class="mt-who">{{ $assignee ? ($assignee->id === $me->id ? 'You' : $assignee->name) : 'Nobody' }}</span>
                 @endif
             </div>
@@ -105,12 +107,14 @@
         @if ($replying)
             <div class="mt-presence is-replying" role="status">
                 <i data-lucide="pen-line"></i>
+                @foreach ($replying as $o) <x-hq.avatar :user="$o['avatar'] ?? null" :size="22" /> @endforeach
                 <span>{{ $names($replying) }} {{ count($replying) > 1 ? 'are' : 'is' }} writing a reply. Check with them before you send one.</span>
             </div>
         @endif
         @if ($viewing)
             <div class="mt-presence is-viewing" role="status">
                 <i data-lucide="eye"></i>
+                @foreach ($viewing as $o) <x-hq.avatar :user="$o['avatar'] ?? null" :size="22" /> @endforeach
                 <span>{{ $names($viewing) }} {{ count($viewing) > 1 ? 'are' : 'is' }} also looking at this.</span>
             </div>
         @endif
@@ -125,6 +129,7 @@
                         @foreach ($notes as $n)
                             <li wire:key="note-{{ $n->id }}">
                                 <div class="mt-note-head">
+                                    <x-hq.avatar :user="$n->user" :size="24" />
                                     <strong>{{ $n->user_id === $me->id ? 'You' : ($n->user?->name ?? 'Former colleague') }}</strong>
                                     <time datetime="{{ $n->created_at?->toIso8601String() }}">{{ $when($n->created_at) }}</time>
                                     @if ($n->user_id === $me->id || $canManage)

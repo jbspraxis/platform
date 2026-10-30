@@ -134,7 +134,7 @@ class RoleManagement extends Component
             ->leftJoin('organizations as org', 'u.organization_id', '=', 'org.id')
             ->where('u.lifecycle_stage', '!=', 'System')
             ->select(
-                'u.id', 'u.first_name', 'u.last_name', 'u.email', 'u.lifecycle_stage', 'u.status',
+                'u.id', 'u.first_name', 'u.last_name', 'u.email', 'u.lifecycle_stage', 'u.status', 'u.avatar_path',
                 'org.name as org_name', 'org.id as org_id',
                 // Primary role first; the rest only add access
                 DB::raw("(SELECT GROUP_CONCAT(r.name ORDER BY sr.is_primary DESC, r.is_protected DESC, r.id SEPARATOR ', ') FROM staff_roles sr JOIN roles r ON r.id = sr.role_id WHERE sr.user_id = u.id) as role_name")

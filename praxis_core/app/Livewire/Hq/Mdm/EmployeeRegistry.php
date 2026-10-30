@@ -103,7 +103,7 @@ class EmployeeRegistry extends Component
             ->where('u.organization_id', $jbsOrgId) 
             ->select(
                 'emp.*', 
-                'u.first_name', 'u.last_name', 'u.email', 
+                'u.first_name', 'u.last_name', 'u.email', 'u.avatar_path',
                 'm.first_name as manager_first', 'm.last_name as manager_last'
             )
             ->orderBy('emp.created_at', 'desc');

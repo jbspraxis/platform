@@ -89,7 +89,7 @@ class LeadsRegister extends Component
     {
         // Fetch raw organizations
         $organizations = DB::table('organizations')
-            ->select('organizations.*', 'owner.first_name as owner_first', 'owner.last_name as owner_last', 'owner.id as owner_id')
+            ->select('organizations.*', 'owner.first_name as owner_first', 'owner.last_name as owner_last', 'owner.id as owner_id', 'owner.avatar_path as owner_avatar')
             ->leftJoin('users as owner', 'organizations.assigned_to', '=', 'owner.id')
             ->whereIn('organizations.status', ['Lead', 'Active Client'])
             ->get();
