@@ -208,6 +208,11 @@
     .footer-legal { margin-top: 8px !important; }
     .footer-button { padding: 0; border: 0; background: none; color: var(--color-fg-on-dark); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
     .footer-button:hover { color: var(--color-accent-on-dark); }
+    /* Social links as logos: 44px touch targets, one colour, the name in the link's label */
+    .site-footer .social-links { display: flex; flex-wrap: wrap; gap: 8px; }
+    .social-link { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 1px solid var(--color-border-on-dark); border-radius: var(--radius-control); box-sizing: border-box; transition: border-color var(--motion-instant), color var(--motion-instant); }
+    .social-link:hover { border-color: var(--color-accent-on-dark); }
+    .social-icon { width: 18px; height: 18px; flex-shrink: 0; }
     .footer-base { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--color-border-on-dark); display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; font-size: 0.8125rem; line-height: 1.125rem; }
 
     /* ---- Page structure ---- */

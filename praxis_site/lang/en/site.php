@@ -45,6 +45,7 @@ return [
         'registration_pending' => 'registration in progress',
         'contact' => 'Contact',
         'follow' => 'Follow us',
+        'social_label' => 'JBS Praxis on :network',
         'links' => 'Links',
         'security' => 'Security and data',
         'privacy' => 'Privacy',

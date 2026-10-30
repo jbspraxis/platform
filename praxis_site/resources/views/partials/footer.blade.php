@@ -1,4 +1,4 @@
-{{-- Built from GET /settings (App\Support\SiteSettings). Pending registrations read "registration in progress". --}}
+{{-- Built from GET /settings (App\Support\SiteSettings). Only registrations with a number are shown; social links are logos. --}}
 <footer class="site-footer">
     <div class="container">
         <div class="footer-grid">
@@ -21,13 +21,13 @@
                         @endforeach
                     </ul>
                 @endif
-                @if ($site->registrations)
+                @if ($site->registered())
                     <h2 class="footer-gap">{{ __('site.footer.registrations') }}</h2>
                     <ul>
-                        @foreach ($site->registrations as $registration)
+                        @foreach ($site->registered() as $registration)
                             <li>
                                 {{ $registration['label'] }}@if ($registration['country'] !== '') ({{ $registration['country'] }})@endif:
-                                {{ $registration['number'] ?? __('site.footer.registration_pending') }}
+                                {{ $registration['number'] }}
                             </li>
                         @endforeach
                     </ul>
@@ -44,9 +44,10 @@
                 </ul>
                 @if ($site->social)
                     <h2 class="footer-gap">{{ __('site.footer.follow') }}</h2>
-                    <ul>
+                    <ul class="social-links">
                         @foreach ($site->social as $link)
-                            <li><a href="{{ $link['url'] }}" rel="noopener">{{ $link['label'] }}</a></li>
+                            <li><a class="social-link" href="{{ $link['url'] }}" rel="noopener" title="{{ $link['label'] }}"
+                                   aria-label="{{ __('site.footer.social_label', ['network' => $link['label']]) }}">@include('partials.social-icon', ['network' => $link['network']])</a></li>
                         @endforeach
                     </ul>
                 @endif

@@ -31,12 +31,16 @@ class LayoutAndSecurityTest extends TestCase
             ->assertSee('JBS Praxis LLC')
             ->assertSee('Lagos, Nigeria')
             ->assertSee('Douala, Cameroon')
-            ->assertSee('CAC (Nigeria):')
-            ->assertSee('registration in progress')
+            // Registrations still in progress are not shown (owner, 30 Oct 2026)
+            ->assertDontSee('CAC (Nigeria):')
+            ->assertDontSee('registration in progress')
             ->assertSee('mailto:info@jbspraxis.com', false)
-            ->assertSee('https://www.linkedin.com/company/jbspraxis', false)
+            // Social links are logos with the name in the link's label
+            ->assertSee('href="https://www.linkedin.com/company/jbspraxis" rel="noopener" title="LinkedIn"', false)
+            ->assertSee('aria-label="JBS Praxis on LinkedIn"', false)
             ->assertSee('https://x.com/jbspraxis', false)
-            ->assertSee('https://www.youtube.com/@jbspraxis', false);
+            ->assertSee('https://www.youtube.com/@jbspraxis', false)
+            ->assertSee('<svg class="social-icon"', false);
     }
 
     public function test_a_registration_number_is_shown_once_it_is_registered(): void
@@ -45,7 +49,9 @@ class LayoutAndSecurityTest extends TestCase
         $settings['company']['registrations'][0] = ['country' => 'NG', 'label' => 'CAC', 'number' => 'RC 1234567', 'status' => 'registered'];
         Http::fake([self::HQ . '/settings' => Http::response(['data' => $settings])]);
 
-        $this->get('/feedback')->assertOk()->assertSee('RC 1234567');
+        $this->get('/feedback')->assertOk()->assertSee('CAC (Nigeria):')->assertSee('RC 1234567')
+            ->assertDontSee('RCCM (Cameroon):');
+        $this->get('/company')->assertOk()->assertSee('CAC: RC 1234567')->assertDontSee('RCCM');
     }
 
     public function test_pages_still_render_with_the_fallback_email_when_hq_was_never_reached(): void

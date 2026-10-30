@@ -151,7 +151,8 @@ class CalculatorAndReportTest extends TestCase
         $this->assertStringContainsString('Spreadsheets (Excel)', $html);
         $this->assertStringContainsString('Friday 30 October 2026', $html);
         $this->assertStringNotContainsString('99,999,999', $html, 'no fee is ever shown');
-        $this->assertStringNotContainsString('4.2', $html, 'no break-even time is shown');
+        // The page's text, without the footer logos' SVG outlines (their coordinates contain digits like 4.2)
+        $this->assertStringNotContainsString('4.2', preg_replace('~<svg\b.*?</svg>~s', '', $html), 'no break-even time is shown');
     }
 
     public function test_an_unknown_report_is_a_404(): void

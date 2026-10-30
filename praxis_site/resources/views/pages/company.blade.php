@@ -29,9 +29,9 @@
                         @endforeach
                     </dd></div>
                 @endif
-                @foreach ($site->registrations as $registration)
+                @foreach ($site->registered() as $registration)
                     <div><dt>{{ __('pages.company.registration') }}@if ($registration['country'] !== '') ({{ $registration['country'] }})@endif</dt>
-                        <dd>{{ $registration['label'] }}: {{ $registration['number'] ?? __('site.footer.registration_pending') }}</dd></div>
+                        <dd>{{ $registration['label'] }}: {{ $registration['number'] }}</dd></div>
                 @endforeach
                 <div><dt>{{ __('pages.company.contact') }}</dt><dd><a href="mailto:{{ $site->email }}">{{ $site->email }}</a></dd></div>
                 @if ($site->social)

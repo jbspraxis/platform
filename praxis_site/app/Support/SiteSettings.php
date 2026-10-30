@@ -97,6 +97,17 @@ final class SiteSettings
         );
     }
 
+    /**
+     * Registrations that have a number. A registration still in progress is not shown on the public pages
+     * (owner, 30 Oct 2026: "registration in progress" in the footer doesn't look professional).
+     *
+     * @return list<array{label: string, country: string, number: string}>
+     */
+    public function registered(): array
+    {
+        return array_values(array_filter($this->registrations, fn (array $registration) => $registration['number'] !== null));
+    }
+
     private static function str(mixed $value): ?string
     {
         if (! is_string($value) && ! is_int($value)) {
