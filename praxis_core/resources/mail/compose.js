@@ -32,7 +32,11 @@
                 var self = this;
                 var ed = this.$root.querySelector(".mc-editor");
                 this._ed = ed;
-                ed.innerHTML = opts.html || '';
+                // Started once per draft: if Alpine ever starts this again, keep what the person typed and where they are
+                if (ed._hqStarted) return;
+                ed._hqStarted = true;
+                ed.innerHTML = ed.getAttribute('data-html') || opts.html || '';
+                ed.removeAttribute('data-html');
                 this._onLoad = function (e) { ed.innerHTML = (e.detail && e.detail.html) || ''; };
                 window.addEventListener('mail-editor-load', this._onLoad);
                 ed.addEventListener('input', function () { self.changed(); });

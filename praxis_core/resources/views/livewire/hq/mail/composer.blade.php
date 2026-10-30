@@ -114,7 +114,9 @@
 
     @if ($open && $outboxId)
         <div class="mc-backdrop" wire:key="mc-{{ $outboxId }}"
-             x-data="hqMailEditor({ html: @js($editorHtml), autosaveMs: {{ (int) config('mail_compose.autosave_ms', 1500) }} })"
+             {{-- x-data must never change while the composer is open: a changed x-data makes Alpine start the editor again
+                  (text reset to the last save, focus moved). The draft's text rides on the editor inside wire:ignore instead. --}}
+             x-data="hqMailEditor({ autosaveMs: {{ (int) config('mail_compose.autosave_ms', 1500) }} })"
              x-on:keydown.escape.window="if (!$event.defaultPrevented) { $event.preventDefault(); $wire.close(html()) }"
              x-on:click.self="$wire.close(html())">
             <section class="mc-panel" role="dialog" aria-modal="true" aria-labelledby="mc-title"
@@ -249,7 +251,7 @@
 
                     <div wire:ignore>
                         <div class="mc-editor" x-ref="editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Message"
-                             data-placeholder="Write your message" spellcheck="true" @if (in_array($kind, ['reply', 'reply_all'], true)) data-autofocus @endif></div>
+                             data-placeholder="Write your message" data-html="{{ $editorHtml }}" spellcheck="true" @if (in_array($kind, ['reply', 'reply_all'], true)) data-autofocus @endif></div>
                     </div>
 
                     <div class="mc-extra">
