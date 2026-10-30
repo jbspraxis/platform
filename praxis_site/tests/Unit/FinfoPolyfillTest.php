@@ -15,6 +15,16 @@ class FinfoPolyfillTest extends TestCase
 {
     private array $files = [];
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Without the extension, its FILEINFO_* constants come from the stand-in's loader (as AppServiceProvider does)
+        if (! extension_loaded('fileinfo')) {
+            require_once dirname(__DIR__, 2) . '/app/Support/Polyfill/fileinfo.php';
+        }
+    }
+
     protected function tearDown(): void
     {
         foreach ($this->files as $f) {
