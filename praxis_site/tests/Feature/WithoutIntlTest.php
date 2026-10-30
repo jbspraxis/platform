@@ -57,21 +57,18 @@ class WithoutIntlTest extends TestCase
     }
 
     /**
-     * A PHP without $extension: this one when it already lacks it, else this one without php.ini (-n) plus the
-     * extensions it loads except that one; null when the extension is compiled in.
+     * A PHP without $extension: this one without php.ini (-n) plus the extensions it loads except that one (so a
+     * suite already run with -n and fewer extensions keeps them that way: the bare binary would read php.ini again
+     * and could get the extension back), as HQ's tests/Support/PhpWithout.php does; null when it is compiled in.
      */
     private function phpWithout(string $extension): ?array
     {
-        if (! extension_loaded($extension)) {
-            return [PHP_BINARY];
-        }
-
         $dir = (string) ini_get('extension_dir');
         if (! is_dir($dir)) {
             $dir = dirname(PHP_BINARY) . DIRECTORY_SEPARATOR . $dir;
         }
         $shared = fn (string $name) => is_file("{$dir}/php_{$name}.dll") || is_file("{$dir}/{$name}.so");
-        if (! $shared($extension)) {
+        if (extension_loaded($extension) && ! $shared($extension)) {
             return null;
         }
 
