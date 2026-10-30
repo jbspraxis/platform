@@ -265,7 +265,8 @@
                 <livewire:hq.components.notification-bell />
                 @php
                     $userName = $user->name ?? trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? ''));
-                    $initials = strtoupper(mb_substr($user->first_name ?? '', 0, 1) . mb_substr($user->last_name ?? '', 0, 1)) ?: 'JP';
+                    // One role shows with the name: the primary one (Settings → Accounts); the others only add access
+                    $userRole = $user?->primary_role_name ?: 'Staff';
                 @endphp
                 {{-- The person's menu: My profile, notification settings, installing the app, and Sign out --}}
                 <div class="hq-user" x-data="{ open: false, top: 64 }" @keydown.escape.window="if (open) { open = false; $refs.userBtn.focus() }">
@@ -275,18 +276,18 @@
                             aria-label="Your account: {{ $userName }}">
                         <div>
                             <span class="user-chip-name">{{ $userName }}</span>
-                            <span class="user-chip-role">{{ $user?->role_names ?: 'Staff' }}</span>
+                            <span class="user-chip-role">{{ $userRole }}</span>
                         </div>
-                        <span class="avatar" aria-hidden="true">{{ $initials }}</span>
+                        <x-hq.avatar :user="$user" />
                     </button>
                     <div class="hq-menu-dim" x-show="open" x-transition.opacity @click="open = false" :style="'--hq-menu-top:' + top + 'px'" style="display: none;"></div>
                     <div id="hq-user-menu" class="hq-menu-panel hq-user-panel bg-paper border border-line rounded-card shadow-float"
                          x-show="open" x-transition.opacity @click.outside="open = false" :style="'--hq-menu-top:' + top + 'px'" style="display: none;">
                         <div class="hq-user-head">
-                            <span class="avatar" aria-hidden="true">{{ $initials }}</span>
+                            <x-hq.avatar :user="$user" />
                             <div style="min-width: 0;">
                                 <strong>{{ $userName }}</strong>
-                                <span>{{ $user?->role_names ?: 'Staff' }}</span>
+                                <span>{{ $userRole }}</span>
                                 <span>{{ $user->email }}</span>
                             </div>
                         </div>

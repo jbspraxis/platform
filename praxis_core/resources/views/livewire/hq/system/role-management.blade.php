@@ -127,7 +127,7 @@
                                 <div role="group" aria-labelledby="staff-roles-label" class="flex flex-col gap-2" style="padding: 12px; border: 1px solid var(--color-line-strong); border-radius: var(--radius-control);">
                                     @foreach($staffRoles as $role)
                                         <label class="flex items-center gap-2" style="cursor: pointer; font-size: 0.875rem;">
-                                            <input type="checkbox" wire:model="role_ids" value="{{ $role->id }}" class="checkbox">
+                                            <input type="checkbox" wire:model.live="role_ids" value="{{ $role->id }}" class="checkbox">
                                             <span class="text-ink">{{ $role->name }}</span>
                                             @if($role->is_protected) <span class="help">(only an owner can give this role)</span> @endif
                                         </label>
@@ -135,6 +135,19 @@
                                 </div>
                                 <span class="help">Choose one or more. A person with several roles can do everything those roles allow.</span>
                                 @error('role_ids') <span class="field-error">{{ $message }}</span> @enderror
+                                @if(count($role_ids) > 1)
+                                    <div class="field" style="margin-top: 12px;">
+                                        <label class="label" for="acc-primary-role">Primary role</label>
+                                        <select id="acc-primary-role" class="select" wire:model="primary_role_id">
+                                            @foreach($staffRoles as $role)
+                                                @if(in_array((string) $role->id, array_map('strval', $role_ids), true))
+                                                    <option value="{{ $role->id }}">{{ $role->name }}</option>
+                                                @endif
+                                            @endforeach
+                                        </select>
+                                        <span class="help">Shown with their name across HQ. The other roles only add access.</span>
+                                    </div>
+                                @endif
                             @endif
                         </div>
 

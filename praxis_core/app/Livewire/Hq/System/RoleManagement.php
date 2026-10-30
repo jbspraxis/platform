@@ -56,6 +56,7 @@ class RoleManagement extends Component
 
     // --- FORM STATE: ACCESS ---
     public $role_ids = [];          // staff: one or more staff roles
+    public $primary_role_id = '';   // staff: the one HQ shows; the others only add access
     public $client_role_id = '';    // client: one portal role
     public $organization_id = '';
 
@@ -135,7 +136,8 @@ class RoleManagement extends Component
             ->select(
                 'u.id', 'u.first_name', 'u.last_name', 'u.email', 'u.lifecycle_stage', 'u.status',
                 'org.name as org_name', 'org.id as org_id',
-                DB::raw("(SELECT GROUP_CONCAT(r.name ORDER BY r.is_protected DESC, r.id SEPARATOR ', ') FROM staff_roles sr JOIN roles r ON r.id = sr.role_id WHERE sr.user_id = u.id) as role_name")
+                // Primary role first; the rest only add access
+                DB::raw("(SELECT GROUP_CONCAT(r.name ORDER BY sr.is_primary DESC, r.is_protected DESC, r.id SEPARATOR ', ') FROM staff_roles sr JOIN roles r ON r.id = sr.role_id WHERE sr.user_id = u.id) as role_name")
             )
             ->orderBy('u.created_at', 'desc')
             ->get();
@@ -248,8 +250,11 @@ class RoleManagement extends Component
                 }
 
                 if (!$isClient) {
+                    $primary = $this->primaryRoleId();
                     DB::table('staff_roles')->where('user_id', $userId)->delete();
-                    DB::table('staff_roles')->insert(collect($this->role_ids)->unique()->map(fn ($r) => ['user_id' => $userId, 'role_id' => (int) $r, 'created_at' => now()])->all());
+                    DB::table('staff_roles')->insert(collect($this->role_ids)->unique()->map(fn ($r) => [
+                        'user_id' => $userId, 'role_id' => (int) $r, 'is_primary' => (int) $r === $primary, 'created_at' => now(),
+                    ])->values()->all());
                 }
             });
 
@@ -313,6 +318,27 @@ class RoleManagement extends Component
         }
 
         return true;
+    }
+
+    /**
+     * The primary role among those ticked: the one chosen, else the first that isn't the protected Owner role
+     * (the role a person does, rather than the access they hold).
+     */
+    private function primaryRoleId(): int
+    {
+        $ticked = collect($this->role_ids)->map(fn ($r) => (int) $r)->unique();
+        if ($ticked->contains((int) $this->primary_role_id)) {
+            return (int) $this->primary_role_id;
+        }
+
+        return (int) (DB::table('roles')->where('audience', 'staff')->whereIn('id', $ticked->all())
+            ->orderBy('is_protected')->orderBy('id')->value('id') ?? $ticked->first());
+    }
+
+    /** Keep the primary role one of the ticked roles while the form changes */
+    public function updatedRoleIds(): void
+    {
+        $this->primary_role_id = $this->role_ids ? (string) $this->primaryRoleId() : '';
     }
 
     /** True when $target (staff) holds a permission the signed-in non-owner doesn’t. */
@@ -380,6 +406,8 @@ class RoleManagement extends Component
             $this->phone = $user->phone;
             $this->job_title = $user->job_title;
             $this->role_ids = $isClient ? [] : DB::table('staff_roles')->where('user_id', $user->id)->pluck('role_id')->map(fn ($r) => (string) $r)->all();
+            $marked = $isClient ? null : DB::table('staff_roles')->where('user_id', $user->id)->where('is_primary', 1)->value('role_id');
+            $this->primary_role_id = $isClient ? '' : (string) ($marked ?: ($this->role_ids ? $this->primaryRoleId() : ''));
             $this->client_role_id = $isClient ? (string) ($user->role_id ?? '') : '';
             $this->organization_id = $user->organization_id;
 
@@ -448,7 +476,7 @@ class RoleManagement extends Component
     {
         $this->reset([
             'first_name', 'last_name', 'email', 'phone', 'job_title',
-            'role_ids', 'client_role_id', 'organization_id', 'new_org_name', 'new_org_industry',
+            'role_ids', 'primary_role_id', 'client_role_id', 'organization_id', 'new_org_name', 'new_org_industry',
             'editMode', 'editingUserId', 'editingIsClient'
         ]);
     }

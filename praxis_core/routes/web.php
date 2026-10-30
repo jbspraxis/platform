@@ -56,6 +56,9 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
         Route::get('/dashboard/workspace', \App\Livewire\Hq\Dashboards\MyWorkspace::class)->name('hq.dash.workspace');
         // Each person's own profile (the avatar menu): phone numbers and password; open to every staff member
         Route::get('/profile', \App\Livewire\Hq\Account\MyProfile::class)->name('hq.profile');
+        // People's photos (uploaded on My profile), for signed-in staff only
+        Route::get('/avatar/{user}', fn (string $user) => \App\Support\Avatars::response($user))
+            ->where('user', '[0-9a-f-]{36}')->name('hq.avatar');
         Route::get('/dashboard/investor', \App\Livewire\Hq\Dashboards\InvestorTerminal::class)->middleware('can:dashboard.view')->name('hq.dash.investor');
         Route::get('/dashboard/audit', \App\Livewire\Hq\Dashboards\AuditTerminal::class)->middleware('can:audit.view')->name('hq.dash.audit');
 

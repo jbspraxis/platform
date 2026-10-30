@@ -11,7 +11,8 @@ use Illuminate\Support\Facades\Validator;
 
 /**
  * Email signatures (owner decision 5): one company design, built from HR records. The person's name and job
- * title come from their user and employee records, the department from their staff role, the phone from the
+ * title come from their user and employee records (no department line: roles are access, not departments,
+ * owner 30 Oct 2026), the phone from the
  * HR record unless they set their own numbers (mail_signatures, the only part a person edits). Logo and
  * company details come from mail_settings `signature.company`, over defaults from the website settings.
  *
@@ -25,9 +26,6 @@ final class Signatures
 
     /** Digits, spaces, brackets, dots and dashes, with an optional + in front (as WebsiteSettings) */
     public const PHONE = '/^\+?[0-9][0-9 ().\-]{4,22}[0-9]$/';
-
-    /** Roles that are not a department in a signature */
-    private const NOT_DEPARTMENTS = ['owner', 'auditor'];
 
     /** @return array{name: string, descriptor: ?string, website: ?string, logo_url: ?string, show_logo: bool, address: ?string, phone: ?string} */
     public static function company(): array
@@ -107,13 +105,12 @@ final class Signatures
     public static function person(User $user): array
     {
         $employee = DB::table('mdm_employees')->where('user_id', $user->id)->where('is_active', 1)->orderByDesc('updated_at')->first();
-        $department = $user->roles()->whereNotIn('roles.slug', self::NOT_DEPARTMENTS)->orderBy('roles.name')->value('roles.name');
         $own = self::numbers($user);
 
         return [
             'name' => trim((string) $user->name) ?: (string) $user->email,
             'title' => self::blank($user->job_title) ?? self::blank($employee->job_classification ?? null),
-            'department' => $department,
+            'department' => null, // signatures show the job title only (owner, 30 Oct 2026)
             'phone' => $own['phone'] ?? self::blank($user->phone),
             'mobile' => $own['mobile'],
         ];

@@ -15,7 +15,7 @@ use Livewire\Component;
 /**
  * HQ → Mail → Signature: each person's signature as it sends (one company design built from HR records, owner
  * decision 5), their own numbers, and the company settings for those who may change them (Shared mailboxes:
- * Create, i.e. Owner and Partner). Name, job title and department come from HR and are changed there.
+ * Create, i.e. Owner and Partner). Name and job title come from HR and are changed there.
  */
 #[Layout('components.layouts.hq')]
 #[Title('Signature')]

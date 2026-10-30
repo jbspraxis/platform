@@ -74,12 +74,42 @@ class User extends Authenticatable
      */
     public function roles()
     {
-        return $this->belongsToMany(Role::class, 'staff_roles')->where('roles.audience', 'staff');
+        return $this->belongsToMany(Role::class, 'staff_roles')->where('roles.audience', 'staff')->withPivot('is_primary');
     }
 
-    /** Role names for display, e.g. "Delivery Lead, Engineer". */
+    /** Role names for display, e.g. "Delivery Lead, Engineer" (access lists; people are shown by their primary role). */
     public function getRoleNamesAttribute(): string
     {
         return $this->roles->pluck('name')->implode(', ');
+    }
+
+    /**
+     * The role HQ shows for the person (top bar, menu, profile). Their other roles only add access. Chosen on
+     * Settings → Accounts; when none is marked, their first role that isn't the protected Owner role.
+     */
+    public function primaryRole(): ?Role
+    {
+        $roles = $this->roles;
+
+        return $roles->first(fn ($r) => (bool) $r->pivot->is_primary)
+            ?? $roles->sortBy(fn ($r) => [(int) $r->is_protected, $r->id])->first();
+    }
+
+    public function getPrimaryRoleNameAttribute(): string
+    {
+        return (string) ($this->primaryRole()?->name ?? '');
+    }
+
+    /** The person's photo (My profile), or null for their initials */
+    public function avatarUrl(): ?string
+    {
+        return $this->avatar_path
+            ? route('hq.avatar', ['user' => $this->id, 'v' => substr(sha1($this->avatar_path), 0, 10)], false)
+            : null;
+    }
+
+    public function initials(): string
+    {
+        return strtoupper(mb_substr($this->first_name ?? '', 0, 1) . mb_substr($this->last_name ?? '', 0, 1)) ?: 'JP';
     }
 }

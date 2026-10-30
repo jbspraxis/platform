@@ -231,7 +231,8 @@ class ComposeScreenTest extends TestCase
 
         Livewire::actingAs($sender)->test(Signature::class)
             ->assertSee('Account Manager')
-            ->assertSee('Sales &amp; Marketing', false)
+            // Job title only: a role is access, not a department (owner, 30 Oct 2026)
+            ->assertDontSee('Sales &amp; Marketing', false)
             ->assertSee('+234 801 000 0000')
             ->set('mobile', 'call me')
             ->call('saveNumbers')

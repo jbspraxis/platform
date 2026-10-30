@@ -4,7 +4,13 @@
         .mp { max-width: 820px; }
         .mp-cards { display: flex; flex-direction: column; gap: 24px; }
         .mp-who { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
-        .mp-who .avatar { width: 64px; height: 64px; font-size: 1.25rem; }
+        .mp-who .avatar { width: 80px; height: 80px; font-size: 1.5rem; }
+        .mp-photo { position: relative; flex-shrink: 0; }
+        .mp-photo-btn { position: relative; display: block; padding: 0; border: 0; background: none; border-radius: 50%; cursor: pointer; }
+        .mp-photo-btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+        .mp-photo-btn:hover .avatar { box-shadow: 0 0 0 2px var(--color-teal); }
+        .mp-photo-cam { position: absolute; right: -2px; bottom: -2px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--color-deep-teal); color: #fff; border: 2px solid var(--color-paper); }
+        .mp-photo-cam svg { width: 14px; height: 14px; }
         .mp-who h2 { margin: 0; font-size: 1.125rem; line-height: 1.625rem; font-weight: 600; color: var(--color-ink); }
         .mp-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 12px 0 0; }
         .mp-facts dt { color: var(--color-muted); font-size: 0.8125rem; line-height: 1.25rem; }
@@ -24,19 +30,72 @@
     </div>
 
     <div class="mp-cards">
-        <section class="card" aria-labelledby="mp-who">
+        {{-- The photo is cropped to a square in the browser, then uploaded and saved (App\Support\Avatars) --}}
+        <section class="card" aria-labelledby="mp-who"
+                 x-data="{
+                     preview: null, blob: null, busy: false, error: '',
+                     pick() { this.error = ''; this.$refs.photoFile.click() },
+                     async choose(e) {
+                         const file = e.target.files[0]; e.target.value = '';
+                         if (!file) return;
+                         if (!/^image\//.test(file.type)) { this.error = 'Choose a photo (JPG, PNG or WebP).'; return }
+                         if (file.size > 20 * 1024 * 1024) { this.error = 'Choose a photo under 20 MB.'; return }
+                         let img = null;
+                         try { img = await createImageBitmap(file, { imageOrientation: 'from-image' }) } catch (err) { img = null }
+                         if (!img) { this.error = 'That photo couldn’t be opened. Try a JPG or PNG.'; return }
+                         const side = Math.min(img.width, img.height), size = Math.min({{ \App\Support\Avatars::SIZE }}, side);
+                         const canvas = document.createElement('canvas'); canvas.width = canvas.height = size;
+                         canvas.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size);
+                         this.blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
+                         this.preview = canvas.toDataURL('image/jpeg', 0.9);
+                     },
+                     cancel() { this.preview = null; this.blob = null; this.error = '' },
+                     save() {
+                         if (!this.blob) return;
+                         this.busy = true; this.error = '';
+                         const file = new File([Alpine.raw(this.blob)], 'photo.jpg', { type: 'image/jpeg' });
+                         this.$wire.upload('photo', file,
+                             () => this.$wire.savePhoto().then(() => { this.busy = false; this.cancel() }),
+                             () => { this.busy = false; this.error = 'The photo couldn’t be uploaded. Check the connection and try again.' });
+                     },
+                 }">
+            @if ($photoFlash)
+                <div class="alert alert-success mb-4" role="status"><i data-lucide="circle-check"></i><span>{{ $photoFlash }}</span></div>
+            @endif
             <div class="mp-who">
-                <span class="avatar" aria-hidden="true">{{ $initials }}</span>
+                <div class="mp-photo">
+                    <button type="button" class="mp-photo-btn" x-on:click="pick()" x-show="!preview" aria-label="{{ $user->avatar_path ? 'Change your photo' : 'Add a photo' }}" title="{{ $user->avatar_path ? 'Change your photo' : 'Add a photo' }}">
+                        <x-hq.avatar :user="$user" />
+                        <span class="mp-photo-cam" aria-hidden="true"><i data-lucide="camera"></i></span>
+                    </button>
+                    <img x-show="preview" x-bind:src="preview" alt="Your new photo" class="avatar" style="display: none; object-fit: cover;">
+                    <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" x-ref="photoFile" x-on:change="choose($event)" hidden>
+                </div>
                 <div style="min-width: 0; flex: 1 1 240px;">
                     <h2 id="mp-who">{{ $person['name'] }}</h2>
+                    <div class="mp-actions mt-1" x-show="!preview">
+                        <button type="button" class="btn btn-secondary btn-sm" x-on:click="pick()"><i data-lucide="camera"></i> {{ $user->avatar_path ? 'Change photo' : 'Add a photo' }}</button>
+                        @if ($user->avatar_path)
+                            <button type="button" class="btn btn-ghost btn-sm" wire:click="removePhoto" wire:confirm="Remove your photo? HQ shows your initials instead.">Remove photo</button>
+                        @endif
+                    </div>
+                    <div class="mp-actions mt-1" x-show="preview" style="display: none;">
+                        <button type="button" class="btn btn-primary btn-sm" x-on:click="save()" x-bind:disabled="busy">
+                            <span x-show="!busy">Save photo</span><span x-show="busy" style="display: none;">Saving…</span>
+                        </button>
+                        <button type="button" class="btn btn-ghost btn-sm" x-on:click="cancel()" x-bind:disabled="busy">Cancel</button>
+                        <span class="help">Cropped to a square from the middle of the photo.</span>
+                    </div>
+                    <p class="field-error" x-show="error" x-text="error" style="display: none;"></p>
+                    @error('photo') <p class="field-error">{{ $message }}</p> @enderror
                     <dl class="mp-facts">
                         <dt>Job title</dt><dd>{{ $person['title'] ?: 'Not set' }}</dd>
-                        <dt>Department</dt><dd>{{ $person['department'] ?: 'Not set' }}</dd>
                         <dt>Email</dt><dd>{{ $user->email }}</dd>
-                        <dt>Roles</dt><dd>{{ $user->role_names ?: 'Staff' }}</dd>
+                        <dt>Role</dt><dd>{{ $primaryRole }}</dd>
+                        @if ($otherRoles !== '')<dt>Also has access as</dt><dd>{{ $otherRoles }}</dd>@endif
                         @if ($lastSignIn)<dt>Signed in</dt><dd>{{ $lastSignIn }} (WAT)</dd>@endif
                     </dl>
-                    <p class="help mt-4" style="margin-bottom: 0;">These come from your HR record and your roles. To change them, ask HR or an administrator.</p>
+                    <p class="help mt-4" style="margin-bottom: 0;">Your job title comes from your HR record, your roles from Settings and access. To change them, ask HR or an administrator. Your photo shows in HQ only.</p>
                 </div>
             </div>
         </section>

@@ -62,4 +62,79 @@ class MyProfileTest extends TestCase
         $this->assertTrue(Hash::check('new-password-2', $me->fresh()->password));
         $this->assertSame(1, DB::table('system_audit_logs')->where('user_id', $me->id)->where('action', 'PASSWORD_CHANGED')->count());
     }
+
+    public function test_one_primary_role_shows_and_the_signature_has_no_department(): void
+    {
+        // An owner who is also Partner / Director: the migration's rule makes Partner / Director primary
+        $me = $this->staff('own', ['owner', 'partner']);
+        $partner = DB::table('roles')->where('slug', 'partner')->value('id');
+        DB::table('staff_roles')->where('user_id', $me->id)->update(['is_primary' => 0]);
+        $me->forceFill(['job_title' => 'Managing Partner'])->save();
+
+        $this->assertSame('Partner / Director', $me->fresh()->primary_role_name, 'Without a choice: the first role that isn’t Owner');
+
+        DB::table('staff_roles')->where('user_id', $me->id)->where('role_id', $partner)->update(['is_primary' => 1]);
+        $html = $this->actingAs($me)->get('https://' . Hosts::hq() . '/profile')->assertOk()->getContent();
+        $this->assertStringContainsString('<span class="user-chip-role">Partner / Director</span>', $html);
+        $this->assertStringContainsString('Also has access as</dt><dd>Owner</dd>', $html);
+        $this->assertStringNotContainsString('Owner, Partner / Director', $html);
+
+        $person = Signatures::person($me->fresh());
+        $this->assertSame('Managing Partner', $person['title']);
+        $this->assertNull($person['department']);
+    }
+
+    public function test_the_primary_role_is_chosen_on_accounts(): void
+    {
+        $owner = $this->staff('own', ['owner']);
+        $ada = $this->staff('ada', ['sales']);
+        $sales = (string) DB::table('roles')->where('slug', 'sales')->value('id');
+        $engineer = (string) DB::table('roles')->where('slug', 'engineer')->value('id');
+
+        Livewire::actingAs($owner)->test(\App\Livewire\Hq\System\RoleManagement::class)
+            ->call('editUser', $ada->id)
+            ->assertSet('primary_role_id', $sales)
+            ->set('role_ids', [$sales, $engineer])
+            ->set('primary_role_id', $engineer)
+            ->call('saveUser')
+            ->assertHasNoErrors();
+
+        $this->assertSame((int) $engineer, (int) DB::table('staff_roles')->where('user_id', $ada->id)->where('is_primary', 1)->value('role_id'));
+        $this->assertSame(1, DB::table('staff_roles')->where('user_id', $ada->id)->where('is_primary', 1)->count());
+
+        // Unticking the primary role moves it to one that is still ticked
+        Livewire::actingAs($owner)->test(\App\Livewire\Hq\System\RoleManagement::class)
+            ->call('editUser', $ada->id)->set('role_ids', [$sales])->assertSet('primary_role_id', $sales);
+    }
+
+    public function test_a_photo_is_cropped_stored_privately_shown_and_removed(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $me = $this->staff('eng', ['engineer']);
+
+        Livewire::actingAs($me)->test(MyProfile::class)
+            ->set('photo', \Illuminate\Http\UploadedFile::fake()->image('me.png', 900, 600))
+            ->call('savePhoto')
+            ->assertHasNoErrors()->assertSee('Photo saved');
+
+        $me->refresh();
+        $this->assertNotNull($me->avatar_path);
+        \Illuminate\Support\Facades\Storage::disk('local')->assertExists($me->avatar_path);
+        [$w, $h] = getimagesizefromstring(\Illuminate\Support\Facades\Storage::disk('local')->get($me->avatar_path));
+        $this->assertSame([512, 512], [$w, $h]);
+
+        $page = $this->actingAs($me)->get('https://' . Hosts::hq() . '/profile')->assertOk();
+        $page->assertSee($me->avatarUrl(), false);
+        $this->actingAs($me)->get('https://' . Hosts::hq() . $me->avatarUrl())->assertOk()->assertHeader('Content-Type', 'image/jpeg');
+
+        // Not a photo
+        Livewire::actingAs($me)->test(MyProfile::class)
+            ->set('photo', \Illuminate\Http\UploadedFile::fake()->createWithContent('notes.png', 'just text'))
+            ->call('savePhoto')->assertHasErrors('photo');
+
+        $old = $me->avatar_path;
+        Livewire::actingAs($me)->test(MyProfile::class)->call('removePhoto')->assertSee('Photo removed');
+        $this->assertNull($me->fresh()->avatar_path);
+        \Illuminate\Support\Facades\Storage::disk('local')->assertMissing($old);
+    }
 }

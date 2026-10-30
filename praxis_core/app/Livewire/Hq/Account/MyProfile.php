@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Hq\Account;
 
+use App\Support\Avatars;
 use App\Support\Mail\Compose\Signatures;
 use App\Support\Mail\MailAccess;
 use Illuminate\Support\Facades\Auth;
@@ -13,16 +14,26 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 /**
- * HQ → avatar → My profile (owner, 30 Oct 2026): who you are in HQ (name, job title, department, email and roles,
- * read-only: they come from your HR record and your roles), your phone numbers (the same ones your email
- * signature uses, App\Support\Mail\Compose\Signatures) and your password. Every staff member can open it.
+ * HQ → avatar → My profile (owner, 30 Oct 2026): your photo (HQ only, App\Support\Avatars), who you are in HQ
+ * (name, job title, email, your primary role and the roles that only add access; read-only, from your HR record
+ * and Settings → Accounts), your phone numbers (the same ones your email signature uses,
+ * App\Support\Mail\Compose\Signatures) and your password. Every staff member can open it.
  */
 #[Layout('components.layouts.hq')]
 #[Title('My profile')]
 class MyProfile extends Component
 {
+    use WithFileUploads;
+
+    /** The photo, already cropped square in the browser */
+    public $photo;
+
+    #[Locked]
+    public ?string $photoFlash = null;
+
     public string $mobile = '';
     public string $office = '';
 
@@ -57,6 +68,37 @@ class MyProfile extends Component
         $this->resetErrorBag(['office', 'mobile']);
         $this->audit('PROFILE_NUMBERS_UPDATED', 'Updated their phone numbers on My profile.');
         $this->numbersFlash = 'Phone numbers saved. Your email signature uses them from now on.';
+    }
+
+    public function savePhoto(): void
+    {
+        $this->photoFlash = null;
+        $this->validate(['photo' => 'required|image|max:5120'], [
+            'photo.required' => 'Choose a photo.',
+            'photo.image' => 'Use a JPG, PNG or WebP photo.',
+            'photo.max' => 'Use a photo under 5 MB.',
+        ]);
+
+        try {
+            Avatars::store(Auth::user(), $this->photo);
+        } catch (ValidationException $e) {
+            $this->addError('photo', $e->errors()['photo'][0] ?? 'That photo couldn’t be saved.');
+
+            return;
+        } finally {
+            rescue(fn () => $this->photo?->delete(), null, false);
+            $this->photo = null;
+        }
+
+        $this->audit('PROFILE_PHOTO_UPDATED', 'Changed their photo on My profile.');
+        $this->photoFlash = 'Photo saved. It shows next to your name across HQ.';
+    }
+
+    public function removePhoto(): void
+    {
+        Avatars::remove(Auth::user());
+        $this->audit('PROFILE_PHOTO_REMOVED', 'Removed their photo on My profile.');
+        $this->photoFlash = 'Photo removed. HQ shows your initials again.';
     }
 
     public function changePassword(): void
@@ -102,14 +144,16 @@ class MyProfile extends Component
 
     public function render()
     {
-        $user = Auth::user();
+        $user = Auth::user()->fresh(['roles']);
         $person = Signatures::person($user);
+        $primary = $user->primaryRole();
 
         return view('livewire.hq.account.my-profile', [
             'user' => $user,
             'person' => $person,
+            'primaryRole' => $primary?->name ?: 'Staff',
+            'otherRoles' => $user->roles->reject(fn ($r) => $primary && $r->id === $primary->id)->pluck('name')->implode(', '),
             'hrPhone' => trim((string) $user->phone),
-            'initials' => strtoupper(mb_substr($user->first_name ?? '', 0, 1) . mb_substr($user->last_name ?? '', 0, 1)) ?: 'JP',
             'lastSignIn' => $user->last_login_at?->timezone('Africa/Lagos')->format('j F Y, H:i'),
             'canUseMail' => MailAccess::canUse($user),
         ]);

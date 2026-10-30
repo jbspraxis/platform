@@ -67,7 +67,6 @@
                 <dl class="ms-facts">
                     <dt>Name</dt><dd>{{ $person['name'] }}</dd>
                     <dt>Job title</dt><dd>{{ $person['title'] ?? 'Not set' }}</dd>
-                    <dt>Department</dt><dd>{{ $person['department'] ?? 'Not set' }}</dd>
                 </dl>
                 <p class="help mt-4">To change these, ask HR to update your employee record.@if ($previewShared) On a shared mailbox the signature shows the shared address, not yours.@endif</p>
             </section>
