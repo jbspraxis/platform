@@ -31,3 +31,9 @@ Schedule::command('pwa:push-prune')->dailyAt('03:10');
 Schedule::command('mail:sync')->everyMinute()->withoutOverlapping(10);
 Schedule::command('mail:send-due')->everyMinute()->withoutOverlapping(5);
 Schedule::command('mail:prune')->dailyAt('03:40');
+
+// Careers (the privacy policy on jbspraxis.com): CVs deleted and applications anonymised 12 months after they
+// arrive. Only once the owner sets CV_RETENTION_PURGE=true (config/praxis.php); try it with --dry-run first
+if (config('praxis.cv_retention_purge')) {
+    Schedule::command('careers:purge-cvs')->dailyAt('03:25')->withoutOverlapping(30);
+}
