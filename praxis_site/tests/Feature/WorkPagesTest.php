@@ -21,8 +21,12 @@ class WorkPagesTest extends TestCase
         foreach ($this->paths() as $path) {
             $this->get($path)->assertOk()->assertSee('<html lang="en">', false)
                 ->assertSee('<link rel="alternate" hreflang="fr" href="' . url('/fr' . $path) . '">', false);
-            $this->get('/fr' . $path)->assertOk()->assertSee('<html lang="fr">', false)
-                ->assertSee('<link rel="alternate" hreflang="en" href="' . url($path) . '">', false);
+            $html = $this->get('/fr' . $path)->assertOk()->assertSee('<html lang="fr">', false)
+                ->assertSee('<link rel="alternate" hreflang="en" href="' . url($path) . '">', false)->getContent();
+
+            // The CSP allows no inline script or style (JSON-LD is data, never run)
+            $this->assertDoesNotMatchRegularExpression('/<script(?![^>]*\b(?:src=|type="application\/ld\+json"))[^>]*>/i', $html, $path);
+            $this->assertDoesNotMatchRegularExpression('/\sstyle\s*=|<style\b/i', $html, $path);
         }
 
         $this->get('/work')->assertSee('What we built, and how it runs.')->assertSee('Book a free audit and demo');
