@@ -54,6 +54,8 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
         // 1. COMMAND OVERVIEW (the workspace is open to every staff member)
         Route::get('/dashboard/admin', \App\Livewire\Hq\Dashboards\GlobalTelemetry::class)->middleware('can:dashboard.view')->name('hq.dash.admin');
         Route::get('/dashboard/workspace', \App\Livewire\Hq\Dashboards\MyWorkspace::class)->name('hq.dash.workspace');
+        // Each person's own profile (the avatar menu): phone numbers and password; open to every staff member
+        Route::get('/profile', \App\Livewire\Hq\Account\MyProfile::class)->name('hq.profile');
         Route::get('/dashboard/investor', \App\Livewire\Hq\Dashboards\InvestorTerminal::class)->middleware('can:dashboard.view')->name('hq.dash.investor');
         Route::get('/dashboard/audit', \App\Livewire\Hq\Dashboards\AuditTerminal::class)->middleware('can:audit.view')->name('hq.dash.audit');
 

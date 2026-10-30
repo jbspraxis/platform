@@ -14,6 +14,7 @@
     $section = match (true) {
         request()->routeIs('hq.dash.workspace') => 'My workspace',
         request()->routeIs('hq.mdm.employees') => 'Team',
+        request()->routeIs('hq.profile') => 'My profile',
         default => [
             'dash' => 'Overview', 'mdm' => 'Master data', 'hr' => 'Team', 'crm' => 'Leads and proposals',
             'ops' => 'Projects', 'finance' => 'Finance', 'marketing' => 'Marketing', 'system' => 'Settings and access', 'mail' => 'Mail',
@@ -233,18 +234,77 @@
     </aside>
 
     <div class="main">
+        {{-- Top bar menus (the bell and the avatar): a dropdown on computers; on phones a full-width panel just
+             under the top bar over a dimmed page (owner, 30 Oct 2026). --hq-menu-top is set when a menu opens. --}}
+        <style>
+            .hq-menu-panel { position: absolute; right: 0; top: calc(100% + 8px); width: min(360px, calc(100vw - 32px)); z-index: 60; overflow: hidden; }
+            .hq-menu-dim { display: none; }
+            .hq-user { position: relative; display: flex; align-items: center; }
+            .hq-user-btn { background: none; border: 0; padding: 4px; margin: -4px; border-radius: var(--radius-control); cursor: pointer; font: inherit; color: inherit; }
+            .hq-user-btn:hover .avatar, .hq-user-btn[aria-expanded="true"] .avatar { box-shadow: 0 0 0 2px var(--color-teal); }
+            .hq-user-btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+            .hq-user-panel { width: min(300px, calc(100vw - 32px)); }
+            .hq-user-head { display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid var(--color-line); }
+            .hq-user-head .avatar { width: 44px; height: 44px; font-size: 0.9375rem; }
+            .hq-user-head strong { display: block; color: var(--color-ink); font-size: 0.9375rem; line-height: 1.375rem; font-weight: 600; }
+            .hq-user-head div span { display: block; font-size: 0.8125rem; line-height: 1.125rem; color: var(--color-muted); overflow-wrap: anywhere; }
+            .hq-user-links { padding: 6px 0; border-bottom: 1px solid var(--color-line); }
+            .hq-user-links .hqp-menu-item { text-decoration: none; }
+            .hq-user-foot { padding: 12px 16px 16px; }
+            .hq-user-foot .btn { width: 100%; justify-content: center; }
+            @media (max-width: 640px) {
+                .hq-menu-panel, .hq-user-panel { position: fixed; left: 0; right: 0; top: var(--hq-menu-top, 64px); width: auto; border-radius: 0 0 12px 12px; border-left: 0; border-right: 0;
+                    max-height: calc(100dvh - var(--hq-menu-top, 64px) - 12px); display: flex; flex-direction: column; }
+                .hq-menu-scroll { flex: 1 1 auto; max-height: none !important; min-height: 0; }
+                .hq-menu-dim { display: block; position: fixed; left: 0; right: 0; bottom: 0; top: var(--hq-menu-top, 64px); background: rgba(12, 20, 43, 0.45); z-index: 59; }
+            }
+        </style>
         <header class="topbar">
             <div class="topbar-title">HQ @if ($section) / <strong>{{ $section }}</strong>@endif</div>
             <div class="topbar-actions">
                 <livewire:hq.components.notification-bell />
-                <div class="user-chip">
-                    <div>
-                        <span class="user-chip-name">{{ $user->name ?? trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) }}</span>
-                        <span class="user-chip-role">{{ $user?->role_names ?: 'Staff' }}</span>
+                @php
+                    $userName = $user->name ?? trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? ''));
+                    $initials = strtoupper(mb_substr($user->first_name ?? '', 0, 1) . mb_substr($user->last_name ?? '', 0, 1)) ?: 'JP';
+                @endphp
+                {{-- The person's menu: My profile, notification settings, installing the app, and Sign out --}}
+                <div class="hq-user" x-data="{ open: false, top: 64 }" @keydown.escape.window="if (open) { open = false; $refs.userBtn.focus() }">
+                    <button type="button" class="user-chip hq-user-btn" x-ref="userBtn"
+                            @click="open = !open; if (open) top = Math.max(0, Math.round($el.closest('.topbar').getBoundingClientRect().bottom))"
+                            aria-haspopup="true" aria-controls="hq-user-menu" aria-expanded="false" :aria-expanded="open.toString()"
+                            aria-label="Your account: {{ $userName }}">
+                        <div>
+                            <span class="user-chip-name">{{ $userName }}</span>
+                            <span class="user-chip-role">{{ $user?->role_names ?: 'Staff' }}</span>
+                        </div>
+                        <span class="avatar" aria-hidden="true">{{ $initials }}</span>
+                    </button>
+                    <div class="hq-menu-dim" x-show="open" x-transition.opacity @click="open = false" :style="'--hq-menu-top:' + top + 'px'" style="display: none;"></div>
+                    <div id="hq-user-menu" class="hq-menu-panel hq-user-panel bg-paper border border-line rounded-card shadow-float"
+                         x-show="open" x-transition.opacity @click.outside="open = false" :style="'--hq-menu-top:' + top + 'px'" style="display: none;">
+                        <div class="hq-user-head">
+                            <span class="avatar" aria-hidden="true">{{ $initials }}</span>
+                            <div style="min-width: 0;">
+                                <strong>{{ $userName }}</strong>
+                                <span>{{ $user?->role_names ?: 'Staff' }}</span>
+                                <span>{{ $user->email }}</span>
+                            </div>
+                        </div>
+                        <div class="hq-user-links hq-menu-scroll" style="overflow-y: auto;">
+                            <a href="{{ route('hq.profile') }}" class="hqp-menu-item" wire:navigate @click="open = false">
+                                <i data-lucide="user-round" style="width: 18px; height: 18px;"></i> My profile
+                            </a>
+                            <button type="button" class="hqp-menu-item" @click="open = false; $dispatch('open-notification-settings')">
+                                <i data-lucide="settings" style="width: 18px; height: 18px;"></i> Notification settings
+                            </button>
+                            {{-- hq-pwa.js draws "Install the app" (and "Turn on notifications") here when this device can use them --}}
+                            <div data-hq-pwa="bell-actions" x-on:hq-pwa-close-menu="open = false"></div>
+                        </div>
+                        <div class="hq-user-foot">
+                            <a href="{{ route('hq.logout') }}" class="btn btn-danger"><i data-lucide="log-out"></i> Sign out</a>
+                        </div>
                     </div>
-                    <span class="avatar" aria-hidden="true">{{ strtoupper(mb_substr($user->first_name ?? '', 0, 1) . mb_substr($user->last_name ?? '', 0, 1)) ?: 'JP' }}</span>
                 </div>
-                <a href="{{ route('hq.logout') }}" class="btn btn-ghost btn-sm"><i data-lucide="log-out"></i> Sign out</a>
             </div>
         </header>
 
