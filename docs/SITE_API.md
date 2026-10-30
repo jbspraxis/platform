@@ -99,6 +99,8 @@ Request fields (JSON, snake_case of today's Livewire properties; rules exactly a
   → `201 {"data":{"token":"…","report_path":"/dossier/<token>", "figures":{…as the page shows them…}}}`.
 - `POST /kaizen/submissions`: `full_name`*, `title`*, `email`*, `linkedin_url`* (URL), `category`* (`The Boardroom` or
   `The Server Room`), `article_title`*, `exec_summary`* (50 words at most), `vulnerability`*, `solution`*, `roi`*.
+  Stored as `Pending Moderation` ("Waiting for review" in HQ); it stays off `GET /kaizen/articles` until someone with
+  `kaizen.approve` publishes it in HQ (Sign-offs → Case studies and articles → Insights articles).
 - `POST /feedback`: `identity`, `email`, `category`*, `severity` (1–3, default 1), `description`* (10–5000).
 - `POST /careers/applications` (multipart): `full_name`*, `email`*, `country_code` (default `+234`), `phone`*, `city`*,
   `primary_skill`*, `other_skill` (required if primary_skill = other), `secondary_skillset`*, `linkedin_url`* (URL),
