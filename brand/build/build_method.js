@@ -2,10 +2,10 @@
 //   praxis_core/resources/pdf/the-praxis-method-en.pdf and -fr.pdf  (A4, printed by headless Edge)
 // Sources: brand/method/the-praxis-method.{en,fr}.html and method.css; logo from brand/kit; fonts from
 // method_fonts.py (static instances, so the PDF embeds real fonts with selectable text).
-// Needs Node, Python with fontTools, and Microsoft Edge (as build_book.js).
+// Needs Node, Python with fontTools, and Microsoft Edge (as build_book.js); pdftotext, if present, prints layout failures.
 //   node brand/build/build_method.js            both languages
 //   node brand/build/build_method.js fr         one language
-// To look at the pages: node brand/build/pdf_sheet.js 1 6 3 600 praxis_core/resources/pdf/the-praxis-method-en.pdf
+// To look at the pages (about 4 a run): node brand/build/pdf_sheet.js 1 4 2 600 praxis_core/resources/pdf/the-praxis-method-en.pdf
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
