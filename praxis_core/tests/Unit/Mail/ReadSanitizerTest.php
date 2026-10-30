@@ -179,4 +179,14 @@ class ReadSanitizerTest extends TestCase
         $this->assertSame([['budget', 'q4 review'], ['ada']], ThreadList::parse('budget from:ada "q4 review"'));
         $this->assertSame([[], []], ThreadList::parse('   '));
     }
+
+    public function test_the_senders_charset_declaration_never_garbles_the_text(): void
+    {
+        // Outlook's HTML says windows-1252; MIME decoding has already made it UTF-8 (owner report, 30 Oct 2026)
+        foreach (['<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">', '<META charset="iso-8859-1">'] as $meta) {
+            $out = HtmlSanitizer::clean("<html><head>{$meta}</head><body><p>we don\u{2019}t want – café</p></body></html>")['html'];
+            $this->assertStringContainsString("we don\u{2019}t want – café", html_entity_decode($out, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $this->assertStringNotContainsString('â€', $out);
+        }
+    }
 }

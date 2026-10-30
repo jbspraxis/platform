@@ -11,7 +11,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Storage that works without PHP's fileinfo extension (the live web PHP lacks it): App\Support\FilesystemManager
+        $this->app->singleton('filesystem', fn ($app) => new \App\Support\FilesystemManager($app));
     }
 
     /**

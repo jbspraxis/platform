@@ -70,7 +70,9 @@ final class HtmlSanitizer
 
         $doc = new DOMDocument('1.0', 'UTF-8');
         $previous = libxml_use_internal_errors(true);
-        // The XML declaration makes libxml read the string as UTF-8 (MIME decoding already converted it)
+        // The XML declaration makes libxml read the string as UTF-8 (MIME decoding already converted it). The sender's
+        // own <meta charset> (Outlook: windows-1252) would win over it and garble the text ("donâ€™t"), so it goes first.
+        $html = preg_replace('/<meta\b[^>]*\bcharset\b[^>]*>/i', '', $html) ?? $html;
         $doc->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_NONET | LIBXML_COMPACT | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
         libxml_use_internal_errors($previous);

@@ -66,4 +66,11 @@ class ComposeTextTest extends TestCase
         $this->assertSame("Merci !", WriteWithAi::withoutQuotes("Merci !\nLe lun. 27 oct. 2026, Ada a écrit :\n> On se voit ?"));
         $this->assertSame("See below\nok", WriteWithAi::withoutQuotes("See below\n> quoted line\nok\n---------- Forwarded message ----------\nFrom: x"));
     }
+
+    public function test_a_quoted_originals_charset_declaration_never_garbles_the_text(): void
+    {
+        $clean = HtmlCleaner::clean('<meta http-equiv="Content-Type" content="text/html; charset=windows-1252"><p>we don' . "\u{2019}" . 't want</p>');
+        $this->assertStringContainsString("we don\u{2019}t want", html_entity_decode($clean, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $this->assertStringNotContainsString('â€', $clean);
+    }
 }

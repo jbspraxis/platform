@@ -86,6 +86,8 @@ final class HtmlCleaner
     {
         $doc = new DOMDocument('1.0', 'UTF-8');
         $previous = libxml_use_internal_errors(true);
+        // A quoted or forwarded original's own <meta charset> (Outlook: windows-1252) would win over the UTF-8 declaration
+        $html = preg_replace('/<meta\b[^>]*\bcharset\b[^>]*>/i', '', $html) ?? $html;
         $doc->loadHTML('<?xml encoding="utf-8"?><html><body><div id="hq-root">' . $html . '</div></body></html>', LIBXML_NONET | LIBXML_COMPACT);
         libxml_clear_errors();
         libxml_use_internal_errors($previous);
