@@ -18,6 +18,7 @@ use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -250,6 +251,28 @@ class SiteApiTest extends TestCase
     }
 
     // ------------------------------------------------------------------ endpoints (6.4)
+
+    public function test_the_method_guide_goes_out_in_the_visitors_language(): void
+    {
+        $this->api('POST', '/whitepaper', ['email' => 'guide.en@example.test'], ip: '198.51.100.61')
+            ->assertCreated()->assertJsonPath('data.sent', true);
+        $this->api('POST', '/whitepaper', ['email' => 'guide.fr@example.test'], ip: '198.51.100.62', locale: 'fr')
+            ->assertCreated()->assertJsonPath('data.sent', true);
+
+        $this->assertSame(['The Praxis Method'], DB::table('whitepaper_downloads')
+            ->whereIn('email_captured', ['guide.en@example.test', 'guide.fr@example.test'])->distinct()->pluck('document_name')->all());
+
+        // The French page gets the French email with the French edition, under its French name
+        foreach ([
+            'en' => ['guide.en@example.test', 'the-praxis-method-en.pdf', 'JBS-Praxis-Method.pdf'],
+            'fr' => ['guide.fr@example.test', 'the-praxis-method-fr.pdf', 'JBS-Praxis-Methode.pdf'],
+        ] as $locale => [$email, $file, $name]) {
+            $guide = Attachment::fromPath(resource_path("pdf/{$file}"))->as($name)->withMime('application/pdf');
+            Mail::assertSent(PraxisFrameworkDispatch::class, fn (PraxisFrameworkDispatch $mail) => $mail->hasTo($email)
+                && $mail->locale === $locale && $mail->hasAttachment($guide));
+        }
+        Mail::assertSent(PraxisFrameworkDispatch::class, 2);
+    }
 
     public function test_enquiry_stores_start_timing_and_emails_only_the_first_name(): void
     {
