@@ -13,6 +13,9 @@ class CareersController extends Controller
         'linkedin_url', 'portfolio_url', 'praxis_answer',
     ];
 
+    /** The CV's own checks; "mimes" reads the file's first bytes (finfo, or App\Support\Polyfill\Finfo without it) */
+    public const CV_RULES = ['required', 'file', 'mimes:pdf,doc,docx', 'max:5120'];
+
     public function show()
     {
         return view('pages.careers');
@@ -22,7 +25,7 @@ class CareersController extends Controller
     {
         // The file is checked here before it travels to HQ (HQ checks it again); everything else is HQ's to validate
         $request->validate(
-            ['cv' => ['required', 'file', 'mimes:pdf,doc,docx', 'max:5120']],
+            ['cv' => self::CV_RULES],
             [
                 'cv.required' => __('site.careers.cv_required'),
                 'cv.file' => __('site.careers.cv_failed'),
