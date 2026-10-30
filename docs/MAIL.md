@@ -290,6 +290,11 @@ Each PR, when its tests pass and the owner has seen it locally:
 - With fileinfo worked around, the upload succeeded and the composer then failed to draw the attachment chip: `Number::fileSize()` needs PHP's **intl** extension, missing on the live web PHP. The size is now plain arithmetic (`2ae6c4f`; live, size checked; backup `~/mail_backup_fix3_20261030/`).
 - Rule for all Mail code: no `Illuminate\Support\Number`, `NumberFormatter`, `Collator`, `finfo`, `sodium_*`, `exif_*` or `gmp_*` without a fallback (see the Fix 1 note on the live PHP).
 
+### Fix 4: 30 October 2026, evening (every upload, not only Mail)
+
+- When PHP has no fileinfo extension, `AppServiceProvider` loads `app/Support/Polyfill/fileinfo.php`: a global `finfo`, `finfo_*()` and `mime_content_type()` backed by `App\Support\Polyfill\Finfo` (type from the first bytes: PDF, images, Word/Excel/PowerPoint, OpenDocument, audio, video, text; then the extension). Laravel's `mimes`/`image` rules, Livewire (including its fallback for files with no or unusual extensions, which still crashed), Flysystem and Symfony use it unchanged. Matches the real finfo on PDF, PNG, GIF, JPEG, text, DOCX and XLSX (`FinfoPolyfillTest`). `FilesystemManager` stays as a second guard. Commit `71026aa`.
+- Checked on the live server's own PHP (ea-php83 CLI, no fileinfo) with a one-off cron running `_localtest/upload_check.php` (a copy is in `~`, logs `~/upload_check_before.log` and `~/upload_check_after.log`): before and after, a CV PDF passes `mimes:pdf,doc,docx`, a PNG passes `image`, a text file is refused as a PDF, and storage reports the right types; after, it runs through the stand-in.
+
 ## 12. Changes to contracts, PR notes and requests
 
 *(each PR records here: payload keys it chose, new events, anything another PR must know; and requests for changes to files it doesn't own)*
