@@ -30,7 +30,7 @@ class SignoffManager extends Component
     public const KAIZEN_STATUSES = ['Pending Moderation' => 'Waiting for review', 'Draft' => 'Draft', 'Published' => 'Published', 'Rejected' => 'Rejected'];
 
     /** The only status changes HQ makes to an article: from these statuses to that one */
-    private const KAIZEN_CHANGES = [
+    public const KAIZEN_CHANGES = [
         'publish' => ['from' => ['Draft', 'Pending Moderation'], 'to' => 'Published', 'audit' => 'KAIZEN_ARTICLE_PUBLISHED'],
         'unpublish' => ['from' => ['Published'], 'to' => 'Draft', 'audit' => 'KAIZEN_ARTICLE_UNPUBLISHED'],
     ];
