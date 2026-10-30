@@ -2,19 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Support\Articles;
 use App\Support\HqApi;
+use App\Support\Sitemap;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Throwable;
 
 /** The content pages (text in lang/{en,fr}/site.php and pages-extra.php), and the files for crawlers. */
 class PageController extends Controller
 {
-    /** Pages listed in the sitemap, each in English and French (route names without the "fr." prefix). */
-    public const PAGES = ['home', 'services', 'how-we-work', 'company', 'security', 'schedule', 'contact', 'calculator', 'kaizen', 'careers', 'privacy'];
-
     public function home()
     {
         return view('pages.home');
@@ -50,35 +46,19 @@ class PageController extends Controller
         return response($body, 200, ['Content-Type' => 'text/plain; charset=UTF-8']);
     }
 
-    /** Every page in both languages with its hreflang pair, then the published Insights articles (English). */
+    /** Every page in both languages with its hreflang pair, then the published Insights articles (App\Support\Sitemap). */
     public function sitemap(HqApi $api): Response
     {
-        $root = rtrim(url('/'), '/');
-        $urls = [];
-        foreach (self::PAGES as $name) {
-            $path = route($name, [], false);
-            $en = $root . $path;
-            $fr = $root . '/fr' . ($path === '/' ? '' : $path);
-            $urls[] = ['loc' => $en, 'en' => $en, 'fr' => $fr];
-            $urls[] = ['loc' => $fr, 'en' => $en, 'fr' => $fr];
-        }
+        return response()->view('seo.sitemap', ['urls' => Sitemap::entries($api)], 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
+    }
 
-        // Articles: the first pages of the list; the sitemap never fails because HQ is slow
-        try {
-            for ($page = 1; $page <= 5; $page++) {
-                $list = Articles::page($api->kaizenArticles($page), $page);
-                foreach ($list['items'] as $article) {
-                    $urls[] = ['loc' => $root . '/kaizen/' . $article['slug']];
-                }
-                if (! $list['has_more']) {
-                    break;
-                }
-            }
-        } catch (Throwable) {
-            // pages only
-        }
+    /** IndexNow's key file (config site.indexnow): the engines read the key here; any other key is not found. */
+    public function indexNowKey(string $key): Response
+    {
+        $ours = (string) config('site.indexnow.key');
+        abort_unless($ours !== '' && $key === $ours, 404);
 
-        return response()->view('seo.sitemap', ['urls' => $urls], 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
+        return response($ours, 200, ['Content-Type' => 'text/plain; charset=UTF-8']);
     }
 
     /** A plain-text summary for AI crawlers (llmstxt.org). */
