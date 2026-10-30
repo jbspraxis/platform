@@ -91,4 +91,20 @@ class InvoiceControlsTest extends TestCase
         Livewire::test(InvoiceLedger::class)->call('cancelInvoice', $pending)->assertForbidden();
         $this->assertSame('Pending', $this->invoiceStatus($pending));
     }
+
+    public function test_the_overdue_run_marks_only_unpaid_invoices_and_logs_the_change(): void
+    {
+        $pending = $this->invoice('Pending');
+        $paid = $this->invoice('Paid');
+        $this->actingAs($this->staff('finance', ['finance']));
+
+        Livewire::test(InvoiceLedger::class)->call('enforceGuillotineProtocol')->assertSee('1 invoice was marked overdue.');
+        $this->assertSame('Overdue', $this->invoiceStatus($pending));
+        $this->assertSame('Paid', $this->invoiceStatus($paid));
+
+        $log = DB::table('system_audit_logs')->where('action', 'GUILLOTINE_PROTOCOL_ENGAGED')->get();
+        $this->assertSame([$pending], $log->pluck('target_id')->all());
+        $this->assertEquals(['status' => 'Pending'], json_decode($log[0]->old_values, true));
+        $this->assertEquals(['status' => 'Overdue'], json_decode($log[0]->new_values, true));
+    }
 }

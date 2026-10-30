@@ -307,6 +307,9 @@ class InvoiceLedger extends Component
                     'description' => "Invoice {$invoice->invoice_number} is past its due date and was marked overdue. Client Portal access for the project is on hold.",
                     'target_table' => 'invoices',
                     'target_id' => $invoice->id,
+                    'old_values' => json_encode(['status' => 'Pending']),
+                    'new_values' => json_encode(['status' => 'Overdue']),
+                    'ip_address' => request()?->ip(),
                     'created_at' => now()
                 ]);
             }
