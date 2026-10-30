@@ -96,21 +96,7 @@
         @endif
     </div>
 
-    @if (session()->has('success'))
-        <div class="alert alert-success" role="status" style="margin-bottom: 20px;">
-            <i data-lucide="check-circle"></i><span>{{ session('success') }}</span>
-        </div>
-    @endif
-    @if (session()->has('info'))
-        <div class="alert alert-info" role="status" style="margin-bottom: 20px;">
-            <i data-lucide="info"></i><span>{{ session('info') }}</span>
-        </div>
-    @endif
-    @if (session()->has('error'))
-        <div class="alert alert-danger" role="alert" style="margin-bottom: 20px;">
-            <i data-lucide="circle-alert"></i><span>{{ session('error') }}</span>
-        </div>
-    @endif
+    <x-flash style="margin-bottom: 20px;" />
 
     @if($activeView === 'lobby')
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">

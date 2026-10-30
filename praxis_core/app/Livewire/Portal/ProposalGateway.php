@@ -51,6 +51,11 @@ class ProposalGateway extends Component
         'go-live and handover' => 'go_live_handover',
     ];
 
+    // Signing code limits: 3 codes per proposal and per email address, 5 wrong codes per proposal, every 15 minutes
+    public const MAX_CODES = 3;
+    public const MAX_WRONG_CODES = 5;
+    public const LOCK_SECONDS = 900;
+
     // Validation messages in the page language (lang/<locale>/gateway.php)
     protected function messages(): array
     {
@@ -128,13 +133,20 @@ class ProposalGateway extends Component
             return;
         }
 
-        // At most 3 signing codes per proposal and IP every 15 minutes (the same limit as the sign-off page)
-        $limiterKey = 'proposal-otp-send:' . $proposal->id . ':' . Request::ip();
-        if (RateLimiter::tooManyAttempts($limiterKey, 3)) {
-            $this->addError('signingCode', __('gateway.proposal.too_many_codes'));
-            return;
+        // At most 3 signing codes every 15 minutes per proposal and per email address, whichever device asks
+        $sendKeys = [
+            'too_many_codes' => self::sendKey($proposal->id),
+            'too_many_codes_email' => self::sendKeyForEmail($this->signerEmail),
+        ];
+        foreach ($sendKeys as $message => $key) {
+            if (RateLimiter::tooManyAttempts($key, self::MAX_CODES)) {
+                $this->addError('signingCode', __('gateway.proposal.' . $message, ['wait' => self::waitFor($key)]));
+                return;
+            }
         }
-        RateLimiter::hit($limiterKey, 900);
+        foreach ($sendKeys as $key) {
+            RateLimiter::hit($key, self::LOCK_SECONDS);
+        }
 
         // Generate OTP
         $otp = (string) random_int(100000, 999999);
@@ -156,8 +168,13 @@ class ProposalGateway extends Component
             Mail::to($this->signerEmail)->locale($locale)
                 ->send(new SigningCode($otp, SigningCode::PROPOSAL, $proposal->title ?: $proposal->proposal_ref, $vectorPerson->first_name));
         } catch (\Exception $e) {
-            // Fallback for local testing so you can read the OTP in your log file
-            Log::info("Praxis Auth OTP for {$this->signerEmail}: {$otp}");
+            // Never log the code itself: anyone who can read the log could sign. The unsent code is cancelled, so a
+            // reload shows the signing form again (the signature stays saved) instead of asking for a code that never came.
+            Log::error('Proposal signing code email failed', ['proposal_id' => $proposal->id, 'message' => $e->getMessage()]);
+            DB::table('proposals')->where('id', $proposal->id)->update(['auth_otp' => null, 'otp_expires_at' => null]);
+            $this->addError('signerEmail', __('gateway.proposal.email_failed'));
+            $this->dispatch('reinit-canvas');
+            return;
         }
 
         $this->viewState = 'otp_verification';
@@ -182,16 +199,23 @@ class ProposalGateway extends Component
             return;
         }
 
-        // At most 5 wrong codes per proposal and IP every 15 minutes (the same limit as the sign-off page)
-        $checkKey = 'proposal-otp-check:' . $proposal->id . ':' . Request::ip();
-        if (RateLimiter::tooManyAttempts($checkKey, 5)) {
-            $this->addError('otpInput', __('gateway.proposal.too_many_attempts'));
+        // At most 5 wrong codes per proposal (from any device), then a 15-minute wait. The fifth wrong code also
+        // cancels the code, so it can't be guessed after the wait: the signer asks for a new one.
+        $checkKey = self::checkKey($proposal->id);
+        if (RateLimiter::tooManyAttempts($checkKey, self::MAX_WRONG_CODES)) {
+            $this->addError('otpInput', __('gateway.proposal.too_many_attempts', ['wait' => self::waitFor($checkKey)]));
             return;
         }
 
         // Validate OTP
-        if ($proposal->auth_otp !== $this->otpInput || now()->greaterThan($proposal->otp_expires_at)) {
-            RateLimiter::hit($checkKey, 900);
+        if (! $proposal->auth_otp || ! hash_equals((string) $proposal->auth_otp, (string) $this->otpInput) || now()->greaterThan($proposal->otp_expires_at)) {
+            RateLimiter::hit($checkKey, self::LOCK_SECONDS);
+            if (RateLimiter::tooManyAttempts($checkKey, self::MAX_WRONG_CODES)) {
+                // updated_at kept as it is: the proposal's validity runs from it
+                DB::table('proposals')->where('id', $proposal->id)->update(['auth_otp' => null, 'otp_expires_at' => null, 'updated_at' => $proposal->updated_at]);
+                $this->addError('otpInput', __('gateway.proposal.too_many_attempts', ['wait' => self::waitFor($checkKey)]));
+                return;
+            }
             $this->addError('otpInput', __('gateway.proposal.code_invalid'));
             return;
         }
@@ -394,6 +418,30 @@ class ProposalGateway extends Component
 
         $this->viewState = 'completed';
         $this->dispatch('reinit-deck');
+    }
+
+    /** Limiter keys for codes sent and wrong codes; the email address is hashed so it isn't stored in the cache */
+    public static function sendKey(string $proposalId): string
+    {
+        return 'proposal-otp-send:' . $proposalId;
+    }
+
+    public static function sendKeyForEmail(string $email): string
+    {
+        return 'proposal-otp-send-email:' . sha1(mb_strtolower(trim($email)));
+    }
+
+    public static function checkKey(string $proposalId): string
+    {
+        return 'proposal-otp-check:' . $proposalId;
+    }
+
+    /** "12 minutes" (in the page language): how long until the limiter lets the person try again */
+    private static function waitFor(string $key): string
+    {
+        $minutes = max(1, (int) ceil(RateLimiter::availableIn($key) / 60));
+
+        return trans_choice('gateway.proposal.wait_minutes', $minutes, ['count' => $minutes]);
     }
 
     /** Only a proposal HQ has signed and sent (status Pending Auth) can be signed by the client */

@@ -121,6 +121,9 @@ return [
     */
 
     'brand' => [
+        // The sender name on every email HQ and the Client Portal send (docs/BRAND.md section 13). Fixed here,
+        // not read from MAIL_FROM_NAME, so an older value in a server's .env can't bring back another name.
+        'from_name' => 'JBS Praxis',
         'reply_to' => [
             'address' => env('MAIL_REPLY_TO_ADDRESS', 'intelligence@jbspraxis.com'),
             'name' => env('MAIL_REPLY_TO_NAME', 'JBS Praxis'),

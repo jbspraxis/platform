@@ -119,7 +119,11 @@ return [
         'sending_code' => 'Envoi du code…',
         'signature_missing' => 'Tracez votre signature dans le cadre avant de continuer.',
         'email_not_recognised' => "Nous n’avons pas pu envoyer de code à cette adresse\u{00A0}: elle ne figure pas parmi les adresses des signataires de votre organisation. Utilisez l’adresse e-mail que JBS Praxis a enregistrée pour vous, ou demandez à votre contact JBS Praxis de l’ajouter.",
-        'too_many_codes' => "Vous avez demandé 3\u{202F}codes de signature au cours des 15\u{202F}dernières minutes. Patientez 15\u{202F}minutes, puis demandez un nouveau code.",
+        'email_failed' => 'Nous n’avons pas pu vous envoyer votre code de signature par e-mail. Réessayez dans quelques minutes ou demandez de l’aide à votre contact JBS Praxis.',
+        // :wait est wait_minutes ci-dessous (« 12 minutes »)
+        'too_many_codes' => "Nous avons envoyé 3\u{202F}codes de signature pour cette proposition au cours des 15\u{202F}dernières minutes. Patientez :wait, puis demandez un nouveau code.",
+        'too_many_codes_email' => "Nous avons envoyé 3\u{202F}codes de signature à cette adresse e-mail au cours des 15\u{202F}dernières minutes. Patientez :wait, puis demandez un nouveau code.",
+        'wait_minutes' => "{1} 1\u{202F}minute|[2,*] :count\u{202F}minutes",
         'not_ready' => 'Cette proposition est en cours de mise à jour par JBS Praxis et ne peut pas être signée pour le moment. Nous vous enverrons un nouveau lien dès qu’elle sera prête.',
 
         'code_title' => 'Saisissez votre code de signature',
@@ -128,7 +132,7 @@ return [
         'confirm_sign' => 'Signer la proposition',
         'signing' => 'Signature en cours…',
         'code_invalid' => 'Ce code est incorrect ou a expiré. Vérifiez l’e-mail et réessayez, ou rechargez la page pour demander un nouveau code.',
-        'too_many_attempts' => "Trop de codes erronés. Patientez 15\u{202F}minutes, puis réessayez.",
+        'too_many_attempts' => "Trop de codes erronés\u{00A0}: ce code n’est plus valable. Patientez :wait, puis rechargez la page et demandez un nouveau code.",
 
         'signed_title' => 'Proposition signée',
         'signed_body' => "Votre signature est enregistrée. Nous avons émis la facture d’acompte\u{202F}; vous la trouverez dans votre portail client.",

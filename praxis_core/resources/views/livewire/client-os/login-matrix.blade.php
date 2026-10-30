@@ -110,12 +110,7 @@
             @else
                 <p class="mb-4 text-sm text-slate">{{ __('portal.sos.intro') }}</p>
 
-                @if (session()->has('redline_error'))
-                    <div class="alert alert-danger mb-4" role="alert">
-                        <i data-lucide="circle-alert"></i>
-                        <span>{{ session('redline_error') }}</span>
-                    </div>
-                @endif
+                <x-flash :keys="['redline_error']" class="mb-4" />
 
                 <form wire:submit.prevent="submitRedlineSos" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div class="field">

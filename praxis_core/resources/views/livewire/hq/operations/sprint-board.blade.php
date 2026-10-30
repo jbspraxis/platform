@@ -28,9 +28,7 @@
         </div>
     </div>
 
-    @if (session()->has('error'))
-        <div class="alert alert-danger mb-4" role="alert"><i data-lucide="circle-alert"></i> <span>{{ session('error') }}</span></div>
-    @endif
+    <x-flash class="mb-4" />
 
     @if(empty($sprints))
         <div class="alert alert-info mb-4"><i data-lucide="info"></i> <span>No sprints planned for this project yet. Once sprints are planned, their tasks appear here.</span></div>

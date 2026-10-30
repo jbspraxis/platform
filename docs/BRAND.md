@@ -917,7 +917,7 @@ Email is often the first and most frequent contact a client has with JBS Praxis.
 | Setting | Value |
 |---|---|
 | From address | `system@jbspraxis.com` (all site email, including broadcasts) |
-| From name | **JBS Praxis** (recommended change from "JBS Praxis Intelligence Desk"; owner to confirm) |
+| From name | **JBS Praxis** (replaces "JBS Praxis Intelligence Desk"; fixed in `config/mail.php` `brand.from_name`, so `MAIL_FROM_NAME` no longer changes it) |
 | Reply-To | `JBS Praxis <intelligence@jbspraxis.com>` on client-facing email; the visitor’s address on internal enquiry alerts |
 | Forwarding | `system@` forwards to `intelligence@` (in place since 29 Oct 2026) |
 | Delivery | SMTP via mail.jbspraxis.com, relayed by SMTP2GO; SPF, DKIM and DMARC pass |
@@ -1212,7 +1212,7 @@ The metric-matched `@font-face` fallbacks ("Newsreader Fallback" from local Geor
 
 ### Open decisions (owner)
 
-1. **From name**: "JBS Praxis" (recommended) or keep "JBS Praxis Intelligence Desk".
+1. **From name**: "JBS Praxis" (the recommended default, in use from the 30 Oct 2026 build; the owner can still ask for the old name).
 2. **Logo versions**: approve the flat two-tone versions as the default and the horizontal lockup arrangement; decide where, if anywhere, the original gradient artwork is still used.
 3. **Signature device**: approve the Praxis rule, taken from the logo’s bars, in place of visible grid lines.
 4. **The method**: the name "the Praxis Method" and its four stages (See, Design, Build, Hold).

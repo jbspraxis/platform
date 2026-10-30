@@ -20,6 +20,9 @@ Schedule::command('finance:sync-exchange-rates')->dailyAt('00:00');
 // 'finance:run-automations' (00:30) was removed: no such command exists, so it failed every night.
 // Add it back here once the ledger automation command is built.
 
+// Free audit requests nobody approved before their start time close by themselves (Cancelled, logged, no email)
+Schedule::command('crm:expire-audit-requests')->hourly()->withoutOverlapping(10);
+
 // HQ → System Health: heartbeat, new log errors, alerts, the 8am digest (app/Support/Monitor)
 Schedule::command('monitor:run')->everyFiveMinutes()->withoutOverlapping(10);
 

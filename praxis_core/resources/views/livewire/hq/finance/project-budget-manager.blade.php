@@ -25,12 +25,7 @@
         </div>
     </div>
 
-    @if(session()->has('success'))
-        <div class="alert alert-success mb-6" role="status"><i data-lucide="check-circle"></i><span>{{ session('success') }}</span></div>
-    @endif
-    @if(session()->has('error'))
-        <div class="alert alert-danger mb-6" role="alert"><i data-lucide="circle-alert"></i><span>{{ session('error') }}</span></div>
-    @endif
+    <x-flash class="mb-6" />
 
     @if($activeProject)
         @php $cur = $activeProject->currency; @endphp

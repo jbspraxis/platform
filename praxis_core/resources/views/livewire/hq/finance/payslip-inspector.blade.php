@@ -26,9 +26,7 @@
         </div>
     </div>
 
-    @if(session()->has('error'))
-        <div class="alert alert-danger mb-6" role="alert"><i data-lucide="circle-alert"></i><span>{{ session('error') }}</span></div>
-    @endif
+    <x-flash class="mb-6" />
 
     <div class="card mb-6">
         <div class="flex flex-wrap items-end gap-4">

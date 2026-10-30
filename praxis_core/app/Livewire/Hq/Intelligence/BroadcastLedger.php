@@ -39,6 +39,8 @@ class BroadcastLedger extends Component
     public $rawBody = '';
     public $enhancedBody = '';
     public $selectedTone = 'Consultative & Authoritative';
+    // The email's language: the frame (sign-off, footer) follows it, and the assistant writes in it
+    public $language = 'en';
 
     // Ledger Data
     public $campaigns = [];
@@ -47,7 +49,7 @@ class BroadcastLedger extends Component
     public $failedLogs = [];
 
     // Field names in validation messages (sentence case, docs/BRAND.md section 12)
-    protected $validationAttributes = ['subject' => 'subject', 'rawBody' => 'draft', 'enhancedBody' => 'email text', 'selectedTone' => 'tone'];
+    protected $validationAttributes = ['subject' => 'subject', 'rawBody' => 'draft', 'enhancedBody' => 'email text', 'selectedTone' => 'tone', 'language' => 'language'];
 
     public function mount()
     {
@@ -169,13 +171,15 @@ class BroadcastLedger extends Component
 
         $this->validate([
             'rawBody' => 'required|string|min:10',
-            'selectedTone' => 'required|string'
+            'selectedTone' => 'required|string',
+            'language' => 'required|in:en,fr',
         ]);
 
         // Brand voice for client emails: docs/BRAND.md sections 4 and 13. The email layout adds the sign-off.
+        $language = $this->language === 'fr' ? 'French (courant soigné, vouvoiement), translating the draft if it is in English' : 'British English, translating the draft if it is in French';
         $prompt = "You write emails for JBS Praxis, a consulting and engineering firm in Lagos and Douala. Rewrite the draft below in a '{$this->selectedTone}' tone that stays plain, precise, warm and measured.
         RULES:
-        1. Write in the draft’s language: British English, or French (courant soigné, vouvoiement).
+        1. Write in {$language}.
         2. Two or three short paragraphs, short sentences, sentence case. No exclamation marks, no hype (revolutionary, cutting-edge, seamless, robust, unlock, leverage, elite), no guaranteed outcomes.
         3. Output HTML using only <p>, <strong>, <ul> and <li>. No <html> or <body> tags.
         4. Open with 'Hello {{ first_name }},' in English or 'Bonjour,' in French. Do not add a sign-off or signature: the email adds one.
@@ -226,7 +230,8 @@ class BroadcastLedger extends Component
 
         $this->validate([
             'subject' => 'required|string|max:150',
-            'enhancedBody' => 'required|string|min:10'
+            'enhancedBody' => 'required|string|min:10',
+            'language' => 'required|in:en,fr',
         ]);
 
         DB::transaction(function () {
@@ -242,6 +247,7 @@ class BroadcastLedger extends Component
                 'id' => $campaignId,
                 'subject' => $this->subject,
                 'body_html' => $this->enhancedBody,
+                'language' => $this->language,
                 'gemini_tone_used' => $this->selectedTone,
                 'status' => 'Sending',
                 'total_recipients' => $finalCount,
