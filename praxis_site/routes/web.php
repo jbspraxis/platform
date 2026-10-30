@@ -83,6 +83,9 @@ Route::permanentRedirect('/privacy-policy', '/privacy');
 // Search engines and AI crawlers
 Route::get('/sitemap.xml', [PageController::class, 'sitemap'])->withoutMiddleware($stateless)->name('sitemap');
 Route::get('/llms.txt', [PageController::class, 'llms'])->withoutMiddleware($stateless)->name('llms');
+// IndexNow's key file (php artisan site:indexnow): only the key in config site.indexnow is found
+Route::get('/{key}.txt', [PageController::class, 'indexNowKey'])->where('key', '[A-Za-z0-9-]{8,128}')
+    ->withoutMiddleware($stateless)->name('indexnow.key');
 
 // Broadcast email links (same paths as today). The pixel counts its own limit: past it the image is still
 // returned and only the call to HQ is skipped (TrackingController::open)

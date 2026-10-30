@@ -5,6 +5,18 @@ return [
     // Preview mode (next.jbspraxis.com): X-Robots-Tag noindex on every response and robots.txt disallows all.
     'noindex' => (bool) env('SITE_NOINDEX', true),
 
+    /*
+    | IndexNow (Bing, Yandex, Seznam, Naver…): `php artisan site:indexnow` tells the engines which addresses are new
+    | or changed (every address in the sitemap, or the ones given). Nothing is sent while noindex is on.
+    | The key is public by design: the engines read it at https://jbspraxis.com/{key}.txt (PageController::indexNowKey)
+    | to check that a submission comes from this site. A new key needs only INDEXNOW_KEY (8 to 128 letters, digits, -).
+    */
+    'indexnow' => [
+        'key' => (string) (env('INDEXNOW_KEY') ?: '107c5408c63d049ad4d07d14e5f2e8e6'),
+        'host' => 'jbspraxis.com',
+        'endpoint' => 'https://api.indexnow.org/indexnow',
+    ],
+
     // Google Analytics 4 (G-…). Loaded only after the visitor accepts the cookie banner; empty = no banner, no analytics.
     'ga4_id' => (string) env('GA4_ID', ''),
 
