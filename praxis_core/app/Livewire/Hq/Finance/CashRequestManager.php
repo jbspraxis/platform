@@ -94,7 +94,7 @@ class CashRequestManager extends Component
             return;
         }
 
-        $userId = Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c';
+        $userId = Auth::id(); // always signed in here (auth middleware); approvals are never attributed to anyone else
         $ipAddress = request()->ip();
         $timestamp = now()->toDateTimeString();
 
@@ -216,7 +216,7 @@ class CashRequestManager extends Component
     {
         abort_unless(Auth::user()->can('expenses.approve'), 403);
 
-        $userId = Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c';
+        $userId = Auth::id(); // always signed in here (auth middleware); approvals are never attributed to anyone else
 
         // Only an approved request can be closed, only once, and not by the person who raised it
         if (! $this->ensureClearable()) {
