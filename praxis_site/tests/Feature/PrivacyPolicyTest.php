@@ -40,6 +40,7 @@ class PrivacyPolicyTest extends TestCase
 
             // What the systems really do, and the law (docs: the CV purge in praxis_core, Praxis AI's providers)
             $response->assertSee('Gemini')->assertSee('DeepSeek')->assertSee('ndpc.gov.ng')->assertSee('2024/017')
+                ->assertSee('General Application and Implementation Directive')
                 ->assertSee('youtube-nocookie.com')->assertSee('jbs_consent')->assertSee('_ga, _ga_…');
             $response->assertSee($locale === 'fr' ? '12 mois à compter de leur réception' : '12 months from the day we receive them');
 
