@@ -18,6 +18,9 @@ html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 body { margin: 0; background: #fff; color: var(--slate); font: 400 10.5pt/16pt var(--sans); font-variant-numeric: lining-nums; font-kerning: normal; counter-reset: page; }
 p, ul, ol, h1, h2, h3, figure, blockquote { margin: 0; }
 p, li { text-wrap: pretty; }
+/* Edge builds the PDF outline from a heading's lines and drops the space where it wraps ("runs twice:once");
+   kept spaces hang at the line end, so nothing moves on the page */
+h1, h2, h3 { white-space-collapse: preserve; }
 strong { color: var(--ink); font-weight: 600; }
 a { color: inherit; text-decoration: none; }
 svg { display: block; }
@@ -100,7 +103,7 @@ svg { display: block; }
 .stage-head { display: grid; grid-template-columns: 38mm minmax(0, 1fr); column-gap: 10mm; align-items: end; padding-bottom: 6mm; margin-bottom: 8mm; border-bottom: 0.25pt solid var(--hair); }
 .stage-num { font: 400 88pt/70pt var(--display); color: var(--teal); letter-spacing: -0.02em; }
 .stage-head .eyebrow { margin-bottom: 1.5mm; }
-.stage-head h2 { font-weight: 400; }
+/* The h2 is the stage name alone, so the PDF outline reads See, Design, Build, Hold */
 .stage-name { display: block; font: 400 40pt/44pt var(--display); color: var(--ink); letter-spacing: -0.01em; margin-bottom: 2mm; }
 .stage-title { display: block; font: 400 16pt/21pt var(--title); color: var(--slate); text-wrap: balance; }
 .outcome { position: absolute; left: 0; right: 0; bottom: 24mm; padding: 7mm var(--side) 7.5mm; background: var(--mist); display: grid; grid-template-columns: 38mm minmax(0, 1fr) minmax(0, 1fr); column-gap: 10mm; }
@@ -164,4 +167,6 @@ svg { display: block; }
 :lang(fr) .glance { grid-template-columns: 31mm minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); }
 :lang(fr) .glance .stage { font-size: 14pt; }
 :lang(fr) .pull { font-size: 13pt; line-height: 18pt; }
-:lang(fr) .expect { margin-top: 7mm; grid-template-columns: minmax(0, 1fr); row-gap: 3.5mm; }
+/* The taller French table leaves less room above the folio on page 3 */
+:lang(fr) .glance > div:not(.th) { padding: 2.6mm 0 3mm; }
+:lang(fr) .expect { margin-top: 6mm; padding: 5.5mm 8mm; grid-template-columns: minmax(0, 1fr); row-gap: 2.5mm; }

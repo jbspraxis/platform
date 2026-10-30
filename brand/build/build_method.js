@@ -107,7 +107,8 @@ document.fonts.ready.then(() => {
     const box = page.getBoundingClientRect();
     const foot = page.querySelector(':scope > .outcome') || page.querySelector(':scope > .folio');
     const limit = foot ? foot.getBoundingClientRect().top - 4 * mm : box.bottom - 15 * mm;
-    page.querySelectorAll('p, li, h1, h2, h3, a, .stage, .glance > div').forEach(el => {
+    // The tinted boxes too: their padding can reach the folio while the text inside still fits
+    page.querySelectorAll('p, li, h1, h2, h3, a, .stage, .glance > div, .expect, .band').forEach(el => {
       if (foot && foot.contains(el)) return;
       const r = el.getBoundingClientRect();
       const where = 'page ' + (i + 1) + ': "' + el.textContent.trim().slice(0, 50) + '"';
