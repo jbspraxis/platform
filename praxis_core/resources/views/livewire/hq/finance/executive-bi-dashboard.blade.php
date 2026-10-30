@@ -16,12 +16,7 @@
         @endcan
     </div>
 
-    @if(session()->has('success'))
-        <div class="alert alert-success mb-6" role="status"><i data-lucide="check-circle"></i><span>{{ session('success') }}</span></div>
-    @endif
-    @if(session()->has('info'))
-        <div class="alert alert-info mb-6" role="status"><i data-lucide="info"></i><span>{{ session('info') }}</span></div>
-    @endif
+    <x-flash class="mb-6" />
 
     <div class="card mb-6">
         <div class="flex flex-wrap items-end gap-4">

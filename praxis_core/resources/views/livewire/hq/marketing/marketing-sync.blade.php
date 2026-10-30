@@ -45,12 +45,7 @@
         @endforeach
     </div>
 
-    @if (session()->has('success'))
-        <div class="alert alert-success" role="status" style="margin-bottom: 16px;"><i data-lucide="check-circle"></i><span>{{ session('success') }}</span></div>
-    @endif
-    @if (session()->has('warning'))
-        <div class="alert alert-warning" role="status" style="margin-bottom: 16px;"><i data-lucide="triangle-alert"></i><span>{{ session('warning') }}</span></div>
-    @endif
+    <x-flash style="margin-bottom: 16px;" />
     @if ($errors->any())
         <div class="alert alert-danger" role="alert" style="margin-bottom: 16px;">
             <i data-lucide="circle-alert"></i>

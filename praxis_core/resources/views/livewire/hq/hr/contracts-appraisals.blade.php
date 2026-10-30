@@ -29,9 +29,7 @@
         <button type="button" role="tab" wire:click="setTab('appraisals')" class="tab {{ $activeTab === 'appraisals' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'appraisals' ? 'true' : 'false' }}">Appraisals</button>
     </div>
 
-    @if(session()->has('error'))
-        <div class="alert alert-danger mb-6" role="alert"><i data-lucide="circle-alert"></i><span>{{ session('error') }}</span></div>
-    @endif
+    <x-flash class="mb-6" />
 
     <div class="grid items-start gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
 

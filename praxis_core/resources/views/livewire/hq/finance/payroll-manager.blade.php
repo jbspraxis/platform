@@ -31,9 +31,7 @@
         <button type="button" role="tab" wire:click="setTab('inspector')" class="tab {{ $activeTab === 'inspector' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'inspector' ? 'true' : 'false' }}">Payslips</button>
     </div>
 
-    @if(session()->has('error'))
-        <div class="alert alert-danger mb-6" role="alert"><i data-lucide="circle-alert"></i><span>{{ session('error') }}</span></div>
-    @endif
+    <x-flash class="mb-6" />
 
     @if($activeTab === 'ledger')
 

@@ -17,21 +17,7 @@
         </div>
     </nav>
 
-    @if (session()->has('warning'))
-        <div class="bg-red-500/10 border border-red-500 text-red-500 px-6 py-3 font-mono text-sm text-center">
-            > {{ session('warning') }}
-        </div>
-    @endif
-    @if (session()->has('success'))
-        <div class="bg-green-500/10 border border-green-500 text-green-500 px-6 py-3 font-mono text-sm text-center">
-            > {{ session('success') }}
-        </div>
-    @endif
-    @if (session()->has('error'))
-        <div class="bg-red-500/10 border border-red-500 text-red-500 px-6 py-3 font-mono text-sm text-center">
-            > {{ session('error') }}
-        </div>
-    @endif
+    <x-flash :keys="['warning', 'success', 'error']" />
 
     <main class="max-w-6xl mx-auto px-6 py-12">
         

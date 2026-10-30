@@ -39,12 +39,7 @@
         @endforeach
     </div>
 
-    @if (session()->has('error'))
-        <div class="alert alert-danger mb-6" role="alert">
-            <i data-lucide="circle-alert"></i>
-            <span>{{ session('error') }}</span>
-        </div>
-    @endif
+    <x-flash class="mb-6" />
 
     <div class="grid grid-cols-1 items-start gap-6 xl:grid-cols-[400px_minmax(0,1fr)]">
 
@@ -231,12 +226,7 @@
                                 <i data-lucide="calculator" style="width: 18px; height: 18px;"></i> Pay calculator
                             </div>
 
-                            @if(session()->has('gross_up_success'))
-                                <div class="alert alert-success" role="status" style="margin: 0;">
-                                    <i data-lucide="circle-check"></i>
-                                    <span>{{ session('gross_up_success') }}</span>
-                                </div>
-                            @endif
+                            <x-flash :keys="['gross_up_success']" style="margin: 0;" />
 
                             <div class="grid items-end gap-3 sm:grid-cols-[1fr_auto] xl:grid-cols-1">
                                 <div class="field">

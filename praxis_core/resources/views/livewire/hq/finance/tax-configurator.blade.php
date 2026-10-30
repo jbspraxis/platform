@@ -30,9 +30,7 @@
         <button type="button" role="tab" wire:click="setRegion('GLOBAL')" class="tab {{ $activeRegion === 'GLOBAL' ? 'is-active' : '' }}" aria-selected="{{ $activeRegion === 'GLOBAL' ? 'true' : 'false' }}">Other countries (flat rate)</button>
     </div>
 
-    @if(session()->has('error'))
-        <div class="alert alert-danger mb-6" role="alert"><i data-lucide="circle-alert"></i><span>{{ session('error') }}</span></div>
-    @endif
+    <x-flash class="mb-6" />
 
     @if(empty($config['id']))
         <div class="alert alert-info mb-6" role="note">

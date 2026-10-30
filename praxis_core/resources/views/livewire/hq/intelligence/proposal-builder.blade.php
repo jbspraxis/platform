@@ -77,10 +77,7 @@
     </div>
 
     {{-- Messages --}}
-    @if(session()->has('success')) <div class="alert alert-success" role="status" style="margin-bottom: 16px;"><i data-lucide="check-circle"></i><span>{{ session('success') }}</span></div> @endif
-    @if(session()->has('ai_success')) <div class="alert alert-info" role="status" style="margin-bottom: 16px;"><i data-lucide="info"></i><span>{{ session('ai_success') }}</span></div> @endif
-    @if(session()->has('error')) <div class="alert alert-danger" role="alert" style="margin-bottom: 16px;"><i data-lucide="circle-alert"></i><span>{{ session('error') }}</span></div> @endif
-    @if(session()->has('dispatch_success')) <div class="alert alert-success" role="status" style="margin-bottom: 16px;"><i data-lucide="check-circle"></i><span>{{ session('dispatch_success') }}</span></div> @endif
+    <x-flash :keys="['success', 'ai_success', 'error', 'dispatch_success']" :tones="['ai_success' => 'info']" style="margin-bottom: 16px;" />
 
     @if($isLocked && $activeTab !== 'ledger')
         <div class="alert alert-warning" style="margin-bottom: 16px; justify-content: space-between; align-items: center; flex-wrap: wrap;">
