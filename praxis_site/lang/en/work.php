@@ -414,7 +414,7 @@ return [
                 'see' => 'We started from how small shops actually trade: through chats, part payments and deliveries.',
                 'design' => 'We chose the words and the screens for the owner: an order at the centre of every sale, and no accounting terms.',
                 'build' => 'We build and host nfelia ourselves, as a JBS Praxis product.',
-                'hold' => 'We run it, help its users on WhatsApp, and open new countries as it grows.',
+                'hold' => 'We run it, help the businesses that use it on WhatsApp, and open new countries as it grows.',
             ],
         ],
     ],

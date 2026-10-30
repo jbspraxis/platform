@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Support\Articles;
 use App\Support\HqApi;
+use App\Support\Work;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -13,7 +14,7 @@ use Throwable;
 class PageController extends Controller
 {
     /** Pages listed in the sitemap, each in English and French (route names without the "fr." prefix). */
-    public const PAGES = ['home', 'services', 'how-we-work', 'company', 'security', 'schedule', 'contact', 'calculator', 'kaizen', 'careers', 'privacy'];
+    public const PAGES = ['home', 'services', 'how-we-work', 'work', 'industries', 'company', 'security', 'schedule', 'contact', 'calculator', 'kaizen', 'careers', 'privacy'];
 
     public function home()
     {
@@ -50,13 +51,16 @@ class PageController extends Controller
         return response($body, 200, ['Content-Type' => 'text/plain; charset=UTF-8']);
     }
 
-    /** Every page in both languages with its hreflang pair, then the published Insights articles (English). */
+    /** Every page and case study in both languages with its hreflang pair, then the published Insights articles (English). */
     public function sitemap(HqApi $api): Response
     {
         $root = rtrim(url('/'), '/');
         $urls = [];
-        foreach (self::PAGES as $name) {
-            $path = route($name, [], false);
+        $paths = array_map(fn (string $name) => route($name, [], false), self::PAGES);
+        foreach (Work::slugs() as $slug) {
+            $paths[] = route('work.show', ['slug' => $slug], false);
+        }
+        foreach ($paths as $path) {
             $en = $root . $path;
             $fr = $root . '/fr' . ($path === '/' ? '' : $path);
             $urls[] = ['loc' => $en, 'en' => $en, 'fr' => $fr];

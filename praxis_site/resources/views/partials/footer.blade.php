@@ -56,6 +56,8 @@
             <div>
                 <h2>{{ __('site.footer.links') }}</h2>
                 <ul>
+                    <li><a href="{{ route('work') }}">{{ __('site.footer.work') }}</a></li>
+                    <li><a href="{{ route('industries') }}">{{ __('site.footer.industries') }}</a></li>
                     <li><a href="{{ route('security') }}">{{ __('site.footer.security') }}</a></li>
                     <li><a href="{{ route('privacy') }}">{{ __('site.footer.privacy') }}</a></li>
                     <li><a href="{{ route('careers') }}">{{ __('site.footer.careers') }}</a></li>

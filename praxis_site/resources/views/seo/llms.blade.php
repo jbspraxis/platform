@@ -11,6 +11,8 @@ The way of working is the Praxis Method (formerly the Praxis Framework): See, De
 - [Home]({{ url('/') }}): what JBS Praxis builds, the Praxis Method in short, who it works with
 - [Services]({{ url('/services') }}): the five domains with examples
 - [How we work]({{ url('/how-we-work') }}): the Praxis Method stage by stage
+- [Our work]({{ url('/work') }}): case studies, each with what the client needed, the system built, how it runs and what changed
+- [Industries]({{ url('/industries') }}): the sectors JBS Praxis works in, each linked to the work behind it
 - [Company]({{ url('/company') }}): offices, registration, contact, our product nfelia
 - [Security and data]({{ url('/security') }}): roles and permissions, audit logs, private storage, ISO 27001-aligned processes, NDPA and Cameroonian law
 - [Book a free audit and demo]({{ url('/schedule') }})
@@ -19,5 +21,11 @@ The way of working is the Praxis Method (formerly the Praxis Framework): See, De
 - [Insights]({{ url('/kaizen') }}): articles on how organisations run
 - [Careers]({{ url('/careers') }})
 - [Privacy]({{ url('/privacy') }})
+
+## Case studies
+
+@foreach (\App\Support\Work::CASES as $slug => $case)
+- [{{ __('work.cases.' . $slug . '.name', [], 'en') }}]({{ url('/work/' . $slug) }}): {{ __('work.cases.' . $slug . '.summary', [], 'en') }}
+@endforeach
 
 French versions of every page are under {{ url('/fr') }}/ (for example {{ url('/fr/services') }}).
