@@ -108,7 +108,8 @@ Request fields (JSON, snake_case of today's Livewire properties; rules exactly a
 
 `*` = required. Exact lengths and rules come from the current Livewire `validate()` calls.
 
-Details (PR2b API, as built; the rules live once in `app/Services/Site/*` and the old Livewire pages use the same):
+Details (PR2b API, as built; the rules live once in `app/Services/Site/*`. The old Livewire pages named in the table
+above were removed from praxis_core on 30 Oct 2026; their route names stay as 404 stubs so emails build the same URLs):
 
 - `POST /enquiries`: optional `diagnostic` (boolean). When it is absent, the diagnostic rules apply if any diagnostic
   answer is sent (then `stage`* and `bottleneck`*, and `other_bottleneck`* when `bottleneck` = `other`). A missing or
@@ -214,8 +215,8 @@ question instead of the budget.
 
 ### 6.2 Limits (replaces the rate limits in section 1)
 
-Every limit is enforced in HQ's shared services, on **the same limiter keys for the old Livewire pages and the API**,
-so a visitor never gets two budgets. "Visitor" = the IPv4 address, or the IPv6 /64 network.
+Every limit is enforced in HQ's services, on **the limiter keys the old Livewire pages used** (kept when those pages
+were removed), so counts carried over to the API. "Visitor" = the IPv4 address, or the IPv6 /64 network.
 
 | Action | Per visitor | Per identity | Global (circuit breaker, alert in System Health) |
 |---|---|---|---|
@@ -292,7 +293,7 @@ name (40 characters).
 - Limits (`App\Services\Site\SiteLimits`, numbers in `config/site_api.php` `limits`): only accepted requests are counted
   (a 422, 409 or refused request uses no allowance). Each per-visitor allowance in the old page's own window keeps that
   page's limiter key (`contact-form:`, `booking:`, `copq-report:`, `kaizen-submit:`, `feedback:`, `whitepaper-mail:`,
-  `ai-agent:10m:` / `ai-agent:day:`), so the old pages and the API share one budget. Identity keys hold a hash of the
+  `ai-agent:10m:` / `ai-agent:day:`), kept from before the old pages were removed. Identity keys hold a hash of the
   address, never the address. A tripped global allowance writes one System health entry (source `site-limit`) per
   action and hour; the monitor's usual alert email and bell notification follow.
 - Chat: the conversation count is the larger of `question_number` and the user turns in `history` plus one; the
