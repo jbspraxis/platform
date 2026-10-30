@@ -6,6 +6,7 @@ use App\Console\Commands\DbShow;
 use App\Console\Commands\DbTable;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Process;
+use Tests\Support\PhpWithout;
 use Tests\TestCase;
 
 /**
@@ -16,6 +17,8 @@ use Tests\TestCase;
  */
 class DbInspectWithoutIntlTest extends TestCase
 {
+    use PhpWithout;
+
     private ?string $database = null;
 
     protected function tearDown(): void
@@ -94,37 +97,5 @@ class DbInspectWithoutIntlTest extends TestCase
         $out = Artisan::output();
         $this->assertStringContainsString('notes', $out);
         $this->assertNull(json_decode($out, true), 'the usual layout, not JSON');
-    }
-
-    /**
-     * A PHP without $extension: this one when it already lacks it, else this one without php.ini (-n) plus the
-     * extensions it loads except that one; null when the extension is compiled in.
-     */
-    private function phpWithout(string $extension): ?array
-    {
-        if (! extension_loaded($extension)) {
-            return [PHP_BINARY];
-        }
-
-        $dir = (string) ini_get('extension_dir');
-        if (! is_dir($dir)) {
-            $dir = dirname(PHP_BINARY) . DIRECTORY_SEPARATOR . $dir;
-        }
-        $shared = fn (string $name) => is_file("{$dir}/php_{$name}.dll") || is_file("{$dir}/{$name}.so");
-        if (! $shared($extension)) {
-            return null;
-        }
-
-        $command = [PHP_BINARY, '-n', '-d', 'extension_dir=' . $dir, '-d', 'memory_limit=512M'];
-        $zend = array_map('strtolower', get_loaded_extensions(true));
-        foreach (get_loaded_extensions() as $loaded) {
-            $name = strtolower($loaded);
-            // Compiled-in extensions stay without asking; Zend ones (OPcache, Xdebug) are not needed here
-            if ($name !== $extension && ! in_array($name, $zend, true) && $shared($name)) {
-                array_push($command, '-d', 'extension=' . $name);
-            }
-        }
-
-        return $command;
     }
 }

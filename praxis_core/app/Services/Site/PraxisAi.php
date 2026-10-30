@@ -246,6 +246,7 @@ PROMPT;
             }
         }
 
-        return strtoupper($code);
+        // The live web PHP has no intl: the names HQ offers for offices and registrations (never a bare "NG")
+        return WebsiteSettings::COUNTRIES[strtoupper($code)] ?? strtoupper($code);
     }
 }
