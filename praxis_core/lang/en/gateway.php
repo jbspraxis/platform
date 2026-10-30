@@ -119,7 +119,10 @@ return [
         'sending_code' => 'Sending code…',
         'signature_missing' => 'Draw your signature in the box before you continue.',
         'email_not_recognised' => 'We couldn’t send a code to that address because it isn’t a signatory email we have for your organisation. Use the email address JBS Praxis has on file for you, or ask your JBS Praxis contact to add it.',
-        'too_many_codes' => 'You’ve asked for 3 signing codes in the last 15 minutes. Wait 15 minutes, then ask for a new code.',
+        // :wait is wait_minutes below ("12 minutes")
+        'too_many_codes' => 'We’ve sent 3 signing codes for this proposal in the last 15 minutes. Wait :wait, then ask for a new code.',
+        'too_many_codes_email' => 'We’ve sent 3 signing codes to this email address in the last 15 minutes. Wait :wait, then ask for a new code.',
+        'wait_minutes' => '{1} 1 minute|[2,*] :count minutes',
         'not_ready' => 'This proposal is being updated by JBS Praxis, so it can’t be signed right now. We’ll send you a new link when it’s ready.',
 
         'code_title' => 'Enter your signing code',
@@ -128,7 +131,7 @@ return [
         'confirm_sign' => 'Sign the proposal',
         'signing' => 'Signing…',
         'code_invalid' => 'That code isn’t right or has expired. Check the email and try again, or reload the page to ask for a new code.',
-        'too_many_attempts' => 'Too many wrong codes. Wait 15 minutes, then try again.',
+        'too_many_attempts' => 'Too many wrong codes, so this code no longer works. Wait :wait, then reload the page and ask for a new code.',
 
         'signed_title' => 'Proposal signed',
         'signed_body' => 'Your signature is recorded. We have issued the deposit invoice; you’ll find it in your Client Portal.',
