@@ -27,10 +27,9 @@ class CopyCheck extends Command
         'resources/views/components/layouts', 'resources/views/layouts/portal.blade.php', 'resources/views/layouts/client-light.blade.php',
         'resources/views/emails', 'resources/views/components/mail', 'resources/views/partials',
         'app/Livewire/Hq', 'app/Livewire/ClientOs', 'app/Livewire/Portal', 'app/Livewire/Tracker', 'app/Mail', 'lang/en/emails', 'lang/fr/emails',
-        // Scheduled commands and website forms that write the notifications staff read in HQ
-        // (the forms' saving code, shared with the site API, is in app/Services/Site)
-        'app/Console/Commands', 'app/Livewire/ScheduleConsultation.php', 'app/Livewire/ContactHub.php', 'app/Livewire/Kaizen.php',
-        'app/Services/Site',
+        // Scheduled commands and the website forms' saving code (the site API's services), which write the
+        // notifications staff read in HQ
+        'app/Console/Commands', 'app/Services/Site',
     ];
 
     /** Capitalised words that are fine: acronyms and codes */

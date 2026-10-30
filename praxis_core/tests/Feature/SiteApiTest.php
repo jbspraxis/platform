@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\SiteApi\ApiErrors;
-use App\Livewire\Services as ServicesPage;
 use App\Mail\AuditRequested;
 use App\Mail\CopqReportMail;
 use App\Mail\EnquiryAlert;
@@ -198,20 +197,6 @@ class SiteApiTest extends TestCase
         // In French too
         $this->api('POST', '/whitepaper', ['email' => 'pdf9@example.test'], ip: '2001:db8:1::5', locale: 'fr')
             ->assertStatus(429)->assertJsonPath('error.message', 'Vous avez envoyé plusieurs demandes en peu de temps. Réessayez plus tard.');
-    }
-
-    public function test_the_old_page_and_the_api_share_one_budget(): void
-    {
-        // Livewire tests come from 127.0.0.1: the same visitor as these API requests
-        foreach ([1, 2, 3] as $i) {
-            $this->api('POST', '/whitepaper', ['email' => "shared{$i}@example.test"], ip: '127.0.0.1')->assertCreated();
-        }
-
-        Livewire::test(ServicesPage::class)
-            ->set('email', 'shared9@example.test')
-            ->call('processWhitepaper')
-            ->assertHasErrors('email');
-        $this->assertSame(0, DB::table('whitepaper_downloads')->where('email_captured', 'shared9@example.test')->count());
     }
 
     public function test_a_global_limit_is_a_circuit_breaker_with_an_alert(): void
