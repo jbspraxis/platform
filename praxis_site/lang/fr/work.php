@@ -3,7 +3,7 @@
 // Texte des pages de preuves : Nos réalisations (/fr/work), chaque étude de cas (/fr/work/{slug}) et Secteurs
 // (/fr/industries). Mêmes clés que lang/en/work.php ; la structure (secteurs, domaines, liens) est dans App\Support\Work.
 // Règles du français de docs/BRAND.md : vouvoiement, guillemets « », espace fine insécable (U+202F) avant ; : ! ? et à
-// l intérieur des guillemets. Aucun chiffre inventé, aucun client nommé hors de la liste approuvée, aucune personne nommée.
+// l’intérieur des guillemets. Aucun chiffre inventé, aucun client nommé hors de la liste approuvée, aucune personne nommée.
 return [
 
     'final_title' => 'Commencez par un domaine de votre organisation.',
@@ -97,7 +97,7 @@ return [
             'h1' => 'Un transitaire dont chaque dossier d’expédition rejoint la comptabilité.',
             'lead' => 'Smart Logistics and Services fait passer des marchandises par les ports, la douane, les entrepôts et les camions au Cameroun. Nous avons construit Praxis LS, le système qui fait tourner ce travail et tient sa comptabilité selon l’OHADA, en français et en anglais.',
             'needed' => [
-                "L’entreprise gérait déjà ses opérations de fret sur un ancien système. Celui-ci n’avait pas de couche comptable\u{202F}: les coûts et les factures devaient être reportés à la main dans les comptes, et ses écrans n’existaient qu’en anglais, dans un pays qui travaille en français et en anglais.",
+                "L’entreprise gérait déjà ses opérations de fret sur un ancien système. Celui-ci n’avait pas de couche comptable\u{202F}: ses coûts et ses factures n’arrivaient jamais d’eux-mêmes en comptabilité, et ses écrans n’existaient qu’en anglais, dans un pays qui travaille en français et en anglais.",
                 "Il lui fallait un seul système pour tout le dossier d’expédition\u{202F}: la cotation, les étapes de douane et de transport, l’entrepôt, les camions, les équipes, et une comptabilité tenue selon le SYSCOHADA, le référentiel comptable de l’OHADA.",
             ],
             'map' => [
@@ -162,23 +162,23 @@ return [
                 ],
                 'spine' => 'Un seul moteur de validation derrière chaque demande. Congés, dépenses, demandes d’explication et offres suivent le circuit fixé par l’entreprise, et chaque décision est enregistrée.',
             ],
-            'day_title' => 'Une dépense, de la demande à l’enregistrement',
+            'day_title' => 'Une dépense, telle que le système est conçu pour la traiter',
             'day' => [
                 'Un salarié demande des fonds pour un achat, avec le motif et le montant.',
-                'La finance examine la demande. Au-delà d’un seuil fixé par l’entreprise, le directeur général l’approuve aussi.',
-                'Une fois approuvée, la demande attend avec le statut approuvée mais non payée, pour que rien ne se perde entre les deux.',
-                'Au moment du paiement, la référence de la transaction bancaire est obligatoire pour clôturer l’enregistrement.',
-                'La dépense est imputée au budget du service, où les managers comparent le budget et le réalisé.',
+                'Son manager approuve ou rejette la demande, puis le service des opérations fait de même.',
+                'Les opérations regroupent les demandes approuvées en une seule réquisition pour le directeur général.',
+                'Le directeur général approuve la réquisition. Une ligne qui atteint ou dépasse le seuil de sa catégorie doit être approuvée à part, pour qu’un montant important ne passe jamais à la faveur d’un petit montant voisin.',
+                'Les demandes approuvées attendent avec le statut approuvée mais non payée. Au moment du paiement, la référence de la transaction bancaire est obligatoire pour clôturer l’enregistrement.',
             ],
             'changed' => [
-                ['title' => 'Un dossier par personne', 'text' => 'De la candidature au bulletin de paie, l’historique de chaque salarié tient en un seul endroit, au lieu de tableurs séparés.'],
+                ['title' => 'Un dossier par personne', 'text' => 'De la candidature au bulletin de paie, l’historique de chaque salarié tiendra en un seul endroit, au lieu de tableurs séparés.'],
                 ['title' => 'Des règles que le système applique', 'text' => "Circuits de validation, seuils de dépenses et semaine de travail sont des paramètres, et non des habitudes\u{202F}: ils s’appliquent de la même façon à chaque fois."],
                 ['title' => 'Des réponses sans risque', 'text' => 'L’assistant lit et explique. Toute modification passe par l’écran qui en est responsable, avec les droits de la personne elle-même.'],
             ],
             'role' => [
-                'see' => 'Nous avons présenté la plateforme au client lors d’un appel de découverte, puis passé ses besoins en revue avec son équipe, module par module.',
+                'see' => 'Nous avons rencontré l’équipe de MyCity App et réglé avec elle les questions ouvertes, une à une, avant d’écrire le moindre plan.',
                 'design' => "Nous avons rédigé le plan des jalons\u{202F}: les décisions d’architecture, l’inventaire de chaque écran et une définition de «\u{202F}terminé\u{202F}» pour chaque jalon.",
-                'build' => 'Nous le construisons en onze jalons, chacun présenté au client lors d’une démonstration avant que le suivant ne commence.',
+                'build' => 'Nous le construisons en onze jalons, chacun présenté au client sur un environnement de test.',
                 'hold' => 'Le dernier jalon est consacré à la passation et à la formation, sur un environnement de test qui se comporte exactement comme le système en production.',
             ],
         ],
@@ -257,10 +257,9 @@ return [
             'day_title' => 'Une commande, du site web à la comptabilité',
             'day' => [
                 "Un client commande sur le site. Le prix et le stock sont lus en direct dans l’ERP\u{202F}: le site ne peut pas proposer ce qui n’existe pas.",
-                'Une fois le paiement confirmé, la commande comptabilise son chiffre d’affaires et son coût des marchandises, et le stock bouge.',
+                'Une fois le paiement confirmé, la commande comptabilise son chiffre d’affaires et son coût des marchandises, et le stock bouge, le tout en une seule opération. Un paiement qui ne correspond pas à la commande est mis en attente de vérification.',
                 "Le client rejoint la liste de contacts commune\u{202F}: l’équipe voit un acheteur en ligne comme n’importe quel autre client.",
                 'Un coursier livre la commande, et la livraison est signée.',
-                'Des points de fidélité sont ajoutés pour le prochain achat.',
             ],
             'changed' => [
                 ['title' => 'Un stock, tous les canaux', 'text' => "Le site, le comptoir et les revendeurs puisent dans le même stock\u{202F}: la marque ne vend pas ce qu’elle n’a plus."],
@@ -272,7 +271,7 @@ return [
                 'see' => "Nous avons cartographié la façon dont la marque vend et l’endroit où se trouve son stock\u{202F}: au comptoir, sur son site et chez ses revendeurs.",
                 'design' => 'Nous avons décidé que la boutique en ligne serait un canal de l’ERP, et non un second système, et conçu sa comptabilité pour qu’elle corresponde à une vente au comptoir.',
                 'build' => 'Nous avons construit l’ERP, la boutique en ligne et les liaisons avec les prestataires de paiement et les coursiers.',
-                'hold' => 'Nous continuons de l’enrichir à mesure que l’entreprise grandit, par exemple avec l’encaissement des paiements sur des comptes bancaires dédiés.',
+                'hold' => 'Nous continuons de l’enrichir à mesure que l’entreprise grandit, par exemple avec un numéro de compte bancaire propre à chaque commande, pour qu’un virement soit rapproché de sa commande dès son arrivée.',
             ],
         ],
 
@@ -332,7 +331,7 @@ return [
             'h1' => 'Un ERP reconstruit par étapes, pendant que l’entreprise continuait de s’en servir.',
             'lead' => 'Un distributeur de biens de consommation au Cameroun gère ses commandes, ses livraisons, ses emballages consignés, sa flotte, sa paie et sa comptabilité dans un seul système. Celui-ci était déjà en service quand nous sommes arrivés. Nous l’avons audité, puis reconstruit sprint après sprint, sans arrêter l’activité.',
             'needed' => [
-                'Le système fonctionnait, mais il avait grandi sans garde-fous. L’accès reposait sur quelques rôles très larges, une écriture pouvait être enregistrée sans être équilibrée, et un mois clôturé pouvait encore changer.',
+                'Le système fonctionnait, mais il avait grandi sans garde-fous. L’accès reposait sur quelques rôles très larges, une écriture pouvait être enregistrée sans être équilibrée, et un exercice clôturé pouvait encore changer.',
                 'L’entreprise devait aussi suivre les emballages consignés détenus par ses clients, ainsi que les camions, le carburant et les chauffeurs qui transportent ses marchandises.',
             ],
             'map' => [
@@ -345,7 +344,7 @@ return [
                     ['name' => 'Équipes', 'items' => ['Paie, comptabilisée dans le grand livre', 'Bulletins de paie']],
                     ['name' => 'Contrôle', 'items' => ['Des rôles et des droits sur chaque page', 'Une trace de chaque modification', 'Des documents que les clients signent sur leur propre téléphone, depuis un lien ou un QR code']],
                 ],
-                'spine' => 'Une seule comptabilité OHADA. La base de données elle-même refuse une écriture déséquilibrée, ainsi que toute modification d’un mois clôturé.',
+                'spine' => 'Une seule comptabilité OHADA. La base de données elle-même refuse une écriture déséquilibrée, ainsi que toute écriture datée d’un exercice clôturé.',
             ],
             'day_title' => 'Une livraison, de la commande à la comptabilité',
             'day' => [
@@ -353,11 +352,11 @@ return [
                 'Le camion part avec son chauffeur. Le kilométrage est relevé, et le système refuse un relevé inférieur au précédent.',
                 'Chez le client, les emballages pleins sortent et les vides reviennent, consignés sur un reçu que le client signe sur son téléphone.',
                 'La facture est comptabilisée dans le grand livre, et le paiement rejoint la trésorerie.',
-                'En fin de mois, la période est clôturée, et ses écritures ne peuvent plus être modifiées.',
+                'Une fois l’exercice clôturé, plus rien de ce qui y est daté ne peut être ajouté ni modifié.',
             ],
             'changed' => [
                 ['title' => 'Un accès selon le rôle', 'text' => 'Chacun ne voit que les pages que son rôle autorise, et l’entreprise définit elle-même ces rôles dans un écran d’administration.'],
-                ['title' => 'Des comptes qui tiennent', 'text' => 'Les écritures déséquilibrées sont refusées, les mois clôturés le restent, et chaque modification est enregistrée avec son auteur.'],
+                ['title' => 'Des comptes qui tiennent', 'text' => 'Les écritures déséquilibrées sont refusées, les exercices clôturés le restent, et chaque modification est enregistrée avec son auteur.'],
                 ['title' => 'Chaque emballage enregistré', 'text' => 'Tout type d’emballage du catalogue peut être enregistré lorsqu’un client le rapporte, sans modifier le logiciel.'],
                 ['title' => 'Des mises en production plus sûres', 'text' => 'Avant chaque mise en production, la base de données et le plan de comptes sont vérifiés et des tests de bon fonctionnement sont lancés.'],
             ],

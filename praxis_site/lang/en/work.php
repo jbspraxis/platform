@@ -71,7 +71,7 @@ return [
         'logistics' => ['name' => 'Logistics and freight',
             'line' => 'Goods pass through ports, customs, warehouses and trucks. Every step has a cost that must reach the right shipment file and the books.'],
         'consumer-goods' => ['name' => 'Consumer goods and distribution',
-            'line' => 'Orders, deliveries and returns move every day across many customers. Stock, vehicles and cash have to agree at the end of each one.'],
+            'line' => 'Orders, deliveries and returns move every day across many customers. Stock, vehicles and cash have to agree at the end of each day.'],
         'retail' => ['name' => 'Retail and consumer brands',
             'line' => 'A brand sells in its shop, on its website, on social media and through partners at once. One stock and one set of books have to stand behind all of them.'],
         'pharma' => ['name' => 'Pharmaceuticals',
@@ -101,7 +101,7 @@ return [
             'h1' => 'A freight business where every shipment file reaches the books.',
             'lead' => 'Smart Logistics and Services moves goods through ports, customs, warehouses and trucks in Cameroon. We built Praxis LS, the system that runs that work and keeps its accounts under OHADA, in English and French.',
             'needed' => [
-                'The business already ran its freight work on an older system. That system had no accounting layer, so costs and invoices had to be carried into the books by hand, and its screens were in English only, in a country that works in French and English.',
+                'The business already ran its freight work on an older system. That system had no accounting layer, so its costs and invoices never reached the books on their own, and its screens were in English only, in a country that works in French and English.',
                 'It needed one system for the whole shipment file: the quotation, the customs and transport steps, the warehouse, the trucks, the people, and accounts kept under SYSCOHADA, the OHADA accounting standard.',
             ],
             'map' => [
@@ -166,23 +166,23 @@ return [
                 ],
                 'spine' => 'One approval engine behind every request. Leave, expenses, queries and offers follow the chain the company sets, and every decision is recorded.',
             ],
-            'day_title' => 'One expense, from request to record',
+            'day_title' => 'One expense, as the system is designed to handle it',
             'day' => [
                 'A staff member asks for money for a purchase, with the reason and the amount.',
-                'Finance reviews the request. Above a threshold the company sets, the chief executive approves it too.',
-                'Once approved, the request waits as approved but not yet paid, so nothing falls between the two.',
-                'When the money is paid, the bank transaction reference is required before the record can close.',
-                'The spending lands against the department’s budget, where managers see budget against actual.',
+                'The line manager approves or rejects it, then operations does the same.',
+                'Operations groups the approved requests into one requisition for the chief executive.',
+                'The chief executive approves the requisition. A line at or above its category’s threshold needs its own approval, so a large amount never passes on the strength of a small one beside it.',
+                'Approved requests wait as approved but not yet paid. When the money goes out, the bank transaction reference is required before the record can close.',
             ],
             'changed' => [
-                ['title' => 'One record per person', 'text' => 'From application to payslip, each employee’s history sits in one place instead of separate spreadsheets.'],
+                ['title' => 'One record per person', 'text' => 'From application to payslip, each employee’s history will sit in one place instead of separate spreadsheets.'],
                 ['title' => 'Rules the system keeps', 'text' => 'Approval chains, spending thresholds and the working week are settings, not habits, so they apply the same way every time.'],
                 ['title' => 'Answers without risk', 'text' => 'The assistant reads and explains. Any change goes through the screen that owns it, under the person’s own permissions.'],
             ],
             'role' => [
-                'see' => 'We showed the client the platform in a discovery call, then reviewed its requirements with its team, module by module.',
+                'see' => 'We met MyCity App’s team and settled the open questions with it, one by one, before any plan was written.',
                 'design' => 'We wrote the milestone plan: the architecture decisions, the inventory of every screen and a definition of done for each milestone.',
-                'build' => 'We are building it in eleven milestones, each shown to the client in a demonstration before the next begins.',
+                'build' => 'We are building it in eleven milestones, each demonstrated to the client on a test environment.',
                 'hold' => 'The last milestone is handover and training, on a test environment that behaves exactly like the live system.',
             ],
         ],
@@ -261,10 +261,9 @@ return [
             'day_title' => 'One order, from the website to the books',
             'day' => [
                 'A customer orders on the website. Price and stock are read live from the ERP, so the website cannot offer what is not there.',
-                'Once the payment clears, the order posts its revenue and its cost of goods, and the stock moves.',
+                'Once the payment clears, the order posts its revenue and its cost of goods, and the stock moves, all in one step. A payment that does not match the order is held for review instead.',
                 'The customer joins the shared contact list, so the team sees a web buyer like any other customer.',
                 'A courier delivers the order, and the delivery is signed for.',
-                'Loyalty points are added for the next purchase.',
             ],
             'changed' => [
                 ['title' => 'One stock, every channel', 'text' => 'The website, the counter and the stockists draw on the same stock, so the brand does not sell what it no longer has.'],
@@ -276,7 +275,7 @@ return [
                 'see' => 'We mapped how the brand sells and where its stock sits: at the counter, on its website and with its stockists.',
                 'design' => 'We decided that the online shop would be a channel of the ERP, not a second system, and designed its accounting to match a sale at the counter.',
                 'build' => 'We built the ERP, the online shop and the connections to payment providers and couriers.',
-                'hold' => 'We keep extending it as the business grows, for example with payments collected into dedicated bank accounts.',
+                'hold' => 'We keep extending it as the business grows, for example with a bank account number for each order, so a transfer is matched to its order on arrival.',
             ],
         ],
 
@@ -336,7 +335,7 @@ return [
             'h1' => 'An ERP rebuilt in stages, while the business kept using it.',
             'lead' => 'An FMCG distributor in Cameroon runs its orders, deliveries, returnable containers, fleet, payroll and accounts on one system. It was already live when we started. We audited it, then rebuilt it sprint by sprint without stopping the business.',
             'needed' => [
-                'The system worked, but it had grown without guard rails. Access was controlled by a few broad roles, entries could be saved without balancing, and a closed month could still change.',
+                'The system worked, but it had grown without guard rails. Access was controlled by a few broad roles, entries could be saved without balancing, and a closed financial year could still change.',
                 'The business also needed to account for the returnable containers its customers hold, and for the trucks, fuel and drivers that carry its goods.',
             ],
             'map' => [
@@ -349,7 +348,7 @@ return [
                     ['name' => 'People', 'items' => ['Payroll, posted to the ledger', 'Payslips']],
                     ['name' => 'Control', 'items' => ['Roles and permissions on every page', 'A record of every change', 'Documents customers sign on their own phone, from a link or a QR code']],
                 ],
-                'spine' => 'One set of OHADA books. The database itself refuses an entry that does not balance, and any change to a closed month.',
+                'spine' => 'One set of OHADA books. The database itself refuses an entry that does not balance, and any entry dated in a closed financial year.',
             ],
             'day_title' => 'One delivery, from order to the books',
             'day' => [
@@ -357,11 +356,11 @@ return [
                 'The truck leaves with its driver. The odometer is recorded, and the system will not accept a reading lower than the last one.',
                 'At the customer, full containers go out and empties come back, recorded on a receipt the customer signs on their phone.',
                 'The invoice posts to the ledger, and the payment follows into cash flow.',
-                'At month end the period is closed, and its entries can no longer be changed.',
+                'Once the financial year is closed, nothing dated in it can be added or changed.',
             ],
             'changed' => [
                 ['title' => 'Access by role', 'text' => 'Each person sees only the pages their role allows, and the business sets those roles itself in an administration screen.'],
-                ['title' => 'Books that hold', 'text' => 'Entries that do not balance are refused, closed months stay closed, and every change is recorded with who made it.'],
+                ['title' => 'Books that hold', 'text' => 'Entries that do not balance are refused, closed years stay closed, and every change is recorded with who made it.'],
                 ['title' => 'Every container on the record', 'text' => 'Any container type in the catalogue can be booked when a customer returns it, with no change to the software.'],
                 ['title' => 'Safer releases', 'text' => 'Each release checks the database and the chart of accounts, and runs smoke tests, before it goes live.'],
             ],
