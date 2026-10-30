@@ -32,7 +32,11 @@ return [
         'h1' => 'Ask your company anything.',
         'lead' => 'We design how your organisation runs, then build the system that answers for it.',
         'see_answers' => 'See what Praxis AI answers',
-        'video_label' => 'Praxis AI answering questions from a chief operating officer, a chief financial officer and a managing director, with figures from Ndali Group, an illustrative company.',
+        'video_label' => 'The 60-second demo: a chief operating officer asks her company questions and gets answers from its own data. Ndali Group is a fictional company.',
+        'watch_demo' => 'Watch the 3-minute demo',
+        'demo_title' => 'A chief operating officer’s morning, in 3 minutes',
+        'demo_close' => 'Close the video',
+        'demo_note' => 'Ndali Group is a fictional company: all names and figures are demo data. The video plays from YouTube.',
         'pause' => 'Pause the animation',
         'play' => 'Play the animation',
         'problem_title' => 'A dozen tools. Not one answer.',
@@ -131,6 +135,7 @@ return [
             'cookies' => ['title' => 'Cookies', 'body' => [
                 'The site uses the cookies it needs to work: a session cookie and a security token for the forms, and a cookie that remembers your choice in the cookie banner.',
                 'Google Analytics, which tells us which pages people use, loads only if you select Accept in the banner. Its cookies (_ga and _ga_…) are then kept for up to two years. If you select Reject, or make no choice, it never loads.',
+                'The demo video on the home page plays from YouTube (youtube-nocookie.com), which may store its own cookies. Nothing from YouTube loads until you select Watch the 3-minute demo.',
                 'You can change your choice at any time with the Cookie settings link at the bottom of every page.',
             ]],
             'changes' => ['title' => 'Changes to this policy', 'body' => [

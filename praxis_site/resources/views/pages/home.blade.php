@@ -3,12 +3,17 @@
 @section('page_title', __('pages.home.title'))
 @section('description', __('pages.home.description'))
 
+@php
+    // The narrated 3-minute demo on YouTube, in the page's language (config site.demo_video)
+    $demoId = (string) (config('site.demo_video.' . app()->getLocale()) ?: config('site.demo_video.en'));
+@endphp
+
 @push('head')
-    <link rel="preload" as="image" href="{{ asset('media/ask-your-company-anything-poster.jpg') }}">
+    <link rel="preload" as="image" href="{{ asset('media/hero-60s-poster.jpg') }}">
 @endpush
 
 @section('full')
-    {{-- lucide: landmark users truck shield-check message-square-text pause play arrow-down calculator phone message-circle --}}
+    {{-- lucide: landmark users truck shield-check message-square-text pause play circle-play arrow-down calculator phone message-circle x --}}
     <section class="hero" aria-labelledby="hero-title">
         <div class="container hero-inner">
             <div class="hero-text">
@@ -16,15 +21,22 @@
                 <p class="hero-lead">{{ __('pages.home.lead') }}</p>
                 <div class="actions">
                     <a class="btn btn-primary btn-lg" href="{{ route('schedule') }}">{{ __('site.cta') }}</a>
-                    <a class="btn btn-ghost" href="#answers"><i data-lucide="arrow-down"></i>{{ __('pages.home.see_answers') }}</a>
+                    @if ($demoId !== '')
+                        {{-- Without JavaScript this opens the video on YouTube; with it, a player on the page (partials.demo-dialog) --}}
+                        <a class="btn btn-ghost" href="https://www.youtube.com/watch?v={{ $demoId }}" rel="noopener" data-demo-open="{{ $demoId }}">
+                            <i data-lucide="circle-play"></i>{{ __('pages.home.watch_demo') }}
+                        </a>
+                    @else
+                        <a class="btn btn-ghost" href="#answers"><i data-lucide="arrow-down"></i>{{ __('pages.home.see_answers') }}</a>
+                    @endif
                 </div>
             </div>
-            {{-- The 20-second interface loop (brand/kit/social/posts; it draws its own window). Muted, no autoplay attribute: app.js plays it
-                 unless the visitor asked for reduced motion, and the button pauses it (WCAG 2.2.2) --}}
+            {{-- The 60-second demo, silent, captions in the picture (demo/hero-60s-loop.mp4). Muted, no autoplay attribute:
+                 app.js plays it unless the visitor asked for reduced motion, and the button pauses it (WCAG 2.2.2) --}}
             <figure class="screen" id="answers">
                 <video class="screen-video" data-loop muted loop playsinline preload="metadata" width="1920" height="1080"
-                       poster="{{ asset('media/ask-your-company-anything-poster.jpg') }}" aria-label="{{ __('pages.home.video_label') }}">
-                    <source src="{{ asset('media/ask-your-company-anything-16x9.mp4') }}" type="video/mp4">
+                       poster="{{ asset('media/hero-60s-poster.jpg') }}" aria-label="{{ __('pages.home.video_label') }}">
+                    <source src="{{ asset('media/hero-60s-loop.mp4') }}" type="video/mp4">
                 </video>
                 <button class="screen-toggle" type="button" data-loop-toggle hidden
                         data-pause="{{ __('pages.home.pause') }}" data-play="{{ __('pages.home.play') }}" aria-label="{{ __('pages.home.pause') }}">
@@ -89,4 +101,8 @@
     </section>
 
     @include('partials.final-cta', ['title' => __('pages.home.final_title'), 'text' => __('pages.home.final_text')])
+
+    @if ($demoId !== '')
+        @include('partials.demo-dialog')
+    @endif
 @endsection

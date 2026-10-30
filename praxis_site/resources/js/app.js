@@ -161,12 +161,55 @@ function enhanceLoop() {
         drawIcons();
     };
     toggle.addEventListener('click', () => {
-        if (video.paused) video.play().catch(() => {}); else video.pause();
+        // Remember a pause the visitor chose, so closing the demo dialog doesn't restart the loop
+        if (video.paused) { delete video.dataset.userPaused; video.play().catch(() => {}); } else { video.dataset.userPaused = '1'; video.pause(); }
     });
     video.addEventListener('play', () => show(true));
     video.addEventListener('pause', () => show(false));
     toggle.hidden = false;
     video.play().catch(() => show(false));
+}
+
+// The narrated demo (partials.demo-dialog): the link opens a dialog and only then adds YouTube's player, with captions
+// on in the page's language; closing removes it, which stops the video. The loop pauses while the dialog is open.
+function enhanceDemo() {
+    const dialog = document.querySelector('[data-demo-dialog]');
+    const frame = dialog?.querySelector('[data-demo-frame]');
+    if (!dialog || !frame || typeof dialog.showModal !== 'function') return;
+    const loop = document.querySelector('[data-loop]');
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Every way out runs this (some browsers don't fire the dialog's close event reliably): remove the player,
+    // which stops the video, and restart the loop unless the visitor had paused it
+    const shut = () => {
+        if (dialog.open) dialog.close();
+        if (!frame.firstChild) return;
+        frame.replaceChildren();
+        if (loop && !reduced && !loop.dataset.userPaused) loop.play().catch(() => {});
+    };
+
+    document.querySelectorAll('[data-demo-open]').forEach((link) => link.addEventListener('click', (event) => {
+        const id = link.dataset.demoOpen;
+        if (!/^[A-Za-z0-9_-]{6,20}$/.test(id)) return; // the plain link to YouTube still works
+        event.preventDefault();
+        const lang = dialog.dataset.lang === 'fr' ? 'fr' : 'en';
+        const player = document.createElement('iframe');
+        player.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1&cc_load_policy=1&cc_lang_pref=${lang}&hl=${lang}`;
+        player.title = dialog.querySelector('h2')?.textContent || 'Demo';
+        player.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+        player.allowFullscreen = true;
+        player.referrerPolicy = 'strict-origin-when-cross-origin';
+        frame.replaceChildren(player);
+        loop?.pause();
+        dialog.showModal();
+    }));
+
+    dialog.querySelector('[data-demo-close]')?.addEventListener('click', shut);
+    // A click on the backdrop (outside the dialog's box) closes it too
+    dialog.addEventListener('click', (event) => { if (event.target === dialog) shut(); });
+    dialog.addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.preventDefault(); shut(); } });
+    dialog.addEventListener('cancel', (event) => { event.preventDefault(); shut(); });
+    dialog.addEventListener('close', shut);
 }
 
 // Cookie choice (resources/views/partials/consent.blade.php): Google Analytics loads only after "Accept". The choice is
@@ -232,5 +275,6 @@ document.addEventListener('DOMContentLoaded', () => {
     enhanceChat();
     toggleOtherFields();
     enhanceLoop();
+    enhanceDemo();
     enhanceConsent();
 });

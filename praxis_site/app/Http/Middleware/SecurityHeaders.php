@@ -11,7 +11,8 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Security headers on every response, and noindex while the site is a preview (SITE_NOINDEX).
  * The CSP allows only this origin: no inline scripts or styles, no third parties (fonts are self-hosted), except
- * Cloudflare Turnstile and Google Analytics when they are configured (Analytics loads only after consent).
+ * Cloudflare Turnstile, Google Analytics (only after consent) and the YouTube player of the demo video (only after a
+ * click), each when it is configured.
  */
 class SecurityHeaders
 {
@@ -36,6 +37,9 @@ class SecurityHeaders
         $gaScript = $ga ? ' https://www.googletagmanager.com' : '';
         $gaSend = $ga ? ' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com' : '';
 
+        // The demo video's player, added to the page only when the visitor asks to watch (config site.demo_video)
+        $youtube = array_filter((array) config('site.demo_video')) ? ' https://www.youtube-nocookie.com' : '';
+
         $csp = implode('; ', [
             "default-src {$self}",
             "script-src {$self}" . $turnstile . $gaScript . $dev,
@@ -43,7 +47,7 @@ class SecurityHeaders
             "img-src {$self} data:" . $gaSend,
             "font-src {$self}" . $dev,
             "connect-src {$self}" . $gaSend . $dev,
-            "frame-src {$self}" . $turnstile,
+            "frame-src {$self}" . $turnstile . $youtube,
             "form-action {$self}",
             "frame-ancestors 'none'",
             "base-uri 'none'",

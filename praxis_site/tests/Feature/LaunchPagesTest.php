@@ -77,4 +77,24 @@ class LaunchPagesTest extends TestCase
         $on->assertSee('data-ga="G-91FM19NGCK"', false)->assertSee('hidden>', false)->assertDontSee('gtag/js', false);
         $this->assertStringContainsString('https://www.googletagmanager.com', $on->headers->get('Content-Security-Policy'));
     }
+
+    public function test_the_demo_button_opens_youtube_only_when_configured(): void
+    {
+        $this->fakeHq();
+
+        config(['site.demo_video' => ['en' => '', 'fr' => '']]);
+        $off = $this->get('/');
+        $off->assertOk()->assertDontSee('data-demo-open', false)->assertSee('media/hero-60s-loop.mp4', false);
+        $this->assertStringNotContainsString('youtube', $off->headers->get('Content-Security-Policy'));
+
+        config(['site.demo_video' => ['en' => 'EnDemo123', 'fr' => 'FrDemo456']]);
+        $en = $this->get('/');
+        $en->assertSee('href="https://www.youtube.com/watch?v=EnDemo123" rel="noopener" data-demo-open="EnDemo123"', false)
+            ->assertSee('Watch the 3-minute demo')->assertSee('data-demo-dialog', false);
+        $this->assertStringContainsString("frame-src 'self' https://www.youtube-nocookie.com", $en->headers->get('Content-Security-Policy'));
+        // No player in the page until the visitor clicks (app.js adds it)
+        $en->assertDontSee('<iframe', false);
+
+        $this->get('/fr')->assertSee('data-demo-open="FrDemo456"', false)->assertSee('Voir la démo de 3 minutes');
+    }
 }

@@ -30,7 +30,11 @@ return [
         'h1' => 'Posez toutes vos questions à votre entreprise.',
         'lead' => 'Nous concevons le fonctionnement de votre organisation, puis le système qui en rend compte.',
         'see_answers' => 'Voir ce que répond Praxis AI',
-        'video_label' => 'Praxis AI répond aux questions d’un directeur des opérations, d’une directrice financière et d’une directrice générale, avec les chiffres de Ndali Group, une entreprise fictive.',
+        'video_label' => 'La démo de 60 secondes : une directrice des opérations interroge son entreprise et obtient des réponses tirées de ses propres données. Ndali Group est une entreprise fictive.',
+        'watch_demo' => 'Voir la démo de 3 minutes',
+        'demo_title' => 'La matinée d’une directrice des opérations, en 3 minutes',
+        'demo_close' => 'Fermer la vidéo',
+        'demo_note' => 'Ndali Group est une entreprise fictive : tous les noms et chiffres sont des données de démonstration. La vidéo est lue depuis YouTube.',
         'pause' => 'Mettre l’animation en pause',
         'play' => 'Lire l’animation',
         'problem_title' => 'Une dizaine d’outils. Aucune réponse.',
@@ -129,6 +133,7 @@ return [
             'cookies' => ['title' => 'Cookies', 'body' => [
                 'Le site utilise les cookies nécessaires à son fonctionnement  un cookie de session et un jeton de sécurité pour les formulaires, ainsi qu’un cookie qui retient votre choix dans le bandeau cookies.',
                 'Google Analytics, qui nous indique quelles pages sont consultées, ne se charge que si vous choisissez Accepter dans le bandeau. Ses cookies (_ga et _ga_…) sont alors conservés jusqu’à deux ans. Si vous choisissez Refuser, ou si vous ne faites aucun choix, il ne se charge jamais.',
+                'La vidéo de démonstration de la page d’accueil est lue depuis YouTube (youtube-nocookie.com), qui peut enregistrer ses propres cookies. Rien n’est chargé depuis YouTube tant que vous ne choisissez pas Voir la démo de 3 minutes.',
                 'Vous pouvez modifier votre choix à tout moment avec le lien Paramètres des cookies en bas de chaque page.',
             ]],
             'changes' => ['title' => 'Modifications', 'body' => [

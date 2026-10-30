@@ -186,7 +186,7 @@
     @media (max-width: 560px) {
         .site-logo img { height: 26px; }
         .site-tools { gap: 8px; }
-        .site-tools > .btn { padding-left: 12px; padding-right: 12px; }
+        .site-tools > .btn { padding-left: 12px; padding-right: 12px; white-space: nowrap; font-size: 0.875rem; }
     }
     @media (max-width: 340px) {
         .site-tools > .btn { display: none; }
@@ -448,6 +448,18 @@
     .facts-wide dd { text-align: left; }
     .facts-wide div:last-child { border-bottom: 1px solid var(--color-line); }
     .policy h2 { scroll-margin-top: 24px; }
+
+    /* The narrated demo: a native <dialog> with YouTube's player, 16:9, as wide as the screen allows */
+    .demo-dialog { margin: auto; width: min(64rem, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 0; border-radius: var(--radius-dialog); background: var(--color-ink); color: var(--color-fg-on-dark-muted); box-shadow: var(--shadow-float); overflow: hidden; }
+    .demo-dialog::backdrop { background: rgba(12, 20, 43, 0.72); }
+    .demo-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 12px 10px 20px; }
+    .demo-dialog-head h2 { margin: 0; font-size: 1rem; line-height: 1.5rem; font-weight: 600; color: #fff; }
+    .demo-dialog-head .btn { color: #fff; }
+    .demo-dialog-head .btn:hover { background: rgba(255, 255, 255, 0.1); }
+    .demo-dialog :focus-visible { outline-color: var(--color-accent-on-dark); }
+    .demo-frame { aspect-ratio: 16 / 9; background: #000; }
+    .demo-frame iframe { display: block; width: 100%; height: 100%; border: 0; }
+    .demo-note { margin: 0; padding: 10px 20px 14px; font-size: 0.8125rem; line-height: 1.125rem; }
 
     /* Cookie choice: bottom left, clear of Praxis AI's button on the right */
     .consent { position: fixed; left: 16px; bottom: 16px; z-index: 50; width: min(26rem, calc(100vw - 32px)); padding: 16px 20px; background: var(--color-paper); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-float); font-size: 0.875rem; line-height: 1.375rem; color: var(--color-ink); box-sizing: border-box; }

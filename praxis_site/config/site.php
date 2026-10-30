@@ -15,6 +15,13 @@ return [
     // Shown with the social links from Website settings, which has no Instagram field yet
     'instagram_url' => 'https://www.instagram.com/jbspraxis',
 
+    // The narrated 3-minute demo on YouTube (video ids), played on the home page only after a click
+    // (partials.demo-dialog); empty = the button is not shown and no YouTube address is allowed by the CSP
+    'demo_video' => [
+        'en' => env('DEMO_VIDEO_EN', 'XPqfJZ32jvc'),   // "Ask your company anything: a COO’s morning in 3 minutes"
+        'fr' => env('DEMO_VIDEO_FR', 'nhx9HYZkIq4'),   // the same, narrated in French
+    ],
+
     // Our product (Company page)
     'nfelia_url' => 'https://nfelia.com',
 
