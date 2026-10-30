@@ -148,6 +148,9 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
             Route::get('/health', \App\Livewire\Hq\System\SystemHealth::class)->middleware('can:system.view')->name('hq.system.health');
         });
 
+        // 8. MAIL (docs/MAIL.md): own and shared mailboxes; routes/mail.php
+        require __DIR__ . '/mail.php';
+
         // Private uploads (receipts, payment proofs, QA evidence, CVs), checked per file
         Route::get('/files/{path}', [\App\Http\Controllers\SecureFileController::class, 'show'])->where('path', '.*')->name('hq.file');
     });

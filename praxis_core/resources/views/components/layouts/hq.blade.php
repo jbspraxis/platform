@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-<head>
+<head><meta charset="utf-8">
     @include('partials.app-head', ['app' => 'hq', 'title' => $title ?? null])
 </head>
 <body>
@@ -16,7 +16,7 @@
         request()->routeIs('hq.mdm.employees') => 'Team',
         default => [
             'dash' => 'Overview', 'mdm' => 'Master data', 'hr' => 'Team', 'crm' => 'Leads and proposals',
-            'ops' => 'Projects', 'finance' => 'Finance', 'marketing' => 'Marketing', 'system' => 'Settings and access',
+            'ops' => 'Projects', 'finance' => 'Finance', 'marketing' => 'Marketing', 'system' => 'Settings and access', 'mail' => 'Mail',
         ][explode('.', (string) request()->route()?->getName())[1] ?? ''] ?? null,
     };
     $user = auth()->user();
@@ -43,6 +43,24 @@
             <a href="{{ route('hq.dash.workspace') }}" class="rail-link {{ $on('hq.dash.workspace') }}" wire:navigate>
                 <i data-lucide="user-round"></i> My workspace
             </a>
+
+            {{-- Mail (docs/MAIL.md): owner-only until the owner opens it to everyone --}}
+            @can('use-mail')
+                @php $mailUnread = \App\Support\Mail\MailNav::unread($user); @endphp
+                <a href="{{ route('hq.mail.inbox') }}" class="rail-link {{ $on('hq.mail.*') }}" wire:navigate>
+                    <i data-lucide="mail"></i> Mail
+                    @if ($mailUnread > 0)
+                        <span style="margin-left: auto; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--color-bright-teal); color: var(--color-ink); font-size: 0.75rem; line-height: 1.25rem; font-weight: 700; text-align: center;" aria-label="{{ $mailUnread }} unread">{{ $mailUnread > 99 ? '99+' : $mailUnread }}</span>
+                    @endif
+                </a>
+                @if (request()->routeIs('hq.mail.*'))
+                    <div class="rail-sub">
+                        <a href="{{ route('hq.mail.inbox') }}" class="{{ $on('hq.mail.inbox') }}" wire:navigate>Inbox</a>
+                        <a href="{{ route('hq.mail.mailboxes') }}" class="{{ $on('hq.mail.mailboxes') }}" wire:navigate>Mailboxes</a>
+                        <a href="{{ route('hq.mail.signature') }}" class="{{ $on('hq.mail.signature') }}" wire:navigate>Signature</a>
+                    </div>
+                @endif
+            @endcan
 
             @canany(['dashboard.view', 'audit.view'])
                 <a href="{{ $user->can('dashboard.view') ? route('hq.dash.admin') : route('hq.dash.audit') }}" class="rail-link {{ $on('hq.dash.admin', 'hq.dash.investor', 'hq.dash.audit') }}" wire:navigate>

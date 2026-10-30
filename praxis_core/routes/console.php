@@ -26,3 +26,8 @@ Schedule::command('monitor:run')->everyFiveMinutes()->withoutOverlapping(10);
 // HQ app (docs/PWA.md): push bell notifications that weren't pushed as they were written, and tidy up old delivery records
 Schedule::command('pwa:push-pending')->everyMinute()->withoutOverlapping(5);
 Schedule::command('pwa:push-prune')->dailyAt('03:10');
+
+// HQ Mail (docs/MAIL.md): copy new mail from every connected mailbox, send what is due, tidy up
+Schedule::command('mail:sync')->everyMinute()->withoutOverlapping(10);
+Schedule::command('mail:send-due')->everyMinute()->withoutOverlapping(5);
+Schedule::command('mail:prune')->dailyAt('03:40');
