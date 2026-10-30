@@ -90,7 +90,7 @@ class InsightsRefreshTest extends TestCase
             $previous = $row->created_at;
         }
 
-        // None is published: the site API, the sitemap and the old pages only read published articles
+        // None is published: the site API only reads published articles
         $site = app(KaizenService::class);
         $this->assertSame(0, DB::table('kaizen_articles')->whereIn('slug', $this->slugs())->where('status', 'Published')->count());
         $this->assertSame(6, $site->articles(1, null)['total']);
@@ -148,7 +148,7 @@ class InsightsRefreshTest extends TestCase
             $validator = Validator::make([
                 'article_title' => $a['title'], 'exec_summary' => $a['executive_summary'], 'vulnerability' => $a['problem_statement'],
                 'solution' => $a['engineered_solution'], 'roi' => $a['final_roi'], 'category' => $a['category'],
-            ], array_intersect_key(KaizenService::rules(), array_flip(['article_title', 'exec_summary', 'vulnerability', 'solution', 'roi', 'category'])));
+            ], array_intersect_key(KaizenService::rules('The summary is longer than 50 words.'), array_flip(['article_title', 'exec_summary', 'vulnerability', 'solution', 'roi', 'category'])));
             $this->assertSame([], $validator->errors()->all(), $a['slug']);
 
             $this->assertLessThanOrEqual(50, str_word_count($a['executive_summary']), $a['slug']);

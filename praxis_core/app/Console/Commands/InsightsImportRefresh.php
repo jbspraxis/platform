@@ -17,7 +17,8 @@ use Illuminate\Support\Facades\DB;
  *   php artisan insights:import-refresh --dry-run    what would be created, nothing written
  *   php artisan insights:import-refresh
  *
- * The drafts appear in HQ under Sign-offs, Case studies and articles, Insights articles.
+ * The drafts appear in HQ under Sign-offs, Case studies and articles, Insights articles. That list only shows
+ * them: HQ has no screen yet to edit or publish an article (published = status Published, is_public 1, published_at).
  */
 class InsightsImportRefresh extends Command
 {
