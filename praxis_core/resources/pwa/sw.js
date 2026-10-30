@@ -22,7 +22,9 @@ const STATIC_CACHE = 'hq-static-v1';
 const STATIC_LIMIT = 80;
 const OFFLINE_URL = '/offline';
 const ICON = '/icons/icon-192.png';
-const DEFAULT_TITLE = 'New notification in HQ';
+// The app's own words: HQ or the Client Portal (PwaController@serviceWorker)
+const APP = __PWA_APP__;
+const DEFAULT_TITLE = APP.title;
 
 // Livewire's own script (/livewire-<key>/livewire.min.js?id=<build>); everything else under /livewire* is left alone
 const LIVEWIRE_SCRIPT = /^\/livewire-[^/]+\/livewire(\.csp)?(\.min)?\.js$/;
@@ -31,10 +33,10 @@ const LIVEWIRE_SCRIPT = /^\/livewire-[^/]+\/livewire(\.csp)?(\.min)?\.js$/;
 // itself when the browser is back online or HQ answers again.
 const FALLBACK_PAGE = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
     + '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#0C142B">'
-    + '<title>You’re offline | JBS Praxis HQ</title></head>'
+    + '<title>You’re offline | ' + APP.name + '</title></head>'
     + '<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#F2F5F7;color:#4A5468;font:16px/26px &quot;Plus Jakarta Sans&quot;,&quot;Segoe UI&quot;,Arial,sans-serif">'
     + '<main style="max-width:420px;padding:32px 16px"><h1 style="margin:0 0 8px;color:#0C142B;font-size:24px;line-height:32px;font-weight:600">You’re offline</h1>'
-    + '<p style="margin:0 0 24px">This device can’t reach HQ right now. Check your Wi-Fi or mobile data. This page reloads by itself as soon as HQ answers.</p>'
+    + '<p style="margin:0 0 24px">This device can’t reach ' + APP.short + ' right now. Check your Wi-Fi or mobile data. This page reloads by itself as soon as it answers.</p>'
     + '<button type="button" onclick="location.reload()" style="min-height:44px;padding:9px 16px;border:0;border-radius:4px;background:#08707C;color:#fff;font:inherit;font-weight:500;cursor:pointer">Try again</button>'
     + '</main><script>(function () { var reload = function () { location.reload(); };'
     + ' addEventListener("online", reload);'

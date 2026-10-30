@@ -434,13 +434,18 @@ class NotificationSettingsTest extends TestCase
         $this->assertNull($config['vapidKey']);
     }
 
-    public function test_the_client_portal_never_gets_the_app(): void
+    public function test_the_client_portal_gets_its_own_app_but_never_hq_settings(): void
     {
         $this->withoutVite();
 
-        $this->get('https://' . Hosts::portal() . '/login')
-            ->assertOk()
-            ->assertDontSee('hq-pwa-config', false)
-            ->assertDontSee('hq-pwa.js', false);
+        $html = (string) $this->get('https://' . Hosts::portal() . '/login')->assertOk()->assertSee('hq-pwa.js', false)->getContent();
+        $this->assertSame(1, preg_match('~<script id="hq-pwa-config" type="application/json">(.*?)</script>~s', $html, $m));
+        $config = json_decode($m[1], true);
+        $this->assertSame('portal', $config['app']);
+        $this->assertSame('auth', $config['page'], 'never an invitation on the sign-in page');
+        $this->assertSame('/pwa/push/subscription', $config['routes']['subscribe']);
+        $this->assertSame(3, $config['snoozeDays']['install']);
+        $this->assertNotEmpty($config['strings'], 'the portal sends its own words');
+        $this->assertStringNotContainsString('notification-settings', $html, 'HQ\'s staff settings panel never shows on the portal');
     }
 }

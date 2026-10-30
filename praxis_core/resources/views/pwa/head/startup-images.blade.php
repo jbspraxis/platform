@@ -1,7 +1,8 @@
 {{-- iPhone and iPad startup images (docs/BRAND.md section 14): the first frame of the launch animation, the letters
      and HQ on Ink, so the installed app opens on exactly what the animation starts from. One image per device size
      and orientation; device-width and device-height are always the portrait values. scripts/pwa/startup_images.py
-     reads $devices below and renders the files into resources/pwa/startup. --}}
+     reads $devices below and renders the files into resources/pwa/startup. The Client Portal's (portal-*.png)
+     are the logo alone: its launch has no label, so one image suits English and French. --}}
 @php
     // CSS width and height in portrait, and pixel ratio, of every iPhone and iPad that can add HQ to its home screen
     $devices = [
@@ -13,6 +14,6 @@
 @endphp
 @foreach ($devices as [$w, $h, $r])
 @foreach (['portrait' => [$w * $r, $h * $r], 'landscape' => [$h * $r, $w * $r]] as $orientation => [$pw, $ph])
-<link rel="apple-touch-startup-image" media="screen and (device-width: {{ $w }}px) and (device-height: {{ $h }}px) and (-webkit-device-pixel-ratio: {{ $r }}) and (orientation: {{ $orientation }})" href="{{ \App\Support\Pwa\Pwa::asset("startup/hq-{$pw}x{$ph}.png") }}">
+<link rel="apple-touch-startup-image" media="screen and (device-width: {{ $w }}px) and (device-height: {{ $h }}px) and (-webkit-device-pixel-ratio: {{ $r }}) and (orientation: {{ $orientation }})" href="{{ \App\Support\Pwa\Pwa::asset('startup/' . (($pwaApp ?? 'hq') === 'portal' ? 'portal' : 'hq') . "-{$pw}x{$ph}.png") }}">
 @endforeach
 @endforeach

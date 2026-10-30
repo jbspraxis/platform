@@ -4,11 +4,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-/** A browser or installed app that receives HQ push notifications for one staff member (docs/PWA.md). */
+/**
+ * A browser or installed app that receives push notifications (docs/PWA.md): for one staff member
+ * (user_id, HQ) or one client portal account (client_user_id, Client Portal, in its locale).
+ */
 class PushSubscription extends Model
 {
     protected $fillable = [
         'user_id',
+        'client_user_id',
+        'locale',
         'endpoint',
         'endpoint_hash',
         'public_key',

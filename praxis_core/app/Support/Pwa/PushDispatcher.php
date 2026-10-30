@@ -206,7 +206,7 @@ class PushDispatcher
     }
 
     /** WebPush::send(), except that a failure on this side (keys, OpenSSL) is reported and blames no device. */
-    private static function send(array $messages): array
+    public static function send(array $messages): array
     {
         if (! $messages) {
             return [];
@@ -225,7 +225,7 @@ class PushDispatcher
      * forgotten are removed, and devices that didn't answer move one step closer to removal.
      * Returns how many were removed.
      */
-    private static function updateDevices(array $targets, array $results): int
+    public static function updateDevices(array $targets, array $results): int
     {
         $byDevice = [];
         foreach ($targets as $key => [, $subscription]) {
@@ -261,7 +261,7 @@ class PushDispatcher
         return $removed;
     }
 
-    private static function message(PushSubscription $subscription, string $payload, string $urgency): array
+    public static function message(PushSubscription $subscription, string $payload, string $urgency): array
     {
         return [
             'endpoint' => $subscription->endpoint,
@@ -274,7 +274,7 @@ class PushDispatcher
     }
 
     /** The JSON the service worker reads (docs/PWA.md, "Push payload"). */
-    private static function payload(array $p): string
+    public static function payload(array $p): string
     {
         return json_encode([
             'v' => 1,
@@ -299,7 +299,7 @@ class PushDispatcher
     }
 
     /** One line of plain text, at most $limit characters including the ellipsis. */
-    private static function clean(string $text, int $limit): string
+    public static function clean(string $text, int $limit): string
     {
         $text = trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
         $limit = max(2, $limit);

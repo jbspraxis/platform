@@ -188,6 +188,8 @@ class InvoiceLedger extends Component
             // Accrue the receivable in the general ledger, as the proposal gateway does for deposits
             \App\Livewire\Hq\Finance\GeneralLedgerManager::recordInvoiceIssued($invoiceId);
         });
+        // The client's billing people hear about it in their portal and on their devices (docs/PWA.md)
+        \App\Support\Pwa\ClientNotify::invoice($invoiceId, 'invoice_issued');
 
         $this->showCreateModal = false;
         $this->reset(['new_project_id', 'new_phase_id', 'new_amount_due', 'new_description']);
@@ -238,6 +240,7 @@ class InvoiceLedger extends Component
             'ip_address' => request()->ip(),
             'created_at' => now()
         ]);
+        \App\Support\Pwa\ClientNotify::invoice($invoiceId, 'invoice_cancelled');
 
         $this->loadInvoices();
         session()->flash('success', "Invoice {$invoice->invoice_number} cancelled.");
@@ -284,6 +287,7 @@ class InvoiceLedger extends Component
                     ];
                 }
                 if(!empty($notifications)) DB::table('notifications')->insert($notifications);
+                \App\Support\Pwa\ClientNotify::invoice($invoice->id, 'invoice_overdue');
 
                 // 3. Audit trail (safe null UUID)
                 DB::table('system_audit_logs')->insert([

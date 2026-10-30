@@ -3,13 +3,14 @@
 namespace App\Http\Controllers\Pwa;
 
 use App\Http\Controllers\Controller;
+use App\Support\Hosts;
 use App\Support\Pwa\Pwa;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
- * The app shell on the HQ host (docs/PWA.md): manifest, service worker, offline page, the app's files,
- * the connection check and the manifest shortcuts. All but the shortcuts answer without a session and
+ * The app shell on the HQ and Client Portal hosts (docs/PWA.md): manifest, service worker, offline page,
+ * the app's files, the connection check and HQ's manifest shortcuts. All but the shortcuts answer without a session and
  * set no cookies (routes/pwa.php), so nothing in them is ever personal.
  */
 class PwaController extends Controller
@@ -34,6 +35,22 @@ class PwaController extends Controller
         'finance' => ['finance.view' => 'hq.finance.bi', 'payroll.view' => 'hq.finance.payroll', 'expenses.view' => 'hq.finance.manager', 'expenses.create' => 'hq.finance.request'],
     ];
 
+    // The offline page's words on HQ (the portal's are in lang/*/portal.php, pwa.offline)
+    private const HQ_OFFLINE = [
+        'title' => 'You’re offline | JBS Praxis HQ',
+        'heading' => 'You’re offline',
+        'lead' => 'This device can’t reach HQ right now. Check your Wi-Fi or mobile data. This page reloads by itself as soon as HQ answers.',
+        'note' => 'Anything you hadn’t saved before the connection dropped may not have reached HQ. Check your last changes when the page reloads.',
+        'retry' => 'Try again',
+        'noscript' => 'Reload this page to try again.',
+        'next' => 'Next check in :time.',
+        'one_second' => '1 second',
+        'seconds' => ':n seconds',
+        'still' => 'Still offline.',
+        'checking' => 'Checking the connection…',
+        'connected' => 'Connected. Opening HQ…',
+    ];
+
     // Pictures of HQ for the richer install dialog in Chrome, Edge and Android: My workspace with fictional demo
     // records, signed in as a test account (never production data). The labels are their alt text.
     private const SCREENSHOTS = [
@@ -41,8 +58,20 @@ class PwaController extends Controller
         ['img/screenshots/hq-narrow.png', 'narrow', 'My workspace in JBS Praxis HQ on a phone: open tasks, hours this week and proposals awaiting signature'],
     ];
 
-    public function manifest()
+    // The app icons are static files in the web root (brand/kit/icons), the same for HQ and the Client Portal
+    private const ICONS = [
+        ['src' => '/icons/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any'],
+        ['src' => '/icons/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any'],
+        ['src' => '/icons/icon-maskable-192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'maskable'],
+        ['src' => '/icons/icon-maskable-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'maskable'],
+    ];
+
+    public function manifest(Request $request)
     {
+        if (Hosts::isPortal($request)) {
+            return $this->portalManifest($request);
+        }
+
         $manifest = [
             // The id stays "/" (what the first manifest's start_url gave), so devices that installed HQ before keep the same app
             'id' => '/',
@@ -58,13 +87,7 @@ class PwaController extends Controller
             'lang' => 'en',
             'dir' => 'ltr',
             'categories' => ['business', 'productivity'],
-            // The app icons are static files in the web root (brand/kit/icons)
-            'icons' => [
-                ['src' => '/icons/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any'],
-                ['src' => '/icons/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any'],
-                ['src' => '/icons/icon-maskable-192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'maskable'],
-                ['src' => '/icons/icon-maskable-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'maskable'],
-            ],
+            'icons' => self::ICONS,
             'shortcuts' => $this->shortcuts(),
             // One HQ window: opening the app again (or a shortcut) brings the open one forward
             'launch_handler' => ['client_mode' => ['focus-existing', 'auto']],
@@ -80,7 +103,7 @@ class PwaController extends Controller
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
-    public function serviceWorker()
+    public function serviceWorker(Request $request)
     {
         $source = Pwa::file('sw.js');
         abort_unless($source, 404);
@@ -97,6 +120,9 @@ class PwaController extends Controller
             '__PWA_VERSION__' => Pwa::version(),
             '__PWA_PRECACHE__' => json_encode($precache, JSON_UNESCAPED_SLASHES),
             '__PWA_BADGE__' => Pwa::file(self::BADGE) ? Pwa::asset(self::BADGE) : '',
+            '__PWA_APP__' => json_encode(Hosts::isPortal($request)
+                ? ['title' => 'JBS Praxis', 'name' => 'JBS Praxis Client Portal', 'short' => 'the Client Portal']
+                : ['title' => 'New notification in HQ', 'name' => 'JBS Praxis HQ', 'short' => 'HQ'], JSON_UNESCAPED_UNICODE),
         ]);
 
         // Never cached: browsers compare this file byte for byte to find a new version of the app
@@ -107,9 +133,42 @@ class PwaController extends Controller
         ]);
     }
 
-    public function offline()
+    public function offline(Request $request)
     {
-        return response()->view('pwa.offline', [], 200, ['Cache-Control' => 'no-cache']);
+        $texts = Hosts::isPortal($request)
+            ? ['en' => __('portal.pwa.offline', [], 'en'), 'fr' => __('portal.pwa.offline', [], 'fr')]
+            : ['en' => self::HQ_OFFLINE];
+
+        return response()->view('pwa.offline', ['texts' => $texts], 200, ['Cache-Control' => 'no-cache']);
+    }
+
+    /** The Client Portal's manifest, in the language of the page that links it (?lang=fr). */
+    private function portalManifest(Request $request)
+    {
+        $lang = $request->query('lang') === 'fr' ? 'fr' : 'en';
+        $manifest = [
+            'id' => '/',
+            'name' => __('portal.app_full_name', [], $lang),
+            'short_name' => __('portal.app_name', [], $lang),
+            'description' => __('portal.pwa.description', [], $lang),
+            'start_url' => '/?source=pwa',
+            'scope' => '/',
+            'display' => 'standalone',
+            'orientation' => 'any',
+            'background_color' => config('pwa.background_color'),
+            'theme_color' => config('pwa.theme_color'),
+            'lang' => $lang,
+            'dir' => 'ltr',
+            'categories' => ['business', 'productivity'],
+            'icons' => self::ICONS,
+            'launch_handler' => ['client_mode' => ['focus-existing', 'auto']],
+            'prefer_related_applications' => false,
+        ];
+
+        return response()->json($manifest, 200, [
+            'Content-Type' => 'application/manifest+json',
+            'Cache-Control' => 'no-cache',
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
     public function ping()

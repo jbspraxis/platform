@@ -19,6 +19,30 @@
     var noop = function () {};
 
     var config = readConfig();
+
+    // The words on screen. HQ's are the English in this file; the Client Portal sends its own in config.strings
+    // (its English, which says "Client Portal", or its French). :name placeholders are filled from vars.
+    function t(text, vars) {
+        var words = config.strings || {};
+        var out = Object.prototype.hasOwnProperty.call(words, text) ? words[text] : text;
+        if (vars) {
+            Object.keys(vars).forEach(function (key) { out = out.split(':' + key).join(vars[key]); });
+        }
+        return out;
+    }
+
+    // "Tap *Share*." becomes ['Tap ', { strong: 'Share' }, '.'] for the install steps
+    function rich(text) {
+        return text.split(/\*([^*]+)\*/).map(function (part, i) { return i % 2 ? { strong: part } : part; })
+            .filter(function (part) { return part !== ''; });
+    }
+
+    // The offline page (kept by the service worker) shows itself in the language this device last used
+    function rememberLanguage() {
+        try {
+            if (config.lang) localStorage.setItem('hq-pwa:lang', config.lang);
+        } catch (e) { /* private window: the offline page uses the browser's language */ }
+    }
     var env = detect();
     var state = {
         standalone: isStandalone(),
@@ -102,15 +126,15 @@
     // "this iPhone", "this computer"…
     function thisDevice() {
         if (env.ios) {
-            return 'this ' + env.device;
+            return t('this :device', { device: env.device });
         }
-        return env.device === 'Android' ? (env.tablet ? 'this tablet' : 'this phone') : 'this computer';
+        return env.device === 'Android' ? (env.tablet ? t('this tablet') : t('this phone')) : t('this computer');
     }
 
     // How the device appears in "Your devices", e.g. "iPhone · HQ app", "Windows · Edge"
     function deviceLabel() {
-        var name = env.device || (env.mobile ? 'Phone' : 'Computer');
-        return name + ' · ' + (state.standalone ? 'HQ app' : env.browser || 'Browser');
+        var name = env.device || (env.mobile ? t('Phone') : t('Computer'));
+        return name + ' · ' + (state.standalone ? t('HQ app') : env.browser || t('Browser'));
     }
 
     // ---- Storage (per browser; private windows may refuse it, then invitations just show again) -------------
@@ -587,7 +611,7 @@
     function register(sub, force) {
         return hashText(sub.endpoint).then(function (hash) {
             state.endpointHash = hash;
-            var mark = [config.user, hash, config.vapidKey].join('|');
+            var mark = [config.user, hash, config.vapidKey, config.lang || ''].join('|');
             var last = read('synced', true);
             if (!force && last && last.mark === mark && Date.now() - last.at < DAY) {
                 state.subscribed = true;
@@ -600,7 +624,8 @@
                 keys: { p256dh: keys.p256dh, auth: keys.auth },
                 contentEncoding: 'aes128gcm',
                 standalone: state.standalone,
-                device: deviceLabel()
+                device: deviceLabel(),
+                locale: config.lang || undefined
             }), 15000, 'failed').then(function (res) {
                 if (res.status === 422) {
                     throw failure('service');
@@ -626,11 +651,21 @@
             readEndpoint().then(update);
             return;
         }
-        subscribe(false).then(update, function () {
+        subscribe(false).then(update, function (err) {
             state.subscribed = false;
             update();
+            // The worker was still starting (a slow connection or the first visit): try again once it's ready
+            if (err && err.hqReason === 'worker' && 'serviceWorker' in navigator && !resyncWaiting) {
+                resyncWaiting = true;
+                navigator.serviceWorker.ready.then(function () {
+                    resyncWaiting = false;
+                    resync();
+                });
+            }
         });
     }
+
+    var resyncWaiting = false;
 
     function readEndpoint() {
         return currentRegistration().then(function (reg) {
@@ -723,6 +758,11 @@
         if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
             return;
         }
+        var logoutButton = e.target && e.target.closest ? e.target.closest('[wire\\:click="executeLogout"]') : null;
+        if (logoutButton) {
+            signOutButton(e, logoutButton);
+            return;
+        }
         var link = e.target && e.target.closest ? e.target.closest('a[href]') : null;
         if (!link || (link.target && link.target !== '_self')) {
             return;
@@ -736,6 +776,32 @@
         if (url.origin === location.origin && /\/logout$/.test(url.pathname)) {
             signOut(e, url.href);
         }
+    }
+
+    // The portal's sign-out button: forget this device (at most 2.5 s), then let Livewire sign out
+    function signOutButton(e, button) {
+        write('synced', null, true);
+        setBadge(0);
+        if (button.hqpPass || config.page !== 'app' || !env.push || !config.routes.unsubscribe) {
+            return;
+        }
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        var known = state.endpoint ? Promise.resolve(state.endpoint) : readEndpoint().then(function (sub) { return sub && sub.endpoint; });
+        within(known, 1000).then(function (endpoint) {
+            if (!endpoint || !window.fetch) return null;
+            var form = new FormData();
+            form.append('_token', config.csrf || '');
+            form.append('endpoint', endpoint);
+            return within(fetch(config.routes.unsubscribe, {
+                method: 'POST', body: form, credentials: 'same-origin',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            }).then(function () { return true; }, function () { return true; }), 2500);
+        }).then(null, noop).then(function () {
+            button.hqpPass = true;
+            button.click();
+            button.hqpPass = false;
+        });
     }
 
     function signOut(e, href) {
@@ -939,17 +1005,17 @@
     }
 
     function installPitch() {
-        if (env.device === 'Android') return 'Open HQ from your Home screen, full screen, like any other app.';
-        if (env.device === 'Windows') return 'Open HQ in its own window, from the Start menu or the taskbar.';
-        if (env.device === 'Mac') return 'Open HQ in its own window, from the Dock or Launchpad.';
-        if (env.device === 'ChromeOS') return 'Open HQ in its own window, from the launcher or the shelf.';
-        return 'Open HQ in its own window, like any other app.';
+        if (env.device === 'Android') return t('Open HQ from your Home screen, full screen, like any other app.');
+        if (env.device === 'Windows') return t('Open HQ in its own window, from the Start menu or the taskbar.');
+        if (env.device === 'Mac') return t('Open HQ in its own window, from the Dock or Launchpad.');
+        if (env.device === 'ChromeOS') return t('Open HQ in its own window, from the launcher or the shelf.');
+        return t('Open HQ in its own window, like any other app.');
     }
 
     function errorText(reason) {
-        if (reason === 'service') return 'HQ can’t send notifications to this browser. Try Chrome, Edge, Firefox or Safari.';
-        if (reason === 'worker') return 'We couldn’t turn on notifications because part of HQ didn’t load. Reload the page and try again.';
-        return 'We couldn’t turn on notifications. Check your connection and try again.';
+        if (reason === 'service') return t('HQ can’t send notifications to this browser. Try Chrome, Edge, Firefox or Safari.');
+        if (reason === 'worker') return t('We couldn’t turn on notifications because part of HQ didn’t load. Reload the page and try again.');
+        return t('We couldn’t turn on notifications. Check your connection and try again.');
     }
 
     function cardContent() {
@@ -957,12 +1023,12 @@
             var how = installKind();
             return {
                 art: h('span', { class: 'hqp-glyph', 'aria-hidden': 'true' }, [h('img', { src: '/icons/icon-192.png', alt: '', width: '40', height: '40' })]),
-                title: how === 'ios' ? 'Install HQ on your ' + env.device : how === 'mac' ? 'Add HQ to your Dock' : 'Install HQ',
-                text: how === 'ios' ? 'Add HQ to your Home Screen to open it like an app and get notifications.'
-                    : how === 'mac' ? 'Open HQ in its own window, straight from your Dock.' : installPitch(),
+                title: how === 'ios' ? t('Install HQ on your :device', { device: env.device }) : how === 'mac' ? t('Add HQ to your Dock') : t('Install HQ'),
+                text: how === 'ios' ? t('Add HQ to your Home Screen to open it like an app and get notifications.')
+                    : how === 'mac' ? t('Open HQ in its own window, straight from your Dock.') : installPitch(),
                 actions: [
-                    btn(how === 'prompt' ? 'Install the app' : 'Show me how', 'primary', install, 'install'),
-                    btn('Not now', 'ghost', function () { snooze('install'); closeCard(); }, 'later')
+                    btn(how === 'prompt' ? t('Install the app') : t('Show me how'), 'primary', install, 'install'),
+                    btn(t('Not now'), 'ghost', function () { snooze('install'); closeCard(); }, 'later')
                 ]
             };
         }
@@ -970,11 +1036,11 @@
             return {
                 art: glyph('check', 'is-on'),
                 focus: 'turn-on',
-                title: 'Notifications are on',
-                text: 'HQ notifications now come to ' + thisDevice() + '. Choose what they’re about in Notification settings.',
+                title: t('Notifications are on'),
+                text: t('HQ notifications now come to :device. Choose what they’re about in Notification settings.', { device: thisDevice() }),
                 actions: [
-                    btn('Notification settings', 'secondary', function () { closeCard(); openSettings(); }, 'settings'),
-                    btn('Close', 'ghost', closeCard, 'close')
+                    btn(t('Notification settings'), 'secondary', function () { closeCard(); openSettings(); }, 'settings'),
+                    btn(t('Close'), 'ghost', closeCard, 'close')
                 ]
             };
         }
@@ -982,11 +1048,11 @@
             return {
                 art: glyph('lock', 'is-blocked'),
                 focus: 'turn-on',
-                title: 'Notifications are blocked',
-                text: 'This browser is set to block notifications from HQ. You can allow them in its settings.',
+                title: t('Notifications are blocked'),
+                text: t('This browser is set to block notifications from HQ. You can allow them in its settings.'),
                 actions: [
-                    btn('Show me how', 'secondary', function () { closeCard(); openSettings(); }, 'settings'),
-                    btn('Close', 'ghost', closeCard, 'close')
+                    btn(t('Show me how'), 'secondary', function () { closeCard(); openSettings(); }, 'settings'),
+                    btn(t('Close'), 'ghost', closeCard, 'close')
                 ]
             };
         }
@@ -994,26 +1060,26 @@
             return {
                 art: glyph('alert', 'is-blocked'),
                 focus: 'turn-on',
-                title: 'Notifications aren’t available here',
+                title: t('Notifications aren’t available here'),
                 text: errorText('service'),
-                actions: [btn('Close', 'ghost', laterNotify, 'close')]
+                actions: [btn(t('Close'), 'ghost', laterNotify, 'close')]
             };
         }
         if (state.cardResult === 'failed') {
             return {
                 art: glyph('alert', 'is-blocked'),
-                title: 'Turn on notifications',
+                title: t('Turn on notifications'),
                 text: errorText(state.error),
-                actions: [btn('Try again', 'primary', turnOn, 'turn-on'), btn('Not now', 'ghost', laterNotify, 'later')]
+                actions: [btn(t('Try again'), 'primary', turnOn, 'turn-on'), btn(t('Not now'), 'ghost', laterNotify, 'later')]
             };
         }
         return {
             art: glyph('bell'),
-            title: 'Turn on notifications',
-            text: 'See HQ notifications on ' + thisDevice() + ' as they arrive, even when HQ isn’t on screen.',
+            title: t('Turn on notifications'),
+            text: t('See HQ notifications on :device as they arrive, even when HQ isn’t on screen.', { device: thisDevice() }),
             actions: [
-                btn(state.busy ? 'Turning on…' : 'Turn on', 'primary', turnOn, 'turn-on', state.busy),
-                btn('Not now', 'ghost', laterNotify, 'later', state.busy)
+                btn(state.busy ? t('Turning on…') : t('Turn on'), 'primary', turnOn, 'turn-on', state.busy),
+                btn(t('Not now'), 'ghost', laterNotify, 'later', state.busy)
             ]
         };
     }
@@ -1079,7 +1145,7 @@
         var online = state.notice === 'online';
         var toast = h('div', { class: 'hqp-toast hqp-enter' + (online ? ' is-online' : '') }, [
             icon(online ? 'check' : 'wifiOff'),
-            h('span', { text: online ? 'Back online.' : 'You’re offline. HQ can’t save changes until your connection is back.' })
+            h('span', { text: online ? t('Back online.') : t('You’re offline. HQ can’t save changes until your connection is back.') })
         ]);
         box.textContent = '';
         box.appendChild(toast);
@@ -1143,17 +1209,17 @@
             box.setAttribute('data-sig', sig);
             var items = [];
             if (kind === 'off') {
-                items.push(menuItem('bell', state.busy ? 'Turning on…' : 'Turn on notifications', turnOn, 'turn-on', state.busy));
+                items.push(menuItem('bell', state.busy ? t('Turning on…') : t('Turn on notifications'), turnOn, 'turn-on', state.busy));
                 if (state.error) items.push(h('p', { class: 'hqp-menu-note', text: errorText(state.error) }));
             } else if (kind === 'on') {
-                items.push(h('p', { class: 'hqp-menu-item is-status', tabindex: '-1', 'data-action': 'turn-on' }, [icon('check'), 'Notifications are on']));
+                items.push(h('p', { class: 'hqp-menu-item is-status', tabindex: '-1', 'data-action': 'turn-on' }, [icon('check'), t('Notifications are on')]));
             } else if (kind === 'blocked') {
-                items.push(menuItem('lock', 'Allow notifications', openSettings, 'allow'));
+                items.push(menuItem('lock', t('Allow notifications'), openSettings, 'allow'));
             } else if (kind === 'install-first') {
-                items.push(menuItem('bell', 'Install the app to get notifications', function () { openSheet('ios'); }, 'install-first'));
+                items.push(menuItem('bell', t('Install the app to get notifications'), function () { openSheet('ios'); }, 'install-first'));
             }
             if (install && kind !== 'install-first') {
-                items.push(menuItem('download', 'Install the app', install, 'install'));
+                items.push(menuItem('download', t('Install the app'), install, 'install'));
             }
             fill(box, items);
         });
@@ -1163,30 +1229,30 @@
     function blockedHelp() {
         var host = location.host;
         if (env.ios) {
-            return ['Open Settings on your ' + env.device + ', then Notifications.', 'Tap HQ and turn on Allow Notifications.'];
+            return [t('Open Settings on your :device, then Notifications.', { device: env.device }), t('Tap HQ and turn on Allow Notifications.')];
         }
         if (env.device === 'Android' && state.standalone) {
-            return ['Touch and hold the HQ icon, then tap App info.', 'Tap Notifications and turn them on.'];
+            return [t('Touch and hold the HQ icon, then tap App info.'), t('Tap Notifications and turn them on.')];
         }
         if (env.device === 'Mac' && env.browser === 'Safari' && state.standalone) {
-            return ['Open System Settings, then Notifications.', 'Choose HQ and turn on Allow notifications.'];
+            return [t('Open System Settings, then Notifications.'), t('Choose HQ and turn on Allow notifications.')];
         }
         if (env.browser === 'Safari') {
-            return ['In Safari, choose Safari > Settings, then Websites.', 'Select Notifications, find ' + host + ' and choose Allow.'];
+            return [t('In Safari, choose Safari > Settings, then Websites.'), t('Select Notifications, find :host and choose Allow.', { host: host })];
         }
         if (env.browser === 'Firefox') {
-            return ['Select the permissions icon to the left of the address bar.', 'Clear the Blocked setting next to Send notifications.', 'Reload HQ and turn notifications on.'];
+            return [t('Select the permissions icon to the left of the address bar.'), t('Clear the Blocked setting next to Send notifications.'), t('Reload HQ and turn notifications on.')];
         }
         if (env.browser === 'Samsung Internet') {
-            return ['Open the menu, then Settings > Sites and downloads > Notifications.', 'Allow ' + host + ', then reload HQ.'];
+            return [t('Open the menu, then Settings > Sites and downloads > Notifications.'), t('Allow :host, then reload HQ.', { host: host })];
         }
         if (env.device === 'Android') {
-            return ['Tap the icon to the left of the address bar, then Permissions.', 'Turn on Notifications, then reload HQ.'];
+            return [t('Tap the icon to the left of the address bar, then Permissions.'), t('Turn on Notifications, then reload HQ.')];
         }
         if (state.standalone) {
-            return ['Open the menu at the top of the HQ window, then App info.', 'Set Notifications to Allow, then reload HQ.'];
+            return [t('Open the menu at the top of the HQ window, then App info.'), t('Set Notifications to Allow, then reload HQ.')];
         }
-        return ['Select the icon to the left of the address bar.', 'Set Notifications to Allow, then reload HQ.'];
+        return [t('Select the icon to the left of the address bar.'), t('Set Notifications to Allow, then reload HQ.')];
     }
 
     function settingsContent() {
@@ -1194,21 +1260,24 @@
         var nodes = [h('p', { class: 'hqp-this-name', text: deviceLabel() })];
         var actions = [];
         if (kind === 'on') {
-            nodes.push(h('p', { class: 'hqp-state is-on', tabindex: '-1', 'data-action': 'turn-on' }, [icon('check'), 'Notifications are on for this device.']));
-            actions.push(btn(state.test === 'sending' ? 'Sending…' : 'Send a test notification', 'secondary', sendTest, 'test', state.test === 'sending'));
+            nodes.push(h('p', { class: 'hqp-state is-on', tabindex: '-1', 'data-action': 'turn-on' }, [icon('check'), t('Notifications are on for this device.')]));
+            actions.push(btn(state.test === 'sending' ? t('Sending…') : t('Send a test notification'), 'secondary', sendTest, 'test', state.test === 'sending'));
+            if (config.app === 'portal') {
+                actions.push(btn(t('Turn off'), 'ghost', function () { turnOff(); }, 'turn-off'));
+            }
         } else if (kind === 'off') {
-            nodes.push(h('p', { class: 'hqp-state' }, [icon('bell'), state.busy ? 'Turning on notifications…' : 'Notifications are off for this device.']));
-            actions.push(btn(state.busy ? 'Turning on…' : 'Turn on notifications', 'primary', turnOn, 'turn-on', state.busy));
+            nodes.push(h('p', { class: 'hqp-state' }, [icon('bell'), state.busy ? t('Turning on notifications…') : t('Notifications are off for this device.')]));
+            actions.push(btn(state.busy ? t('Turning on…') : t('Turn on notifications'), 'primary', turnOn, 'turn-on', state.busy));
         } else if (kind === 'blocked') {
-            nodes.push(h('p', { class: 'hqp-state is-blocked', tabindex: '-1', 'data-action': 'turn-on' }, [icon('lock'), 'Notifications are blocked for HQ in this browser. To allow them:']));
+            nodes.push(h('p', { class: 'hqp-state is-blocked', tabindex: '-1', 'data-action': 'turn-on' }, [icon('lock'), t('Notifications are blocked for HQ in this browser. To allow them:')]));
             nodes.push(h('ol', { class: 'hqp-steps-help' }, blockedHelp().map(function (step) { return h('li', { text: step }); })));
         } else if (kind === 'install-first') {
-            nodes.push(h('p', { class: 'hqp-state' }, [icon('bell'), 'On ' + env.device + ', HQ can send notifications only from the app on your Home Screen.']));
-            actions.push(btn('Install the app', 'primary', function () { openSheet('ios'); }, 'install-first'));
+            nodes.push(h('p', { class: 'hqp-state' }, [icon('bell'), t('On :device, HQ can send notifications only from the app on your Home Screen.', { device: env.device })]));
+            actions.push(btn(t('Install the app'), 'primary', function () { openSheet('ios'); }, 'install-first'));
         } else if (env.ios && state.standalone) {
-            nodes.push(h('p', { class: 'hqp-state' }, [icon('alert'), 'Notifications need iOS 16.4 or later. Update your ' + env.device + ' in Settings > General > Software Update.']));
+            nodes.push(h('p', { class: 'hqp-state' }, [icon('alert'), t('Notifications need iOS 16.4 or later. Update your :device in Settings > General > Software Update.', { device: env.device })]));
         } else {
-            nodes.push(h('p', { class: 'hqp-state' }, [icon('alert'), 'This browser can’t show notifications from HQ.']));
+            nodes.push(h('p', { class: 'hqp-state' }, [icon('alert'), t('This browser can’t show notifications from HQ.')]));
         }
         if (actions.length) {
             nodes.push(h('div', { class: 'hqp-this-actions' }, actions));
@@ -1219,9 +1288,9 @@
         if (kind === 'on' && state.test && state.test !== 'sending') {
             var sent = state.test === 'sent';
             nodes.push(h('p', { class: 'hqp-result ' + (sent ? 'is-ok' : 'is-error') }, [icon(sent ? 'check' : 'alert'),
-                sent ? 'Test notification sent. It should appear in a few seconds.'
-                    : state.test === 'busy' ? 'You’ve sent several tests in a row. Wait a minute and try again.'
-                    : 'We couldn’t send the test notification. Check your connection and try again.']));
+                sent ? t('Test notification sent. It should appear in a few seconds.')
+                    : state.test === 'busy' ? t('You’ve sent several tests in a row. Wait a minute and try again.')
+                    : t('We couldn’t send the test notification. Check your connection and try again.')]));
         }
         return [h('div', { class: 'hqp-this' }, nodes)];
     }
@@ -1263,25 +1332,25 @@
     function showSheet(kind) {
         if (sheet) closeSheet();
         var mac = kind === 'mac';
-        var shareHint = env.browser === 'Safari' ? 'It’s in Safari’s toolbar. If you don’t see it, tap More (•••) first.'
-            : 'It’s next to the address bar or in the browser’s menu.';
+        var shareHint = env.browser === 'Safari' ? t('It’s in Safari’s toolbar. If you don’t see it, tap More (•••) first.')
+            : t('It’s next to the address bar or in the browser’s menu.');
         var steps = mac ? [
-            step('dock', 1, ['In the menu bar, choose ', { strong: 'File' }, ', then ', { strong: 'Add to Dock' }, '.']),
-            step('check', 2, ['Select ', { strong: 'Add' }, '. HQ then opens in its own window from your Dock.'])
+            step('dock', 1, rich(t('In the menu bar, choose *File*, then *Add to Dock*.'))),
+            step('check', 2, rich(t('Select *Add*. HQ then opens in its own window from your Dock.')))
         ] : [
-            step('share', 1, ['Tap ', { strong: 'Share' }, '.'], shareHint),
-            step('addSquare', 2, ['Scroll down and tap ', { strong: 'Add to Home Screen' }, '.']),
-            step('home', 3, ['Tap ', { strong: 'Add' }, ', then open HQ from your Home Screen and sign in.'])
+            step('share', 1, rich(t('Tap *Share*.')), shareHint),
+            step('addSquare', 2, rich(t('Scroll down and tap *Add to Home Screen*.'))),
+            step('home', 3, rich(t('Tap *Add*, then open HQ from your Home Screen and sign in.')))
         ];
         var returnTo = document.activeElement;
         var dialog = h('div', { class: 'hqp-sheet hqp-enter', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'hqp-sheet-title', tabindex: '-1' }, [
             h('div', { class: 'hqp-sheet-head' }, [
-                h('h2', { class: 'hqp-sheet-title', id: 'hqp-sheet-title', text: mac ? 'Add HQ to your Dock' : 'Install HQ on your ' + (env.ios ? env.device : 'iPhone') }),
-                h('button', { type: 'button', class: 'hqp-icon-btn', 'aria-label': 'Close the steps', onclick: function () { closeSheet(); } }, [icon('x')])
+                h('h2', { class: 'hqp-sheet-title', id: 'hqp-sheet-title', text: mac ? t('Add HQ to your Dock') : t('Install HQ on your :device', { device: env.ios ? env.device : 'iPhone' }) }),
+                h('button', { type: 'button', class: 'hqp-icon-btn', 'aria-label': t('Close the steps'), onclick: function () { closeSheet(); } }, [icon('x')])
             ]),
             h('ol', { class: 'hqp-steps' }, steps),
-            mac ? null : h('p', { class: 'hqp-sheet-note', text: 'On iPhone and iPad, HQ can send notifications only from the app on your Home Screen.' }),
-            h('div', { class: 'hqp-sheet-actions' }, [btn('Close', 'secondary', function () { closeSheet(); }, 'close')])
+            mac ? null : h('p', { class: 'hqp-sheet-note', text: t('On iPhone and iPad, HQ can send notifications only from the app on your Home Screen.') }),
+            h('div', { class: 'hqp-sheet-actions' }, [btn(t('Close'), 'secondary', function () { closeSheet(); }, 'close')])
         ]);
         var backdrop = h('div', { class: 'hqp-sheet-backdrop hqp-enter', onclick: function () { closeSheet(); } });
         // Everything behind the steps is out of reach until they close
@@ -1471,6 +1540,7 @@
     document.addEventListener('livewire:navigated', function () {
         var before = config.user;
         config = readConfig();
+        rememberLanguage();
         state.standalone = isStandalone();
         if (state.cardResult && !state.busy) {
             // "Notifications are on" and the like don't follow people to the next page
@@ -1491,6 +1561,7 @@
         if (!state.card) scheduleCard(800);
     });
 
+    rememberLanguage();
     hookLivewire();
     registerWorker();
     if (navigator.onLine === false) {

@@ -163,6 +163,8 @@ class QaHub extends Component
         // Auto-Update Status to Investigating if it was Open (only for someone who works tickets: qa.edit)
         if ($this->selectedTicket['status'] === 'Open' && Auth::user()->can('qa.edit')) {
             DB::table('qa_tickets')->where('id', $ticketId)->update(['status' => 'Investigating', 'updated_at' => now()]);
+            // The client who reported it hears that someone is on it (docs/PWA.md)
+            \App\Support\Pwa\ClientNotify::ticket($ticketId, 'ticket_investigating');
             $this->loadFirehose();
             $this->selectedTicket['status'] = 'Investigating';
         }
@@ -207,6 +209,10 @@ class QaHub extends Component
             'created_at' => now(),
             'updated_at' => now()
         ]);
+        // A reply the client can see (not an internal note) reaches the client who reported the issue
+        if (! $this->isInternalOnly) {
+            \App\Support\Pwa\ClientNotify::ticket($this->selectedTicket['id'], 'ticket_reply');
+        }
 
         $this->newCommentText = '';
         $this->isInternalOnly = false;
@@ -317,6 +323,8 @@ class QaHub extends Component
                 ]);
             }
         });
+
+        \App\Support\Pwa\ClientNotify::ticket($this->selectedTicket['id'], 'ticket_resolved');
 
         // Close offcanvas and refresh grid
         $this->dispatch('close-offcanvas');

@@ -153,6 +153,8 @@
                     </div>
                 </div>
                 <div class="topbar-actions" style="gap: 16px;">
+                    {{-- The portal's notifications, and the app on this device (docs/PWA.md) --}}
+                    <livewire:client-os.notification-bell />
                     @include('livewire.client-os.partials.language-switch')
                     <div class="user-chip">
                         <div>

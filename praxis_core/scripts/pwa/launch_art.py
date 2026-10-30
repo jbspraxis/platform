@@ -147,7 +147,7 @@ def artwork():
                f'<use href="#hql-mi" fill="{WHITE}" stroke="{WHITE}" {PAINT}/></g>')
     rule = (f'<path class="hql-rule" d="M0 {num(RULE_TOP + RULE_WIDTH / 2)}H{W}" fill="none" '
             f'stroke="url(#hql-split)" stroke-width="{num(RULE_WIDTH)}"/>')
-    name = f'<path d="{label_outlines()}" fill="{ON_INK_MUTED}"/>'
+    name = f'<path class="hql-label" d="{label_outlines()}" fill="{ON_INK_MUTED}"/>'
     height = num(HEIGHT)
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{height}" viewBox="0 0 {W} {height}" focusable="false">'
             f'<defs>{"".join(defs)}</defs>{"".join(bars)}{letters}{rule}{name}</svg>'), total

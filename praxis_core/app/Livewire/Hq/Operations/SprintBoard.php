@@ -259,6 +259,10 @@ class SprintBoard extends Component
                 }
             }
         });
+        // Waiting for the client's review: the project's client accounts hear about it (docs/PWA.md)
+        if ($newStatus === 'QA_Review') {
+            \App\Support\Pwa\ClientNotify::task($task->id);
+        }
 
         $this->loadBoardData();
     }

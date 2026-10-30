@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Pwa;
 
 use App\Http\Controllers\Controller;
 use App\Models\PushSubscription;
+use App\Support\Hosts;
+use App\Support\Pwa\ClientPush;
 use App\Support\Pwa\PushDispatcher;
 use App\Support\Pwa\VapidKeys;
 use App\Support\Pwa\WebPush;
@@ -53,12 +55,16 @@ class PushSubscriptionController extends Controller
 
         $endpoint = (string) $request->input('endpoint');
         $hash = PushSubscription::hash($endpoint);
-        $userId = (string) Auth::id();
+        [$column, $userId] = self::owner($request);
         $now = now();
         $device = self::label($request->input('device'));
 
         $row = [
-            'user_id' => $userId,
+            // A device belongs to one account at a time: a staff member on HQ or a client on the portal
+            'user_id' => $column === 'user_id' ? $userId : null,
+            'client_user_id' => $column === 'client_user_id' ? $userId : null,
+            // Portal pushes are written in the language the client uses on this device
+            'locale' => $column === 'client_user_id' ? (in_array($request->input('locale'), ['en', 'fr'], true) ? $request->input('locale') : 'en') : null,
             'endpoint' => $endpoint,
             'endpoint_hash' => $hash,
             // Stored in one form (base64url, no padding), whatever the browser sent
@@ -72,7 +78,7 @@ class PushSubscriptionController extends Controller
             'created_at' => $now,
             'updated_at' => $now,
         ];
-        $update = ['user_id', 'endpoint', 'public_key', 'auth_token', 'content_encoding', 'standalone', 'user_agent', 'last_seen_at', 'failures', 'updated_at'];
+        $update = ['user_id', 'client_user_id', 'locale', 'endpoint', 'public_key', 'auth_token', 'content_encoding', 'standalone', 'user_agent', 'last_seen_at', 'failures', 'updated_at'];
         // A refresh without a label keeps the one the device already has
         if ($device !== null) {
             $row['device'] = $device;
@@ -85,7 +91,7 @@ class PushSubscriptionController extends Controller
 
         // At most max_devices per person: the least recently seen go first
         $keep = max(1, (int) config('pwa.push.max_devices')) - 1;
-        $others = DB::table('push_subscriptions')->where('user_id', $userId)->where('id', '!=', $id)
+        $others = DB::table('push_subscriptions')->where($column, $userId)->where('id', '!=', $id)
             ->orderByDesc('last_seen_at')->orderByDesc('id')->pluck('id');
         if ($others->count() > $keep) {
             DB::table('push_subscriptions')->whereIn('id', $others->slice($keep)->all())->delete();
@@ -102,9 +108,10 @@ class PushSubscriptionController extends Controller
             return self::invalid(['endpoint' => ['Send the push address of the device to remove.']]);
         }
 
+        [$column, $userId] = self::owner($request);
         DB::table('push_subscriptions')
             ->where('endpoint_hash', PushSubscription::hash($endpoint))
-            ->where('user_id', Auth::id())
+            ->where($column, $userId)
             ->delete();
 
         return response()->noContent();
@@ -117,7 +124,19 @@ class PushSubscriptionController extends Controller
             return self::invalid(['endpoint' => ['The push address is not valid.']]);
         }
 
+        if (Hosts::isPortal($request)) {
+            return response()->json(ClientPush::sendTest(Auth::guard('client')->user(), $endpoint ?: null));
+        }
+
         return response()->json(PushDispatcher::sendTest($request->user(), $endpoint ?: null));
+    }
+
+    /** Whose devices these are: the client signed in on the portal, or the staff member on HQ. */
+    private static function owner(Request $request): array
+    {
+        return Hosts::isPortal($request)
+            ? ['client_user_id', (string) Auth::guard('client')->id()]
+            : ['user_id', (string) Auth::guard('web')->id()];
     }
 
     /**

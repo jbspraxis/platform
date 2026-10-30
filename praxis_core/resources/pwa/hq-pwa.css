@@ -121,6 +121,10 @@ html #nprogress .bar { top: var(--hqp-safe-top); }
     max-width: calc(100vw - 32px - var(--hqp-safe-left) - var(--hqp-safe-right));
     pointer-events: none;
 }
+/* The Client Portal's "message your project team" button sits in the same corner: the card waits above it */
+body:has(.portal-fab:not(.hidden)) .hqp-cards {
+    bottom: calc(88px + var(--hqp-safe-bottom));
+}
 .hqp-card {
     pointer-events: auto;
     display: flex;

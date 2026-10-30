@@ -53,10 +53,14 @@ def devices():
     return found
 
 
-def first_frame_page():
-    """A page with the component's style and overlay, exactly as written in the view, plus the freeze."""
+def first_frame_page(app='hq'):
+    """A page with the component's style and overlay, exactly as written in the view, plus the freeze. For the
+    Client Portal (app='portal') also the view's portal style: the logo alone, without "HQ"."""
     view = re.sub(r'\{\{--.*?--\}\}\n?', '', VIEW.read_text(encoding='utf-8'), flags=re.S)
     style = re.search(r'<style id="hq-launch-style">.*?</style>', view, re.S)
+    portal = re.search(r'<style id="hq-launch-portal">.*?</style>', view, re.S) if app == 'portal' else None
+    if app == 'portal' and not portal:
+        raise SystemExit(f'startup_images.py: no portal style (id="hq-launch-portal") in {VIEW}')
     overlay = re.search(r'<div class="hq-launch".*?</svg>\s*</div>', view, re.S)
     if not style or not overlay or '<svg' not in overlay.group(0):
         raise SystemExit(f'startup_images.py: no launch style, overlay or artwork in {VIEW} (run launch_art.py first)')
@@ -64,7 +68,7 @@ def first_frame_page():
         raise SystemExit('startup_images.py: the overlay has Blade syntax in it; the startup images need plain markup')
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
-            f'{style.group(0)}{FREEZE}</head><body style="margin:0">{overlay.group(0)}</body></html>')
+            f'{style.group(0)}{portal.group(0) if portal else ""}{FREEZE}</head><body style="margin:0">{overlay.group(0)}</body></html>')
 
 
 def shoot(chrome, page, profile, css_w, css_h, ratio, out):
@@ -125,23 +129,28 @@ def palette(img):
 
 
 def main():
+    # python startup_images.py           HQ's images (hq-*.png)
+    # python startup_images.py portal    the Client Portal's (portal-*.png): the logo alone
+    app = sys.argv[1] if len(sys.argv) > 1 else 'hq'
+    if app not in ('hq', 'portal'):
+        raise SystemExit('startup_images.py: the app is hq or portal')
     chrome = browser()
     work = Path(tempfile.mkdtemp(prefix='hq-startup-'))
     try:
         page = work / 'first-frame.html'
-        page.write_text(first_frame_page(), encoding='utf-8')
+        page.write_text(first_frame_page(app), encoding='utf-8')
         OUT.mkdir(parents=True, exist_ok=True)
         written, worst = set(), 0
         for w, h, r in devices():
             for css_w, css_h in ((w, h), (h, w)):
-                name = f'hq-{css_w * r}x{css_h * r}.png'
+                name = f'{app}-{css_w * r}x{css_h * r}.png'
                 img = shoot(chrome, page, work / 'profile', css_w, css_h, r, work / name)
                 small, colours, error = palette(img)
                 small.save(OUT / name, optimize=True)
                 worst = max(worst, error)
                 written.add(name)
                 print(f'  {name}  {colours} colours, largest error {error}/255  {(OUT / name).stat().st_size / 1024:.1f} KB')
-        for old in OUT.glob('hq-*.png'):
+        for old in OUT.glob(f'{app}-*.png'):
             if old.name not in written:
                 old.unlink()
                 print(f'  removed {old.name}')

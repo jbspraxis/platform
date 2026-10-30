@@ -86,11 +86,11 @@ class PwaRoutesTest extends TestCase
         $this->assertSame(parse_url(route($route), PHP_URL_PATH), parse_url($location, PHP_URL_PATH), $location);
     }
 
-    public function test_the_app_shell_answers_on_the_hq_host_only(): void
+    public function test_the_app_shell_answers_on_hq_and_the_portal_never_on_the_site(): void
     {
         foreach ($this->statelessRoutes() as $path => $status) {
             $this->get($this->hq($path))->assertStatus($status);
-            $this->get($this->on(Hosts::portal(), $path))->assertNotFound();
+            $this->get($this->on(Hosts::portal(), $path))->assertStatus($status);
             $this->get($this->on(Hosts::site(), $path))->assertNotFound();
         }
 

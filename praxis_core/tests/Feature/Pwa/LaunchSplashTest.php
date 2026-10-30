@@ -140,9 +140,25 @@ class LaunchSplashTest extends TestCase
         $this->assertSame(0, $this->overlays($this->get($this->hq('/login'))->assertOk()));
     }
 
-    public function test_the_portal_and_the_public_site_never_launch(): void
+    public function test_the_client_portal_launches_with_the_logo_alone(): void
     {
-        foreach ([Hosts::portal(), Hosts::site()] as $host) {
+        // A guest opens the installed portal: "/" sends them to the sign-in page, which plays the launch once
+        $response = $this->get($this->on(Hosts::portal(), '/?source=pwa'));
+        $response->assertRedirect();
+        $page = $this->get((string) $response->headers->get('Location'))->assertOk();
+        $this->assertSame(1, $this->overlays($page));
+        $this->assertStringContainsString('id="hq-launch-portal"', (string) $page->getContent());
+        $this->assertSame(0, $this->overlays($this->get($this->on(Hosts::portal(), '/login'))));
+
+        // HQ's launch keeps its label
+        $hq = $this->get($this->hq('/login?source=pwa'))->assertOk();
+        $this->assertSame(1, $this->overlays($hq));
+        $this->assertStringNotContainsString('id="hq-launch-portal"', (string) $hq->getContent());
+    }
+
+    public function test_the_public_site_never_launches(): void
+    {
+        foreach ([Hosts::site()] as $host) {
             $response = $this->get($this->on($host, '/?source=pwa'));
             $this->assertLessThan(500, $response->getStatusCode(), $host);
             $this->assertSame(0, $this->overlays($response), $host);
@@ -254,10 +270,12 @@ class LaunchSplashTest extends TestCase
         $this->assertCount(44, $media, 'each device and orientation once');
         $this->assertCount(44, glob(resource_path('pwa/startup/hq-*.png')), 'no image that is not listed');
 
-        // Served on HQ only
+        // Served on HQ; the Client Portal lists its own set (the logo alone, portal-*.png); never on the public site
         $this->get($this->hq($links[0][5]))->assertOk()->assertHeader('Content-Type', 'image/png');
-        $this->get($this->on(Hosts::portal(), $links[0][5]))->assertNotFound();
-        $portal = $this->get($this->on(Hosts::portal(), '/login'))->assertOk();
-        $this->assertStringNotContainsString('/pwa/', (string) $portal->getContent());
+        $this->assertCount(44, glob(resource_path('pwa/startup/portal-*.png')), 'the portal: the same 44 sizes');
+        $portal = (string) $this->get($this->on(Hosts::portal(), '/login'))->assertOk()->getContent();
+        $this->assertSame(44, substr_count($portal, '/startup/portal-'));
+        $this->assertStringNotContainsString('/startup/hq-', $portal);
+        $this->get($this->on(Hosts::site(), $links[0][5]))->assertNotFound();
     }
 }

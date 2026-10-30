@@ -3,31 +3,44 @@
      "app" only for a signed-in staff member in the HQ layout: the sign-in and setup pages are "auth" even for
      someone already signed in, so no invitation ever shows there. --}}
 @php
-    $pwaUser = \Illuminate\Support\Facades\Auth::guard('web')->user();
-    $pwaStaff = $pwaUser && \App\Http\Middleware\HqStaff::allows($pwaUser);
-    $pwaAuthPage = request()->routeIs('login', 'hq.setup', 'taskforce.*');
+    // On the Client Portal the same script runs for the signed-in client, on the dashboard only, in their language
+    $pwaPortal = ($pwaApp ?? 'hq') === 'portal';
+    if ($pwaPortal) {
+        $pwaUser = \Illuminate\Support\Facades\Auth::guard('client')->user();
+        $pwaMember = $pwaUser && $pwaUser->status === 'Active';
+        $pwaAuthPage = ! request()->routeIs('client.dashboard');
+    } else {
+        $pwaUser = \Illuminate\Support\Facades\Auth::guard('web')->user();
+        $pwaMember = $pwaUser && \App\Http\Middleware\HqStaff::allows($pwaUser);
+        $pwaAuthPage = request()->routeIs('login', 'hq.setup', 'taskforce.*');
+    }
+    $pwaRoute = fn (string $name) => route(($pwaPortal ? 'portal.pwa.' : 'pwa.') . $name, absolute: false);
+    $pwaLang = app()->getLocale() === 'fr' ? 'fr' : 'en';
     try {
-        // Made on first use and kept in pwa_settings: if that fails (no table yet, no OpenSSL), HQ still opens
+        // Made on first use and kept in pwa_settings: if that fails (no table yet, no OpenSSL), the page still opens
         $pwaVapidKey = \App\Support\Pwa\VapidKeys::publicKey();
     } catch (\Throwable $e) {
         $pwaVapidKey = null;
     }
     $pwaConfig = [
+        'app' => $pwaPortal ? 'portal' : 'hq',
+        'lang' => $pwaPortal ? $pwaLang : 'en',
         'version' => \App\Support\Pwa\Pwa::version(),
-        'sw' => route('pwa.sw', absolute: false),
-        'page' => $pwaStaff && ! $pwaAuthPage ? 'app' : 'auth',
-        'user' => $pwaStaff ? substr(hash('sha256', (string) $pwaUser->getAuthIdentifier()), 0, 16) : null,
+        'sw' => $pwaRoute('sw'),
+        'page' => $pwaMember && ! $pwaAuthPage ? 'app' : 'auth',
+        'user' => $pwaMember ? substr(hash('sha256', ($pwaPortal ? 'client:' : '') . $pwaUser->getAuthIdentifier()), 0, 16) : null,
         'csrf' => csrf_token(),
         'vapidKey' => $pwaVapidKey,
         'routes' => [
-            'subscribe' => route('pwa.push.store', absolute: false),
-            'unsubscribe' => route('pwa.push.destroy', absolute: false),
-            'test' => route('pwa.push.test', absolute: false),
+            'subscribe' => $pwaRoute('push.store'),
+            'unsubscribe' => $pwaRoute('push.destroy'),
+            'test' => $pwaRoute('push.test'),
         ],
-        'snoozeDays' => [
-            'install' => (int) config('pwa.snooze_days.install', 14),
-            'notify' => (int) config('pwa.snooze_days.notify', 14),
-        ],
+        'snoozeDays' => $pwaPortal
+            ? ['install' => (int) config('pwa.snooze_days.portal', 3), 'notify' => (int) config('pwa.snooze_days.portal', 3)]
+            : ['install' => (int) config('pwa.snooze_days.install', 14), 'notify' => (int) config('pwa.snooze_days.notify', 14)],
+        // The portal's words for the script (its English says "Client Portal"; or its French). HQ uses the script's own.
+        'strings' => $pwaPortal ? (array) __('portal.pwa.js', [], $pwaLang) : new \stdClass(),
     ];
 @endphp
 <script id="hq-pwa-config" type="application/json">{!! json_encode($pwaConfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES) !!}</script>

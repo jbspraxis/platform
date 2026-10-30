@@ -28,6 +28,10 @@ class PwaPushPending extends Command
             . "{$s['muted']} muted, {$s['no-device']} without a device, {$s['skipped']} skipped; "
             . "{$s['devices']} device(s) reached, {$s['removed']} removed");
 
+        // The Client Portal's inbox (ClientNotify)
+        $c = \App\Support\Pwa\ClientPush::dispatchPending($limit !== null ? max(1, (int) $limit) : null);
+        $this->line("portal push: {$c['checked']} new, {$c['pushed']} pushed; {$c['devices']} device(s) reached, {$c['removed']} removed");
+
         return self::SUCCESS;
     }
 }

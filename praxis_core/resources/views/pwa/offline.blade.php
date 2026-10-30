@@ -1,8 +1,11 @@
-{{-- The HQ offline page (docs/PWA.md). The service worker keeps a copy at install and shows it when a page can't
+{{-- The offline page of HQ and of the Client Portal (docs/PWA.md). The service worker keeps a copy at install and shows it when a page can't
      be reached. Fully self-contained: inline CSS, the logo and the tab icon inlined, no font or script from the
      network. It checks the connection by itself (when the browser says it's back, and every 5 to 30 seconds)
-     and reloads the page that was asked for as soon as HQ answers. Same look as the sign-in page: one card on Mist. --}}
+     and reloads the page that was asked for as soon as HQ answers. Same look as the sign-in page: one card on Mist.
+     $texts holds the words per language: HQ's in English; the portal's in English and French, picked on the
+     device from the language the portal was last used in (hq-pwa.js keeps it), else the browser's. --}}
 @php
+    $t = $texts['en'];
     $logo = file_get_contents(resource_path('pwa/img/logo-horizontal-colour.svg'));
     $icon = 'data:image/svg+xml,' . strtr(str_replace('"', "'", trim(file_get_contents(resource_path('pwa/img/favicon.svg')))), ['%' => '%25', '#' => '%23', '<' => '%3C', '>' => '%3E']);
 @endphp
@@ -14,7 +17,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#0C142B">
-<title>You’re offline | JBS Praxis HQ</title>
+<title>{{ $t['title'] }}</title>
 <link rel="icon" href="{{ $icon }}" type="image/svg+xml">
 <style>
     :root {
@@ -64,17 +67,30 @@
 <body>
 <main>
     <div class="logo">{!! $logo !!}</div>
-    <h1>You’re offline</h1>
-    <p>This device can’t reach HQ right now. Check your Wi-Fi or mobile data. This page reloads by itself as soon as HQ answers.</p>
-    <p class="note">Anything you hadn’t saved before the connection dropped may not have reached HQ. Check your last changes when the page reloads.</p>
-    <button type="button" class="retry" id="offline-retry">Try again</button>
+    <h1 id="offline-heading">{{ $t['heading'] }}</h1>
+    <p id="offline-lead">{{ $t['lead'] }}</p>
+    <p class="note" id="offline-note">{{ $t['note'] }}</p>
+    <button type="button" class="retry" id="offline-retry">{{ $t['retry'] }}</button>
     <p class="status" id="offline-status" aria-hidden="true"></p>
     <p class="sr-only" id="offline-announce" role="status"></p>
-    <noscript><p class="status">Reload this page to try again.</p></noscript>
+    <noscript><p class="status">{{ $t['noscript'] }}</p></noscript>
 </main>
 <script>
 (function () {
     'use strict';
+
+    // The words, in the language this device last used the app in (the portal has English and French)
+    var TEXTS = {!! json_encode($texts, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) !!};
+    var lang = 'en';
+    try { lang = (localStorage.getItem('hq-pwa:lang') || navigator.language || 'en').slice(0, 2).toLowerCase(); } catch (e) {}
+    var T = TEXTS[lang] || TEXTS.en;
+    if (T !== TEXTS.en) {
+        document.documentElement.lang = lang;
+        document.title = T.title;
+        ['heading', 'lead', 'note', 'retry'].forEach(function (key) {
+            document.getElementById(key === 'retry' ? 'offline-retry' : 'offline-' + key).textContent = T[key];
+        });
+    }
 
     // Seconds before each automatic check: 5, then 10 and 20, then every 30
     var WAITS = [5, 10, 20, 30];
@@ -95,18 +111,22 @@
     }
 
     function seconds(n) {
-        return n === 1 ? '1 second' : n + ' seconds';
+        return n === 1 ? T.one_second : T.seconds.replace(':n', n);
+    }
+
+    function next(prefix) {
+        return prefix + T.next.replace(':time', seconds(remaining));
     }
 
     function schedule(prefix) {
         clearInterval(ticker);
         remaining = WAITS[Math.min(attempt, WAITS.length - 1)];
         attempt += 1;
-        show(prefix + 'Next check in ' + seconds(remaining) + '.');
+        show(next(prefix));
         ticker = setInterval(function () {
             remaining -= 1;
             if (remaining > 0) {
-                show(prefix + 'Next check in ' + seconds(remaining) + '.');
+                show(next(prefix));
             } else {
                 check(false, false);
             }
@@ -115,8 +135,8 @@
 
     function reconnected() {
         clearInterval(ticker);
-        show('Connected. Opening HQ…');
-        tell('Connected. Opening HQ.');
+        show(T.connected);
+        tell(T.connected.replace(/…$/, '.'));
         // The page that was asked for; this address on its own goes to HQ's home
         if (location.pathname === '/offline') {
             location.replace('/');
@@ -130,8 +150,8 @@
         if (checking) return;
         checking = true;
         clearInterval(ticker);
-        show('Checking the connection…');
-        if (byHand) tell('Checking the connection.');
+        show(T.checking);
+        if (byHand) tell(T.checking.replace(/…$/, '.'));
 
         function done(online) {
             checking = false;
@@ -140,8 +160,8 @@
                 return;
             }
             if (restart) attempt = 0;
-            if (byHand) tell('Still offline.');
-            schedule('Still offline. ');
+            if (byHand) tell(T.still);
+            schedule(T.still + ' ');
         }
 
         // The browser knows there is no network at all: no request to make

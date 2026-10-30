@@ -169,8 +169,9 @@ class SignoffManager extends Component
                 $parsedData = json_decode($jsonString, true);
 
                 if (isset($parsedData['executive_summary']) && isset($parsedData['roi_metrics'])) {
+                    $signoffId = (string) Str::uuid();
                     DB::table('project_signoffs')->insert([
-                        'id' => (string) Str::uuid(),
+                        'id' => $signoffId,
                         'project_id' => $this->draftProjectId,
                         'token' => hash('sha256', Str::random(40)),
                         'signatory_email' => $this->draftSignatoryEmail,
@@ -179,6 +180,8 @@ class SignoffManager extends Component
                         'status' => 'Draft',
                         'created_at' => now()
                     ]);
+                    // The client's approvers also find it in their portal, with its signing link (docs/PWA.md)
+                    \App\Support\Pwa\ClientNotify::signoff($signoffId);
                     session()->flash('success', 'Sign-off drafted. Copy its link and send it to the signatory.');
                     $this->draftProjectId = ''; $this->draftSignatoryEmail = '';
                 } else {

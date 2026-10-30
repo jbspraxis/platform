@@ -516,6 +516,8 @@ class ProposalBuilder extends Component
             session()->flash('error', "This proposal is no longer a draft, so it wasn’t signed. Its current status is shown above.");
             return;
         }
+        // The client's approvers with a portal account find it in their portal, with its signing link (docs/PWA.md)
+        \App\Support\Pwa\ClientNotify::proposal($this->proposalId);
         session()->flash('dispatch_success', 'Proposal signed and locked. Send the client the signing link below.');
     }
     

@@ -169,6 +169,11 @@ class Dashboard extends Component
         $this->can = collect(Access::catalogue())->filter(fn ($p) => $p['audience'] === 'client')
             ->mapWithKeys(fn ($p, $slug) => [substr($slug, strlen(Access::CLIENT_PREFIX)) => Access::allows($this->user, $slug)])->all();
         $this->activeTab = collect(self::TAB_PERMISSIONS)->filter(fn ($perm) => $this->can[$perm] ?? false)->keys()->first() ?? 'overview';
+        // A notification opens its tab (/?tab=financials), if this account may see that tab
+        $askedTab = request()->query('tab');
+        if (is_string($askedTab) && isset(self::TAB_PERMISSIONS[$askedTab]) && ($this->can[self::TAB_PERMISSIONS[$askedTab]] ?? false)) {
+            $this->activeTab = $askedTab;
+        }
 
         // Project Routing
         $projectQuery = DB::table('projects')->where('organization_id', $this->organization->id)->orderBy('created_at', 'desc');

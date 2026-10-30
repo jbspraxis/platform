@@ -34,7 +34,14 @@ class PwaLaunch
         }
 
         $request->attributes->set(self::ATTRIBUTE, true);
-        $response = $next($request);
+        try {
+            $response = $next($request);
+        } catch (\Illuminate\Auth\AuthenticationException $e) {
+            // A guest opening the installed portal: the sign-in page that check sends them to plays the launch
+            $session->flash(self::FLASH, true);
+
+            throw $e;
+        }
 
         // A redirect on HQ (or a chain of them) hands the launch to the next page; anything else ends it
         if (self::redirectsHere($request, $response)) {
@@ -58,7 +65,8 @@ class PwaLaunch
      */
     private static function isPage(Request $request): bool
     {
-        if (! $request->isMethod('GET') || ! Hosts::isHq($request)) {
+        // The two apps: HQ and the Client Portal (each with its own start_url, /?source=pwa)
+        if (! $request->isMethod('GET') || ! (Hosts::isHq($request) || Hosts::isPortal($request))) {
             return false;
         }
 

@@ -5,6 +5,7 @@
 </head>
 {{-- Client Portal and the client's token pages (proposal, sign-off, contract check): light workspace (docs/BRAND.md section 14) --}}
 <body class="bg-mist text-slate">
+    <x-pwa.launch />
     {{ $slot }}
     @livewireScripts
 </body>

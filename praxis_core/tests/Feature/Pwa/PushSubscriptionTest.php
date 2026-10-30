@@ -58,10 +58,11 @@ class PushSubscriptionTest extends TestCase
         $this->assertSame(0, DB::table('push_subscriptions')->count());
     }
 
-    public function test_the_routes_only_answer_on_the_hq_host(): void
+    public function test_staff_register_devices_on_hq_only(): void
     {
         $user = $this->staff();
-        $this->actingAs($user)->postJson('https://' . config('app.domains.portal') . '/pwa/push/subscription', $this->payload())->assertNotFound();
+        // The portal's routes are for client accounts: a staff session is not signed in there
+        $this->actingAs($user)->postJson('https://' . config('app.domains.portal') . '/pwa/push/subscription', $this->payload())->assertUnauthorized();
         $this->actingAs($user)->postJson('https://' . config('app.domains.site') . '/pwa/push/subscription', $this->payload())->assertNotFound();
         $this->assertSame(0, DB::table('push_subscriptions')->count());
     }

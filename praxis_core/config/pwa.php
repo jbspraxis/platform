@@ -44,9 +44,10 @@ return [
         ],
     ],
 
-    // Days a "Not now" keeps the install card and the notifications card away
+    // Days a "Not now" keeps the install card and the notifications card away (HQ staff; Client Portal clients)
     'snooze_days' => [
         'install' => 14,
         'notify' => 14,
+        'portal' => 3,
     ],
 ];

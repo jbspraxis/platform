@@ -157,6 +157,8 @@ class EscrowVerification extends Component
             return;
         }
 
+        \App\Support\Pwa\ClientNotify::invoice($this->selectedTx->invoice_id ?? null, 'payment_verified');
+
         $this->showVerifyModal = false;
         $this->loadTransactions();
         session()->flash('success', 'Payment verified and recorded in the general ledger.');
@@ -195,6 +197,8 @@ class EscrowVerification extends Component
             session()->flash('error', 'This payment has already been verified or rejected, so nothing was changed. The list has been refreshed.');
             return;
         }
+
+        \App\Support\Pwa\ClientNotify::invoice($this->selectedTx->invoice_id ?? null, 'payment_rejected');
 
         $this->showVerifyModal = false;
         $this->loadTransactions();
