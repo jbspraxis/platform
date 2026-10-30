@@ -30,7 +30,30 @@ Bio:
 
 Consulting and engineering for Africa’s institutions. We design how your organisation runs, then build the system that answers for it. En français aussi.
 
-## Instagram
+## LinkedIn (company page)
+- Page: linkedin.com/company/jbspraxis. Nothing on, or linked to, any person's profile: no "add to experience", no invitations, no shares from a personal account.
+- Logo: linkedin/jbs-praxis-linkedin-logo-400.png
+- Cover: linkedin/jbs-praxis-linkedin-cover-1128x191.png
+- Industry: Business Consulting and Services. Type: Privately held. Website: https://jbspraxis.com
+- Button: "Visit website" → https://jbspraxis.com/schedule
+
+Tagline (80/120):
+
+Ask your company anything. Consulting and engineering for Africa’s institutions.
+
+About:
+
+JBS Praxis is a consulting and engineering firm for Africa’s institutions. We design how organisations should run, then build the systems that make them run that way: finance, people, operations and risk, in English and French, under IFRS and OHADA.
+
+We work from Lagos and Douala.
+
+Ask your company anything.
+
+JBS Praxis est un cabinet de conseil et d’ingénierie au service des institutions africaines. Nous concevons le fonctionnement des organisations, puis les systèmes qui le rendent réel.
+
+Book a free audit and demo: https://jbspraxis.com/schedule
+
+## Instagram (not set up: the account was suspended at sign-up on 29 Oct 2026)
 - Profile picture: instagram/jbs-praxis-instagram-profile-1080.png
 - Category: Business consultant
 

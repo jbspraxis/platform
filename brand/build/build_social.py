@@ -60,6 +60,10 @@ def main():
         # X header 1500x500: the profile picture covers the lower left, so the text sits right of it
         ('x/jbs-praxis-x-header-1500x500.png', banner(1500, 500, 1000, 380, 72, 'xh', safe_left=380, bars=False), 1500, 500),
         ('instagram/jbs-praxis-instagram-profile-1080.png', avatar(1080, 'ip'), 1080, 1080),
+        # LinkedIn page: a square logo (not cropped to a circle) and a 1128x191 cover; the logo covers the
+        # cover's lower left on desktop, so the text starts right of it and the bars stay clear of the text
+        ('linkedin/jbs-praxis-linkedin-logo-400.png', avatar(400, 'll'), 400, 400),
+        ('linkedin/jbs-praxis-linkedin-cover-1128x191.png', banner(1128, 191, 600, 160, 40, 'lc', safe_left=300), 1128, 191),
     ]
     for name, html, w, h in jobs:
         out = OUT / name
