@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Support\Sitemap;
+use App\Support\Work;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Http;
@@ -11,6 +13,12 @@ use Tests\TestCase;
 class IndexNowTest extends TestCase
 {
     private const ENDPOINT = 'https://api.indexnow.org/indexnow';
+
+    /** The pages and case studies, each in English and French (what is sent when HQ lists no article) */
+    private function pageCount(): int
+    {
+        return 2 * (count(Sitemap::PAGES) + count(Work::slugs()));
+    }
 
     private function article(string $slug): array
     {
@@ -65,13 +73,13 @@ class IndexNowTest extends TestCase
         $this->fakeHqAndIndexNow();
         $key = config('site.indexnow.key');
 
-        $this->artisan('site:indexnow')->expectsOutputToContain('Sent 23 addresses to IndexNow (200 OK).')->assertSuccessful();
+        $this->artisan('site:indexnow')->expectsOutputToContain('Sent ' . ($this->pageCount() + 1) . ' addresses to IndexNow (200 OK).')->assertSuccessful();
 
         $body = $this->submitted();
         $this->assertSame('jbspraxis.com', $body['host']);
         $this->assertSame($key, $body['key']);
         $this->assertSame("https://jbspraxis.com/{$key}.txt", $body['keyLocation']);
-        foreach (['/', '/fr', '/careers', '/fr/careers', '/how-we-work', '/fr/how-we-work', '/kaizen/one-ledger'] as $path) {
+        foreach (['/', '/fr', '/careers', '/fr/careers', '/how-we-work', '/fr/how-we-work', '/work', '/fr/industries', '/work/nfelia', '/fr/work/nfelia', '/kaizen/one-ledger'] as $path) {
             $this->assertContains('https://jbspraxis.com' . $path, $body['urlList']);
         }
 
@@ -91,7 +99,7 @@ class IndexNowTest extends TestCase
 
         $this->artisan('site:indexnow')
             ->expectsOutputToContain('The Insights could not be read from HQ: only the pages are listed.')
-            ->expectsOutputToContain('Sent 22 addresses to IndexNow (200 OK).')
+            ->expectsOutputToContain('Sent ' . $this->pageCount() . ' addresses to IndexNow (200 OK).')
             ->assertSuccessful();
 
         $urls = $this->submitted()['urlList'];
@@ -147,7 +155,7 @@ class IndexNowTest extends TestCase
 
         $this->artisan('site:indexnow', ['--dry-run' => true])
             ->expectsOutput('https://jbspraxis.com/fr/security')
-            ->expectsOutputToContain('23 addresses; nothing was sent')
+            ->expectsOutputToContain(($this->pageCount() + 1) . ' addresses; nothing was sent')
             ->assertSuccessful();
 
         Http::assertNotSent(fn (HttpRequest $r) => $r->url() === self::ENDPOINT);
