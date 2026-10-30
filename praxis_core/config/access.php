@@ -43,6 +43,11 @@ return [
             // What jbspraxis.com shows: company details, contact, social links, leadership (HQ → Marketing → Website settings).
             // Roles that already exist get it from the migration 2026_10_30_000002_grant_website_settings_permissions.
             'website' => ['label' => 'Website settings', 'actions' => ['view', 'edit']],
+            // Mail (docs/MAIL.md): view = use HQ Mail (your own mailbox, and shared mailboxes you are invited to).
+            // Shared mailboxes: create = add a shared mailbox (you become its manager). Who reads and sends from
+            // each shared mailbox is set per mailbox by its managers, not here.
+            'mail' => ['label' => 'Mail', 'actions' => ['view']],
+            'mailboxes' => ['label' => 'Shared mailboxes', 'actions' => ['create']],
             'expenses' => ['label' => 'Cash requests', 'actions' => ['view', 'create', 'approve', 'export']],
             'finance' => ['label' => 'Invoices, ledger & budgets', 'actions' => $all],
             'payroll' => ['label' => 'Payroll & tax', 'actions' => $all],
@@ -73,21 +78,21 @@ return [
             'owner' => ['name' => 'Owner', 'protected' => true, 'description' => 'Full access, always. Cannot be edited or deleted.', 'grant' => ['*']],
             'partner' => ['name' => 'Partner / Director', 'description' => 'Runs the firm: every module.', 'grant' => ['*']],
             'finance' => ['name' => 'Finance & Payroll', 'description' => 'Money in, money out, payroll and tax.', 'grant' => [
-                'dashboard.*', 'audit.view', 'expenses.*', 'finance.*', 'payroll.*', 'mdm.view', 'mdm.create', 'mdm.edit', 'projects.view', 'crm.view',
+                'dashboard.*', 'audit.view', 'expenses.*', 'finance.*', 'payroll.*', 'mdm.view', 'mdm.create', 'mdm.edit', 'projects.view', 'crm.view', 'mail.view',
             ]],
             'delivery' => ['name' => 'Delivery Lead', 'description' => 'Runs projects, sprints, QA and sign-offs.', 'grant' => [
-                'dashboard.view', 'projects.*', 'qa.*', 'timesheets.*', 'signoffs.*', 'kaizen.view', 'kaizen.create', 'kaizen.edit', 'crm.view', 'expenses.create',
+                'dashboard.view', 'projects.*', 'qa.*', 'timesheets.*', 'signoffs.*', 'kaizen.view', 'kaizen.create', 'kaizen.edit', 'crm.view', 'expenses.create', 'mail.view',
             ]],
             'engineer' => ['name' => 'Engineer', 'description' => 'Works on assigned tasks and QA tickets.', 'grant' => [
-                'projects.view', 'projects.edit', 'qa.view', 'qa.create', 'qa.edit', 'timesheets.view', 'timesheets.create', 'kaizen.view', 'kaizen.create', 'expenses.create',
+                'projects.view', 'projects.edit', 'qa.view', 'qa.create', 'qa.edit', 'timesheets.view', 'timesheets.create', 'kaizen.view', 'kaizen.create', 'expenses.create', 'mail.view',
             ]],
             // marketing.delete also opens the social-account password vault, so it stays with Owner/Partner
             'sales' => ['name' => 'Sales & Marketing', 'description' => 'Leads, proposals, broadcasts, campaigns and website settings.', 'grant' => [
                 'dashboard.view', 'crm.*', 'broadcasts.*', 'marketing.view', 'marketing.create', 'marketing.edit', 'marketing.approve',
-                'website.*', 'kaizen.*', 'projects.view', 'expenses.create',
+                'website.*', 'kaizen.*', 'projects.view', 'expenses.create', 'mail.view',
             ]],
             'hr' => ['name' => 'HR', 'description' => 'People records, attendance, contracts and appraisals.', 'grant' => [
-                'hr.*', 'payroll.view', 'timesheets.view', 'timesheets.approve', 'timesheets.export', 'mdm.view', 'expenses.create',
+                'hr.*', 'payroll.view', 'timesheets.view', 'timesheets.approve', 'timesheets.export', 'mdm.view', 'expenses.create', 'mail.view',
             ]],
             'auditor' => ['name' => 'Auditor', 'description' => 'Reads and exports everything, changes nothing.', 'grant' => ['*.view', '*.export']],
         ],
