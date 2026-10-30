@@ -86,7 +86,7 @@
                                 </div>
                                 <div class="text-caption text-muted mt-1">{{ $lead->copq_industry ?? 'Industry not given' }}</div>
                                 @if($lead->status === 'Lead')
-                                    <button type="button" wire:click.stop="requestConsultation('{{ $lead->org_id }}')" class="btn btn-ghost btn-sm mt-1" style="padding-left: 0;" title="Book a free audit for this lead, starting in 15 minutes">
+                                    <button type="button" wire:click.stop="requestConsultation('{{ $lead->org_id }}')" class="btn btn-ghost btn-sm mt-1" style="padding-left: 0;" title="Book a free audit for this lead">
                                         <i data-lucide="calendar-plus"></i> Book free audit
                                     </button>
                                 @endif
@@ -149,7 +149,7 @@
                                 <div class="flex items-start justify-between gap-2">
                                     <span class="font-semibold text-ink">{{ $lead->company_name }}</span>
                                     @if($lead->status === 'Lead')
-                                        <button type="button" wire:click.stop="requestConsultation('{{ $lead->org_id }}')" class="btn btn-ghost btn-sm" title="Book a free audit for this lead, starting in 15 minutes" aria-label="Book a free audit for {{ $lead->company_name }}">
+                                        <button type="button" wire:click.stop="requestConsultation('{{ $lead->org_id }}')" class="btn btn-ghost btn-sm" title="Book a free audit for this lead" aria-label="Book a free audit for {{ $lead->company_name }}">
                                             <i data-lucide="calendar-plus"></i>
                                         </button>
                                     @endif
@@ -473,5 +473,39 @@
                 </form>
             </div>
         </aside>
+    @endif
+
+    {{-- Book a free audit: date and time in Lagos time (WAT), like website bookings --}}
+    @if($showBookingModal)
+        <div class="modal-backdrop" style="z-index: 60;">
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="booking-title" style="max-width: 440px;">
+                <form wire:submit="bookConsultation">
+                    <h2 id="booking-title" class="modal-title">Book a free audit</h2>
+                    <p class="text-small text-muted" style="margin: 0 0 16px;">For <strong class="text-ink">{{ $bookingCompany }}</strong>. It appears in the Consultation hub as a request; approve it there with the meeting link to email the client.</p>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="field">
+                            <label class="label" for="booking-date">Date</label>
+                            <input id="booking-date" type="date" wire:model="bookingDate" required class="input">
+                            @error('bookingDate') <span class="field-error">{{ $message }}</span> @enderror
+                        </div>
+                        <div class="field">
+                            <label class="label" for="booking-time">Time (WAT)</label>
+                            <input id="booking-time" type="time" step="300" wire:model="bookingTime" required class="input">
+                            @error('bookingTime') <span class="field-error">{{ $message }}</span> @enderror
+                        </div>
+                    </div>
+                    <p class="help" style="margin: 8px 0 0;">Lagos time (WAT), the same as website bookings. The free audit lasts an hour.</p>
+
+                    <div class="modal-actions">
+                        <button type="button" wire:click="closeBookingModal" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" wire:loading.attr="disabled" wire:target="bookConsultation" class="btn btn-primary">
+                            <span wire:loading.remove wire:target="bookConsultation">Book free audit</span>
+                            <span wire:loading wire:target="bookConsultation">Booking…</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     @endif
 </div>
