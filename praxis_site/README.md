@@ -15,6 +15,7 @@ through the private, signed Site API on HQ (`docs/SITE_API.md`), through one cli
 | `/dossier/{token}` | Cost of poor quality report | `GET /reports/{token}` |
 | `/kaizen`, `/kaizen/{slug}`, `/kaizen/write` | JBS Praxis Insights and the submission form | `GET /kaizen/articles…`, `POST /kaizen/submissions` |
 | `/services` | Praxis Method PDF by email | `POST /whitepaper` |
+| `/work`, `/work/{slug}`, `/industries` | The proof pages (PR4): the work as a register, one case study per client (`App\Support\Work`, text in `lang/{en,fr}/work.php`), and the sectors with the domains their work covers | none |
 | `/careers` | Application with a CV (multipart) | `POST /careers/applications` |
 | `/feedback` | Feedback on the site | `POST /feedback` |
 | `POST /chat` | Praxis AI, the website assistant, on every page (last 20 turns and a question counter in the session; the reply's links as buttons) | `POST /chat` |

@@ -8,10 +8,10 @@ use Throwable;
 final class Sitemap
 {
     /** Pages listed in the sitemap, each in English and French (route names without the "fr." prefix). */
-    public const PAGES = ['home', 'services', 'how-we-work', 'company', 'security', 'schedule', 'contact', 'calculator', 'kaizen', 'careers', 'privacy'];
+    public const PAGES = ['home', 'services', 'how-we-work', 'work', 'industries', 'company', 'security', 'schedule', 'contact', 'calculator', 'kaizen', 'careers', 'privacy'];
 
     /**
-     * Every page in both languages with its hreflang pair, then the published Insights articles (English), on $root
+     * Every page and case study (App\Support\Work) in both languages with its hreflang pair, then the published Insights articles (English), on $root
      * (default: this site's own address). It never fails because HQ is slow: then it lists the pages only, and calls
      * $whenHqFails (site:indexnow says so).
      *
@@ -21,8 +21,11 @@ final class Sitemap
     {
         $root = rtrim($root ?? url('/'), '/');
         $urls = [];
-        foreach (self::PAGES as $name) {
-            $path = route($name, [], false);
+        $paths = array_map(fn (string $name) => route($name, [], false), self::PAGES);
+        foreach (Work::slugs() as $slug) {
+            $paths[] = route('work.show', ['slug' => $slug], false);
+        }
+        foreach ($paths as $path) {
             $en = $root . $path;
             $fr = $root . '/fr' . ($path === '/' ? '' : $path);
             $urls[] = ['loc' => $en, 'en' => $en, 'fr' => $fr];

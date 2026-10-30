@@ -77,14 +77,18 @@
         </div>
     </section>
 
+    {{-- Who we work with: each name opens its case study (App\Support\Work, lang work.cases.*.list_name) --}}
     <section class="band band-paper" id="work" aria-labelledby="work-title">
         <div class="container split">
             <h2 class="band-title" id="work-title">{{ __('pages.home.work_title') }}</h2>
-            <ul class="names">
-                @foreach (__('pages.home.work') as $name)
-                    <li>{{ $name }}</li>
-                @endforeach
-            </ul>
+            <div>
+                <ul class="names">
+                    @foreach (array_keys(\App\Support\Work::CASES) as $slug)
+                        <li><a href="{{ route('work.show', ['slug' => $slug]) }}">{{ __('work.cases.' . $slug . '.list_name') }}</a></li>
+                    @endforeach
+                </ul>
+                <p class="band-link"><a href="{{ route('work') }}">{{ __('work.home_link') }}</a></p>
+            </div>
         </div>
     </section>
 

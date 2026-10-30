@@ -46,7 +46,7 @@ class PageController extends Controller
         return response($body, 200, ['Content-Type' => 'text/plain; charset=UTF-8']);
     }
 
-    /** Every page in both languages with its hreflang pair, then the published Insights articles (App\Support\Sitemap). */
+    /** Every page and case study in both languages with its hreflang pair, then the published Insights articles (App\Support\Sitemap). */
     public function sitemap(HqApi $api): Response
     {
         return response()->view('seo.sitemap', ['urls' => Sitemap::entries($api)], 200, ['Content-Type' => 'application/xml; charset=UTF-8']);

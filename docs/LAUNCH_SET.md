@@ -50,7 +50,7 @@ pages. The cost report and Insights articles keep their stored language (article
 
 ## 2. Must not break (the domain switch)
 
-- **301s** from old paths: `/about` → `/company`, `/trust-center` → `/security`, `/portfolio` → `/#work`,
+- **301s** from old paths: `/about` → `/company`, `/trust-center` → `/security`, `/portfolio` → `/work` (the proof pages since PR4; `/#work` before),
   `/framework` → `/services#method`, the old calculator at `/` keeps a link from the home page; the legacy HQ and
   portal paths (`/hq/*`, `/client/*`, `/portal/*`, `/signoff/*`, `/verify/*`, `/taskforce/*`) redirect to
   `hq.` / `portal.` exactly as `praxis_core` does today (`App\Support\Hosts::LEGACY_PATTERN`); `www.` → apex.
