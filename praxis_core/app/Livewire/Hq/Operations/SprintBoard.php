@@ -96,9 +96,10 @@ class SprintBoard extends Component
         $this->loadBoardData();
     }
 
-    // Triggers every 10 seconds via wire:poll in the UI
+    // Triggers every 10 seconds via wire:poll in the UI (and on switchSprint), so access is checked again here too
     public function loadBoardData()
     {
+        $this->authoriseBoard();
         if (!$this->activeSprintId) return;
 
         $rawTasks = DB::table('tasks')

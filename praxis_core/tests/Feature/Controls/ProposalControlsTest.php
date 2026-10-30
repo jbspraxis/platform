@@ -88,4 +88,17 @@ class ProposalControlsTest extends TestCase
         $this->assertEquals(['status' => 'Pending Auth'], json_decode($log[1]->old_values, true));
         $this->assertEquals(['status' => 'Draft'], json_decode($log[1]->new_values, true));
     }
+
+    public function test_unlocking_a_draft_changes_nothing(): void
+    {
+        $draft = $this->proposal('Draft', 'Draft scope (test)');
+        $token = DB::table('proposals')->where('id', $draft)->value('token_hash');
+        $this->actingAs($this->staff('sales', ['sales']));
+
+        Livewire::test(ProposalBuilder::class, ['id' => $draft])->call('unlockProposal')->assertSee('This proposal is already a draft.');
+
+        // Same signing link, and nothing in the audit log
+        $this->assertSame($token, DB::table('proposals')->where('id', $draft)->value('token_hash'));
+        $this->assertSame(0, DB::table('system_audit_logs')->where('target_table', 'proposals')->count());
+    }
 }

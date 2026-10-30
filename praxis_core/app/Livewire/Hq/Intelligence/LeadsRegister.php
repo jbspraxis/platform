@@ -165,9 +165,27 @@ class LeadsRegister extends Component
     {
         abort_unless(Auth::user()->can('crm.edit'), 403);
 
-        $userId = Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c';
-        DB::table('organizations')->where('id', $orgId)->whereIn('status', self::REGISTER_STATUSES)
-            ->update(['assigned_to' => $userId, 'updated_at' => now()]);
+        $userId = Auth::id();
+        $lead = DB::table('organizations')->where('id', $orgId)->whereIn('status', self::REGISTER_STATUSES)->first();
+
+        // Only a lead nobody owns yet ("Assign to me" is offered only for those): an owned lead can't be taken over
+        $claimed = $lead ? DB::table('organizations')->where('id', $lead->id)->whereIn('status', self::REGISTER_STATUSES)
+            ->whereNull('assigned_to')
+            ->update(['assigned_to' => $userId, 'updated_at' => now()]) : 0;
+
+        if ($claimed) {
+            DB::table('system_audit_logs')->insert([
+                'user_id' => $userId,
+                'action' => 'LEAD_CLAIMED',
+                'description' => "Took ownership of the lead {$lead->name}.",
+                'target_table' => 'organizations',
+                'target_id' => $lead->id,
+                'old_values' => json_encode(['assigned_to' => $lead->assigned_to]),
+                'new_values' => json_encode(['assigned_to' => $userId]),
+                'ip_address' => request()?->ip(),
+                'created_at' => now(),
+            ]);
+        }
         $this->loadLeads();
         if ($this->selectedLead && $this->selectedLead->org_id === $orgId) { $this->openDrawer($orgId); }
     }

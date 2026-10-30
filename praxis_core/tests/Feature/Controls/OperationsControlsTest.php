@@ -112,6 +112,18 @@ class OperationsControlsTest extends TestCase
         $this->assertNull(DB::table('tasks')->where('id', $this->openTask)->value('assigned_to'));
     }
 
+    public function test_an_open_board_stops_refreshing_once_access_ends(): void
+    {
+        $this->actingAs($this->engineer);
+        $refresh = Livewire::test(SprintBoard::class, ['id' => $this->ownProject]);
+        $switch = Livewire::test(SprintBoard::class, ['id' => $this->ownProject]);
+
+        DB::table('tasks')->where('id', $this->ownTask)->update(['assigned_to' => null]);
+
+        $refresh->call('loadBoardData')->assertForbidden();
+        $switch->call('switchSprint', (string) Str::uuid())->assertForbidden();
+    }
+
     public function test_the_qa_hub_lists_and_opens_only_tickets_the_person_may_see(): void
     {
         $this->actingAs($this->engineer);

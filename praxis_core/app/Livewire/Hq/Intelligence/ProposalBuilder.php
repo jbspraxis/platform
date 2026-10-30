@@ -536,11 +536,17 @@ class ProposalBuilder extends Component
             session()->flash('error', "This proposal can’t be unlocked because the client has already signed it.");
             return;
         }
+        // A draft stays as it is: no new signing link, nothing in the audit log
+        if ($status === 'Draft') {
+            $this->loadProposalData();
+            session()->flash('error', "This proposal is already a draft.");
+            return;
+        }
 
         // Back to draft: remove the HQ signature, any signature or code the client had started, and
         // replace the signing link (token_hash), so the link already sent can no longer be used.
-        // The status guard covers a client who signs between the check above and this update
-        $unlocked = DB::table('proposals')->where('id', $this->proposalId)->whereNotIn('status', ['Authorized', 'Converted'])->update([
+        // The status guard covers a client who signs (or someone else unlocks) between the check above and this update
+        $unlocked = DB::table('proposals')->where('id', $this->proposalId)->whereNotIn('status', ['Authorized', 'Converted', 'Draft'])->update([
             'status' => 'Draft',
             'token_hash' => 'TKN-' . strtoupper(Str::random(10)),
             'hq_signer_name' => null,

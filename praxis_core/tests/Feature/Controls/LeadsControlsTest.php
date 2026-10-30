@@ -13,7 +13,8 @@ use Tests\TestCase;
 
 /**
  * HQ → Leads: merging two assessments writes only the whitelisted columns (the browser can't name others),
- * the merge is in the audit log, and a lead only moves to one of the register's own stages.
+ * the merge is in the audit log, a lead only moves to one of the register's own stages, and a lead someone
+ * owns can't be taken over by another "Assign to me".
  * Runs on a throwaway MySQL database (see UsesThrowawayDatabase).
  */
 class LeadsControlsTest extends TestCase
@@ -102,5 +103,24 @@ class LeadsControlsTest extends TestCase
 
         Livewire::test(LeadsRegister::class)->call('updateStage', $this->orgId, 'Qualifying');
         $this->assertSame('Qualifying', DB::table('organizations')->where('id', $this->orgId)->value('pipeline_stage'));
+    }
+
+    public function test_a_lead_someone_owns_cannot_be_taken_over_and_claims_are_logged(): void
+    {
+        $first = $this->staff('sales', ['sales']);
+        $this->actingAs($first);
+        Livewire::test(LeadsRegister::class)->call('claimLead', $this->orgId);
+        $this->assertSame($first->id, DB::table('organizations')->where('id', $this->orgId)->value('assigned_to'));
+
+        // A colleague's "Assign to me" sent from an old page doesn't take it over
+        $this->actingAs($this->staff('sales2', ['sales']));
+        Livewire::test(LeadsRegister::class)->call('claimLead', $this->orgId);
+        $this->assertSame($first->id, DB::table('organizations')->where('id', $this->orgId)->value('assigned_to'));
+
+        $log = DB::table('system_audit_logs')->where('action', 'LEAD_CLAIMED')->get();
+        $this->assertCount(1, $log);
+        $this->assertSame($first->id, $log[0]->user_id);
+        $this->assertSame($this->orgId, $log[0]->target_id);
+        $this->assertEquals(['assigned_to' => $first->id], json_decode($log[0]->new_values, true));
     }
 }
