@@ -87,6 +87,7 @@ class InsightsPublishTest extends TestCase
             ->assertSet('confirmChange', 'publish')
             ->assertSee('Publish this article?')
             ->assertSee('‘Why month-end takes three weeks’')
+            ->assertSeeHtml('aria-describedby="kz-confirm-name kz-confirm-text" x-trap.noscroll="true"')
             ->call('publishArticle', $draft['id'])
             ->assertSet('confirmArticleId', null)
             ->assertSee('Published ‘Why month-end takes three weeks’. It appears on the website within 10 minutes.')
@@ -220,6 +221,30 @@ class InsightsPublishTest extends TestCase
 
         // Sales & Marketing holds kaizen.approve
         $this->ledger($this->staff('sales', ['sales']))->assertSet('canPublishKaizen', true)->assertSeeHtml('askArticleChange');
+
+        // HR has no kaizen.view, so it can't open an article in the reader either
+        Livewire::actingAs($this->staff('hr', ['hr']))->test(SignoffManager::class)
+            ->call('readArticle', $draft['id'])->assertForbidden();
+    }
+
+    public function test_a_draft_saved_without_a_slug_gets_one_when_published(): void
+    {
+        // As "Draft an Insights article" saves it: no slug, and the website lists an article only by its slug
+        $draft = $this->article('Draft', ['title' => 'Why the month-end close slips', 'slug' => null]);
+
+        $this->ledger($this->staff('partner', ['partner']))->call('publishArticle', $draft['id']);
+
+        $slug = $this->row($draft['id'])->slug;
+        $this->assertMatchesRegularExpression('/^why-the-month-end-close-slips-[A-Za-z0-9]{5}$/', (string) $slug);
+        $this->assertSame($slug, json_decode($this->audit('KAIZEN_ARTICLE_PUBLISHED', $draft['id'])->new_values, true)['slug']);
+        $this->assertContains($slug, $this->apiSlugs());
+        $this->siteGet("/kaizen/articles/{$slug}")->assertOk()->assertJsonPath('data.title', 'Why the month-end close slips');
+
+        // An article that already has one keeps it
+        $named = $this->article('Draft');
+        $this->ledger($this->staff('partner', ['partner']))->call('publishArticle', $named['id']);
+        $this->assertSame($named['slug'], $this->row($named['id'])->slug);
+        $this->assertArrayNotHasKey('slug', json_decode($this->audit('KAIZEN_ARTICLE_PUBLISHED', $named['id'])->new_values, true));
     }
 
     public function test_the_browser_cannot_change_the_locked_state(): void
@@ -280,6 +305,8 @@ class InsightsPublishTest extends TestCase
         $this->ledger($this->staff('partner', ['partner']))
             ->call('readArticle', $pending['id'])
             ->call('askArticleChange', $pending['id'], 'publish')
+            // Over the reader, only the reader locks the page's scroll (two locks closing together leave it locked)
+            ->assertSeeHtml('x-trap="true" style="max-width: 500px;"')
             ->call('dismissArticle')
             ->assertSet('confirmArticleId', null)
             ->assertSet('readingArticleId', $pending['id'])

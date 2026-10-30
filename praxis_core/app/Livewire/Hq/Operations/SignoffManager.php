@@ -401,6 +401,10 @@ class SignoffManager extends Component
         if ($change === 'publish' && empty($article?->published_at)) {
             $values['published_at'] = now();
         }
+        // Drafts saved from a sign-off have no slug, and the website lists an article only by its slug (made as in KaizenArticle::booted)
+        if ($change === 'publish' && $article && blank($article->slug)) {
+            $values['slug'] = (rtrim(Str::substr(Str::slug($article->title), 0, 80), '-') ?: 'insights-article') . '-' . Str::random(5);
+        }
 
         // Only from an allowed status, and only if nobody changed it a moment ago
         $changed = $article && in_array($article->status, $rule['from'], true)
@@ -417,7 +421,8 @@ class SignoffManager extends Component
                     'target_id' => $article->id,
                     'old_values' => json_encode(['status' => $article->status, 'is_public' => (bool) $article->is_public]),
                     'new_values' => json_encode(['status' => $rule['to'], 'is_public' => $change === 'publish']
-                        + (isset($values['published_at']) ? ['published_at' => $values['published_at']->toDateTimeString()] : [])),
+                        + (isset($values['published_at']) ? ['published_at' => $values['published_at']->toDateTimeString()] : [])
+                        + (isset($values['slug']) ? ['slug' => $values['slug']] : [])),
                     'ip_address' => request()?->ip(),
                     'created_at' => now(),
                 ]);

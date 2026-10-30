@@ -390,7 +390,7 @@
                                         <div class="empty-state">
                                             @if($kaizenStatusFilter !== '' && array_sum($kaizenCounts) > 0)
                                                 <strong>No articles with this status</strong>
-                                                None of the articles is “{{ $kaizenLabels[$kaizenStatusFilter] ?? $kaizenStatusFilter }}” right now.
+                                                None of the articles is ‘{{ $kaizenLabels[$kaizenStatusFilter] ?? $kaizenStatusFilter }}’ right now.
                                                 <div class="mt-4"><button type="button" wire:click="$set('kaizenStatusFilter', '')" class="btn btn-secondary btn-sm">Show all articles</button></div>
                                             @else
                                                 <strong>No Insights articles yet</strong>
@@ -465,10 +465,12 @@
 
                         @if($confirmArticle)
                             @php $publishing = $confirmChange === 'publish'; @endphp
+                            {{-- Over the reader, the reader already holds the page still: a second scroll lock would put back the
+                                 wrong state when both close together after a publish, and leave the page unable to scroll --}}
                             <div class="modal-backdrop">
-                                <div class="modal" role="dialog" aria-modal="true" aria-labelledby="kz-confirm-title" aria-describedby="kz-confirm-text" x-trap.noscroll="true" style="max-width: 500px;">
+                                <div class="modal" role="dialog" aria-modal="true" aria-labelledby="kz-confirm-title" aria-describedby="kz-confirm-name kz-confirm-text" x-trap{{ $readingArticle ? '' : '.noscroll' }}="true" style="max-width: 500px;">
                                     <h2 id="kz-confirm-title" class="modal-title">{{ $publishing ? 'Publish this article?' : 'Unpublish this article?' }}</h2>
-                                    <p class="kz-confirm-name">‘{{ $confirmArticle->title }}’</p>
+                                    <p id="kz-confirm-name" class="kz-confirm-name">‘{{ $confirmArticle->title }}’</p>
                                     <p id="kz-confirm-text" class="muted kz-confirm-text">
                                         {{ $publishing
                                             ? 'It appears on JBS Praxis Insights within 10 minutes, credited to JBS Praxis.'
