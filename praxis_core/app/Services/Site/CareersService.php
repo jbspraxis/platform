@@ -42,18 +42,7 @@ final class CareersService
         ];
     }
 
-    /** The old page's own messages (kept as they are there) */
-    public static function messages(): array
-    {
-        return [
-            'cv.required'   => 'ASSET UPLOAD REQUIRED: You must attach a dossier (PDF/DOC).',
-            'phone.required'    => 'COMM CHANNEL REQUIRED: Enter a valid phone number.',
-            'city.required'     => 'GEO-LOCATION REQUIRED: Select your current city.',
-            'other_skill.required_if' => 'SPECIFICATION REQUIRED: Define your unlisted discipline.',
-        ];
-    }
-
-    /** The same messages for the site API, in plain words and in the request's language */
+    /** The site API's messages for these fields, in plain words and in the request's language */
     public static function apiMessages(): array
     {
         return [
