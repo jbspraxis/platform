@@ -12,11 +12,12 @@ final class Sitemap
 
     /**
      * Every page in both languages with its hreflang pair, then the published Insights articles (English), on $root
-     * (default: this site's own address). It never fails because HQ is slow: then it lists the pages only.
+     * (default: this site's own address). It never fails because HQ is slow: then it lists the pages only, and calls
+     * $whenHqFails (site:indexnow says so).
      *
      * @return list<array{loc: string, en?: string, fr?: string}>
      */
-    public static function entries(HqApi $api, ?string $root = null): array
+    public static function entries(HqApi $api, ?string $root = null, ?callable $whenHqFails = null): array
     {
         $root = rtrim($root ?? url('/'), '/');
         $urls = [];
@@ -39,8 +40,11 @@ final class Sitemap
                     break;
                 }
             }
-        } catch (Throwable) {
-            // pages only
+        } catch (Throwable $e) {
+            // pages only (and the articles of the pages read before the failure)
+            if ($whenHqFails) {
+                $whenHqFails($e);
+            }
         }
 
         return $urls;

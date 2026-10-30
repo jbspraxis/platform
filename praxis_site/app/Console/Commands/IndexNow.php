@@ -45,7 +45,9 @@ class IndexNow extends Command
         $host = strtolower((string) config('site.indexnow.host'));
         $root = 'https://' . $host;
         $given = (array) $this->argument('urls');
-        $urls = $given === [] ? array_column(Sitemap::entries($api, $root), 'loc') : $this->onHost($given, $root, $host);
+        $urls = $given === []
+            ? array_column(Sitemap::entries($api, $root, fn () => $this->warn('The Insights could not be read from HQ: only the pages are listed.')), 'loc')
+            : $this->onHost($given, $root, $host);
         if ($urls === null) {
             return self::FAILURE;
         }

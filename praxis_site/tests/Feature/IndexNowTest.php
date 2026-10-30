@@ -83,6 +83,22 @@ class IndexNowTest extends TestCase
             && $r->header('Content-Type')[0] === 'application/json; charset=utf-8');
     }
 
+    public function test_the_pages_are_still_sent_when_hq_is_down_and_the_command_says_so(): void
+    {
+        config(['site.noindex' => false]);
+        $this->fakeHq(['kaizen/articles*' => $this->down()]);
+        Http::fake([self::ENDPOINT => Http::response('', 200)]);
+
+        $this->artisan('site:indexnow')
+            ->expectsOutputToContain('The Insights could not be read from HQ: only the pages are listed.')
+            ->expectsOutputToContain('Sent 22 addresses to IndexNow (200 OK).')
+            ->assertSuccessful();
+
+        $urls = $this->submitted()['urlList'];
+        $this->assertContains('https://jbspraxis.com/fr/privacy', $urls);
+        $this->assertSame([], preg_grep('~/kaizen/.~', $urls));
+    }
+
     public function test_given_paths_and_addresses_are_sent_as_they_are(): void
     {
         config(['site.noindex' => false]);

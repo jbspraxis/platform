@@ -74,7 +74,7 @@ class ProductionCachesTest extends TestCase
     {
         // After config:cache the .env file is no longer loaded: env() anywhere else would return null on the live site
         $files = Finder::create()->files()->name('*.php')->in([app_path(), base_path('routes'), base_path('bootstrap'), resource_path('views')])
-            ->notPath('cache');
+            ->notPath('#^cache/#');   // bootstrap/cache only
         $found = [];
         foreach ($files as $file) {
             if (preg_match('/(?<![\w>:$])env\s*\(/', $file->getContents())) {   // not ->env(), ::env() or $env(
