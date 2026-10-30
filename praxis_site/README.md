@@ -85,6 +85,13 @@ a file's type. When it is missing, `AppServiceProvider` loads `app/Support/Polyf
 `finfo`, `finfo_*()` and `mime_content_type()` backed by `App\Support\Polyfill\Finfo` (the same stand-in as
 HQ's). `tests/Feature/WithoutFileinfoTest.php` runs the CV check in a second PHP started without fileinfo.
 
+## Production caches
+
+`php artisan config:cache`, `route:cache` and `view:cache` all work: `tests/Feature/ProductionCachesTest.php`
+builds the three into a folder of its own and boots the site from them, and checks that `env()` is read only in
+`config/`. Once the configuration is cached the `.env` file is no longer read, so after any `.env` change on the
+server run `php artisan config:cache` again (or `config:clear`).
+
 ## Cloudflare Turnstile
 
 Off while `TURNSTILE_SITE_KEY` or `TURNSTILE_SECRET_KEY` is empty. With both set, every form shows the
