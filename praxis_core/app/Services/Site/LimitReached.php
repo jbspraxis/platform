@@ -6,8 +6,8 @@ use RuntimeException;
 
 /**
  * A visitor, an identity (an email address) or everyone together has used the allowance for an action
- * (App\Services\Site\SiteLimits). The site API answers 429 too_many with retry_after; the old Livewire
- * pages show their own message. Expected behaviour, so never reported as an error.
+ * (App\Services\Site\SiteLimits). The site API answers 429 too_many with retry_after.
+ * Expected behaviour, so never reported as an error.
  */
 final class LimitReached extends RuntimeException
 {

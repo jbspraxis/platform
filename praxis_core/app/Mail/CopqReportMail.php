@@ -7,7 +7,7 @@ use Illuminate\Mail\Mailables\Content;
 
 /**
  * Cost of poor quality report: the estimate and the private report link. Sent from the calculator on
- * jbspraxis.com (ConversionHub) or re-sent from HQ (Live consultation, $fromHq).
+ * jbspraxis.com (through the site API) or re-sent from HQ (Live consultation, $fromHq).
  */
 class CopqReportMail extends BrandedMail
 {

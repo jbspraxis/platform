@@ -5,7 +5,7 @@ namespace App\Mail;
 use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
 
-/** The team's copy of a website enquiry (ContactHub). Internal: English only, replies go to the visitor. */
+/** The team's copy of a website enquiry (the site's contact form, through the site API). Internal: English only, replies go to the visitor. */
 class EnquiryAlert extends BrandedMail
 {
     public $fullName;

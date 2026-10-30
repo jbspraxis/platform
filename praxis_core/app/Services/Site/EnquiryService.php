@@ -13,20 +13,19 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
- * The contact form: the old /contact page (ContactHub) and POST /enquiries on the site API.
- * Fields use the API names; FIELDS maps ContactHub's properties onto them.
+ * The contact form: POST /enquiries on the site API.
  * Limits (docs/SITE_API.md section 6.2): 3 an hour and 6 a day per visitor, 2 a day per email,
  * 60 an hour for everyone, on the old page's limiter key.
  */
 final class EnquiryService
 {
-    /** ContactHub property => API field */
+    /** The site API's fields (start_timing apart) */
     public const FIELDS = [
-        'fullName' => 'full_name', 'email' => 'email', 'companyName' => 'company_name', 'message' => 'message',
-        'title' => 'title', 'countryCode' => 'country_code', 'phone' => 'phone', 'city' => 'city',
-        'language' => 'language', 'budget' => 'budget',
-        'stage' => 'stage', 'bottleneck' => 'bottleneck', 'otherBottleneck' => 'other_bottleneck',
-        'techReality' => 'tech_reality', 'govStatus' => 'gov_status',
+        'full_name', 'email', 'company_name', 'message',
+        'title', 'country_code', 'phone', 'city',
+        'language', 'budget',
+        'stage', 'bottleneck', 'other_bottleneck',
+        'tech_reality', 'gov_status',
     ];
 
     /** "When would you like to start?" (new site only; replaces the budget): stored value => label in HQ */
@@ -65,13 +64,13 @@ final class EnquiryService
         return $rules;
     }
 
-    /** The site API's rules: the form's, plus the optional start question the old page doesn't ask */
+    /** The site API's rules: the form's, plus the optional start question (the old page didn't ask it) */
     public static function apiRules(bool $diagnostic, $bottleneck): array
     {
         return self::rules($diagnostic, $bottleneck) + ['start_timing' => 'nullable|string|in:' . implode(',', array_keys(self::START_TIMINGS))];
     }
 
-    /** What the form starts with on the old page: the Nigerian code, and the language of the page */
+    /** What a field the visitor left empty becomes, as the old form started: the Nigerian code, and the request's language */
     public static function defaults(): array
     {
         return [

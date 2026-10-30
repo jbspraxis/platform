@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * The website's limits (docs/SITE_API.md section 6.2; numbers in config/site_api.php 'limits').
- * Both callers, the old Livewire pages and the site API, go through here with the same limiter keys,
- * so a visitor never gets two budgets.
+ * The site API goes through here on the limiter keys the old Livewire pages used, so counts carried
+ * over when the site moved.
  *
  *   SiteLimits::visitor($ip)                       the IPv4 address, or the IPv6 /64 network
  *   SiteLimits::check('enquiry', $ip, ['email' => $email])   throws LimitReached when any allowance is used
@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\RateLimiter;
  */
 final class SiteLimits
 {
-    /** The limiter key prefix of each action: the old pages' own keys, kept so both callers share them */
+    /** The limiter key prefix of each action: the old pages' own keys, kept as they were */
     private const PREFIX = [
         'enquiry' => 'contact-form', 'booking' => 'booking', 'assessment' => 'copq-report', 'kaizen' => 'kaizen-submit',
         'feedback' => 'feedback', 'careers' => 'careers', 'method_pdf' => 'whitepaper-mail', 'chat' => 'ai-agent',
