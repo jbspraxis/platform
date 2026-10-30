@@ -11,7 +11,7 @@ return [
 
     'privacy' => [
         'title' => 'Privacy policy | JBS Praxis',
-        'description' => 'How JBS Praxis collects, uses, shares and protects personal data on jbspraxis.com, in the client portal and in its work in Nigeria and Cameroon, and your rights under the NDPA and Cameroonian law.',
+        'description' => 'How JBS Praxis collects, uses, shares and protects personal data in Nigeria and Cameroon, and your rights under the NDPA and Cameroonian law.',
         'eyebrow' => 'Privacy',
         'h1' => 'Privacy policy',
         'lead' => 'How we collect, use, share and protect personal data on this website, in our client portal and in our work for clients in Nigeria and Cameroon.',
@@ -81,8 +81,8 @@ return [
                 'What you report, its category and how much it affects you; your name and email address only if you choose to give them. We use it to fix and improve the website.',
 
                 ['heading' => 'Praxis AI, the website assistant'],
-                'The questions you ask and the answers you receive. The conversation is kept in your session on our website’s server (the last 20 exchanges) so the assistant can follow it, and it ends with your visit. We don’t save it in our client records.',
-                'To answer, our system sends your latest exchanges (12 at most), with our instructions, to Google’s Gemini. If Gemini is busy or doesn’t answer, it sends them to DeepSeek instead. We don’t send your name, email address or IP address with them. Please don’t share personal, financial or confidential details in the chat.',
+                'The questions you ask and the answers you receive. The conversation is kept in your session on our website’s server (its last 20 messages) so the assistant can follow it, and it ends with your visit. We don’t save it in our client records.',
+                'To answer, our system sends the latest messages of the conversation (12 at most), with our instructions, to Google’s Gemini. If Gemini is busy or doesn’t answer, it sends them to DeepSeek instead. We don’t send your name, email address or IP address with them. Please don’t share personal, financial or confidential details in the chat.',
 
                 ['heading' => 'Emails from us'],
                 'If you are in our client records (because you contacted us, booked an audit, used the calculator, wrote for Insights or work with us), we may send you occasional emails about our work and our articles. Every one has an unsubscribe link: follow it, confirm, and we stop.',
@@ -134,8 +134,9 @@ return [
                 'We may also share personal data when the law requires it (for example, with a court or a regulator), to protect our rights or someone’s safety, or with professional advisers bound by confidentiality. If JBS Praxis is reorganised or its business passes to another company, your data would pass with it, under the commitments in this policy.',
             ]],
 
-            'transfers' => ['title' => 'Transfers outside Nigeria and Cameroon', 'body' => [
-                'Some of these providers handle data outside Nigeria and Cameroon:',
+            'transfers' => ['title' => 'International transfers', 'body' => [
+                'Our team in Nigeria and our team in Cameroon work in the same systems, so data about a person in one country may be seen from the other.',
+                'Some of our providers also handle data outside Nigeria and Cameroon:',
                 ['items' => [
                     'Google, in the United States and the other countries where it operates.',
                     'DeepSeek, in China.',

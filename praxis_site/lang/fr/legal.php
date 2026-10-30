@@ -7,7 +7,7 @@ return [
 
     'privacy' => [
         'title' => 'Politique de confidentialité | JBS Praxis',
-        'description' => 'Comment JBS Praxis collecte, utilise, partage et protège les données personnelles sur jbspraxis.com, dans le portail client et dans ses missions au Nigeria et au Cameroun, et vos droits selon la NDPA et la loi camerounaise.',
+        'description' => 'Comment JBS Praxis collecte, utilise, partage et protège les données personnelles au Nigeria et au Cameroun, et vos droits selon la NDPA et la loi camerounaise.',
         'eyebrow' => 'Confidentialité',
         'h1' => 'Politique de confidentialité',
         'lead' => 'Comment nous collectons, utilisons, partageons et protégeons les données personnelles sur ce site, dans notre portail client et dans nos missions pour nos clients au Nigeria et au Cameroun.',
@@ -77,8 +77,8 @@ return [
                 'Ce que vous signalez, sa catégorie et la gêne occasionnée ; vos nom et adresse e-mail seulement si vous choisissez de les donner. Nous les utilisons pour corriger et améliorer le site.',
 
                 ['heading' => 'Praxis AI, l’assistant du site'],
-                'Les questions que vous posez et les réponses que vous recevez. La conversation est conservée dans votre session, sur le serveur de notre site (les 20 derniers échanges), pour que l’assistant puisse la suivre, et elle prend fin avec votre visite. Nous ne l’enregistrons pas dans nos fichiers clients.',
-                'Pour répondre, notre système transmet vos derniers échanges (12 au plus), avec nos instructions, à Gemini, de Google. Si Gemini est saturé ou ne répond pas, il les transmet à DeepSeek. Nous n’y joignons ni votre nom, ni votre adresse e-mail, ni votre adresse IP. Merci de ne communiquer dans la conversation aucune donnée personnelle, financière ou confidentielle.',
+                'Les questions que vous posez et les réponses que vous recevez. La conversation est conservée dans votre session, sur le serveur de notre site (ses 20 derniers messages), pour que l’assistant puisse la suivre, et elle prend fin avec votre visite. Nous ne l’enregistrons pas dans nos fichiers clients.',
+                'Pour répondre, notre système transmet les derniers messages de la conversation (12 au plus), avec nos instructions, à Gemini, de Google. Si Gemini est saturé ou ne répond pas, il les transmet à DeepSeek. Nous n’y joignons ni votre nom, ni votre adresse e-mail, ni votre adresse IP. Merci de ne communiquer dans la conversation aucune donnée personnelle, financière ou confidentielle.',
 
                 ['heading' => 'Nos e-mails'],
                 'Si vous figurez dans nos fichiers clients (parce que vous nous avez contactés, avez réservé un audit, utilisé le calculateur, écrit pour Insights ou travaillez avec nous), nous pouvons vous envoyer de temps à autre des e-mails sur nos travaux et nos articles. Chacun contient un lien de désabonnement : suivez-le, confirmez, et nous arrêtons.',
@@ -130,8 +130,9 @@ return [
                 'Nous pouvons aussi communiquer des données personnelles lorsque la loi l’exige (par exemple à un tribunal ou à une autorité de contrôle), pour protéger nos droits ou la sécurité d’une personne, ou à des conseils professionnels tenus au secret. Si JBS Praxis est réorganisée ou si son activité est reprise par une autre société, vos données seraient transmises avec elle, dans le respect des engagements de cette politique.',
             ]],
 
-            'transfers' => ['title' => 'Transferts hors du Nigeria et du Cameroun', 'body' => [
-                'Certains de ces prestataires traitent des données hors du Nigeria et du Cameroun :',
+            'transfers' => ['title' => 'Transferts internationaux', 'body' => [
+                'Notre équipe au Nigeria et notre équipe au Cameroun travaillent dans les mêmes systèmes : les données d’une personne située dans l’un des deux pays peuvent donc être consultées depuis l’autre.',
+                'Certains de nos prestataires traitent aussi des données hors du Nigeria et du Cameroun :',
                 ['items' => [
                     'Google, aux États-Unis et dans les autres pays où il est présent.',
                     'DeepSeek, en Chine.',
