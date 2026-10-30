@@ -1,0 +1,14 @@
+{
+  "name": "jbs-praxis-demo-pipeline",
+  "private": true,
+  "description": "Records, voices and edits the JBS Praxis demo videos (A morning with the COO). Reproducible: every step is a script.",
+  "type": "commonjs",
+  "scripts": {
+    "record": "node record/record.js",
+    "voice": "node voice/tts.js",
+    "edit": "node edit/edit.js"
+  },
+  "dependencies": {
+    "playwright-core": "1.56.1"
+  }
+}

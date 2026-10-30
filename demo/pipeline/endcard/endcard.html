@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>End card</title>
+<style>
+  /* Brand kit fonts (self-hosted copies of the site's files). */
+  @font-face { font-family: "Newsreader"; src: url(fonts/newsreader-latin.woff2) format("woff2"); font-weight: 200 800; font-display: block;
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: "Newsreader"; src: url(fonts/newsreader-latin-ext.woff2) format("woff2"); font-weight: 200 800; font-display: block;
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  @font-face { font-family: "Plus Jakarta Sans"; src: url(fonts/plus-jakarta-sans-latin.woff2) format("woff2"); font-weight: 200 800; font-display: block;
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: "Plus Jakarta Sans"; src: url(fonts/plus-jakarta-sans-latin-ext.woff2) format("woff2"); font-weight: 200 800; font-display: block;
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
+  :root {
+    --ink: #0C142B; --slate: #4A5468; --muted: #5E6679; --mist: #F2F5F7;
+    --teal: #0C8B9B; --deep-teal: #08707C;
+    --motion-fade: 150ms; --motion-story: 1200ms; --ease-settle: cubic-bezier(0.2, 0, 0, 1);
+  }
+  html, body { margin: 0; height: 100%; background: var(--mist); }
+  body { font-family: "Plus Jakarta Sans", "Segoe UI", Arial, sans-serif; color: var(--ink);
+    -webkit-font-smoothing: antialiased; }
+  .card { position: absolute; inset: 0; padding: 0 160px; display: flex; flex-direction: column; justify-content: center; }
+  .logo { position: absolute; left: 160px; top: 96px; height: 44px; }
+  .logo img { height: 100%; display: block; }
+  h1 { font-family: "Newsreader", Georgia, serif; font-weight: 400; font-size: 76px; line-height: 84px;
+    letter-spacing: -0.01em; font-optical-sizing: auto; margin: 0; opacity: 0;
+    animation: fade var(--motion-fade) linear 400ms forwards; }
+  /* The Praxis rule (BRAND.md §9, "the moment"): one 2px rule, Ink left of the split and Teal
+     right of it, drawn left to right once with stroke-dashoffset, --motion-story, --ease-settle.
+     The gradient is fixed in user space, so the colours stay put while the line draws. */
+  .rule { display: block; width: 760px; height: 2px; margin: 36px 0 32px; overflow: visible; }
+  .rule line { stroke-dasharray: 760; stroke-dashoffset: 760;
+    animation: draw var(--motion-story) var(--ease-settle) 550ms forwards; }
+  p.support { font-size: 26px; line-height: 38px; color: var(--slate); max-width: 760px; margin: 0 0 48px; }
+  .cta { display: flex; align-items: center; gap: 32px; }
+  .button { background: var(--deep-teal); color: #fff; font-weight: 500; font-size: 20px; line-height: 24px;
+    padding: 18px 28px; border-radius: 4px; }
+  .url { font-weight: 500; font-size: 22px; color: var(--ink); }
+  .note { position: absolute; left: 160px; bottom: 64px; font-size: 20px; line-height: 28px; color: var(--muted); }
+  @keyframes fade { to { opacity: 1; } }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo"><img src="../../../brand/kit/logo/jbs-praxis-horizontal-colour.svg" alt="JBS Praxis"></div>
+    <h1>Ask your company anything.</h1>
+    <svg class="rule" viewBox="0 0 760 2" aria-hidden="true">
+      <defs><linearGradient id="split" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="760" y2="0">
+        <stop offset="0.56" stop-color="#0C142B"/><stop offset="0.56" stop-color="#0C8B9B"/>
+      </linearGradient></defs>
+      <line x1="0" y1="1" x2="760" y2="1" stroke="url(#split)" stroke-width="2" stroke-linecap="butt"/>
+    </svg>
+    <p class="support">We design how your organisation runs, then build the system that answers for it.</p>
+    <div class="cta"><span class="button">Book a free audit and demo</span><span class="url">jbspraxis.com</span></div>
+    <div class="note">Built by JBS Praxis</div>
+  </div>
+  <script>
+    document.fonts.ready.then(() => { window.__ndaliReady = true; });
+  </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+# Large media stays out of git; commit scripts, texts and small files only (runbook section 8).
+node_modules/
+captures/
+work/
+*.mp4
+*.mov
+*.mkv
+*.wav
+*.flac
+*.png
+!youtube/thumbnail-*.png
+*.jpg
+!hero-60s-poster.jpg
+*.xlsx
+.env

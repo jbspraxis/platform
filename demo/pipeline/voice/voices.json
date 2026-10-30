@@ -1,0 +1,15 @@
+{
+  "about": "The one place voices are chosen (owner's decision, 30 October 2026: open-source voices instead of Azure; English idera, French Kokoro siwis, credits only). To swap the temporary French voice for a West or Central African French voice later, change fr (engine, voice, script), regenerate the French lines and run the edit again.",
+  "en": {
+    "engine": "YarnGPT2b (Apache-2.0) with the WavTokenizer decoder (MIT)",
+    "voice": "idera",
+    "script": "voice/yarn.py"
+  },
+  "fr": {
+    "engine": "Kokoro-82M (Apache-2.0)",
+    "voice": "ff_siwis",
+    "script": "voice/kokoro_fr.py",
+    "temporary": true,
+    "credit": "French voice trained on the SIWIS French speech synthesis database (CC BY 4.0)."
+  }
+}

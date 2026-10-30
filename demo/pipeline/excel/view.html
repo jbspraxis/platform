@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Excel view</title>
+<style>
+  /* The real Excel window capture, cropped to the sheet (from the formula bar down; the title bar
+     with the account name is already cut off by capture-excel.ps1). The recorder frames it. */
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #FFFFFF; }
+  .sheet { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px;
+    background: url("../../work/excel/projects.png") no-repeat; background-position: 0 0; }
+</style>
+</head>
+<body>
+  <div class="sheet" role="img" aria-label="The exported workbook open in Excel"></div>
+  <script>
+    const img = new Image();
+    img.onload = () => { window.__ndaliReady = true; };
+    img.src = "../../work/excel/projects.png";
+  </script>
+</body>
+</html>

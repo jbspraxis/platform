@@ -1,0 +1,30 @@
+{
+  "id": "60s",
+  "duration": 61.0,
+  "segments": [
+    { "clip": "s1", "from": 0, "to": 6.0 },
+    { "clip": "s2", "from": 0, "to": 11.0 },
+    { "clip": "s3", "from": 0, "to": 9.3 },
+    { "clip": "excel", "from": 0, "to": 2.9, "xfade": 0.2 },
+    { "clip": "s4", "from": 0, "to": 8.0 },
+    { "clip": "s5", "from": 0, "to": 9.0 },
+    { "clip": "s6", "from": 0, "to": 8.16 },
+    { "clip": "endcard", "from": 0, "to": 7.16, "xfade": 0.32 }
+  ],
+  "captions": [
+    { "id": "c1", "in": 1.0, "out": 4.6, "time": "07:45", "text": "Before you ask, the brief is ready" },
+    { "id": "c2", "in": 11.8, "out": 15.2, "time": "08:15", "text": "People and approvals, in one answer" },
+    { "id": "c3", "in": 21.2, "out": 28.6, "time": "08:22", "text": "Projects and money, with the evidence" },
+    { "id": "c4a", "in": 29.2, "out": 30.3, "time": "08:31", "text": "A sales associate’s account" },
+    { "id": "c4b", "in": 34.4, "out": 36.9, "time": "08:31", "text": "Security by role, enforced" },
+    { "id": "c5", "in": 42.3, "out": 45.8, "time": "08:38", "text": "From question to action" },
+    { "id": "c6", "in": 47.0, "out": 49.8, "time": "08:44", "text": "Work done, not just answered" }
+  ],
+  "poster_at": 0.95,
+  "outputs": {
+    "loop": "hero-60s-loop.mp4",
+    "poster": "hero-60s-poster.jpg",
+    "en": "demo-60s-en.mp4",
+    "fr": "demo-60s-fr.mp4"
+  }
+}

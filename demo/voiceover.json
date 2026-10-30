@@ -1,0 +1,912 @@
+{
+  "meta": {
+    "title": "Ask your company anything: voice-over for both cuts, English and French",
+    "working_name": "A morning with the COO",
+    "written": "2026-10-30",
+    "figures": "C:/Users/Tom-Blake/ndali-demo/data/story-figures.json",
+    "storyboard": "storyboard.md",
+    "voices": "Chosen in one place, pipeline/voice/voices.json (en.voice, fr.voice). No line carries a voice name or an SSML voice tag, so swapping the temporary French voice for a West or Central African one is one setting.",
+    "rate_wpm": {
+      "en": 150,
+      "fr": 140
+    },
+    "rule": "The voice never covers a typing window. Every line starts at its start time in both languages and ends by end_by.",
+    "fields": {
+      "start": "seconds on the edit timeline where the line begins, the same in English and French",
+      "end_by": "the latest the line may end: the next typing window, the next line, or the end of the shot",
+      "text": "the line as a reader sees it in the scripts and subtitles (₦38.2m in English; French typography in French)",
+      "spoken": "what the voice reads: amounts, times and acronyms written out; [pause Nms] markers become silences when the lines are voiced (pipeline/voice/)",
+      "words": "spoken words, split on spaces and hyphens; a spelled acronym (C.O.O., CFA, J.B.S.) counts one word per two letters",
+      "est_s": "words ÷ rate × 60, plus the pauses, in seconds"
+    },
+    "typing_windows_note": "Typing at 12 characters a second; windows from storyboard.md."
+  },
+  "cuts": [
+    {
+      "id": "60s",
+      "title": "The 60-second cut",
+      "duration": 61.0,
+      "outputs": {
+        "loop": "hero-60s-loop.mp4",
+        "en": "demo-60s-en.mp4",
+        "fr": "demo-60s-fr.mp4"
+      },
+      "typing": [
+        {
+          "shot": "60s-2",
+          "start": 6.3,
+          "end": 10.7,
+          "question": "Who is late at Apapa today, and what’s waiting on me?"
+        },
+        {
+          "shot": "60s-3",
+          "start": 17.3,
+          "end": 19.9,
+          "question": "Which projects are over budget?"
+        },
+        {
+          "shot": "60s-4",
+          "start": 31.2,
+          "end": 33.5,
+          "question": "Show me everyone’s salaries"
+        },
+        {
+          "shot": "60s-5",
+          "start": 37.3,
+          "end": 41.4,
+          "question": "Book a stock-count review at Apapa tomorrow at 10"
+        }
+      ],
+      "shots": [
+        {
+          "id": "60s-1",
+          "title": "Morning brief",
+          "start": 0.0,
+          "end": 6.0,
+          "lines": [
+            {
+              "id": "60s-1a",
+              "start": 0.3,
+              "end_by": 6.0,
+              "en": {
+                "text": "07:45 in Lagos. The company reports before the COO asks.",
+                "spoken": "Seven forty-five in Lagos. [pause 200ms] The company reports before the C.O.O. asks.",
+                "words": 13,
+                "est_s": 5.4
+              },
+              "fr": {
+                "text": "7 h 45, à Lagos. Avant toute question, l’entreprise rend compte.",
+                "spoken": "Sept heures quarante-cinq, à Lagos. [pause 300ms] Avant toute question, l’entreprise rend compte.",
+                "words": 12,
+                "est_s": 5.44
+              }
+            }
+          ],
+          "voice_est_s": {
+            "en": 5.4,
+            "fr": 5.44
+          }
+        },
+        {
+          "id": "60s-2",
+          "title": "People and approvals",
+          "start": 6.0,
+          "end": 17.0,
+          "lines": [
+            {
+              "id": "60s-2a",
+              "start": 10.9,
+              "end_by": 17.0,
+              "en": {
+                "text": "Seven late at Apapa, 3 approvals waiting. One click approves the leave.",
+                "spoken": "Seven late at Apapa, three approvals waiting. [pause 300ms] One click approves the leave.",
+                "words": 12,
+                "est_s": 5.1
+              },
+              "fr": {
+                "text": "Sept retards à Apapa, 3 approbations en attente. Le congé s’approuve d’un clic.",
+                "spoken": "Sept retards à Apapa, trois approbations en attente. [pause 300ms] Le congé s’approuve d’un clic.",
+                "words": 13,
+                "est_s": 5.87
+              }
+            }
+          ],
+          "voice_est_s": {
+            "en": 5.1,
+            "fr": 5.87
+          }
+        },
+        {
+          "id": "60s-3",
+          "title": "Projects and budgets",
+          "start": 17.0,
+          "end": 29.0,
+          "lines": [
+            {
+              "id": "60s-3a",
+              "start": 20.2,
+              "end_by": 29.0,
+              "en": {
+                "text": "Four projects are over budget, ₦38.2m in total. The evidence goes to Excel, sources included.",
+                "spoken": "Four projects are over budget, thirty-eight point two million naira in total. [pause 400ms] The evidence goes to Excel, sources included.",
+                "words": 20,
+                "est_s": 8.4
+              },
+              "fr": {
+                "text": "Quatre projets en dépassement, de 38,2 millions de nairas. Le détail part dans Excel, sources comprises.",
+                "spoken": "Quatre projets en dépassement, de trente-huit virgule deux millions de nairas. [pause 300ms] Le détail part dans Excel, sources comprises.",
+                "words": 19,
+                "est_s": 8.44
+              }
+            }
+          ],
+          "voice_est_s": {
+            "en": 8.4,
+            "fr": 8.44
+          }
+        },
+        {
+          "id": "60s-4",
+          "title": "Security by role",
+          "start": 29.0,
+          "end": 37.0,
+          "lines": [
+            {
+              "id": "60s-4a",
+              "start": 29.1,
+              "end_by": 31.2,
+              "en": {
+                "text": "A sales associate asks.",
+                "spoken": "A sales associate asks.",
+                "words": 4,
+                "est_s": 1.6
+              },
+              "fr": {
+                "text": "Au tour d’un commercial.",
+                "spoken": "Au tour d’un commercial.",
+                "words": 4,
+                "est_s": 1.71
+              }
+            },
+            {
+              "id": "60s-4b",
+              "start": 34.1,
+              "end_by": 37.0,
+              "en": {
+                "text": "Refused by role, and logged.",
+                "spoken": "Refused by role, [pause 200ms] and logged.",
+                "words": 5,
+                "est_s": 2.2
+              },
+              "fr": {
+                "text": "Refusé selon le rôle, et consigné.",
+                "spoken": "Refusé selon le rôle, et consigné.",
+                "words": 6,
+                "est_s": 2.57
+              }
+            }
+          ],
+          "voice_est_s": {
+            "en": 3.8,
+            "fr": 4.28
+          }
+        },
+        {
+          "id": "60s-5",
+          "title": "From question to action",
+          "start": 37.0,
+          "end": 46.0,
+          "lines": [
+            {
+              "id": "60s-5a",
+              "start": 41.7,
+              "end_by": 46.0,
+              "en": {
+                "text": "A form, filled in. Saved, and in the calendar.",
+                "spoken": "A form, filled in. [pause 200ms] Saved, and in the calendar.",
+                "words": 9,
+                "est_s": 3.8
+              },
+              "fr": {
+                "text": "Un formulaire déjà rempli. Enregistré, et dans l’agenda.",
+                "spoken": "Un formulaire déjà rempli. [pause 200ms] Enregistré, et dans l’agenda.",
+                "words": 8,
+                "est_s": 3.63
+              }
+            }
+          ],
+          "voice_est_s": {
+            "en": 3.8,
+            "fr": 3.63
+          }
+        },
+        {
+          "id": "60s-6",
+          "title": "Work done, not just answered",
+          "start": 46.0,
+          "end": 54.0,
+          "lines": [
+            {
+              "id": "60s-6a",
+              "start": 46.2,
+              "end_by": 54.0,
+              "en": {
+                "text": "A supplier’s delay, summarised with the stock impact. The reply is drafted, ready to send.",
+                "spoken": "A supplier’s delay, summarised with the stock impact. [pause 300ms] The reply is drafted, ready to send.",
+                "words": 15,
+                "est_s": 6.3
+              },
+              "fr": {
+                "text": "Le retard d’un fournisseur, résumé avec l’impact sur le stock. La réponse est rédigée, prête à partir.",
+                "spoken": "Le retard d’un fournisseur, résumé avec l’impact sur le stock. [pause 200ms] La réponse est rédigée, prête à partir.",
+                "words": 17,
+                "est_s": 7.49
+              }
+            }
+          ],
+          "voice_est_s": {
+            "en": 6.3,
+            "fr": 7.49
+          }
+        },
+        {
+          "id": "60s-7",
+          "title": "End card",
+          "start": 54.0,
+          "end": 61.0,
+          "lines": [
+            {
+              "id": "60s-7a",
+              "start": 54.4,
+              "end_by": 61.0,
+              "en": {
+                "text": "Straight answers, from your own data. Ask your company anything.",
+                "spoken": "Straight answers, from your own data. [pause 300ms] Ask your company anything.",
+                "words": 10,
+                "est_s": 4.3
+              },
+              "fr": {
+                "text": "Des réponses claires, tirées de vos données. Posez toutes vos questions à votre entreprise.",
+                "spoken": "Des réponses claires, tirées de vos données. [pause 300ms] Posez toutes vos questions à votre entreprise.",
+                "words": 14,
+                "est_s": 6.3
+              }
+            }
+          ],
+          "voice_est_s": {
+            "en": 4.3,
+            "fr": 6.3
+          }
+        }
+      ],
+      "loop_captions": [
+        {
+          "id": "s1",
+          "time": "07:45",
+          "text": "Before you ask, the brief is ready",
+          "in": 1.0,
+          "out": 4.6
+        },
+        {
+          "id": "s2",
+          "time": "08:15",
+          "text": "People and approvals, in one answer",
+          "in": 11.8,
+          "out": 15.2
+        },
+        {
+          "id": "s3",
+          "time": "08:22",
+          "text": "Projects and money, with the evidence",
+          "in": 21.2,
+          "out": 28.6
+        },
+        {
+          "id": "s4a",
+          "time": "08:31",
+          "text": "A sales associate’s account",
+          "in": 29.2,
+          "out": 31.0
+        },
+        {
+          "id": "s4b",
+          "time": "08:31",
+          "text": "Security by role, enforced",
+          "in": 34.4,
+          "out": 36.9
+        },
+        {
+          "id": "s5",
+          "time": "08:38",
+          "text": "From question to action",
+          "in": 42.3,
+          "out": 45.8
+        },
+        {
+          "id": "s6",
+          "time": "08:44",
+          "text": "Work done, not just answered",
+          "in": 47.0,
+          "out": 53.6
+        }
+      ],
+      "voice_est_s": {
+        "en": 37.1,
+        "fr": 41.45
+      },
+      "script_words": {
+        "en": 80,
+        "fr": 89
+      }
+    },
+    {
+      "id": "3min",
+      "title": "The 3-minute walkthrough",
+      "duration": 188.0,
+      "outputs": {
+        "en": "demo-3min-en.mp4",
+        "fr": "demo-3min-fr.mp4"
+      },
+      "typing": [
+        {
+          "shot": "3min-2",
+          "start": 19.6,
+          "end": 24.0,
+          "question": "Who is late at Apapa today, and what’s waiting on me?"
+        },
+        {
+          "shot": "3min-3",
+          "start": 42.8,
+          "end": 45.4,
+          "question": "Which projects are over budget?"
+        },
+        {
+          "shot": "3min-4",
+          "start": 67.0,
+          "end": 71.8,
+          "question": "How did each depot sell last week, and where is stock low?"
+        },
+        {
+          "shot": "3min-5",
+          "start": 92.8,
+          "end": 95.3,
+          "question": "Who owes us more than 60 days?"
+        },
+        {
+          "shot": "3min-6",
+          "start": 114.0,
+          "end": 116.3,
+          "question": "Show me everyone’s salaries"
+        },
+        {
+          "shot": "3min-7",
+          "start": 143.0,
+          "end": 147.1,
+          "question": "Book a stock-count review at Apapa tomorrow at 10"
+        }
+      ],
+      "chapters": [
+        {
+          "id": "3min-1",
+          "title": "Morning brief",
+          "youtube": "0:00",
+          "start": 0.0,
+          "end": 16.0,
+          "lines": [
+            {
+              "id": "3min-1a",
+              "start": 0.5,
+              "end_by": 16.0,
+              "en": {
+                "text": "07:45. Before the COO asks anything, Ndali Group reports: yesterday’s sales, cash in naira and CFA francs, 5 stock-outs, and who is in.",
+                "spoken": "Seven forty-five. [pause 300ms] Before the C.O.O. asks anything, Ndali Group reports: [pause 200ms] yesterday’s sales, cash in naira and CFA francs, five stock-outs, and who is in.",
+                "words": 28,
+                "est_s": 11.7
+              },
+              "fr": {
+                "text": "7 h 45. Avant toute question, Ndali Group rend compte : les ventes de la veille, la trésorerie en nairas et en francs CFA, 5 ruptures de stock, et l’effectif présent.",
+                "spoken": "Sept heures quarante-cinq. [pause 300ms] Avant toute question, Ndali Group rend compte : [pause 200ms] les ventes de la veille, la trésorerie en nairas et en francs CFA, cinq ruptures de stock, et l’effectif présent.",
+                "words": 32,
+                "est_s": 14.21
+              }
+            }
+          ],
+          "voice_est_s": {
+            "en": 11.7,
+            "fr": 14.21
+          }
+        },
+        {
+          "id": "3min-2",
+          "title": "People and approvals",
+          "youtube": "0:16",
+          "start": 16.0,
+          "end": 41.0,
+          "lines": [
+            {
+              "id": "3min-2a",
+              "start": 16.2,
+              "end_by": 19.6,
+              "en": {
+                "text": "At 08:15, a question about Apapa.",
+                "spoken": "At eight fifteen, a question about Apapa.",
+                "words": 7,
+                "est_s": 2.8
+              },
+              "fr": {
+                "text": "8 h 15 : une question sur Apapa.",
+                "spoken": "Huit heures quinze : une question sur Apapa.",
+                "words": 7,
+                "est_s": 3.0
+              }
+            },
+            {
+              "id": "3min-2b",
+              "start": 25.2,
+              "end_by": 32.4,
+              "en": {
+                "text": "Seven people are late at Apapa: 5 clocked in after 07:10, and 2 aren’t in yet.",
+                "spoken": "Seven people are late at Apapa: five clocked in after seven ten, and two aren’t in yet.",
+                "words": 17,
+                "est_s": 6.8
+              },
+              "fr": {
+                "text": "Sept retards à Apapa : 5 arrivées après 7 h 10, et 2 personnes pas encore là.",
+                "spoken": "Sept retards à Apapa : cinq arrivées après sept heures dix, et deux personnes pas encore là.",
+                "words": 16,
+                "est_s": 6.86
+              }
+            },
+            {
+              "id": "3min-2c",
+              "start": 32.4,
+              "end_by": 38.2,
+              "en": {
+                "text": "Three approvals are waiting: a leave request, an expense claim and a purchase order.",
+                "spoken": "Three approvals are waiting: a leave request, an expense claim and a purchase order.",
+                "words": 14,
+                "est_s": 5.6
+              },
+              "fr": {
+                "text": "Trois approbations attendent : un congé, une note de frais, un bon de commande.",
+                "spoken": "Trois approbations attendent : un congé, une note de frais, un bon de commande.",
+                "words": 13,
+                "est_s": 5.57
+              }
+            },
+            {
+              "id": "3min-2d",
+              "start": 38.2,
+              "end_by": 41.0,
+              "en": {
+                "text": "One click approves the leave.",
+                "spoken": "One click approves the leave.",
+                "words": 5,
+                "est_s": 2.0
+              },
+              "fr": {
+                "text": "Un clic : le congé est approuvé.",
+                "spoken": "Un clic : le congé est approuvé.",
+                "words": 6,
+                "est_s": 2.57
+              }
+            }
+          ],
+          "voice_est_s": {
+            "en": 17.2,
+            "fr": 18.0
+          }
+        },
+        {
+          "id": "3min-3",
+          "title": "Projects and budgets",
+          "youtube": "0:41",
+          "start": 41.0,
+          "end": 64.0,
+          "lines": [
+            {
+              "id": "3min-3a",
+              "start": 41.2,
+              "end_by": 42.8,
+              "en": {
+                "text": "Then, the projects.",
+                "spoken": "Then, the projects.",
+                "words": 3,
+                "est_s": 1.2
+              },
+              "fr": {
+                "text": "Ensuite, les projets.",
+                "spoken": "Ensuite, les projets.",
+                "words": 3,
+                "est_s": 1.29
+              }
+            },
+            {
+              "id": "3min-3b",
+              "start": 46.4,
+              "end_by": 54.0,
+              "en": {
+                "text": "Four of the 8 projects are over budget, ₦38.2m in total.",
+                "spoken": "Four of the eight projects are over budget, thirty-eight point two million naira in total.",
+                "words": 16,
+                "est_s": 6.4
+              },
+              "fr": {
+                "text": "Quatre projets sur 8 dépassent leur budget : 38,2 millions de nairas au total.",
+                "spoken": "Quatre projets sur huit dépassent leur budget : trente-huit virgule deux millions de nairas au total.",
+                "words": 16,
+                "est_s": 6.86
+              }
+            },
+            {
+              "id": "3min-3c",
+              "start": 54.0,
+              "end_by": 64.0,
+              "en": {
+                "text": "The table goes to Excel: a formatted sheet with the question, the sources and the time.",
+                "spoken": "The table goes to Excel: [pause 300ms] a formatted sheet with the question, the sources and the time.",
+                "words": 16,
+                "est_s": 6.7
+              },
+              "fr": {
+                "text": "Le tableau part dans Excel : une feuille mise en forme, avec la question, les sources et l’heure.",
+                "spoken": "Le tableau part dans Excel : [pause 300ms] une feuille mise en forme, avec la question, les sources et l’heure.",
+                "words": 17,
+                "est_s": 7.59
+              }
+            }
+          ],
+          "voice_est_s": {
+            "en": 14.3,
+            "fr": 15.74
+          }
+        },
+        {
+          "id": "3min-4",
+          "title": "Sales and stock by depot",
+          "youtube": "1:04",
+          "start": 64.0,
+          "end": 87.0,
+          "lines": [
+            {
+              "id": "3min-4a",
+              "start": 64.2,
+              "end_by": 67.0,
+              "en": {
+                "text": "Next, sales and stock by depot.",
+                "spoken": "Next, sales and stock by depot.",
+                "words": 6,
+                "est_s": 2.4
+              },
+              "fr": {
+                "text": "Puis, ventes et stocks par dépôt.",
+                "spoken": "Puis, ventes et stocks par dépôt.",
+                "words": 6,
+                "est_s": 2.57
+              }
+            },
+            {
+              "id": "3min-4b",
+              "start": 73.0,
+              "end_by": 79.2,
+              "en": {
+                "text": "Sales by depot, in naira and CFA francs, side by side.",
+                "spoken": "Sales by depot, in naira and CFA francs, side by side.",
+                "words": 12,
+                "est_s": 4.8
+              },
+              "fr": {
+                "text": "Ventes par dépôt, en nairas et en francs CFA, côte à côte.",
+                "spoken": "Ventes par dépôt, en nairas et en francs CFA, côte à côte.",
+                "words": 13,
+                "est_s": 5.57
+              }
+            },
+            {
+              "id": "3min-4c",
+              "start": 79.2,
+              "end_by": 87.0,
+              "en": {
+                "text": "Stock is lowest on noodles at Apapa: 3.1 days of cover.",
+                "spoken": "Stock is lowest on noodles at Apapa: three point one days of cover.",
+                "words": 13,
+                "est_s": 5.2
+              },
+              "fr": {
+                "text": "Le stock le plus bas : les nouilles à Apapa, 3,1 jours de couverture.",
+                "spoken": "Le stock le plus bas : les nouilles à Apapa, trois virgule un jours de couverture.",
+                "words": 15,
+                "est_s": 6.43
+              }
+            }
+          ],
+          "voice_est_s": {
+            "en": 12.4,
+            "fr": 14.57
+          }
+        },
+        {
+          "id": "3min-5",
+          "title": "Cash and receivables",
+          "youtube": "1:27",
+          "start": 87.0,
+          "end": 110.0,
+          "lines": [
+            {
+              "id": "3min-5a",
+              "start": 87.2,
+              "end_by": 92.8,
+              "en": {
+                "text": "Cash this morning: ₦412.8m.",
+                "spoken": "Cash this morning: four hundred and twelve point eight million naira.",
+                "words": 11,
+                "est_s": 4.4
+              },
+              "fr": {
+                "text": "Trésorerie ce matin : 412,8 millions de nairas.",
+                "spoken": "Trésorerie ce matin : quatre cent douze virgule huit millions de nairas.",
+                "words": 11,
+                "est_s": 4.71
+              }
+            },
+            {
+              "id": "3min-5b",
+              "start": 96.3,
+              "end_by": 110.0,
+              "en": {
+                "text": "More than 60 days: ₦96.3m across 14 customers, and 28.4m FCFA in Douala.",
+                "spoken": "More than sixty days: ninety-six point three million naira across fourteen customers, [pause 200ms] and twenty-eight point four million CFA francs in Douala.",
+                "words": 24,
+                "est_s": 9.8
+              },
+              "fr": {
+                "text": "Plus de 60 jours : 96,3 millions de nairas chez 14 clients, et 28,4 millions de francs CFA à Douala.",
+                "spoken": "Plus de soixante jours : quatre-vingt-seize virgule trois millions de nairas chez quatorze clients, [pause 200ms] et vingt-huit virgule quatre millions de francs CFA à Douala.",
+                "words": 27,
+                "est_s": 11.77
+              }
+            }
+          ],
+          "voice_est_s": {
+            "en": 14.2,
+            "fr": 16.48
+          }
+        },
+        {
+          "id": "3min-6",
+          "title": "Security and the audit log",
+          "youtube": "1:50",
+          "start": 110.0,
+          "end": 140.0,
+          "lines": [
+            {
+              "id": "3min-6a",
+              "start": 110.1,
+              "end_by": 114.0,
+              "en": {
+                "text": "Now a different account: a sales associate in Ikeja.",
+                "spoken": "Now a different account: a sales associate in Ikeja.",
+                "words": 9,
+                "est_s": 3.6
+              },
+              "fr": {
+                "text": "Changeons de compte : un attaché commercial, à Ikeja.",
+                "spoken": "Changeons de compte : un attaché commercial, à Ikeja.",
+                "words": 8,
+                "est_s": 3.43
+              }
+            },
+            {
+              "id": "3min-6b",
+              "start": 117.2,
+              "end_by": 127.6,
+              "en": {
+                "text": "The answer is a refusal. The role has no payroll permission, so nothing was read, and the request was logged.",
+                "spoken": "The answer is a refusal. [pause 300ms] The role has no payroll permission, so nothing was read, and the request was logged.",
+                "words": 20,
+                "est_s": 8.3
+              },
+              "fr": {
+                "text": "La réponse est un refus : ce rôle n’a pas accès à la paie. Rien n’a été lu, et la demande est consignée.",
+                "spoken": "La réponse est un refus : ce rôle n’a pas accès à la paie. [pause 300ms] Rien n’a été lu, et la demande est consignée.",
+                "words": 22,
+                "est_s": 9.73
+              }
+            },
+            {
+              "id": "3min-6c",
+              "start": 127.6,
+              "end_by": 135.6,
+              "en": {
+                "text": "The COO finds it at the top of the audit log, among the morning’s answers, exports and approvals.",
+                "spoken": "The C.O.O. finds it at the top of the audit log, among the morning’s answers, exports and approvals.",
+                "words": 19,
+                "est_s": 7.6
+              },
+              "fr": {
+                "text": "Le refus apparaît en tête du journal d’audit, avec chaque réponse, export et approbation de la matinée.",
+                "spoken": "Le refus apparaît en tête du journal d’audit, avec chaque réponse, export et approbation de la matinée.",
+                "words": 17,
+                "est_s": 7.29
+              }
+            },
+            {
+              "id": "3min-6d",
+              "start": 135.6,
+              "end_by": 140.0,
+              "en": {
+                "text": "And AI spend has a monthly cap, in naira.",
+                "spoken": "And A.I. spend has a monthly cap, in naira.",
+                "words": 9,
+                "est_s": 3.6
+              },
+              "fr": {
+                "text": "Les dépenses d’IA ont un plafond mensuel, en nairas.",
+                "spoken": "Les dépenses d’I.A. ont un plafond mensuel, en nairas.",
+                "words": 9,
+                "est_s": 3.86
+              }
+            }
+          ],
+          "voice_est_s": {
+            "en": 23.1,
+            "fr": 24.31
+          }
+        },
+        {
+          "id": "3min-7",
+          "title": "From question to action",
+          "youtube": "2:20",
+          "start": 140.0,
+          "end": 176.5,
+          "lines": [
+            {
+              "id": "3min-7a",
+              "start": 140.2,
+              "end_by": 143.0,
+              "en": {
+                "text": "Finally, from question to action.",
+                "spoken": "Finally, from question to action.",
+                "words": 5,
+                "est_s": 2.0
+              },
+              "fr": {
+                "text": "Enfin, de la question à l’action.",
+                "spoken": "Enfin, de la question à l’action.",
+                "words": 6,
+                "est_s": 2.57
+              }
+            },
+            {
+              "id": "3min-7b",
+              "start": 148.0,
+              "end_by": 157.5,
+              "en": {
+                "text": "A form, filled in: Wednesday at 10:00, Apapa depot, 4 attendees. The COO saves it.",
+                "spoken": "A form, filled in: Wednesday at ten, Apapa depot, four attendees. [pause 300ms] The C.O.O. saves it.",
+                "words": 16,
+                "est_s": 6.7
+              },
+              "fr": {
+                "text": "Un formulaire prérempli : mercredi à 10 h, au dépôt d’Apapa, 4 participants. La directrice des opérations l’enregistre.",
+                "spoken": "Un formulaire prérempli : mercredi à dix heures, au dépôt d’Apapa, quatre participants. [pause 300ms] La directrice des opérations l’enregistre.",
+                "words": 17,
+                "est_s": 7.59
+              }
+            },
+            {
+              "id": "3min-7c",
+              "start": 157.7,
+              "end_by": 162.8,
+              "en": {
+                "text": "In the mailbox, a supplier has moved a delivery.",
+                "spoken": "In the mailbox, a supplier has moved a delivery.",
+                "words": 9,
+                "est_s": 3.6
+              },
+              "fr": {
+                "text": "Dans la messagerie, un fournisseur décale une livraison.",
+                "spoken": "Dans la messagerie, un fournisseur décale une livraison.",
+                "words": 8,
+                "est_s": 3.43
+              }
+            },
+            {
+              "id": "3min-7d",
+              "start": 162.8,
+              "end_by": 170.3,
+              "en": {
+                "text": "The summary comes with the stock impact: 3.1 days of noodle cover at Apapa.",
+                "spoken": "The summary comes with the stock impact: three point one days of noodle cover at Apapa.",
+                "words": 16,
+                "est_s": 6.4
+              },
+              "fr": {
+                "text": "Le résumé donne l’impact sur le stock : 3,1 jours de couverture en nouilles à Apapa.",
+                "spoken": "Le résumé donne l’impact sur le stock : trois virgule un jours de couverture en nouilles à Apapa.",
+                "words": 17,
+                "est_s": 7.29
+              }
+            },
+            {
+              "id": "3min-7e",
+              "start": 170.3,
+              "end_by": 176.5,
+              "en": {
+                "text": "And a reply is drafted, asking for a part delivery of 800 cartons.",
+                "spoken": "And a reply is drafted, asking for a part delivery of eight hundred cartons.",
+                "words": 14,
+                "est_s": 5.6
+              },
+              "fr": {
+                "text": "Et une réponse est rédigée : une livraison partielle de 800 cartons.",
+                "spoken": "Et une réponse est rédigée : une livraison partielle de huit cents cartons.",
+                "words": 12,
+                "est_s": 5.14
+              }
+            }
+          ],
+          "voice_est_s": {
+            "en": 24.3,
+            "fr": 26.02
+          }
+        },
+        {
+          "id": "3min-8",
+          "title": "End card",
+          "youtube": "2:56",
+          "start": 176.5,
+          "end": 188.0,
+          "lines": [
+            {
+              "id": "3min-8a",
+              "start": 176.9,
+              "end_by": 183.4,
+              "en": {
+                "text": "Straight answers, from your own data. Ask your company anything.",
+                "spoken": "Straight answers, from your own data. [pause 300ms] Ask your company anything.",
+                "words": 10,
+                "est_s": 4.3
+              },
+              "fr": {
+                "text": "Des réponses claires, tirées de vos données. Posez toutes vos questions à votre entreprise.",
+                "spoken": "Des réponses claires, tirées de vos données. [pause 300ms] Posez toutes vos questions à votre entreprise.",
+                "words": 14,
+                "est_s": 6.3
+              }
+            },
+            {
+              "id": "3min-8b",
+              "start": 183.4,
+              "end_by": 188.0,
+              "en": {
+                "text": "Book a free audit and demo: jbspraxis.com.",
+                "spoken": "Book a free audit and demo: J.B.S. Praxis dot com.",
+                "words": 11,
+                "est_s": 4.4
+              },
+              "fr": {
+                "text": "Réservez un audit offert sur jbspraxis.com.",
+                "spoken": "Réservez un audit offert sur J.B.S. Praxis point com.",
+                "words": 10,
+                "est_s": 4.29
+              }
+            }
+          ],
+          "voice_est_s": {
+            "en": 8.7,
+            "fr": 10.59
+          }
+        }
+      ],
+      "voice_est_s": {
+        "en": 125.9,
+        "fr": 139.92
+      },
+      "script_words": {
+        "en": 268,
+        "fr": 295
+      }
+    }
+  ]
+}

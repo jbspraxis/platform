@@ -1,0 +1,26 @@
+{
+  "id": "3min",
+  "duration": 188.0,
+  "fade_in_from_mist": 0.32,
+  "segments": [
+    { "clip": "c1", "from": 0, "to": 16.0 },
+    { "clip": "c2", "from": 0, "to": 25.0 },
+    { "clip": "c3", "from": 0, "to": 15.7 },
+    { "clip": "excel3", "from": 0, "to": 7.5, "xfade": 0.2 },
+    { "clip": "c4", "from": 0, "to": 23.0 },
+    { "clip": "c5", "from": 0, "to": 23.0 },
+    { "clip": "c6a", "from": 0, "to": 17.0 },
+    { "clip": "c6b", "from": 0, "to": 13.0 },
+    { "clip": "c7a", "from": 0, "to": 17.5 },
+    { "clip": "c7b", "from": 0, "to": 19.16 },
+    { "clip": "endcard", "from": 0, "to": 11.66, "xfade": 0.32 }
+  ],
+  "overlays": [
+    { "id": "note", "style": "note", "in": 0.5, "out": 4.5, "text": "Ndali Group is a fictional company. All names and figures are demo data." }
+  ],
+  "captions": [],
+  "outputs": {
+    "en": "demo-3min-en.mp4",
+    "fr": "demo-3min-fr.mp4"
+  }
+}

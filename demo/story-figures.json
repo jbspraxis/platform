@@ -1,0 +1,822 @@
+{
+  "meta": {
+    "company": "Ndali Group",
+    "about": "Fictional Nigerian FMCG distributor for the JBS Praxis demo videos. Every figure on screen, in Excel, in captions and in the voice-over comes from this file. Change a number here, then rebuild the seed and the answer cache; never edit a number anywhere else.",
+    "today": "2026-11-03",
+    "today_label_en": "Tuesday 3 November 2026",
+    "tomorrow": "2026-11-04",
+    "tomorrow_label_en": "Wednesday 4 November 2026",
+    "timezone": "Africa/Lagos (WAT, UTC+01:00). Douala is also on WAT.",
+    "formats": {
+      "ngn_en": "₦ before the amount, no space: ₦4,200,000; ₦38.2m; ₦1.1bn",
+      "xaf_en": "FCFA after the amount, with a space: 2,500,000 FCFA; 2.5m FCFA",
+      "ngn_fr": "after the amount: 38,2 millions de nairas (speech); 38,2 M₦ (tables)",
+      "xaf_fr": "21,4 millions de francs CFA (speech); 21,4 M FCFA (tables)",
+      "percent_en": "12.5%",
+      "dates_en": "Wednesday 4 November 2026, 10:00 (WAT); day-first 04/11/2026 in tables",
+      "minus": "true minus sign U+2212 in interfaces"
+    }
+  },
+  "people": {
+    "coo": {
+      "name": "Amaka Obi",
+      "first_name": "Amaka",
+      "role": "Chief operating officer",
+      "role_short": "COO",
+      "site": "IKJ",
+      "account": "coo"
+    },
+    "sales_associate": {
+      "name": "Chidi Okeke",
+      "first_name": "Chidi",
+      "role": "Sales associate",
+      "site": "IKJ",
+      "account": "sales"
+    },
+    "apapa_depot_manager": {
+      "name": "Rotimi Adewale",
+      "role": "Depot manager, Apapa",
+      "site": "APP"
+    },
+    "inventory_controller": {
+      "name": "Ngozi Uche",
+      "role": "Inventory controller",
+      "site": "IKJ"
+    },
+    "head_of_supply_chain": {
+      "name": "Ibrahim Yusuf",
+      "role": "Head of supply chain",
+      "site": "IKJ"
+    },
+    "procurement_lead": {
+      "name": "Chinwe Nnaji",
+      "role": "Procurement lead",
+      "site": "IKJ"
+    },
+    "ibadan_depot_manager": {
+      "name": "Gbenga Oladipo",
+      "role": "Depot manager, Ibadan",
+      "site": "IBD"
+    },
+    "douala_branch_manager": {
+      "name": "Patrice Ebongue",
+      "role": "Branch manager, Douala",
+      "site": "DLA"
+    },
+    "supplier_contact": {
+      "name": "Olumide Bakare",
+      "role": "Account manager",
+      "company": "Harbourline Foods Ltd"
+    }
+  },
+  "sites": [
+    {
+      "code": "IKJ",
+      "name": "Ikeja head office",
+      "short": "Ikeja",
+      "city": "Lagos",
+      "country": "NG",
+      "currency": "NGN",
+      "staff": 38,
+      "shift_start": "08:00",
+      "grace_minutes": 10,
+      "holds_stock": false
+    },
+    {
+      "code": "APP",
+      "name": "Apapa depot",
+      "short": "Apapa",
+      "city": "Lagos",
+      "country": "NG",
+      "currency": "NGN",
+      "staff": 46,
+      "shift_start": "07:00",
+      "grace_minutes": 10,
+      "holds_stock": true
+    },
+    {
+      "code": "IBD",
+      "name": "Ibadan depot",
+      "short": "Ibadan",
+      "city": "Ibadan",
+      "country": "NG",
+      "currency": "NGN",
+      "staff": 34,
+      "shift_start": "07:00",
+      "grace_minutes": 10,
+      "holds_stock": true
+    },
+    {
+      "code": "DLA",
+      "name": "Douala branch",
+      "short": "Douala",
+      "city": "Douala",
+      "country": "CM",
+      "currency": "XAF",
+      "staff": 22,
+      "shift_start": "07:30",
+      "grace_minutes": 10,
+      "holds_stock": true
+    }
+  ],
+  "staff_total": 140,
+  "brands": {
+    "note": "Invented brands. Beverages, noodles, detergents. 60 SKUs in all (20 per category).",
+    "beverages": "Kolaba",
+    "noodles": "Ndali",
+    "detergents": "Wavelle"
+  },
+  "counts": {
+    "skus": 60,
+    "outlets_and_distributors": 300,
+    "history_days": 90,
+    "projects": 8
+  },
+  "scenes": {
+    "s1_brief": {
+      "clock": "07:45",
+      "greeting": "Good morning, Amaka",
+      "kpis": {
+        "sales_yesterday": {
+          "date": "2026-11-02",
+          "ngn": 58642350,
+          "xaf": 21386500,
+          "display_ngn": "₦58.6m",
+          "display_xaf": "21.4m FCFA",
+          "label": "Sales yesterday",
+          "sub": "Nigeria; Douala 21.4m FCFA"
+        },
+        "cash_today": {
+          "ngn": 412836920,
+          "xaf": 96412000,
+          "display_ngn": "₦412.8m",
+          "display_xaf": "96.4m FCFA",
+          "label": "Cash today",
+          "as_of": "07:30"
+        },
+        "stock_outs": {
+          "lines": 5,
+          "by_site": {
+            "APP": 3,
+            "IBD": 2,
+            "DLA": 0
+          },
+          "label": "Stock-outs",
+          "display": "5 lines",
+          "sub": "3 at Apapa, 2 at Ibadan"
+        },
+        "staff_present": {
+          "present": 125,
+          "total": 140,
+          "late_apapa": 7,
+          "label": "Staff present",
+          "display": "125 of 140",
+          "sub": "7 late at Apapa",
+          "by_site_at_0745": {
+            "APP": 42,
+            "IBD": 32,
+            "DLA": 20,
+            "IKJ": 31
+          }
+        }
+      },
+      "stock_out_skus": [
+        {
+          "site": "APP",
+          "sku": "Ndali Noodles Pepper Soup 70g"
+        },
+        {
+          "site": "APP",
+          "sku": "Kolaba Orange 50cl"
+        },
+        {
+          "site": "APP",
+          "sku": "Wavelle Bar Soap 200g"
+        },
+        {
+          "site": "IBD",
+          "sku": "Kolaba Malt 33cl can"
+        },
+        {
+          "site": "IBD",
+          "sku": "Ndali Noodles Chicken 120g"
+        }
+      ]
+    },
+    "s2_late_and_approvals": {
+      "clock": "08:15",
+      "question": "Who is late at Apapa today, and what’s waiting on me?",
+      "apapa_staff": 46,
+      "shift_start": "07:00",
+      "late_after": "07:10",
+      "late_total": 7,
+      "clocked_in_late": 5,
+      "not_yet_in": 2,
+      "late_staff": [
+        {
+          "name": "Ifeanyi Okoro",
+          "role": "Forklift driver",
+          "clock_in": "07:18",
+          "minutes_late": 18
+        },
+        {
+          "name": "Sade Bankole",
+          "role": "Inventory clerk",
+          "clock_in": "07:26",
+          "minutes_late": 26
+        },
+        {
+          "name": "Emeka Udeh",
+          "role": "Loader",
+          "clock_in": "07:41",
+          "minutes_late": 41
+        },
+        {
+          "name": "Halima Bello",
+          "role": "Shipping clerk",
+          "clock_in": "07:52",
+          "minutes_late": 52
+        },
+        {
+          "name": "Kunle Ajayi",
+          "role": "Delivery driver",
+          "clock_in": "08:03",
+          "minutes_late": 63
+        },
+        {
+          "name": "Musa Garba",
+          "role": "Loader",
+          "clock_in": null,
+          "minutes_late": null,
+          "note": "Not clocked in"
+        },
+        {
+          "name": "Blessing Etim",
+          "role": "Stock clerk",
+          "clock_in": null,
+          "minutes_late": null,
+          "note": "Not clocked in"
+        }
+      ],
+      "clock_in_histogram_apapa": {
+        "note": "Clock-ins per 10-minute slot from 06:30 to 08:15. On time = up to 07:10. Sums to 44 (46 staff, 2 not in).",
+        "slots": [
+          {
+            "slot": "06:30",
+            "on_time": 6,
+            "late": 0
+          },
+          {
+            "slot": "06:40",
+            "on_time": 9,
+            "late": 0
+          },
+          {
+            "slot": "06:50",
+            "on_time": 14,
+            "late": 0
+          },
+          {
+            "slot": "07:00",
+            "on_time": 10,
+            "late": 0
+          },
+          {
+            "slot": "07:10",
+            "on_time": 0,
+            "late": 1
+          },
+          {
+            "slot": "07:20",
+            "on_time": 0,
+            "late": 1
+          },
+          {
+            "slot": "07:30",
+            "on_time": 0,
+            "late": 0
+          },
+          {
+            "slot": "07:40",
+            "on_time": 0,
+            "late": 1
+          },
+          {
+            "slot": "07:50",
+            "on_time": 0,
+            "late": 1
+          },
+          {
+            "slot": "08:00",
+            "on_time": 0,
+            "late": 1
+          },
+          {
+            "slot": "08:10",
+            "on_time": 0,
+            "late": 0
+          }
+        ]
+      },
+      "approvals_waiting": 3,
+      "approvals": [
+        {
+          "ref": "LV-0412",
+          "type": "Leave request",
+          "who": "Yetunde Lawal",
+          "who_role": "Warehouse supervisor, Apapa",
+          "detail": "Annual leave, Monday 9 to Friday 13 November (5 working days)",
+          "submitted": "2026-11-02T16:20:00+01:00",
+          "balance_after_days": 9,
+          "cover": "Sade Bankole",
+          "action": "approve_in_shot"
+        },
+        {
+          "ref": "EXP-2291",
+          "type": "Expense claim",
+          "who": "Gbenga Oladipo",
+          "who_role": "Depot manager, Ibadan",
+          "detail": "Fuel for 6 delivery trucks, 28 October to 1 November",
+          "amount_ngn": 1486500,
+          "display": "₦1,486,500",
+          "submitted": "2026-11-03T07:12:00+01:00"
+        },
+        {
+          "ref": "PO-1187",
+          "type": "Purchase order",
+          "who": "Rotimi Adewale",
+          "who_role": "Depot manager, Apapa",
+          "detail": "Pallet racking for the Apapa expansion, Lekki Storage Systems Ltd",
+          "amount_ngn": 7940000,
+          "display": "₦7,940,000",
+          "submitted": "2026-11-03T07:38:00+01:00"
+        }
+      ],
+      "approved_at": "08:16",
+      "toast": "Leave approved for Yetunde Lawal, 9 to 13 November. Yetunde has been notified."
+    },
+    "s3_projects": {
+      "clock": "08:22",
+      "question": "Which projects are over budget?",
+      "as_of": "2026-10-31",
+      "over_budget_count": 4,
+      "over_budget_total_ngn": 38204600,
+      "over_budget_total_display": "₦38.2m",
+      "chart_title": "4 projects are over budget, ₦38.2m in total",
+      "chart": "Percentage of budget spent, all 8 projects, with a 100% budget line",
+      "projects": [
+        {
+          "code": "PRJ-01",
+          "name": "Apapa depot expansion",
+          "site": "APP",
+          "currency": "NGN",
+          "budget": 412000000,
+          "actual": 431640000,
+          "over": 19640000,
+          "pct_spent": 104.8,
+          "status": "Over budget",
+          "lead": "Rotimi Adewale"
+        },
+        {
+          "code": "PRJ-02",
+          "name": "Ibadan cold room",
+          "site": "IBD",
+          "currency": "NGN",
+          "budget": 86500000,
+          "actual": 94286500,
+          "over": 7786500,
+          "pct_spent": 109,
+          "status": "Over budget",
+          "lead": "Gbenga Oladipo"
+        },
+        {
+          "code": "PRJ-03",
+          "name": "ERP rollout",
+          "site": "IKJ",
+          "currency": "NGN",
+          "budget": 124000000,
+          "actual": 132072400,
+          "over": 8072400,
+          "pct_spent": 106.5,
+          "status": "Over budget",
+          "lead": "Ngozi Uche"
+        },
+        {
+          "code": "PRJ-04",
+          "name": "Route optimisation, Lagos",
+          "site": "IKJ",
+          "currency": "NGN",
+          "budget": 38400000,
+          "actual": 41105700,
+          "over": 2705700,
+          "pct_spent": 107,
+          "status": "Over budget",
+          "lead": "Ibrahim Yusuf"
+        },
+        {
+          "code": "PRJ-05",
+          "name": "Solar power at Ibadan",
+          "site": "IBD",
+          "currency": "NGN",
+          "budget": 57600000,
+          "actual": 49215800,
+          "over": 0,
+          "pct_spent": 85.4,
+          "status": "On track",
+          "lead": "Gbenga Oladipo"
+        },
+        {
+          "code": "PRJ-06",
+          "name": "Douala warehouse refit",
+          "site": "DLA",
+          "currency": "XAF",
+          "budget": 148000000,
+          "actual": 121740000,
+          "over": 0,
+          "pct_spent": 82.3,
+          "status": "On track",
+          "lead": "Patrice Ebongue"
+        },
+        {
+          "code": "PRJ-07",
+          "name": "Fleet tracking",
+          "site": "IKJ",
+          "currency": "NGN",
+          "budget": 29800000,
+          "actual": 22418900,
+          "over": 0,
+          "pct_spent": 75.2,
+          "status": "On track",
+          "lead": "Ibrahim Yusuf"
+        },
+        {
+          "code": "PRJ-08",
+          "name": "Ikeja office refurbishment",
+          "site": "IKJ",
+          "currency": "NGN",
+          "budget": 64200000,
+          "actual": 58904300,
+          "over": 0,
+          "pct_spent": 91.8,
+          "status": "On track",
+          "lead": "Amaka Obi"
+        }
+      ],
+      "excel_file": "projects-over-budget-2026-11-03.xlsx",
+      "excel_exported_at": "08:23"
+    },
+    "s4_refusal": {
+      "clock": "08:31",
+      "account": "sales",
+      "question": "Show me everyone’s salaries",
+      "reply": "You don’t have permission to view salary data. Your request was recorded in the audit log.",
+      "reason": "The Sales associate role has no payroll permission.",
+      "audit_entry": {
+        "id": "118204",
+        "at": "2026-11-03T08:31:12+01:00",
+        "who": "Chidi Okeke, Sales associate, Ikeja",
+        "event": "Asked the assistant for salary data",
+        "outcome": "Refused: no payroll permission"
+      }
+    },
+    "s5_booking": {
+      "clock": "08:38",
+      "question": "Book a stock-count review at Apapa tomorrow at 10",
+      "event": {
+        "title": "Stock-count review, Apapa",
+        "date": "2026-11-04",
+        "start": "10:00",
+        "end": "11:00",
+        "label_en": "Wednesday 4 November 2026, 10:00 to 11:00 (WAT)",
+        "location": "Apapa depot, meeting room 2",
+        "attendees": [
+          "Amaka Obi (COO)",
+          "Rotimi Adewale (Depot manager, Apapa)",
+          "Ngozi Uche (Inventory controller)",
+          "Ibrahim Yusuf (Head of supply chain)"
+        ],
+        "notes": "Count noodles and beverages first: 3 stock-outs at Apapa this morning."
+      },
+      "other_events_wednesday": [
+        {
+          "title": "Weekly sales review",
+          "start": "09:00",
+          "end": "09:45"
+        },
+        {
+          "title": "Douala branch call",
+          "start": "14:00",
+          "end": "14:30"
+        }
+      ]
+    },
+    "s6_mailbox": {
+      "clock": "08:44",
+      "thread_subject": "Ndali Noodles delivery: revised date",
+      "supplier": "Harbourline Foods Ltd",
+      "summary": "Harbourline Foods says the 2,400 cartons of Ndali Noodles 70g due on Wednesday 4 November will now arrive on Monday 9 November, 5 days late, because their flour shipment is held at Tin Can Island port.",
+      "stock_impact": "Apapa has 3.1 days of noodle cover. Ibadan has 6.4 days.",
+      "cartons_due": 2400,
+      "days_late": 5,
+      "original_date": "2026-11-04",
+      "revised_date": "2026-11-09",
+      "apapa_runs_out": "2026-11-06",
+      "draft_reply_ask": "A part delivery of 800 cartons to Apapa by Thursday 5 November, and confirmation by 14:00 today.",
+      "partial_cartons": 800,
+      "purchase_order": {
+        "ref": "PO-1170",
+        "raised": "2026-10-20",
+        "raised_by": "Chinwe Nnaji",
+        "deliver_to": "APP",
+        "value_ngn": 27936000,
+        "display": "₦27,936,000"
+      }
+    },
+    "x1_sales_stock": {
+      "clock": "08:26",
+      "question": "How did each depot sell last week, and where is stock low?",
+      "week": {
+        "from": "2026-10-26",
+        "to": "2026-10-31",
+        "label": "Monday 26 to Saturday 31 October"
+      },
+      "sales": [
+        {
+          "depot": "Lagos (Apapa)",
+          "site": "APP",
+          "currency": "NGN",
+          "amount": 168247900,
+          "display": "₦168.2m",
+          "vs_previous_week_pct": 3.8
+        },
+        {
+          "depot": "Ibadan",
+          "site": "IBD",
+          "currency": "NGN",
+          "amount": 94716350,
+          "display": "₦94.7m",
+          "vs_previous_week_pct": -1.2
+        },
+        {
+          "depot": "Douala",
+          "site": "DLA",
+          "currency": "XAF",
+          "amount": 112480000,
+          "display": "112.5m FCFA",
+          "vs_previous_week_pct": 6.1
+        }
+      ],
+      "sales_by_category": {
+        "note": "Same week, by depot and category; each depot's three add up to its total above.",
+        "APP": {
+          "Beverages": 90550250,
+          "Noodles": 21374850,
+          "Detergents": 56322800
+        },
+        "IBD": {
+          "Beverages": 49382700,
+          "Noodles": 15906250,
+          "Detergents": 29427400
+        },
+        "DLA": {
+          "Beverages": 58914500,
+          "Noodles": 17463000,
+          "Detergents": 36102500
+        }
+      },
+      "stock_cover_days": {
+        "APP": {
+          "Beverages": 9.2,
+          "Noodles": 3.1,
+          "Detergents": 11.4
+        },
+        "IBD": {
+          "Beverages": 12.6,
+          "Noodles": 6.4,
+          "Detergents": 14.8
+        },
+        "DLA": {
+          "Beverages": 15.1,
+          "Noodles": 10.2,
+          "Detergents": 18.7
+        }
+      },
+      "lowest": "Apapa noodles, 3.1 days"
+    },
+    "x2_receivables": {
+      "clock": "08:29",
+      "question": "Who owes us more than 60 days?",
+      "as_of": "2026-11-03",
+      "ngn_ageing": {
+        "d0_30": 284612400,
+        "d31_60": 121935800,
+        "d61_90": 58716200,
+        "d90_plus": 37583900,
+        "total": 502848300
+      },
+      "ngn_over_60": 96300100,
+      "ngn_over_60_display": "₦96.3m",
+      "ngn_customers_over_60": 14,
+      "xaf_over_60": 28400000,
+      "xaf_over_60_display": "28.4m FCFA",
+      "xaf_customers_over_60": 3,
+      "top_ngn": [
+        {
+          "customer": "Mile 12 Provisions Ltd",
+          "site": "APP",
+          "amount": 18412600,
+          "days": 74
+        },
+        {
+          "customer": "Okota Stores and Supplies",
+          "site": "APP",
+          "amount": 12905300,
+          "days": 91
+        },
+        {
+          "customer": "Bodija Market Distributors",
+          "site": "IBD",
+          "amount": 11218700,
+          "days": 66
+        }
+      ],
+      "other_ngn_over_60_total": 53763500,
+      "other_ngn": [
+        {
+          "customer": "Festac Family Supermarket",
+          "site": "APP",
+          "amount": 9604750,
+          "days": 118
+        },
+        {
+          "customer": "Agege Wholesale Ventures",
+          "site": "APP",
+          "amount": 7842300,
+          "days": 81
+        },
+        {
+          "customer": "Iwo Road General Merchants",
+          "site": "IBD",
+          "amount": 5872300,
+          "days": 97
+        },
+        {
+          "customer": "Ojota Fresh Mart",
+          "site": "APP",
+          "amount": 5316850,
+          "days": 69
+        },
+        {
+          "customer": "Dugbe Provisions and Sons",
+          "site": "IBD",
+          "amount": 4907400,
+          "days": 77
+        },
+        {
+          "customer": "Alaba Market Provisions",
+          "site": "APP",
+          "amount": 4213900,
+          "days": 104
+        },
+        {
+          "customer": "Ikorodu Grocers Ltd",
+          "site": "APP",
+          "amount": 4118950,
+          "days": 63
+        },
+        {
+          "customer": "Sango Ota Traders",
+          "site": "APP",
+          "amount": 3986200,
+          "days": 88
+        },
+        {
+          "customer": "Abeokuta Central Stores",
+          "site": "IBD",
+          "amount": 3129450,
+          "days": 133
+        },
+        {
+          "customer": "Mokola Family Stores",
+          "site": "IBD",
+          "amount": 2913200,
+          "days": 71
+        },
+        {
+          "customer": "Ejigbo Mini Mart",
+          "site": "APP",
+          "amount": 1858200,
+          "days": 92
+        }
+      ],
+      "xaf_customers": [
+        {
+          "customer": "Akwa Distribution SARL",
+          "amount": 14600000,
+          "days": 83
+        },
+        {
+          "customer": "Bonabéri Commerce",
+          "amount": 8900000,
+          "days": 68
+        },
+        {
+          "customer": "Deïdo Alimentation",
+          "amount": 4900000,
+          "days": 62
+        }
+      ]
+    },
+    "x3_audit_and_ai_spend": {
+      "clock": "08:33",
+      "audit_entries_today": [
+        {
+          "at": "08:31:12",
+          "who": "Chidi Okeke, Sales associate",
+          "event": "Asked the assistant for salary data",
+          "outcome": "Refused: no payroll permission"
+        },
+        {
+          "at": "08:29:03",
+          "who": "Amaka Obi, COO",
+          "event": "Assistant read Invoices and receipts",
+          "outcome": "Done"
+        },
+        {
+          "at": "08:26:04",
+          "who": "Amaka Obi, COO",
+          "event": "Assistant read Sales and stock, all depots",
+          "outcome": "Done"
+        },
+        {
+          "at": "08:23:40",
+          "who": "Amaka Obi, COO",
+          "event": "Exported “Projects over budget” to Excel",
+          "outcome": "Done"
+        },
+        {
+          "at": "08:22:05",
+          "who": "Amaka Obi, COO",
+          "event": "Assistant read Projects: budgets and actuals",
+          "outcome": "Done"
+        },
+        {
+          "at": "08:16:05",
+          "who": "Amaka Obi, COO",
+          "event": "Approved leave request LV-0412 (Yetunde Lawal)",
+          "outcome": "Done"
+        },
+        {
+          "at": "08:15:02",
+          "who": "Amaka Obi, COO",
+          "event": "Assistant read Attendance (Apapa) and Approvals",
+          "outcome": "Done"
+        },
+        {
+          "at": "07:45:10",
+          "who": "Amaka Obi, COO",
+          "event": "Signed in",
+          "outcome": "Done"
+        }
+      ],
+      "ai_spend": {
+        "month": "November 2026",
+        "spent_ngn": 21860,
+        "cap_ngn": 250000,
+        "pct": 8.7,
+        "display": "₦21,860 of ₦250,000",
+        "requests": 412,
+        "alert_at_pct": 80,
+        "last_month": "October 2026",
+        "last_month_ngn": 203480,
+        "by_role": [
+          {
+            "role": "Chief operating officer",
+            "spent_ngn": 4118,
+            "requests": 58
+          },
+          {
+            "role": "Depot manager",
+            "spent_ngn": 5142,
+            "requests": 96
+          },
+          {
+            "role": "Finance officer",
+            "spent_ngn": 4386,
+            "requests": 84
+          },
+          {
+            "role": "Sales associate",
+            "spent_ngn": 4227,
+            "requests": 112
+          },
+          {
+            "role": "Supply chain and inventory",
+            "spent_ngn": 3987,
+            "requests": 62
+          }
+        ]
+      }
+    }
+  }
+}
