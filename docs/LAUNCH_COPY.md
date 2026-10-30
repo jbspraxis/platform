@@ -207,13 +207,8 @@ request): say it plainly, never name the client, never call it "predictive".
 
 ## Privacy (`/privacy`, `/fr/privacy`)
 
-Port the current policy (`praxis_core/resources/views/livewire/privacy.blade.php`) into the brand voice, keeping every
-legal point it makes, and update it to what the new site actually does. Sections (EN / FR):
-1. Who we are / Qui nous sommes: legal name, offices and contact email from Website settings.
-2. What we collect / Ce que nous collectons: the forms (contact, booking, calculator, careers with CV, Insights submissions, feedback, method guide), Praxis AI questions, and technical data needed to protect the forms (IP address for rate limits, kept for at most 24 hours).
-3. Why / Pourquoi: to answer you, run the free audit, send what you asked for, recruit, and keep the site secure.
-4. How long / Durée de conservation: as in the current policy; CVs as in the current policy.
-5. Who sees it / Qui y a accès: JBS Praxis staff by role; our email and hosting providers; never sold.
-6. Your rights / Vos droits: access, correction, deletion, objection, under the NDPA and Cameroonian law; how to ask (email from settings).
-7. Cookies / Cookies: what the site needs to work (session, security, your cookie choice), and Google Analytics only if you accept it in the banner; you can change your choice at any time from the "Cookie settings" link in the footer.
-8. Changes / Modifications: date of this version (30 October 2026).
+Replaced on 30 October 2026 by the full legal policy in `praxis_site/lang/{en,fr}/legal.php` (rendered by
+`pages/privacy.blade.php`): a short summary, contents, then 13 sections (who we are, scope, what we collect and why,
+legal bases, who receives it, international transfers, retention, security, cookies, rights, complaints, children,
+changes). It describes what the site and HQ really do, so change it together with the code; the CV period is
+`config('praxis.cv_retention_months')` in praxis_core.
