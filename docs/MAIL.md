@@ -277,7 +277,13 @@ Each PR, when its tests pass and the owner has seen it locally:
 
 - **Focus**: the composer's `x-data` held the draft's HTML, so every autosave re-render changed it and Alpine restarted the editor (text reset to the last save, focus moved to To or the top of the message). Now `x-data` never changes; the draft's text rides on the editor inside `wire:ignore` (`data-html`), and the editor starts once per draft (`248c8d2`). Checked locally: typing through two autosaves keeps the cursor and every character. Live: `composer.blade.php` and `compose.js` replaced (sizes checked; backups in `~/mail_backup_fix1_20261030/`).
 - **Attachments**: HQ's PHP allowed 2 MB uploads (`upload_max_filesize=2M`, `post_max_size=8M`, cPanel defaults), so any larger PDF failed with "The uploads.0 failed to upload". Raised for `hq.jbspraxis.com` with cPanel's MultiPHP INI editor (UAPI `LangPHP/php_ini_set_user_basic_directives`): `upload_max_filesize=25M`, `post_max_size=30M`, `memory_limit=256M`, `max_execution_time=60` (written to `public_html/PRAXIS/.user.ini` and `php.ini`, shared with the portal). Checked live: a 10 MB POST now reaches Laravel (419) instead of being refused as too large.
-- Note: HQ and the portal run **ea-php82** (the site ea-php83); keep code PHP 8.2-compatible.
+- Note: cPanel lists HQ and the portal as **ea-php82**, but the web requests behave like **ea-php83**, which has **no `fileinfo`, `intl`, `exif`, `sodium` or `gmp`** (ea-php82's command line has them). Keep code PHP 8.2-compatible and free of those extensions.
+
+### Fix 2: 30 October 2026, about 17:30 CET (owner report: the invoice PDF still would not attach; "donâ€™t" in the reader)
+
+- **Attachments**: the real cause was not size (the PDF is 620 KB): every upload failed with `Class "finfo" not found`, because Laravel's local disk needs PHP's fileinfo extension and the live web PHP lacks it. `App\Support\FilesystemManager` (bound as `filesystem` in `AppServiceProvider`) builds local disks with an extension-based type detector when fileinfo is missing; unchanged otherwise. Also fixes the "sent, tidying up afterwards failed" warning. Test: `ComposeUploadWithoutFileinfoTest`.
+- **Garbled text**: Outlook HTML declares `charset=windows-1252` in a `<meta>`; after MIME decoding the text is UTF-8, but libxml obeyed the meta and decoded it again. `HtmlSanitizer` (reader) and `HtmlCleaner` (composer, quoted originals) now drop the sender's charset `<meta>` before parsing. Tests in `ReadSanitizerTest` and `ComposeTextTest`.
+- Commit `8f2e292`; live: 1 new file, 3 replaced (sizes checked; backups `~/mail_backup_fix2_20261030/`). Full suite: 274 tests pass. Checked live: site, portal, HQ load; no new errors.
 
 ## 12. Changes to contracts, PR notes and requests
 
