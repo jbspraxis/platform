@@ -26,6 +26,7 @@ return [
             'city' => 'City',
             'language' => 'Preferred language',
             'budget' => 'Budget',
+            'start_timing' => 'When they’d like to start',
             'stage' => 'Stage',
             'bottleneck' => 'Main bottleneck',
             'systems' => 'Current systems',

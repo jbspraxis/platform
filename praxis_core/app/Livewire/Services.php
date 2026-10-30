@@ -2,11 +2,10 @@
 
 namespace App\Livewire;
 
+use Livewire\Attributes\Locked;
 use Livewire\Component;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
-use App\Mail\PraxisFrameworkDispatch;
-use App\Support\MailLocale;
+use App\Services\Site\LimitReached;
+use App\Services\Site\WhitepaperService;
 
 class Services extends Component
 {
@@ -14,17 +13,23 @@ class Services extends Component
     public $isWhitepaperSuccess = false;
     public $emailSent = false;
 
+    // The address that passed the limits in processWhitepaper(): the only one dispatchEmail() sends to
+    #[Locked]
+    public ?string $recordedEmail = null;
+
     public function processWhitepaper()
     {
-        $this->validate([
-            'email' => 'required|email|max:100',
-        ]);
+        $this->validate(WhitepaperService::rules());
 
-        DB::table('whitepaper_downloads')->insert([
-            'email_captured' => $this->email,
-            'document_name' => 'The Praxis Framework',
-        ]);
+        // The limits (per visitor, per email, everyone) are the service's, shared with the site API
+        try {
+            app(WhitepaperService::class)->record($this->email, request()->ip());
+        } catch (LimitReached $e) {
+            $this->addError('email', 'Too many requests. Please try again later or use the direct link.');
+            return;
+        }
 
+        $this->recordedEmail = $this->email;
         $this->isWhitepaperSuccess = true;
     }
 
@@ -35,27 +40,17 @@ class Services extends Component
             return;
         }
 
-        // The address comes from the visitor, so cap sends per IP (3 an hour) to stop abuse of our mail server
-        $this->validate(['email' => 'required|email|max:100']);
-        $rateKey = 'whitepaper-mail:' . request()->ip();
-        if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($rateKey, 3)) {
-            session()->flash('error', 'Too many requests. Please try again later or use the direct link.');
+        // Only to the address recorded above (it passed the limits); each address gets 3 visitor emails a day at most
+        if (!$this->recordedEmail) {
             return;
         }
-        \Illuminate\Support\Facades\RateLimiter::hit($rateKey, 3600);
 
-        try {
-            // Send the method PDF to the address they provided, in the language of the page they used
-            Mail::to($this->email)
-                ->locale(MailLocale::forVisitor())
-                ->send(new PraxisFrameworkDispatch());
-
+        // Send the method PDF to the address they provided, in the language of the page they used
+        if (app(WhitepaperService::class)->send($this->recordedEmail)) {
             // Trigger the UI success text
             $this->emailSent = true;
-
-        } catch (\Exception $e) {
-            // If the SMTP fails, log the error safely and optionally alert the user
-            \Illuminate\Support\Facades\Log::error('Whitepaper email failed', ['message' => $e->getMessage()]);
+        } else {
+            // The email could not be sent (logged by the service)
             session()->flash('error', 'Transmission failed. Please check your network connection or try the direct link.');
         }
     }

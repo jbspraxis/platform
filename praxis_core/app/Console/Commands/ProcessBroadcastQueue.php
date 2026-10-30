@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\IntelligenceBroadcast;
+use App\Services\Site\TrackingService;
 use App\Support\MailLocale;
 
 class ProcessBroadcastQueue extends Command
@@ -56,18 +57,20 @@ class ProcessBroadcastQueue extends Command
                 $body = preg_replace_callback('/\{\{\s*(company_name|industry|pipeline_stage)\s*\}\}/i', fn ($m) => e($vars[strtolower($m[1])]), $body);
 
                 // 3. The 1x1 tracking pixel and the unsubscribe link: the mailable puts the pixel at the end of the body
-                //    and the link in the footer and the List-Unsubscribe header
-                $pixelUrl = route('tracking.open', ['campaign_id' => $campaign->id, 'user_id' => $user->id]);
-                $unsubUrl = route('tracking.unsubscribe', ['user_id' => $user->id]);
+                //    and the link in the footer and the List-Unsubscribe header. Both carry this recipient's token
+                //    (docs/SITE_API.md section 6.4), so nobody can count opens for, or unsubscribe, someone else.
+                $t = TrackingService::token($campaign->id, $user->id);
+                $pixelUrl = route('tracking.open', ['campaign_id' => $campaign->id, 'user_id' => $user->id, 't' => $t]);
+                $unsubUrl = route('tracking.unsubscribe', ['user_id' => $user->id, 'campaign' => $campaign->id, 't' => $t]);
 
                 // 4. Send the Email, in the recipient's language
                 Mail::to($user->email)->locale($locale)->send(new IntelligenceBroadcast($campaign->subject, $body, $unsubUrl, $pixelUrl));
 
-                // 5. Mark as Sent
+                // 5. Mark as Sent (with token links: from now on its pixel and unsubscribe link need the token)
                 DB::table('broadcast_logs')->where('id', $log->id)->update([
                     'status' => 'Sent',
                     'updated_at' => now()
-                ]);
+                ] + (TrackingService::canSign() ? ['signed_links' => 1] : []));
 
                 // Increment Sent Count on Campaign
                 DB::table('broadcast_campaigns')->where('id', $campaign->id)->increment('sent_count');

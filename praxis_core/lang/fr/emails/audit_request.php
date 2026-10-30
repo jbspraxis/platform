@@ -19,5 +19,7 @@ return [
         'Data Architecture' => 'Revue de l’ingénierie des données',
         'Custom Software' => 'Développement de logiciel sur mesure ou d’ERP',
         'Retainer' => 'Maintenance et assistance continues',
+        // Un sujet saisi par le visiteur : sa copie ne reprend jamais ce qu’il a saisi
+        'Other' => 'Le sujet que vous avez décrit',
     ],
 ];

@@ -18,14 +18,22 @@
 <body>
 <main>
     @if ($done)
-        <h1>You're unsubscribed</h1>
+        <h1>You’re unsubscribed</h1>
         <p>You will no longer receive JBS Praxis emails. You can close this window.</p>
+        <a href="{{ url('/') }}">Go to jbspraxis.com</a>
+    @elseif ($invalid ?? false)
+        <h1>We couldn’t confirm this link</h1>
+        <p>Use the unsubscribe link in the latest email you received from us, or email info@jbspraxis.com and we’ll stop sending you our emails.</p>
         <a href="{{ url('/') }}">Go to jbspraxis.com</a>
     @else
         <h1>Unsubscribe from JBS Praxis emails?</h1>
-        <p>Confirm below and we'll stop sending you our emails.</p>
+        <p>Confirm below and we’ll stop sending you our emails.</p>
         <form method="POST" action="{{ route('tracking.unsubscribe.confirm', ['user_id' => $userId]) }}">
             @csrf
+            @if (!empty($campaign) && !empty($token))
+                <input type="hidden" name="campaign" value="{{ $campaign }}">
+                <input type="hidden" name="t" value="{{ $token }}">
+            @endif
             <button type="submit">Unsubscribe</button>
         </form>
     @endif

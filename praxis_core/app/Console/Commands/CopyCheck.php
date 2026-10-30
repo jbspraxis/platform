@@ -28,7 +28,9 @@ class CopyCheck extends Command
         'resources/views/emails', 'resources/views/components/mail', 'resources/views/partials',
         'app/Livewire/Hq', 'app/Livewire/ClientOs', 'app/Livewire/Portal', 'app/Livewire/Tracker', 'app/Mail', 'lang/en/emails', 'lang/fr/emails',
         // Scheduled commands and website forms that write the notifications staff read in HQ
+        // (the forms' saving code, shared with the site API, is in app/Services/Site)
         'app/Console/Commands', 'app/Livewire/ScheduleConsultation.php', 'app/Livewire/ContactHub.php', 'app/Livewire/Kaizen.php',
+        'app/Services/Site',
     ];
 
     /** Capitalised words that are fine: acronyms and codes */
@@ -110,7 +112,7 @@ class CopyCheck extends Command
     /**
      * Text a person reads, with its line number. Blade: text between tags plus placeholder, title, alt,
      * aria-label and value attributes, without Blade/PHP code. PHP: messages in flash(), addError(),
-     * and 'title'/'message' entries of notifications.
+     * and 'title'/'message' entries of notifications, including the texts a ternary chooses between.
      *
      * @return list<array{0:int,1:string}>
      */
@@ -148,6 +150,62 @@ class CopyCheck extends Command
             preg_match_all($p, $src, $m, PREG_OFFSET_CAPTURE);
             foreach ($m[2] as [$text, $off]) {
                 if (preg_match('/\p{L}{2,}/u', $text)) $out[] = [$lineOf($off), $text];
+            }
+        }
+
+        return array_merge($out, $this->ternaryText($src));
+    }
+
+    /**
+     * String literals chosen by a ternary or ?? in a 'title' / 'message' / 'label' / 'body' value, e.g.
+     * 'title' => $tier == 1 ? 'First text' : 'Second text' (the patterns above see only a value that starts
+     * with a literal). Read with PHP's tokenizer, so quotes, colons and question marks inside strings don't confuse it.
+     *
+     * @return list<array{0:int,1:string}>
+     */
+    private function ternaryText(string $src): array
+    {
+        $tokens = @token_get_all($src);
+        $out = [];
+        $count = count($tokens);
+        $significant = fn ($t) => !(is_array($t) && in_array($t[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true));
+
+        for ($i = 0; $i < $count; $i++) {
+            $t = $tokens[$i];
+            if (!is_array($t) || $t[0] !== T_CONSTANT_ENCAPSED_STRING || !in_array(substr($t[1], 1, -1), ['title', 'message', 'label', 'body'], true)) {
+                continue;
+            }
+            // 'key' =>
+            $j = $i + 1;
+            while ($j < $count && !$significant($tokens[$j])) $j++;
+            if ($j >= $count || !is_array($tokens[$j]) || $tokens[$j][0] !== T_DOUBLE_ARROW) {
+                continue;
+            }
+
+            // The value runs to the next , ] or ) at its own depth
+            $depth = 0;
+            $previous = null;
+            for ($k = $j + 1; $k < $count; $k++) {
+                $v = $tokens[$k];
+                $char = is_array($v) ? null : $v;
+                if (in_array($char, ['(', '['], true)) {
+                    $depth++;
+                } elseif (in_array($char, [')', ']'], true)) {
+                    if ($depth === 0) break;
+                    $depth--;
+                } elseif ($char === ',' && $depth === 0) {
+                    break;
+                } elseif ($char === ';') {
+                    break;
+                }
+
+                // A literal right after ? or : (a ternary branch) or ?? (a default)
+                if (is_array($v) && $v[0] === T_CONSTANT_ENCAPSED_STRING
+                    && ($previous === '?' || $previous === ':' || (is_array($previous) && $previous[0] === T_COALESCE))) {
+                    $text = stripcslashes(substr($v[1], 1, -1));
+                    if (preg_match('/\p{L}{2,}/u', $text)) $out[] = [$v[2], $text];
+                }
+                if ($significant($v)) $previous = $v;
             }
         }
 

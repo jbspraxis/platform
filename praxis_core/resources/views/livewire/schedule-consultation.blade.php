@@ -350,7 +350,9 @@
                                 @error('customFocus') <span class="error-msg">> {{ $message }}</span> @enderror
                             @else
                                 <div style="margin-bottom: 20px;"></div> @endif
-                            
+
+                            @error('selectedTime') <span class="error-msg" role="alert" style="display: block; margin-bottom: 12px;">> {{ $message }}</span> @enderror
+
                             <button type="submit" class="terminal-action-btn" {{ !$selectedTime ? 'disabled' : '' }} onclick="submitScheduleFX(event)">
                                 <span id="scheduleSubmitText" wire:loading.remove wire:target="processBooking">REQUEST SECURE SLOT</span>
                                 <div wire:loading.inline-block wire:target="processBooking" class="loader-ring"></div>

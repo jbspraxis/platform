@@ -3,14 +3,12 @@
 namespace App\Livewire;
 
 use Livewire\Component;
-use App\Models\ClientUser;
 use App\Models\KaizenArticle;
-use App\Models\User;
-use App\Support\Access;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
+use App\Services\Site\Fields;
+use App\Services\Site\KaizenService;
+use App\Services\Site\LimitReached;
+use App\Support\Monitor\ErrorMonitor;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class Kaizen extends Component
 {
@@ -45,105 +43,21 @@ class Kaizen extends Component
         // Clear previous system errors
         $this->errorMessage = null;
 
-        // 1. Strict Validation Gateway
-        $this->validate([
-            'fullName'      => 'required|string|max:100',
-            'title'         => 'required|string|max:100',
-            'email'         => 'required|email|max:100',
-            'linkedinUrl'   => 'required|url|max:255',
-            'articleTitle'  => 'required|string|max:255',
-            'execSummary'   => [
-                'required',
-                'string',
-                function ($attribute, $value, $fail) {
-                    if (str_word_count($value) > 50) {
-                        $fail('The Executive Summary must not exceed 50 words.');
-                    }
-                },
-            ],
-            'vulnerability' => 'required|string|max:10000',
-            'solution'      => 'required|string|max:10000',
-            'roi'           => 'required|string|max:255',
-            'category'      => 'required|in:The Boardroom,The Server Room',
-        ]);
-
-        // 3 submissions per IP per hour
-        $rateKey = 'kaizen-submit:' . request()->ip();
-        if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($rateKey, 3)) {
-            $this->errorMessage = 'Too many submissions from this connection. Please try again later.';
-            return;
-        }
-        \Illuminate\Support\Facades\RateLimiter::hit($rateKey, 3600);
+        // 1. Strict Validation Gateway (the same rules as the site API: App\Services\Site\KaizenService)
+        $this->validate(Fields::rulesFor(KaizenService::rules(), KaizenService::FIELDS));
 
         try {
-            DB::transaction(function () {
-                $nameParts = explode(' ', trim($this->fullName), 2);
-
-                // 1. The contributor is a client contact (no password, so no portal access).
-                //    An existing client or lead keeps their own record and organisation.
-                $contributor = ClientUser::withTrashed()->where('email', $this->email)->first();
-
-                // 2. New contributors share one organisation
-                if (!$contributor) {
-                    $contributorOrgId = DB::table('organizations')->where('name', 'Kaizen Public Contributors')->value('id');
-                    if (!$contributorOrgId) {
-                        $contributorOrgId = (string) Str::uuid();
-                        DB::table('organizations')->insert([
-                            'id' => $contributorOrgId, 'name' => 'Kaizen Public Contributors',
-                            'status' => 'Internal', 'created_at' => now(), 'updated_at' => now(),
-                        ]);
-                    }
-
-                    $contributor = ClientUser::create([
-                        'organization_id' => $contributorOrgId,
-                        'first_name'      => $nameParts[0],
-                        'last_name'       => $nameParts[1] ?? 'Unknown',
-                        'email'           => $this->email,
-                        'job_title'       => $this->title,
-                        'status'          => 'Active',
-                        'lifecycle_stage' => 'Public Contributor',
-                        'source'          => 'kaizen',
-                    ]);
-                }
-
-                // Calculate Read Time 
-                $combinedText = $this->vulnerability . ' ' . $this->solution;
-                $calculatedReadTime = max(1, ceil(str_word_count($combinedText) / 200));
-
-                // 3. Log the Architecture (Pending Moderation)
-                KaizenArticle::create([
-                    'slug'                => Str::slug($this->articleTitle) . '-' . Str::random(5),
-                    'category'            => $this->category,
-                    'title'               => $this->articleTitle,
-                    'executive_summary'   => $this->execSummary,
-                    'problem_statement'   => $this->vulnerability,
-                    'engineered_solution' => $this->solution,
-                    'final_roi'           => $this->roi,
-                    'read_time_minutes'   => $calculatedReadTime,
-                    'is_public'           => false, 
-                    'is_internal_sop'     => false,
-                    'status'              => 'Pending Moderation',
-                    'created_by'          => User::EDITORIAL_ID,
-                    'contributor_id'      => $contributor->id,
-                ]);
-
-                // Tell the staff who moderate Kaizen there is an article to moderate
-                $notifications = [];
-                foreach (Access::staffWith('kaizen.approve') as $adminId) {
-                    $notifications[] = [
-                        'id' => (string) Str::uuid(), 'user_id' => $adminId,
-                        'title' => 'Kaizen article waiting for review',
-                        'message' => "‘{$this->articleTitle}’ was sent by {$this->fullName}.",
-                        'type' => 'System', 'created_at' => now(),
-                    ];
-                }
-                if (!empty($notifications)) DB::table('notifications')->insert($notifications);
-            });
+            // Contributor contact, the article (waiting for moderation) and the notice to moderators;
+            // the limits are the service's, shared with the site API
+            app(KaizenService::class)->submit(Fields::fromComponent($this, KaizenService::FIELDS), request()->ip());
 
             $this->isSuccess = true;
 
+        } catch (LimitReached $e) {
+            $this->errorMessage = 'Too many submissions from this connection. Please try again later.';
         } catch (\Throwable $e) {
-            Log::error('Kaizen Public Submission Failure: ' . $e->getMessage());
+            // Without bound values: a database error must not copy the contributor's details into the log
+            Log::error('Kaizen Public Submission Failure: ' . ErrorMonitor::safeMessage($e));
             $this->errorMessage = 'Your submission could not be saved. Please try again later or email info@jbspraxis.com.';
         }
     }

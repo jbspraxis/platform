@@ -13,12 +13,14 @@ return [
     'when' => ':date, :time (WAT)',
     'time_format' => 'HH:mm',
 
-    // The topics offered on the booking form (stored values on the left); anything else is shown as typed.
+    // The topics offered on the booking form (stored values on the left); anything else is shown as typed (team alert).
     'topics' => [
         'Performance Audit' => 'Performance audit and compliance',
         'Data Architecture' => 'Data engineering review',
         'Custom Software' => 'Custom software or ERP build',
         'Retainer' => 'Ongoing support and maintenance',
+        // A topic the visitor typed: the visitor's copy never repeats what they typed, the team's copy has it
+        'Other' => 'The topic you described',
     ],
 
     'alert' => [

@@ -2,15 +2,20 @@
 
 namespace App\Support\Monitor;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
  * The error side of the HQ System Health monitor.
  *
  *   captureException($e)   from bootstrap/app.php for every reported exception (never throws)
+ *   safeMessage($e)        the message without personal data: database errors keep the SQL with ? placeholders
+ *                          and lose the values (docs/SITE_API.md section 6.3)
+ *   logSafely($e)          writes a database error to laravel.log the same way (bootstrap/app.php)
  *   record([...])          store one occurrence: grouped by fingerprint, latest 50 events kept
  *   explain($group)        a plain-English hint for common errors
  *   brief($group)          everything an AI needs to fix it, as Markdown ("Copy for AI")
@@ -36,7 +41,7 @@ class ErrorMonitor
                 'source' => 'exception',
                 'level' => 'error',
                 'exception_class' => get_class($e),
-                'message' => $e->getMessage() ?: get_class($e),
+                'message' => self::safeMessage($e) ?: get_class($e),
                 'file' => $file,
                 'line' => $line,
                 'trace' => self::trace($e),
@@ -121,6 +126,49 @@ class ErrorMonitor
         }
 
         return $groupId;
+    }
+
+    /**
+     * The message as it may be stored and shown: for a database error, the driver's message with any quoted
+     * value removed, then the SQL with its ? placeholders (never the bound values, which hold visitors' data).
+     */
+    public static function safeMessage(Throwable $e): string
+    {
+        if ($e instanceof QueryException) {
+            $driver = $e->getPrevious() ? $e->getPrevious()->getMessage() : '';
+            return trim(self::withoutValues($driver) . ' (Connection: ' . $e->getConnectionName() . ', SQL: ' . $e->getSql() . ')');
+        }
+        if ($e instanceof \PDOException) {
+            return self::withoutValues($e->getMessage());
+        }
+
+        return $e->getMessage();
+    }
+
+    /**
+     * A database error in laravel.log without bound values. bootstrap/app.php calls it for QueryException and stops
+     * Laravel's own log line (which would hold them). The context is shaped like Laravel's, so the log scanner
+     * recognises the error that captureException() already recorded.
+     */
+    public static function logSafely(Throwable $e): void
+    {
+        $message = self::safeMessage($e);
+        $trace = [];
+        foreach (array_slice($e->getTrace(), 0, 20) as $i => $f) {
+            $trace[] = '#' . $i . ' ' . (isset($f['file']) ? self::relativePath($f['file']) . '(' . ($f['line'] ?? '?') . ')' : '[internal]') . ': '
+                . ($f['class'] ?? '') . ($f['type'] ?? '') . ($f['function'] ?? '') . '()';
+        }
+        Log::error($message, [
+            'exception' => '[object] (' . get_class($e) . '(code: ' . $e->getCode() . '): ' . $message . ' at ' . $e->getFile() . ':' . $e->getLine() . ')',
+            'trace' => $trace,
+        ]);
+    }
+
+    /** Removes quoted values from a database driver message: Duplicate entry 'a@b.co' → Duplicate entry '?' */
+    private static function withoutValues(string $message): string
+    {
+        // MySQL quotes values without escaping them, so a value runs to the quote before "for" / "at" or the end
+        return (string) preg_replace('/\b(entry|value:?)\s+\'.*?\'(?=\s+(?:for|at)\b|\s*$)/is', '$1 \'?\'', $message);
     }
 
     // ---------------------------------------------------------------- state
@@ -257,7 +305,7 @@ class ErrorMonitor
             $lines[] = "#{$i} {$where} " . ($f['class'] ?? '') . ($f['type'] ?? '') . ($f['function'] ?? '') . '()';
         }
         if ($prev = $e->getPrevious()) {
-            $lines[] = 'Caused by ' . get_class($prev) . ': ' . $prev->getMessage();
+            $lines[] = 'Caused by ' . get_class($prev) . ': ' . self::safeMessage($prev);
         }
         return implode("\n", $lines);
     }

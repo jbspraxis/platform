@@ -281,6 +281,10 @@
                         <dd style="margin: 0; font-variant-numeric: tabular-nums;">{{ \Carbon\Carbon::parse($selectedLead->created_at)->format('j M Y, H:i') }}</dd>
                         <dt class="text-muted">Owner</dt>
                         <dd style="margin: 0;">{{ $selectedLead->owner_id ? $selectedLead->owner_first . ' ' . $selectedLead->owner_last : 'Not assigned' }}</dd>
+                        @if (!empty($selectedLead->start_timing))
+                            <dt class="text-muted">When they’d like to start</dt>
+                            <dd style="margin: 0;">{{ \App\Services\Site\EnquiryService::START_TIMINGS[$selectedLead->start_timing] ?? $selectedLead->start_timing }}</dd>
+                        @endif
                     </dl>
                 </section>
             </div>

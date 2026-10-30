@@ -121,8 +121,10 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
         });
 
         // 5. MARKETING & ROAS
-        Route::prefix('marketing')->middleware('can:marketing.view')->group(function () {
-            Route::get('/campaigns', \App\Livewire\Hq\Marketing\MarketingSync::class)->name('hq.marketing.campaigns');
+        // Each screen checks its own module, so someone with only website.view can open Website settings
+        Route::prefix('marketing')->group(function () {
+            Route::get('/campaigns', \App\Livewire\Hq\Marketing\MarketingSync::class)->middleware('can:marketing.view')->name('hq.marketing.campaigns');
+            Route::get('/website-settings', \App\Livewire\Hq\Marketing\WebsiteSettings::class)->middleware('can:website.view')->name('hq.marketing.website');
         });
 
         // 6. OPERATIONS & DEPLOYMENT MATRIX
@@ -250,18 +252,16 @@ Route::domain(Hosts::site())->group(function () use ($legacy) {
     Route::get('/kaizen/{slug}', \App\Livewire\KaizenArticleView::class)->name('kaizen.show');
 
     // ZONE 4: EXTERNAL TELEMETRY & TRACKING PIXELS (broadcast emails)
+    // Broadcast links carry a token from now on (?t=…, App\Services\Site\TrackingService); links in emails
+    // sent before keep working without it. The same rules as the site API.
     Route::get('/tracking/open/{campaign_id}/{user_id}', function ($campaign_id, $user_id) {
         // Country comes from Cloudflare's header once the site is proxied; visitor IPs are no
         // longer sent in plain text to a third-party geolocation service.
         $ip = request()->ip();
         $geo = request()->header('CF-IPCountry') ?: 'Unknown Location';
+        $token = request()->query('t');
 
-        DB::table('broadcast_logs')->where('campaign_id', $campaign_id)->where('user_id', $user_id)->update([
-            'open_count' => DB::raw('open_count + 1'), 'last_opened_at' => now(), 'last_open_ip' => $ip, 'last_open_geo' => $geo
-        ]);
-
-        $log = DB::table('broadcast_logs')->where('campaign_id', $campaign_id)->where('user_id', $user_id)->first();
-        if ($log && $log->open_count == 1) { DB::table('broadcast_campaigns')->where('id', $campaign_id)->increment('opened_count'); }
+        app(\App\Services\Site\TrackingService::class)->open((string) $campaign_id, (string) $user_id, $ip, mb_substr((string) $geo, 0, 64), is_string($token) ? $token : null);
 
         $pixel = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
         return response($pixel)->header('Content-Type', 'image/png');
@@ -269,12 +269,17 @@ Route::domain(Hosts::site())->group(function () use ($legacy) {
 
     // Unsubscribe needs a click: email security scanners open links automatically, which used to unsubscribe people.
     Route::get('/tracking/unsubscribe/{user_id}', function ($user_id) {
-        return view('unsubscribe', ['userId' => $user_id, 'done' => false]);
+        $campaign = request()->query('campaign');
+        $token = request()->query('t');
+        return view('unsubscribe', ['userId' => $user_id, 'done' => false, 'invalid' => false,
+            'campaign' => is_string($campaign) ? $campaign : null, 'token' => is_string($token) ? $token : null]);
     })->middleware('throttle:30,1')->name('tracking.unsubscribe');
 
     Route::post('/tracking/unsubscribe/{user_id}', function ($user_id) {
-        DB::table('client_users')->where('id', $user_id)->update(['is_subscribed' => 0, 'updated_at' => now()]);
-        return view('unsubscribe', ['userId' => $user_id, 'done' => true]);
+        $campaign = request()->input('campaign');
+        $token = request()->input('t');
+        $done = app(\App\Services\Site\TrackingService::class)->unsubscribe((string) $user_id, is_string($campaign) ? $campaign : null, is_string($token) ? $token : null);
+        return view('unsubscribe', ['userId' => $user_id, 'done' => $done, 'invalid' => !$done, 'campaign' => null, 'token' => null]);
     })->middleware('throttle:30,1')->name('tracking.unsubscribe.confirm');
 
     // Old addresses from before HQ and the portal had their own hosts (emails already sent, bookmarks)

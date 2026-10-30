@@ -2,24 +2,18 @@
 
 namespace App\Livewire;
 
-use App\Mail\AuditRequestAlert;
-use App\Mail\AuditRequested;
-use App\Support\Access;
-use App\Support\MailLocale;
+use App\Services\Site\AlreadyBooked;
+use App\Services\Site\BookingService;
+use App\Services\Site\LimitReached;
+use App\Services\Site\Fields;
 use Livewire\Component;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Str;
 
 class ScheduleConsultation extends Component
 {
     // Slots are shown and booked in Lagos time (WAT); the app itself runs in UTC.
-    private const TIMEZONE = 'Africa/Lagos';
-    private const SLOTS = ['09:00', '10:30', '13:00', '14:30', '16:00'];
+    // Slots, booking rules and the booking itself: App\Services\Site\BookingService (also used by the site API).
+    private const TIMEZONE = BookingService::TIMEZONE;
 
     // Calendar State
     public $currentYear;
@@ -61,19 +55,15 @@ class ScheduleConsultation extends Component
             $this->daysInMonth[] = ['day' => null, 'is_past' => true];
         }
 
-        // Populate actual days
-        $today = Carbon::today(self::TIMEZONE);
+        // Populate actual days: past days, weekends and days more than 92 days ahead can't be booked
+        $bookings = app(BookingService::class);
         for ($i = 1; $i <= $daysInMonthCount; $i++) {
             $currentLoopDate = Carbon::createFromDate($this->currentYear, $this->currentMonth, $i, self::TIMEZONE);
-
-            // Disable past dates and weekends (Saturday=6, Sunday=0)
-            $isPast = $currentLoopDate->startOfDay()->lt($today);
-            $isWeekend = $currentLoopDate->isWeekend();
 
             $this->daysInMonth[] = [
                 'day' => $i,
                 'full_date' => $currentLoopDate->format('Y-m-d'),
-                'is_past' => $isPast || $isWeekend,
+                'is_past' => !$bookings->isBookableDate($currentLoopDate->format('Y-m-d')),
             ];
         }
     }
@@ -95,41 +85,10 @@ class ScheduleConsultation extends Component
         $this->loadTimeSlots($dateString);
     }
 
-    // Free slots for a date: not booked, and for today only times still ahead (Lagos time)
-    private function freeSlots($dateString): array
-    {
-        if (!$this->isBookableDate($dateString)) {
-            return [];
-        }
-
-        // Block slots that are already Scheduled OR Requested (Pending in Lobby)
-        $bookedTimes = DB::table('appointments')
-            ->whereDate('start_time', $dateString)
-            ->whereIn('status', ['Scheduled', 'Requested'])
-            ->pluck('start_time')
-            ->map(fn ($datetime) => Carbon::parse($datetime)->format('H:i'))
-            ->toArray();
-
-        $now = Carbon::now(self::TIMEZONE);
-        $isToday = $dateString === $now->format('Y-m-d');
-
-        return array_values(array_filter(self::SLOTS, function ($slot) use ($bookedTimes, $isToday, $now) {
-            return !in_array($slot, $bookedTimes, true) && (!$isToday || $slot > $now->format('H:i'));
-        }));
-    }
-
-    private function isBookableDate($dateString): bool
-    {
-        $date = Carbon::createFromFormat('Y-m-d', (string) $dateString, self::TIMEZONE);
-        return $date && $date->format('Y-m-d') === $dateString
-            && !$date->startOfDay()->lt(Carbon::today(self::TIMEZONE))
-            && !$date->isWeekend();
-    }
-
     public function loadTimeSlots($dateString)
     {
         try {
-            $this->availableSlots = $this->freeSlots($dateString);
+            $this->availableSlots = app(BookingService::class)->freeSlots($dateString);
         } catch (\Throwable $e) {
             $this->availableSlots = [];
         }
@@ -142,166 +101,28 @@ class ScheduleConsultation extends Component
 
     public function processBooking()
     {
-        $this->validate([
-            'fullName' => 'required|string|max:100',
-            'title' => 'nullable|string|max:100',
-            'email' => 'required|email|max:100',
-            'phone' => 'required|string|max:30',
-            'enterpriseName' => 'required|string|max:150',
-            'focus' => 'required|string|max:100',
-            'customFocus' => 'required_if:focus,Other|max:40',
-            'selectedDate' => 'required|date_format:Y-m-d',
-            'selectedTime' => 'required|in:' . implode(',', self::SLOTS),
-        ]);
+        $this->validate(Fields::rulesFor(BookingService::rules(), BookingService::FIELDS));
 
-        // 5 booking requests per IP per hour
-        $rateKey = 'booking:' . request()->ip();
-        if (RateLimiter::tooManyAttempts($rateKey, 5)) {
+        // Saves the request and sends the confirmation and the team alert; null when the time was just taken.
+        // The limits (per visitor, everyone, one open request per email and organisation) are the service's.
+        try {
+            $booking = app(BookingService::class)->book(Fields::fromComponent($this, BookingService::FIELDS), request()->ip());
+        } catch (LimitReached $e) {
             $this->addError('selectedTime', 'Too many booking requests from this connection. Please try again later.');
+            return;
+        } catch (AlreadyBooked $e) {
+            $this->addError('selectedTime', 'You already have a free audit request waiting for confirmation. To change it, reply to our confirmation email.');
             return;
         }
 
-        $finalFocus = $this->focus === 'Other' ? trim($this->customFocus) : $this->focus;
-        $startDateTime = null;
-
-        $booked = DB::transaction(function () use ($finalFocus, &$startDateTime) {
-            // Re-check the slot on the server, locking that day's appointments
-            DB::table('appointments')->whereDate('start_time', $this->selectedDate)->lockForUpdate()->get();
-            if (!in_array($this->selectedTime, $this->freeSlots($this->selectedDate), true)) {
-                return false;
-            }
-
-            $emailStr = strtolower(trim($this->email));
-            $cleanOrgName = trim($this->enterpriseName);
-
-            // 1A. Find or Create Organization (Case-Insensitive). Only merge into an existing
-            // lead: a match on a client organisation gets its own lead record, flagged for review.
-            $existingOrg = DB::table('organizations')->whereRaw('LOWER(name) = ?', [strtolower($cleanOrgName)])->first();
-
-            if ($existingOrg && $existingOrg->status === 'Lead') {
-                $orgId = $existingOrg->id;
-                // Update timestamp and flag as suspect so command sees a new interaction
-                DB::table('organizations')->where('id', $orgId)->update([
-                    'updated_at' => now(),
-                    'is_duplicate_suspect' => 1
-                ]);
-            } else {
-                $orgId = (string) Str::uuid();
-                DB::table('organizations')->insert([
-                    'id' => $orgId,
-                    'name' => $cleanOrgName,
-                    'status' => 'Lead',
-                    'pipeline_stage' => 'Lead Captured',
-                    'is_duplicate_suspect' => $existingOrg ? 1 : 0,
-                    'preferred_language' => strtoupper(MailLocale::forVisitor()), // later emails from HQ follow the page language
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
-
-            // 1B. Find or create the contact (a lead: client account with no password)
-            $existingUser = DB::table('client_users')->where('email', $emailStr)->first();
-
-            if (!$existingUser) {
-                $userId = (string) Str::uuid();
-                $nameParts = explode(' ', trim($this->fullName), 2);
-
-                DB::table('client_users')->insert([
-                    'id' => $userId,
-                    'organization_id' => $orgId, // Attaches to either the new or existing Org
-                    'first_name' => $nameParts[0],
-                    'last_name' => $nameParts[1] ?? 'Unknown',
-                    'email' => $emailStr,
-                    'phone' => $this->phone,
-                    'job_title' => $this->title,
-                    'status' => 'Active',
-                    'lifecycle_stage' => 'Lead',
-                    'source' => 'booking',
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
-
-            $bookerId = $existingUser->id ?? $userId;
-
-            // 2. Combine Date and Time (stored as the Lagos wall-clock time shown to the visitor)
-            $startDateTime = Carbon::parse($this->selectedDate . ' ' . $this->selectedTime);
-            $endDateTime = $startDateTime->copy()->addMinutes(60); // 1 hour block
-
-            // 3. Create the Appointment mapped straight to the Pending Lobby
-            $appointmentId = (string) Str::uuid();
-            DB::table('appointments')->insert([
-                'id' => $appointmentId,
-                'organization_id' => $orgId,
-                'title' => 'Free audit: ' . $finalFocus,
-                'start_time' => $startDateTime,
-                'end_time' => $endDateTime,
-                'status' => 'Requested',
-                'created_by' => $bookerId, // the contact who booked (HQ-created appointments hold a staff id)
-                'created_at' => now(),
-                'updated_at' => now()
-            ]);
-
-            // 4. System Telemetry (Notify Admins)
-            // Notices are for staff; with no CRM staff account yet, skip it rather than fail the booking
-            $notifications = [];
-            foreach (Access::staffWith('crm.edit') as $adminId) {
-                $notifications[] = [
-                    'id' => (string) Str::uuid(),
-                    'user_id' => $adminId,
-                    'title' => 'New free audit request',
-                    'message' => trim($this->enterpriseName) . " asked for a free audit on " . $startDateTime->format('j M, H:i') . " (WAT). Approve or move it in Free audits.",
-                    'link_url' => route('hq.crm.consult', [], false),
-                    'type' => 'System',
-                    'is_read' => 0,
-                    'created_at' => now()
-                ];
-            }
-            if (!empty($notifications)) DB::table('notifications')->insert($notifications);
-
-            return true;
-        });
-
-        if (!$booked) {
+        if (!$booking) {
             $this->loadTimeSlots($this->selectedDate);
             $this->selectedTime = null;
             $this->addError('selectedTime', 'That time is no longer available. Please choose another slot.');
             return;
         }
 
-        RateLimiter::hit($rateKey, 3600);
-        $this->sendBookingEmails($finalFocus, $startDateTime);
         $this->isSuccess = true;
-    }
-
-    // Confirmation to the visitor and an alert to the team; failures are logged (the request is saved)
-    private function sendBookingEmails(string $focus, Carbon $start): void
-    {
-        $firstName = explode(' ', trim($this->fullName), 2)[0];
-        $visitor = strtolower(trim($this->email));
-
-        try {
-            // In the language of the page the visitor booked from
-            Mail::to($visitor)
-                ->locale(MailLocale::forVisitor())
-                ->send(new AuditRequested($firstName, $focus, $start));
-        } catch (\Throwable $e) {
-            Log::error('Booking: confirmation email failed', ['message' => $e->getMessage()]);
-        }
-
-        $team = config('services.leads.alert_email');
-        if (!$team) {
-            return;
-        }
-
-        try {
-            // Team alert: English, replies go to the visitor
-            Mail::to($team)
-                ->locale('en')
-                ->send(new AuditRequestAlert($this->fullName, $this->title, $visitor, $this->phone, trim($this->enterpriseName), $focus, $start));
-        } catch (\Throwable $e) {
-            Log::error('Booking: team alert email failed', ['message' => $e->getMessage()]);
-        }
     }
 
     public function render()

@@ -16,7 +16,7 @@ class EnquiryAlert extends BrandedMail
     public $leadsUrl;
 
     /**
-     * @param  array<string, ?string>  $details  job_title, phone, city, language, budget, stage, bottleneck, systems, governance (blank ones are left out)
+     * @param  array<string, ?string>  $details  job_title, phone, city, language, budget, start_timing, stage, bottleneck, systems, governance (blank ones are left out)
      */
     public function __construct($fullName, $visitorEmail, $company, $enquiry, array $details = [])
     {
@@ -50,6 +50,7 @@ class EnquiryAlert extends BrandedMail
             'city' => $this->details['city'] ?? null,
             'language' => $this->details['language'] ?? null,
             'budget' => $this->details['budget'] ?? null,
+            'start_timing' => $this->details['start_timing'] ?? null,
             'stage' => $this->details['stage'] ?? null,
             'bottleneck' => $this->details['bottleneck'] ?? null,
             'systems' => $this->details['systems'] ?? null,

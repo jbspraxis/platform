@@ -8,6 +8,10 @@ use Illuminate\Http\Request;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        // The private site API on the HQ host (docs/SITE_API.md): stateless 'api' group, registered
+        // before web.php so HQ's catch-all 404 does not answer its paths first
+        api: __DIR__.'/../routes/site-api.php',
+        apiPrefix: 'api/site/v1',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
@@ -30,7 +34,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'hq.staff' => \App\Http\Middleware\HqStaff::class,
             'client.active' => \App\Http\Middleware\ClientActive::class,
+            // Site API: HMAC signature, nonce and rate limits (site.signed:read|write|chat)
+            'site.signed' => \App\Http\Middleware\VerifySiteSignature::class,
         ]);
+
+        // Site API: inputs reach the shared services exactly as sent (as Livewire's do), and the
+        // multipart signature is computed on the fields as sent
+        $siteApi = fn (Request $request) => $request->is('api/site/v1/*') && \App\Support\Hosts::isHq($request);
+        $middleware->trimStrings(except: [$siteApi]);
+        $middleware->convertEmptyStringsToNull(except: [$siteApi]);
 
         // 4. DYNAMIC SESSION EXPIRATION ROUTING
         $middleware->redirectGuestsTo(function (Request $request) {
@@ -57,4 +69,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->report(function (\Throwable $e) {
             \App\Support\Monitor\ErrorMonitor::captureException($e);
         });
+
+        // Database errors: laravel.log gets the SQL with ? placeholders, never the bound values (visitors'
+        // data, docs/SITE_API.md section 6.3); returning false stops Laravel's own log line, which has them
+        $exceptions->report(function (\Illuminate\Database\QueryException $e) {
+            \App\Support\Monitor\ErrorMonitor::logSafely($e);
+
+            return false;
+        });
+
+        // Site API: errors in its JSON envelope (docs/SITE_API.md section 2), never a stack trace
+        $exceptions->render(fn (\Throwable $e, Request $request) => \App\Http\Controllers\SiteApi\ApiErrors::render($e, $request));
     })->create();

@@ -162,11 +162,21 @@
                 @endif
             @endcan
 
-            @can('marketing.view')
-                <a href="{{ route('hq.marketing.campaigns') }}" class="rail-link {{ $on('hq.marketing.*') }}" wire:navigate>
+            @canany(['marketing.view', 'website.view'])
+                <a href="{{ $user->can('marketing.view') ? route('hq.marketing.campaigns') : route('hq.marketing.website') }}" class="rail-link {{ $on('hq.marketing.*') }}" wire:navigate>
                     <i data-lucide="megaphone"></i> Marketing
                 </a>
-            @endcan
+                @if (request()->routeIs('hq.marketing.*'))
+                    <div class="rail-sub">
+                        @can('marketing.view')
+                            <a href="{{ route('hq.marketing.campaigns') }}" class="{{ $on('hq.marketing.campaigns') }}" wire:navigate>Campaigns</a>
+                        @endcan
+                        @can('website.view')
+                            <a href="{{ route('hq.marketing.website') }}" class="{{ $on('hq.marketing.website') }}" wire:navigate>Website settings</a>
+                        @endcan
+                    </div>
+                @endif
+            @endcanany
 
             @can('mdm.view')
                 <a href="{{ route('hq.mdm.dictionary') }}" class="rail-link {{ $on('hq.mdm.dictionary', 'hq.mdm.copq', 'hq.mdm.tax', 'hq.mdm.remittance', 'hq.mdm.legal') }}" wire:navigate>

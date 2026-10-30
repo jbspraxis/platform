@@ -40,6 +40,9 @@ return [
             'crm' => ['label' => 'Leads & proposals', 'actions' => $all],
             'broadcasts' => ['label' => 'Broadcasts', 'actions' => ['view', 'create', 'approve']],
             'marketing' => ['label' => 'Marketing campaigns', 'actions' => ['view', 'create', 'edit', 'delete', 'approve']],
+            // What jbspraxis.com shows: company details, contact, social links, leadership (HQ → Marketing → Website settings).
+            // Roles that already exist get it from the migration 2026_10_30_000002_grant_website_settings_permissions.
+            'website' => ['label' => 'Website settings', 'actions' => ['view', 'edit']],
             'expenses' => ['label' => 'Cash requests', 'actions' => ['view', 'create', 'approve', 'export']],
             'finance' => ['label' => 'Invoices, ledger & budgets', 'actions' => $all],
             'payroll' => ['label' => 'Payroll & tax', 'actions' => $all],
@@ -79,9 +82,9 @@ return [
                 'projects.view', 'projects.edit', 'qa.view', 'qa.create', 'qa.edit', 'timesheets.view', 'timesheets.create', 'kaizen.view', 'kaizen.create', 'expenses.create',
             ]],
             // marketing.delete also opens the social-account password vault, so it stays with Owner/Partner
-            'sales' => ['name' => 'Sales & Marketing', 'description' => 'Leads, proposals, broadcasts and campaigns.', 'grant' => [
+            'sales' => ['name' => 'Sales & Marketing', 'description' => 'Leads, proposals, broadcasts, campaigns and website settings.', 'grant' => [
                 'dashboard.view', 'crm.*', 'broadcasts.*', 'marketing.view', 'marketing.create', 'marketing.edit', 'marketing.approve',
-                'kaizen.*', 'projects.view', 'expenses.create',
+                'website.*', 'kaizen.*', 'projects.view', 'expenses.create',
             ]],
             'hr' => ['name' => 'HR', 'description' => 'People records, attendance, contracts and appraisals.', 'grant' => [
                 'hr.*', 'payroll.view', 'timesheets.view', 'timesheets.approve', 'timesheets.export', 'mdm.view', 'expenses.create',
