@@ -2,8 +2,9 @@
 
 Agreed 30 October 2026 (PR2b). The marketing site (`praxis_site`, its own Laravel app) has **no database
 password**. Everything it reads or writes goes through this private API on `hq.jbspraxis.com`, served by
-`praxis_core`. The live marketing pages in `praxis_core` keep running until PR3 swaps the domain, so every
-write endpoint calls the **same service class** the current Livewire page calls: one behaviour, two callers.
+`praxis_core`. Every write endpoint calls the **same service class** the old Livewire page in `praxis_core`
+called, so behaviour carried over unchanged. Those old pages were removed once jbspraxis.com moved to
+`praxis_site` (30 October 2026); the sections below still name them where they explain where a rule came from.
 
 Preview of the new app: `next.jbspraxis.com` (noindex). Live switch: PR3.
 
