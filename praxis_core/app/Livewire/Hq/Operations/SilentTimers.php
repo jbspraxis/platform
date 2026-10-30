@@ -33,7 +33,7 @@ class SilentTimers extends Component
     public $ledgerData = [];
     public $correctionRequests = [];
 
-    // L5 God Mode State
+    // Manual time entry state (timesheets.approve + payroll.approve, see $canInject)
     public $godModeUserId;
     public $godModeTaskId;
     public $godModeStartTime;

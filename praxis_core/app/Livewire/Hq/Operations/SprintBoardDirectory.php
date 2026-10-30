@@ -6,7 +6,7 @@ use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
+use App\Support\ProjectAccess;
 
 #[Layout('components.layouts.hq')]
 class SprintBoardDirectory extends Component
@@ -17,7 +17,7 @@ class SprintBoardDirectory extends Component
 
     public function mount()
     {
-        $this->canSeeAll = Auth::user()->can('projects.approve') || Auth::user()->can('projects.export');
+        $this->canSeeAll = ProjectAccess::seesEveryProject();
         $this->loadDirectory();
     }
 
@@ -29,16 +29,9 @@ class SprintBoardDirectory extends Component
             ->select('projects.id', 'projects.title', 'projects.status', 'organizations.name as client_name')
             ->orderBy('projects.created_at', 'desc');
 
-        // Isolation: without $canSeeAll, they only see projects where they have assigned tasks.
-        // (tasks has no project_id; bridge through project_phases)
+        // Isolation: without $canSeeAll, they only see projects where they have assigned tasks
         if (! $this->canSeeAll) {
-            $assignedProjectIds = DB::table('tasks')
-                ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
-                ->where('tasks.assigned_to', Auth::id())
-                ->pluck('project_phases.project_id')
-                ->unique();
-                
-            $query->whereIn('projects.id', $assignedProjectIds);
+            $query->whereIn('projects.id', ProjectAccess::assignedProjectIds());
         }
 
         $this->projects = $query->get()->toArray();

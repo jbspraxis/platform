@@ -94,7 +94,7 @@ class CashRequestManager extends Component
             return;
         }
 
-        $userId = Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c';
+        $userId = Auth::id(); // always signed in here (auth middleware); approvals are never attributed to anyone else
         $ipAddress = request()->ip();
         $timestamp = now()->toDateTimeString();
 
@@ -120,14 +120,7 @@ class CashRequestManager extends Component
             return;
         }
 
-        // Log System Event
-        DB::table('system_audit_logs')->insert([
-            'user_id' => $userId,
-            'action' => 'AUTHORIZED_CASH_REQUEST',
-            'target_table' => 'cash_requests',
-            'ip_address' => $ipAddress,
-            'created_at' => now()
-        ]);
+        $this->logDecision('AUTHORIZED_CASH_REQUEST', 'Pending Auth', 'Authorized', "Approved cash request {$this->selectedRequest->reference}.");
 
         // --- NOTIFICATION ENGINE ---
         // Notify the Requester that their funds are authorized
@@ -165,6 +158,8 @@ class CashRequestManager extends Component
             $this->loadRequests();
             return;
         }
+
+        $this->logDecision('REJECTED_CASH_REQUEST', 'Pending Auth', 'Rejected', "Rejected cash request {$this->selectedRequest->reference}.");
 
         // Notify Requester of Rejection
         DB::table('notifications')->insert([
@@ -221,7 +216,7 @@ class CashRequestManager extends Component
     {
         abort_unless(Auth::user()->can('expenses.approve'), 403);
 
-        $userId = Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c';
+        $userId = Auth::id(); // always signed in here (auth middleware); approvals are never attributed to anyone else
 
         // Only an approved request can be closed, only once, and not by the person who raised it
         if (! $this->ensureClearable()) {
@@ -238,6 +233,10 @@ class CashRequestManager extends Component
                 'updated_at' => now(),
             ]);
 
+            if ($closed) {
+                $this->logDecision('CLEARED_CASH_REQUEST', 'Authorized', 'Cleared', "Checked the receipt and closed cash request {$this->selectedRequest->reference}.");
+            }
+
             // 2. Add the amount to the project budget’s spending (once, only if this call closed it)
             if ($closed && $this->selectedRequest->project_id && $this->selectedRequest->financial_dictionary_id) {
                 DB::table('project_budgets')
@@ -251,6 +250,22 @@ class CashRequestManager extends Component
 
         $this->showClearanceModal = false;
         $this->loadRequests();
+    }
+
+    /** Each decision goes to the audit log: who made it, on which request, from which status to which */
+    private function logDecision(string $action, string $from, string $to, string $description): void
+    {
+        DB::table('system_audit_logs')->insert([
+            'user_id' => Auth::id(),
+            'action' => $action,
+            'description' => $description,
+            'target_table' => 'cash_requests',
+            'target_id' => $this->selectedRequest->id,
+            'old_values' => json_encode(['status' => $from]),
+            'new_values' => json_encode(['status' => $to]),
+            'ip_address' => request()?->ip(),
+            'created_at' => now(),
+        ]);
     }
 
     /**

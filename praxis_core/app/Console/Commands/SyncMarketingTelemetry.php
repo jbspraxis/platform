@@ -88,7 +88,7 @@ class SyncMarketingTelemetry extends Command
             $cac = $oppsCount > 0 ? ($newSpend / $oppsCount) : $newSpend;
 
             // 5. SECURITY FLAG: BLEEDING CAPITAL ALERT (Selection 13-B)
-            // If spending over $500 with ZERO opportunities, alert Level 5 immediately
+            // If spending over $500 with ZERO opportunities, alert the campaign approvers (marketing.approve) immediately
             if ($newSpend > 500 && $oppsCount == 0) {
                 $this->triggerRedAlert($campaign, $newSpend);
             }

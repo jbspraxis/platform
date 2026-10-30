@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use App\Support\Access;
+use App\Support\ProjectAccess;
 
 #[Layout('components.layouts.hq')]
 class SprintBoard extends Component
@@ -66,19 +67,16 @@ class SprintBoard extends Component
         $this->loadBoardData();
     }
 
-    /** The sprint boards list (SprintBoardDirectory) shows a board to the same people */
+    /** The sprint boards list (SprintBoardDirectory) and the QA hub use the same rule (App\Support\ProjectAccess) */
     public static function maySeeBoard($projectId): bool
     {
-        $user = Auth::user();
-        if ($user->can('projects.approve') || $user->can('projects.export')) {
-            return true;
-        }
+        return ProjectAccess::maySee($projectId);
+    }
 
-        return DB::table('tasks')
-            ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
-            ->where('project_phases.project_id', $projectId)
-            ->where('tasks.assigned_to', Auth::id())
-            ->exists();
+    /** Checked again on every change: access can end while the board is open (a task reassigned, a role changed) */
+    private function authoriseBoard(): void
+    {
+        abort_unless(self::maySeeBoard($this->projectId), 403, 'You no longer have access to this sprint board. Ask a project lead to assign you a task on this project, or an administrator to change your role.');
     }
 
     /** A task on this board’s project, or null (task ids come from the browser) */
@@ -98,9 +96,10 @@ class SprintBoard extends Component
         $this->loadBoardData();
     }
 
-    // Triggers every 10 seconds via wire:poll in the UI
+    // Triggers every 10 seconds via wire:poll in the UI (and on switchSprint), so access is checked again here too
     public function loadBoardData()
     {
+        $this->authoriseBoard();
         if (!$this->activeSprintId) return;
 
         $rawTasks = DB::table('tasks')
@@ -162,6 +161,7 @@ class SprintBoard extends Component
     public function assignToMe($taskId)
     {
         abort_unless(Auth::user()->can('projects.edit'), 403);
+        $this->authoriseBoard();
 
         // Only a task on this board
         if (! $this->boardTask($taskId)) return;
@@ -181,6 +181,8 @@ class SprintBoard extends Component
     // --- KANBAN DRAG & DROP + SILENT TIMER LOGIC ---
     public function updateTaskStatus($taskId, $newStatus)
     {
+        $this->authoriseBoard();
+
         // Only a task on this board, and only into one of the board’s columns
         $task = $this->boardTask($taskId);
         if (!$task || $task->status === $newStatus || ! in_array($newStatus, self::COLUMNS, true)) return;

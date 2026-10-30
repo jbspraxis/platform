@@ -114,6 +114,7 @@ class TaxConfigurator extends Component
         }
 
         try {
+            $before = DB::table('tax_configurations')->where('region_code', $this->activeRegion)->first();
             $updateData = [];
             foreach (self::EDITABLE as $field) {
                 if (! array_key_exists($field, (array) $this->config)) {
@@ -127,10 +128,22 @@ class TaxConfigurator extends Component
             $updateData['updated_at'] = now();
 
             // Create the row on first save; roll it back if the values can’t be saved
-            DB::transaction(function () use ($updateData) {
+            DB::transaction(function () use ($updateData, $before) {
+                $configId = $this->savedConfigurationId();
                 DB::table('tax_configurations')
-                    ->where('id', $this->savedConfigurationId())
-                    ->update($updateData);
+                    ->where('id', $configId)
+                    ->update($updateData + ['updated_by' => Auth::id()]);
+
+                // Only the rates that changed, as they were and as they are now
+                $old = $new = [];
+                foreach (array_diff_key($updateData, ['updated_at' => true]) as $field => $value) {
+                    $was = isset($before->$field) ? (float) $before->$field : null;
+                    if ($was !== $value) {
+                        $old[$field] = $was;
+                        $new[$field] = $value;
+                    }
+                }
+                $this->logTaxChange('TAX_RULES_SAVED', $configId, "Saved the tax rules for {$this->activeRegion}.", $before ? $old : null, $new);
             });
 
             $regionNames = ['NG' => 'Nigeria', 'CM' => 'Cameroon', 'KE' => 'Kenya', 'GLOBAL' => 'other countries'];
@@ -167,8 +180,9 @@ class TaxConfigurator extends Component
             return;
         }
 
+        $bandId = Str::uuid()->toString();
         DB::table('tax_bands')->insert([
-            'id' => Str::uuid()->toString(),
+            'id' => $bandId,
             'tax_configuration_id' => $configId,
             'band_name' => $this->newBandName,
             'lower_limit' => $this->newBandLower,
@@ -176,6 +190,9 @@ class TaxConfigurator extends Component
             'tax_rate' => $this->newBandRate,
             'created_at' => now(),
             'updated_at' => now()
+        ]);
+        $this->logTaxChange('TAX_BAND_ADDED', $configId, "Added the tax band ‘{$this->newBandName}’ for {$this->activeRegion}.", null, [
+            'band_id' => $bandId, 'lower_limit' => $this->newBandLower, 'upper_limit' => empty($this->newBandUpper) ? null : $this->newBandUpper, 'tax_rate' => $this->newBandRate,
         ]);
 
         $this->reset(['newBandName', 'newBandLower', 'newBandUpper', 'newBandRate']);
@@ -186,8 +203,37 @@ class TaxConfigurator extends Component
     {
         abort_unless(Auth::user()->can('payroll.delete'), 403);
 
-        DB::table('tax_bands')->where('id', $bandId)->delete();
+        // Only a band of the country on screen (the id comes from the browser)
+        $band = DB::table('tax_bands')
+            ->join('tax_configurations', 'tax_configurations.id', '=', 'tax_bands.tax_configuration_id')
+            ->where('tax_bands.id', $bandId)
+            ->where('tax_configurations.region_code', $this->activeRegion)
+            ->select('tax_bands.*')
+            ->first();
+
+        if ($band) {
+            DB::table('tax_bands')->where('id', $band->id)->delete();
+            $this->logTaxChange('TAX_BAND_REMOVED', $band->tax_configuration_id, "Removed the tax band ‘{$band->band_name}’ for {$this->activeRegion}.", [
+                'band_id' => $band->id, 'lower_limit' => $band->lower_limit, 'upper_limit' => $band->upper_limit, 'tax_rate' => $band->tax_rate,
+            ], null);
+        }
         $this->loadConfiguration();
+    }
+
+    /** Tax rules decide every payslip, so each change goes to the audit log */
+    private function logTaxChange(string $action, string $configId, string $description, ?array $old, ?array $new): void
+    {
+        DB::table('system_audit_logs')->insert([
+            'user_id' => Auth::id(),
+            'action' => $action,
+            'description' => $description,
+            'target_table' => 'tax_configurations',
+            'target_id' => $configId,
+            'old_values' => $old === null ? null : json_encode($old, JSON_UNESCAPED_UNICODE),
+            'new_values' => $new === null ? null : json_encode($new, JSON_UNESCAPED_UNICODE),
+            'ip_address' => request()?->ip(),
+            'created_at' => now(),
+        ]);
     }
 
     public function closeSuccessModal()
