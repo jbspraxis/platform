@@ -150,6 +150,17 @@ function waitForFile(file, ms = 120000) {
   throw new Error(`${path.relative(ROOT, file)} was not written`);
 }
 
+// Edge takes the title and language from the page but writes its own user agent as the Creator. Swap that entry for
+// Author, Subject and Creator of the same length, padded with spaces, so the cross-reference offsets stay right.
+const SUBJECT = { en: 'See, Design, Build, Hold', fr: 'Diagnostiquer, concevoir, construire, pérenniser' };
+function setInfo(file, lang) {
+  const raw = fs.readFileSync(file, 'latin1');
+  const m = raw.match(/\/Creator \((?:\\.|[^\\)])*\)/);
+  const entry = `/Author (JBS Praxis)\n/Subject (${SUBJECT[lang]})\n/Creator (JBS Praxis)`;
+  if (!m || entry.length > m[0].length) throw new Error(`${path.relative(ROOT, file)}: no room for the document information`);
+  fs.writeFileSync(file, raw.slice(0, m.index) + entry.padEnd(m[0].length, ' ') + raw.slice(m.index + m[0].length), 'latin1');
+}
+
 function pdfFacts(file) {
   const raw = fs.readFileSync(file, 'latin1');
   return {
@@ -174,6 +185,7 @@ for (const lang of LANGS) {
     '--generate-pdf-document-outline', '--virtual-time-budget=20000', `--print-to-pdf=${pdf}`, 'file:///' + src.replace(/\\/g, '/')],
   { stdio: 'ignore', timeout: 180000 });
   waitForFile(pdf);
+  setInfo(pdf, lang);
   const bytes = fs.statSync(pdf).size, f = pdfFacts(pdf);
   const issues = [];
   if (f.pages !== PAGES) {
