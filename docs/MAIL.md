@@ -285,6 +285,11 @@ Each PR, when its tests pass and the owner has seen it locally:
 - **Garbled text**: Outlook HTML declares `charset=windows-1252` in a `<meta>`; after MIME decoding the text is UTF-8, but libxml obeyed the meta and decoded it again. `HtmlSanitizer` (reader) and `HtmlCleaner` (composer, quoted originals) now drop the sender's charset `<meta>` before parsing. Tests in `ReadSanitizerTest` and `ComposeTextTest`.
 - Commit `8f2e292`; live: 1 new file, 3 replaced (sizes checked; backups `~/mail_backup_fix2_20261030/`). Full suite: 274 tests pass. Checked live: site, portal, HQ load; no new errors.
 
+### Fix 3: 30 October 2026, about 18:15 CET (owner report: 500 Server Error after attaching)
+
+- With fileinfo worked around, the upload succeeded and the composer then failed to draw the attachment chip: `Number::fileSize()` needs PHP's **intl** extension, missing on the live web PHP. The size is now plain arithmetic (`2ae6c4f`; live, size checked; backup `~/mail_backup_fix3_20261030/`).
+- Rule for all Mail code: no `Illuminate\Support\Number`, `NumberFormatter`, `Collator`, `finfo`, `sodium_*`, `exif_*` or `gmp_*` without a fallback (see the Fix 1 note on the live PHP).
+
 ## 12. Changes to contracts, PR notes and requests
 
 *(each PR records here: payload keys it chose, new events, anything another PR must know; and requests for changes to files it doesn't own)*
