@@ -140,7 +140,7 @@ class PayrollControlsTest extends TestCase
         Livewire::test(PayrollManager::class)
             ->set('draftPeriodMonth', '9')->set('draftPeriodYear', '2026')->set('targetRegion', 'NG')
             ->call('generateDraftRun')
-            ->assertSee('A payroll run for September 2026 that covers NG already exists.');
+            ->assertSee('A payroll run for September 2026 that covers Nigeria already exists.');
 
         // October has a Cameroon run, so a run for every country would pay Cameroon twice
         Livewire::test(PayrollManager::class)
@@ -149,5 +149,37 @@ class PayrollControlsTest extends TestCase
             ->assertSee('A payroll run for October 2026 that covers all countries already exists.');
 
         $this->assertSame(2, DB::table('payroll_runs')->count());
+    }
+
+    public function test_a_new_month_starts_as_a_draft_prepared_by_whoever_created_it(): void
+    {
+        // One active employee in Nigeria, with a current pay record (utility allowance included)
+        $employee = $this->staff('employee', []);
+        $employeeId = (string) Str::uuid();
+        $this->insertRow('mdm_employees', [
+            'id' => $employeeId, 'user_id' => $employee->id, 'employee_code' => 'EMP-TEST-1', 'job_classification' => 'Engineer',
+            'tax_region' => 'NG', 'line_manager_id' => null, 'created_by' => null, 'updated_by' => null,
+        ]);
+        $this->insertRow('mdm_employee_compensations', [
+            'id' => (string) Str::uuid(), 'mdm_employee_id' => $employeeId, 'base_salary' => 1000, 'allowance_housing' => 200,
+            'allowance_transport' => 100, 'allowance_utility' => 50, 'valid_from' => '2026-01-01', 'valid_to' => null, 'created_by' => null,
+        ]);
+
+        $this->actingAs($this->maker);
+        Livewire::test(PayrollManager::class)
+            ->set('draftPeriodMonth', '11')->set('draftPeriodYear', '2026')->set('targetRegion', 'NG')
+            ->call('generateDraftRun')
+            ->assertSet('showSuccessModal', true);
+
+        $run = DB::table('payroll_runs')->where('pay_period_start', '2026-11-01')->first();
+        $this->assertNotNull($run, 'the draft run is created');
+        $this->assertSame('Draft', $run->status);
+        $this->assertSame($this->maker->id, $run->maker_id);
+        $this->assertSame('2026-11-30', (string) $run->payment_date);
+
+        $line = DB::table('payroll_lines')->where('payroll_run_id', $run->id)->first();
+        $this->assertNotNull($line, 'the employee has a payroll line');
+        $this->assertSame($employee->id, $line->user_id);
+        $this->assertEquals(1350, $line->gross_pay);
     }
 }

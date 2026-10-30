@@ -115,7 +115,7 @@ class PayrollManager extends Component
 
         if ($existingRun) {
             $periodLabel = date('F Y', strtotime($periodStart));
-            $regionLabel = $this->targetRegion === 'ALL' ? 'all countries' : $this->targetRegion;
+            $regionLabel = ['ALL' => 'all countries', 'NG' => 'Nigeria', 'CM' => 'Cameroon', 'KE' => 'Kenya'][$this->targetRegion] ?? $this->targetRegion;
             session()->flash('error', "A payroll run for {$periodLabel} that covers {$regionLabel} already exists. Open it from the list below instead of creating another.");
             return;
         }
@@ -131,6 +131,7 @@ class PayrollManager extends Component
                     'reference_number' => $refNumber,
                     'pay_period_start' => $periodStart,
                     'pay_period_end' => $periodEnd,
+                    'payment_date' => $periodEnd, // planned pay day: the last day of the month (required by the schema)
                     'status' => 'Draft',
                     'maker_id' => Auth::id() ?? null,
                     'region_code' => $this->targetRegion,
@@ -162,8 +163,8 @@ class PayrollManager extends Component
                         'base_salary' => $emp->base_salary,
                         'allowance_housing' => $emp->allowance_housing,
                         'allowance_transport' => $emp->allowance_transport,
-                        'allowance_utility' => $emp->allowance_utility,
                         'benefits_in_kind' => 0, // Calculated later
+                        // payroll_lines has no utility allowance column: it is counted in gross pay only
                         'gross_pay' => $emp->base_salary + $emp->allowance_housing + $emp->allowance_transport + $emp->allowance_utility,
                         'created_at' => now(),
                         'updated_at' => now()
