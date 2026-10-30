@@ -1,0 +1,139 @@
+<?php
+
+// Texte des pages Accueil, Services, Entreprise et Confidentialité (docs/LAUNCH_COPY.md). Règles du français de
+// docs/BRAND.md  guillemets « », espace fine insécable avant     (\u{202F}).
+return [
+
+    'domains' => [
+        ['icon' => 'landmark', 'name' => 'Finance', 'line' => 'Facturation, paiements, comptabilité, reporting, prévisions et modèles financiers, dans vos devises, selon les normes IFRS et OHADA.',
+            'examples' => ['Facturation et recouvrement', 'Vérification des paiements', 'Comptabilité générale et reporting multidevise', 'Prévisions de trésorerie et de chiffre d’affaires, budgets et modèles de scénarios (démo sur demande)']],
+        ['icon' => 'users', 'name' => 'Équipes', 'line' => 'Paie, temps, congés et validations, chacun voyant les chiffres qui le concernent.',
+            'examples' => ['Paie Nigeria et Cameroun', 'Temps et congés', 'Évaluations et validations']],
+        ['icon' => 'truck', 'name' => 'Opérations', 'line' => 'Projets, stocks, livraisons et équipes terrain, suivis en temps réel.',
+            'examples' => ['Projets et budgets', 'Stocks et livraisons', 'Équipes terrain et réceptions']],
+        ['icon' => 'shield-check', 'name' => 'Risques et gouvernance', 'line' => 'Chaque action autorisée et tracée, avec les contrôles intégrés au travail.',
+            'examples' => ['Rôles et permissions', 'Journaux d’audit', 'Contrôles dans chaque processus']],
+        ['icon' => 'message-square-text', 'name' => 'Données et IA', 'line' => 'Praxis AI répond à partir de vos propres données, cite ses sources et ouvre l’étape suivante.',
+            'examples' => ['Praxis AI sur vos propres données', 'Tableaux de bord pour la direction', 'Rapports qui se construisent seuls']],
+    ],
+
+    'method' => [
+        ['name' => 'Diagnostiquer', 'text' => 'Nous cartographions le fonctionnement réel d’un domaine de votre organisation. Tout commence par l’audit gratuit.'],
+        ['name' => 'Concevoir', 'text' => "Nous concevons son fonctionnement cible\u{202F}: processus, contrôles, rôles et indicateurs qui comptent."],
+        ['name' => 'Construire', 'text' => 'Nous construisons et paramétrons le système qui le fait fonctionner et le rend visible.'],
+        ['name' => 'Pérenniser', 'text' => 'Nous restons jusqu’à ce que tout tienne, formons vos équipes, puis vous remettons les clés. Le code et les données vous appartiennent.'],
+    ],
+
+    'home' => [
+        'title' => 'JBS Praxis | Conseil et ingénierie pour les institutions africaines',
+        'description' => "Nous concevons le fonctionnement de votre organisation, puis le système qui en rend compte\u{202F}: finance, équipes, opérations et risques au même endroit. Réservez un audit gratuit et une démo.",
+        'h1' => 'Posez toutes vos questions à votre entreprise.',
+        'lead' => 'Nous concevons le fonctionnement de votre organisation, puis le système qui en rend compte.',
+        'see_answers' => 'Voir ce que répond Praxis AI',
+        'video_label' => 'Praxis AI répond aux questions d’un directeur des opérations, d’une directrice financière et d’une directrice générale, avec les chiffres de Ndali Group, une entreprise fictive.',
+        'pause' => 'Mettre l’animation en pause',
+        'play' => 'Lire l’animation',
+        'problem_title' => 'Une dizaine d’outils. Aucune réponse.',
+        'problem_text' => "Les e-mails d’un côté, la messagerie de l’autre, la comptabilité ailleurs, les validations quelque part entre les trois. Chaque outil répond pour lui-même\u{202F}; aucun ne répond pour l’entreprise. Les équipes ressaisissent les chiffres, réconcilient des tableurs en fin de mois, et la direction décide sur des données dont personne n’est tout à fait sûr.",
+        'build_title' => 'Ce que nous construisons',
+        'method_title' => 'Notre méthode',
+        'method_link' => 'En savoir plus sur la méthode Praxis',
+        'work_title' => 'Conçu avec des institutions au Nigeria et au Cameroun',
+        'work' => [
+            'Smart Logistics and Services (Praxis LS)',
+            'MyCity App',
+            'Pixie Girl Global',
+            'Orika Living',
+            'Un grand laboratoire pharmaceutique, avec Tales Consulting',
+            'Un distributeur de biens de consommation au Cameroun',
+            'nfelia, notre propre produit',
+        ],
+        'calculator_title' => "Combien vous coûte la non-qualité\u{202F}?",
+        'calculator_text' => 'Reprises, retards, erreurs et doubles saisies ont un prix. Estimez le vôtre en quelques minutes, dans votre devise.',
+        'calculator_cta' => 'Utiliser le calculateur',
+        'final_title' => 'Voyez-le sur vos propres opérations.',
+        'final_text' => 'L’audit gratuit et la démo durent environ une heure. Nous étudions un domaine de votre organisation et vous montrons à quoi ressemble une réponse claire.',
+        'or_call' => 'ou appelez',
+    ],
+
+    'services' => [
+        'title' => 'Services | JBS Praxis',
+        'description' => "Conseil et ingénierie pour la finance, les équipes, les opérations, les risques, les données et l’IA, selon la méthode Praxis\u{202F}: diagnostiquer, concevoir, construire, pérenniser.",
+        'eyebrow' => 'Services',
+        'h1' => 'Un seul système, conçu autour de votre fonctionnement.',
+        'lead' => 'Nous ne vendons pas de licences. Nous concevons le fonctionnement d’un domaine de votre organisation, puis construisons le système qui le fait tourner, relié aux outils que vous conservez.',
+        'domains_title' => 'Ce que nous construisons',
+        'method_title' => 'Notre méthode',
+        'expect_title' => 'Ce que vous pouvez attendre',
+        'expect' => ['Le code et les données vous appartiennent.', 'Aucune licence par utilisateur.', 'Anglais et français dès le premier jour.', 'Nous restons jusqu’à ce que le système tienne.'],
+        'guide_title' => 'Découvrir la méthode Praxis.',
+        'guide_text' => 'Recevez le guide par e-mail.',
+        'guide_send' => 'Recevoir le guide',
+    ],
+
+    'company' => [
+        'title' => 'Entreprise | JBS Praxis',
+        'description' => 'JBS Praxis est un cabinet de conseil et d’ingénierie au service des institutions africaines, présent à Lagos et à Douala.',
+        'eyebrow' => 'Entreprise',
+        'h1' => 'L’ordre, rendu visible.',
+        'lead' => 'JBS Praxis est un cabinet de conseil et d’ingénierie au service des institutions africaines. Nous concevons le fonctionnement des organisations, puis les systèmes qui en rendent compte, en anglais et en français.',
+        'facts_title' => 'L’entreprise',
+        'legal_name' => 'Dénomination sociale',
+        'offices' => 'Bureaux',
+        'registration' => 'Immatriculation',
+        'contact' => 'Contact',
+        'follow' => 'Suivez-nous',
+        'ourselves_title' => 'Nous l’utilisons nous-mêmes',
+        'ourselves_text' => 'Nous gérons notre propre facturation, notre paie, nos projets et nos validations sur le système que nous construisons pour nos clients.',
+        'products_title' => 'Nos produits',
+        'nfelia' => 'nfelia, un produit JBS Praxis.',
+        'security_title' => 'Sécurité et données',
+        'security_text' => "Vos données restent les vôtres. Chaque action dans les systèmes que nous construisons est autorisée selon le rôle et enregistrée dans un journal d’audit. Les fichiers sont stockés de façon privée, jamais sur des liens publics. Nos processus sont alignés sur la norme ISO\u{202F}27001. Nous respectons la loi nigériane sur la protection des données (NDPA) et la loi camerounaise sur la protection des données personnelles\u{202F}; vous pouvez demander à tout moment ce que nous détenons à votre sujet.",
+        'security_link' => 'Comment nous protégeons vos données',
+        'careers' => 'Travailler avec nous',
+    ],
+
+    'privacy' => [
+        'title' => 'Confidentialité | JBS Praxis',
+        'description' => "Ce que jbspraxis.com collecte, pourquoi, combien de temps nous le conservons, qui y a accès, vos droits selon la NDPA et la loi camerounaise, et l’usage des cookies et de Google Analytics.",
+        'eyebrow' => 'Confidentialité',
+        'h1' => 'Politique de confidentialité',
+        'updated' => 'Version du 30 octobre 2026.',
+        'sections' => [
+            'who' => ['title' => 'Qui nous sommes', 'body' => [
+                ':company édite ce site et décide de l’usage des données personnelles qu’il collecte. Vous pouvez nous écrire à :email.',
+            ]],
+            'what' => ['title' => 'Ce que nous collectons', 'body' => [
+                'Ce que vous nous envoyez par les formulaires  messages de contact, demandes d’audit gratuit et de démo, calculateur du coût de la non-qualité, candidatures avec votre CV, articles proposés pour nos analyses, avis sur le site et demandes du guide de la méthode Praxis. Chaque formulaire ne demande que ce dont il a besoin, et les champs facultatifs sont indiqués.',
+                'Les questions que vous posez à Praxis AI, l’assistant du site, et ses réponses. Merci de ne pas lui communiquer de mots de passe ni de données de paiement.',
+                'Les données techniques nécessaires pour protéger les formulaires  votre adresse IP, utilisée pour limiter le nombre de demandes qu’une même connexion peut envoyer, conservée 24 heures au plus.',
+            ]],
+            'why' => ['title' => 'Pourquoi nous les utilisons', 'body' => [
+                'Pour vous répondre, réaliser l’audit gratuit et la démo, vous envoyer ce que vous avez demandé (le rapport de coûts, le guide de la méthode Praxis), étudier votre candidature et assurer la sécurité du site et de ses formulaires.',
+                'Nous ne vendons pas vos données et n’utilisons jamais les données de nos clients à des fins commerciales pour d’autres. Ce que vous nous dites de votre organisation reste chez nous.',
+            ]],
+            'how_long' => ['title' => 'Durée de conservation', 'body' => [
+                'Nous conservons les messages, demandes et rapports aussi longtemps que nécessaire pour la raison pour laquelle vous les avez envoyés et pour le suivi convenu, puis nous les supprimons.',
+                'Les candidatures et les CV sont conservés tant que nous étudions votre profil pour un poste. Vous pouvez nous demander à tout moment de supprimer le vôtre.',
+                'Les adresses IP utilisées pour protéger les formulaires sont conservées 24 heures au plus.',
+            ]],
+            'who_sees' => ['title' => 'Qui y a accès', 'body' => [
+                'Les membres de l’équipe JBS Praxis dont le rôle l’exige, dans des systèmes où chaque accès est autorisé et tracé.',
+                'Les prestataires qui hébergent nos systèmes et envoient nos e-mails, uniquement pour ce travail.',
+                'Les données circulent chiffrées entre votre navigateur et nos serveurs.',
+            ]],
+            'rights' => ['title' => 'Vos droits', 'body' => [
+                'Vous pouvez demander ce que nous détenons à votre sujet, le faire corriger ou supprimer, et vous opposer à son utilisation. Nous respectons la loi nigériane sur la protection des données (NDPA) et la loi camerounaise, et nous appliquons le même niveau d’exigence où que vous soyez, conformément au RGPD (Europe), à la loi sud-africaine POPIA, à la loi kényane sur la protection des données et aux règles de la CEMAC.',
+                'Pour exercer ces droits, écrivez à :email. Nous répondons sous quelques jours ouvrés.',
+            ]],
+            'cookies' => ['title' => 'Cookies', 'body' => [
+                'Le site utilise les cookies nécessaires à son fonctionnement  un cookie de session et un jeton de sécurité pour les formulaires, ainsi qu’un cookie qui retient votre choix dans le bandeau cookies.',
+                'Google Analytics, qui nous indique quelles pages sont consultées, ne se charge que si vous choisissez Accepter dans le bandeau. Ses cookies (_ga et _ga_…) sont alors conservés jusqu’à deux ans. Si vous choisissez Refuser, ou si vous ne faites aucun choix, il ne se charge jamais.',
+                'Vous pouvez modifier votre choix à tout moment avec le lien Paramètres des cookies en bas de chaque page.',
+            ]],
+            'changes' => ['title' => 'Modifications', 'body' => [
+                'Lorsque nous modifions cette politique, nous publions ici la nouvelle version avec sa date.',
+            ]],
+        ],
+    ],
+];

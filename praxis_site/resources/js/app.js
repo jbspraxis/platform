@@ -1,0 +1,236 @@
+import { createIcons } from 'lucide';
+import icons from './icons';
+
+// Icons are written as <i data-lucide="name"> in the views: one pinned copy of lucide (package.json), only
+// the icons the views use (scripts/icons.mjs), drawn with a 1.5px stroke (docs/BRAND.md section 9).
+const drawIcons = () => createIcons({ icons, attrs: { 'stroke-width': 1.5, 'aria-hidden': 'true' } });
+
+// The assistant's light markdown, as App\Support\ChatText renders it on the server: "- " or "* " bullets,
+// **bold** and [text](https://…) links. Built as DOM nodes with textContent, never as HTML.
+const CHAT_MARKUP = /\*\*(.+?)\*\*|\[([^[\]]+)\]\((https?:\/\/[^\s()<>"]+)\)/gu;
+function chatNodes(text) {
+    const source = text.replace(/^[-*] /gmu, '• ');
+    const nodes = [];
+    let last = 0;
+    for (const match of source.matchAll(CHAT_MARKUP)) {
+        if (match.index > last) nodes.push(document.createTextNode(source.slice(last, match.index)));
+        if (match[3] !== undefined) {
+            const link = document.createElement('a');
+            link.href = match[3];
+            link.rel = 'noopener';
+            link.textContent = match[2];
+            nodes.push(link);
+        } else {
+            const strong = document.createElement('strong');
+            strong.textContent = match[1];
+            nodes.push(strong);
+        }
+        last = match.index + match[0].length;
+    }
+    if (last < source.length) nodes.push(document.createTextNode(source.slice(last)));
+    return nodes;
+}
+
+// A reply's links (docs/SITE_API.md 6.4) shown as buttons: same-site paths only, checked exactly as
+// App\Support\ChatLinks::isSitePath checks them on the server, at most 3.
+const SITE_PATH = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
+function chatLinks(links, label) {
+    const safe = (Array.isArray(links) ? links : [])
+        .filter((link) => link && typeof link.label === 'string' && typeof link.path === 'string'
+            && link.label.trim() !== '' && link.label.length <= 80 && link.path.length <= 200 && SITE_PATH.test(link.path))
+        .slice(0, 3);
+    if (safe.length === 0) return [];
+    const group = document.createElement('span');
+    group.className = 'chat-links';
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', label);
+    for (const link of safe) {
+        const button = document.createElement('a');
+        button.className = 'btn btn-secondary btn-sm';
+        button.href = link.path;
+        button.textContent = link.label.trim();
+        group.append(button);
+    }
+    return [group];
+}
+
+// Praxis AI works as a plain form (POST /chat, then back to the page). With JavaScript the reply is
+// fetched and added in place. Text is always set with textContent, never as HTML.
+function enhanceChat() {
+    const form = document.querySelector('[data-chat-form]');
+    const log = document.querySelector('[data-chat-log]');
+    const status = document.querySelector('[data-chat-status]');
+    const details = document.getElementById('chat');
+    if (!form || !log || !status) return;
+
+    const textarea = form.querySelector('textarea');
+    const button = form.querySelector('button[type="submit"]');
+    const scrollDown = () => { log.scrollTop = log.scrollHeight; };
+
+    const addTurn = (role, text, links = []) => {
+        const item = document.createElement('li');
+        item.className = 'chat-turn ' + (role === 'user' ? 'is-user' : 'is-assistant');
+        const who = document.createElement('span');
+        who.className = 'who';
+        who.textContent = role === 'user' ? form.dataset.you : form.dataset.assistant;
+        item.append(who, ...(role === 'user' ? [document.createTextNode(text)] : [...chatNodes(text), ...chatLinks(links, form.dataset.links)]));
+        log.append(item);
+        scrollDown();
+    };
+
+    // Cloudflare Turnstile (only when its keys are set): a token works once, so ask for a fresh one after each question
+    const resetCheck = () => {
+        const box = form.querySelector('.cf-turnstile');
+        if (box && window.turnstile) {
+            try { window.turnstile.reset(box); } catch { /* the widget was not drawn */ }
+        }
+    };
+
+    details?.addEventListener('toggle', () => {
+        if (details.open) { scrollDown(); textarea?.focus(); }
+    });
+    if (details?.open) scrollDown();
+
+    form.addEventListener('submit', async (event) => {
+        const message = textarea.value.trim();
+        if (message === '') return; // the server answers with the message to type a question first
+        event.preventDefault();
+
+        addTurn('user', message);
+        textarea.value = '';
+        button.disabled = true;
+        status.textContent = form.dataset.sending;
+
+        try {
+            const body = new FormData(form);
+            body.set('chat_message', message);
+            const response = await fetch(form.action, {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+                body,
+            });
+            const data = await response.json().catch(() => ({}));
+            if (response.ok && typeof data.reply === 'string' && data.reply !== '') {
+                // HQ's calm limit text (limited: true) is shown like any other reply
+                addTurn('assistant', data.reply, data.links);
+                status.textContent = '';
+            } else {
+                // 419: the page's form token expired (the framework's words, not ours); otherwise the site's or HQ's message
+                status.textContent = response.status === 419 ? form.dataset.expired : (data.message || form.dataset.failed);
+                textarea.value = message;
+            }
+        } catch {
+            status.textContent = form.dataset.failed;
+            textarea.value = message;
+        } finally {
+            button.disabled = false;
+            resetCheck();
+            textarea.focus();
+        }
+    });
+}
+
+// Show a "something else" field only when its choice is picked (it stays visible without JavaScript)
+function toggleOtherFields() {
+    document.querySelectorAll('[data-show-when]').forEach((wrapper) => {
+        const [name, value] = wrapper.dataset.showWhen.split('=');
+        const select = document.querySelector(`[name="${name}"]`);
+        if (!select) return;
+        const update = () => { wrapper.hidden = select.value !== value; };
+        select.addEventListener('change', update);
+        update();
+    });
+}
+
+// The home page's interface loop: plays only when the visitor hasn't asked for reduced motion, and the button
+// pauses it (moving content longer than 5 seconds needs a pause control). Without JavaScript the poster shows.
+function enhanceLoop() {
+    const video = document.querySelector('[data-loop]');
+    const toggle = document.querySelector('[data-loop-toggle]');
+    if (!video || !toggle) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const show = (playing) => {
+        const label = playing ? toggle.dataset.pause : toggle.dataset.play;
+        toggle.setAttribute('aria-label', label);
+        toggle.title = label;
+        const icon = document.createElement('i');
+        icon.setAttribute('data-lucide', playing ? 'pause' : 'play'); // both listed in pages/home.blade.php for icons.mjs
+        toggle.replaceChildren(icon);
+        drawIcons();
+    };
+    toggle.addEventListener('click', () => {
+        if (video.paused) video.play().catch(() => {}); else video.pause();
+    });
+    video.addEventListener('play', () => show(true));
+    video.addEventListener('pause', () => show(false));
+    toggle.hidden = false;
+    video.play().catch(() => show(false));
+}
+
+// Cookie choice (resources/views/partials/consent.blade.php): Google Analytics loads only after "Accept". The choice is
+// kept for 6 months in the jbs_consent cookie; "Cookie settings" in the footer shows the banner again.
+const CONSENT_COOKIE = 'jbs_consent';
+function readConsent() {
+    const match = document.cookie.match(/(?:^|;\s*)jbs_consent=(granted|denied)/);
+    return match ? match[1] : null;
+}
+function saveConsent(value) {
+    const secure = location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `${CONSENT_COOKIE}=${value}; Max-Age=${60 * 60 * 24 * 182}; Path=/; SameSite=Lax${secure}`;
+}
+function loadAnalytics(id) {
+    if (window.__jbsAnalytics || !/^G-[A-Z0-9]{4,20}$/.test(id)) return;
+    window.__jbsAnalytics = true;
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function gtag() { window.dataLayer.push(arguments); };
+    window.gtag('js', new Date());
+    window.gtag('config', id);
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(id);
+    document.head.append(script);
+}
+function forgetAnalytics() {
+    // Remove Google Analytics' own cookies (_ga, _ga_…) on this domain and its parent
+    const host = location.hostname.replace(/^www\./, '');
+    document.cookie.split(';').map((c) => c.trim().split('=')[0]).filter((name) => /^_ga(_|$)/.test(name)).forEach((name) => {
+        for (const domain of ['', `; Domain=${host}`, `; Domain=.${host}`]) {
+            document.cookie = `${name}=; Max-Age=0; Path=/${domain}`;
+        }
+    });
+}
+function enhanceConsent() {
+    const banner = document.querySelector('[data-consent]');
+    if (!banner) return;
+    const id = banner.dataset.ga || '';
+    const choice = readConsent();
+    if (choice === 'granted') loadAnalytics(id);
+    if (choice === null) banner.hidden = false;
+
+    banner.querySelector('[data-consent-accept]')?.addEventListener('click', () => {
+        saveConsent('granted');
+        banner.hidden = true;
+        loadAnalytics(id);
+    });
+    banner.querySelector('[data-consent-reject]')?.addEventListener('click', () => {
+        const wasOn = readConsent() === 'granted';
+        saveConsent('denied');
+        banner.hidden = true;
+        forgetAnalytics();
+        if (wasOn) location.reload(); // stop the script that is already running
+    });
+    document.querySelectorAll('[data-consent-open]').forEach((button) => button.addEventListener('click', () => {
+        banner.hidden = false;
+        banner.querySelector('[data-consent-accept]')?.focus();
+    }));
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    drawIcons();
+    enhanceChat();
+    toggleOtherFields();
+    enhanceLoop();
+    enhanceConsent();
+});
