@@ -261,7 +261,9 @@
                                     <span class="mc-file" wire:key="f-{{ $file['key'] }}">
                                         <i data-lucide="paperclip"></i>
                                         <span>{{ $file['name'] }}</span>
-                                        <small>{{ \Illuminate\Support\Number::fileSize((int) $file['size'], precision: $file['size'] > 1048576 ? 1 : 0) }}</small>
+                                        {{-- Plain arithmetic: Laravel's Number::fileSize needs PHP's intl extension, which the live web PHP lacks --}}
+                                        @php $bytes = (int) $file['size']; @endphp
+                                        <small>{{ $bytes >= 1048576 ? number_format($bytes / 1048576, 1) . ' MB' : ($bytes >= 1024 ? number_format($bytes / 1024) . ' KB' : $bytes . ' B') }}</small>
                                         <button type="button" class="mc-icon" style="width: 28px; height: 28px;" wire:click="removeAttachment('{{ $file['key'] }}')" aria-label="Remove {{ $file['name'] }}" title="Remove"><i data-lucide="x"></i></button>
                                     </span>
                                 @endforeach
