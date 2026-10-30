@@ -6,21 +6,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Support\Hosts;
 
-// Public Livewire components
-use App\Livewire\ConversionHub;
-use App\Livewire\ScheduleConsultation;
-use App\Livewire\ContactHub;
-use App\Livewire\TheFirm;
-use App\Livewire\Portfolio;
-use App\Livewire\Services;
-use App\Livewire\Careers;
-use App\Livewire\Kaizen;
-use App\Livewire\TelemetryNode;
-use App\Http\Controllers\SitemapController;
-
 /*
 | Three hosts, one app (config/app.php 'domains'):
-|   jbspraxis.com          the public site, website forms, broadcast tracking
+|   jbspraxis.com          served by praxis_site; here only the page names for links, broadcast tracking and old redirects
 |   hq.jbspraxis.com       HQ for staff, and the task force tracker
 |   portal.jbspraxis.com   the client portal and every token link sent to clients
 | Each host keeps its own login cookie. HQ and the portal answer only their own routes;
@@ -243,21 +231,22 @@ Route::domain('www.' . Hosts::site())->group(function () {
 
 Route::domain(Hosts::site())->group(function () use ($legacy) {
 
-    // ZONE 1: PUBLIC ARCHITECTURE (The Marketing Layer)
-    Route::get('/', ConversionHub::class)->name('home');
-    Route::get('/schedule', ScheduleConsultation::class)->name('schedule');
-    Route::get('/contact', ContactHub::class)->name('contact');
-    Route::get('/about', TheFirm::class)->name('about');
-    Route::get('/portfolio', Portfolio::class)->name('portfolio');
-    Route::get('/services', Services::class)->name('services');
-    Route::get('/careers', Careers::class)->name('careers');
-    Route::get('/kaizen', Kaizen::class)->name('kaizen');
-    Route::get('/privacy', \App\Livewire\Privacy::class)->name('privacy');
-    Route::get('/trust-center', \App\Livewire\TrustCenter::class)->name('trust-center');
-    Route::get('/feedback', TelemetryNode::class)->name('feedback');
-    Route::view('/framework', 'framework')->name('framework');
-    Route::get('/sitemap.xml', [SitemapController::class, 'index']);
-    Route::get('/kaizen/{slug}', \App\Livewire\KaizenArticleView::class)->name('kaizen.show');
+    // The public pages are praxis_site's (jbspraxis.com has its own docroot since 30 Oct 2026). The names
+    // stay so emails and HQ keep building the same addresses with route(); this app never serves them.
+    $notHere = fn () => abort(404);
+    Route::get('/', $notHere)->name('home');
+    Route::get('/schedule', $notHere)->name('schedule');
+    Route::get('/contact', $notHere)->name('contact');
+    Route::get('/about', $notHere)->name('about');
+    Route::get('/portfolio', $notHere)->name('portfolio');
+    Route::get('/services', $notHere)->name('services');
+    Route::get('/careers', $notHere)->name('careers');
+    Route::get('/kaizen', $notHere)->name('kaizen');
+    Route::get('/privacy', $notHere)->name('privacy');
+    Route::get('/trust-center', $notHere)->name('trust-center');
+    Route::get('/feedback', $notHere)->name('feedback');
+    Route::get('/framework', $notHere)->name('framework');
+    Route::get('/kaizen/{slug}', $notHere)->name('kaizen.show');
 
     // ZONE 4: EXTERNAL TELEMETRY & TRACKING PIXELS (broadcast emails)
     // Broadcast links carry a token from now on (?t=…, App\Services\Site\TrackingService); links in emails

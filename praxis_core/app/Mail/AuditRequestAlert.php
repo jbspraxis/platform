@@ -6,7 +6,7 @@ use Carbon\Carbon;
 use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
 
-/** The team's copy of a free audit request (ScheduleConsultation), to approve in HQ. Internal: English only, replies go to the visitor. */
+/** The team's copy of a free audit request (the site's /schedule form, through the site API), to approve in HQ. Internal: English only, replies go to the visitor. */
 class AuditRequestAlert extends BrandedMail
 {
     public $fullName;

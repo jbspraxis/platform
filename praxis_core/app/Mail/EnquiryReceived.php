@@ -4,7 +4,7 @@ namespace App\Mail;
 
 use Illuminate\Mail\Mailables\Content;
 
-/** The visitor's copy after the website contact form (ContactHub), with the free audit and demo as the next step. */
+/** The visitor's copy after the website contact form, with the free audit and demo as the next step. */
 class EnquiryReceived extends BrandedMail
 {
     public $firstName;

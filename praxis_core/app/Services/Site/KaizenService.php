@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * JBS Praxis Insights (Kaizen articles): contributor submissions from the old /kaizen page and
- * POST /kaizen/submissions, and the published articles for GET /kaizen/articles[/{slug}].
+ * JBS Praxis Insights (Kaizen articles): contributor submissions from POST /kaizen/submissions,
+ * and the published articles for GET /kaizen/articles[/{slug}].
  * Submission limits (docs/SITE_API.md section 6.2): 2 a day per visitor, 2 a week per email, 20 an hour
  * for everyone, on the old page's limiter key. The API's articles carry no author or job title.
  */
@@ -21,17 +21,15 @@ final class KaizenService
 
     public const PER_PAGE = 12;
 
-    /** The old page's message for a summary over 50 words */
-    public const SUMMARY_WORDS_MESSAGE = 'The Executive Summary must not exceed 50 words.';
-
-    /** Kaizen (Livewire) property => API field */
+    /** The site API's fields */
     public const FIELDS = [
-        'fullName' => 'full_name', 'title' => 'title', 'email' => 'email', 'linkedinUrl' => 'linkedin_url',
-        'articleTitle' => 'article_title', 'execSummary' => 'exec_summary', 'vulnerability' => 'vulnerability',
-        'solution' => 'solution', 'roi' => 'roi', 'category' => 'category',
+        'full_name', 'title', 'email', 'linkedin_url',
+        'article_title', 'exec_summary', 'vulnerability',
+        'solution', 'roi', 'category',
     ];
 
-    public static function rules(string $summaryWordsMessage = self::SUMMARY_WORDS_MESSAGE): array
+    /** @param  string  $summaryWordsMessage  what a summary over 50 words gets, in the request's language */
+    public static function rules(string $summaryWordsMessage): array
     {
         return [
             'full_name'     => 'required|string|max:100',

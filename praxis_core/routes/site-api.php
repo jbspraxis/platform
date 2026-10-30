@@ -38,7 +38,7 @@ Route::domain(Hosts::hq())->group(function () {
             ->where('user_id', '[A-Za-z0-9-]{1,64}');
     });
 
-    // Forms: limited in their shared services, with the old pages (SITE_API.md section 6.2)
+    // Forms: limited in their services, on the old pages' limiter keys (SITE_API.md section 6.2)
     Route::middleware('site.signed:write')->group(function () {
         Route::post('/enquiries', [EnquiryController::class, 'store']);
         Route::post('/bookings', [BookingController::class, 'store']);

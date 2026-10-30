@@ -5,7 +5,7 @@ namespace App\Mail;
 use Carbon\Carbon;
 use Illuminate\Mail\Mailables\Content;
 
-/** The visitor's copy after requesting a free audit and demo (ScheduleConsultation). The team confirms it later from HQ. */
+/** The visitor's copy after requesting a free audit and demo (the site's /schedule form). The team confirms it later from HQ. */
 class AuditRequested extends BrandedMail
 {
     public $firstName;

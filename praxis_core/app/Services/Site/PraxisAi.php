@@ -12,8 +12,7 @@ use Illuminate\Support\Str;
  *
  * The prompt is built from config/praxis_ai.php (site map), the services and the Praxis Method in plain
  * words (docs/BRAND.md sections 1, 2 and 5), how an engagement works, and the contact details and offices
- * from WebsiteSettings::publicPayload() (never hard-coded). The old chat widget keeps its own prompt
- * (ChatService) until PR3 replaces the site.
+ * from WebsiteSettings::publicPayload() (never hard-coded).
  */
 final class PraxisAi
 {

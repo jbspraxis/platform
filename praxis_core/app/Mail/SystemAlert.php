@@ -151,7 +151,7 @@ class SystemAlert extends BrandedMail
     {
         return [
             'new-errors' => static::newErrors([
-                ['summary' => '[error] QueryException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry \'ada.okafor@example.com\' (app/Livewire/ContactHub.php:114) ×3', 'hint' => 'The database refused to save a second copy of something that must be unique (an email, a number, a link).'],
+                ['summary' => '[error] QueryException: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry \'ada.okafor@example.com\' (app/Services/Site/EnquiryService.php:144) ×3', 'hint' => 'The database refused to save a second copy of something that must be unique (an email, a number, a link).'],
                 ['summary' => '[warning] Monitor: alert email failed (app/Support/Monitor/MonitorAlerts.php:120) ×1', 'hint' => null],
             ]),
             'check-failing' => static::checkFailing('Email sending', '2 emails failed in the last 24 hours.', 'Check the mail server settings (MAIL_* in .env) and the mailbox in cPanel.'),
@@ -161,7 +161,7 @@ class SystemAlert extends BrandedMail
                 ['label' => 'Email sending', 'state' => 'ok', 'detail' => 'No failed emails in the last 24 hours.'],
                 ['label' => 'Exchange rates', 'state' => 'ok', 'detail' => 'Last automatic sync 8 hours ago.'],
             ], [
-                '[error] QueryException: SQLSTATE[23000]: Integrity constraint violation (app/Livewire/ContactHub.php:114) ×3',
+                '[error] QueryException: SQLSTATE[23000]: Integrity constraint violation (app/Services/Site/EnquiryService.php:144) ×3',
             ]),
             'scheduler-stopped' => static::schedulerStopped('2026-11-05 08:12:00', '* * * * * /usr/local/bin/ea-php83 /home/example/praxis_core/artisan schedule:run'),
         ];

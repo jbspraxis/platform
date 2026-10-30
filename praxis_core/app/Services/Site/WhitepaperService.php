@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 /**
- * The method PDF by email: the old /services page (Services) and POST /whitepaper.
+ * The method PDF by email: POST /whitepaper on the site API.
  * Limits (docs/SITE_API.md section 6.2): 3 requests a day per visitor, 1 a day per email, 60 an hour
  * for everyone, on the old page's limiter key; the email itself counts towards the address's 3 visitor
  * emails a day.
