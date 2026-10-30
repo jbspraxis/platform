@@ -17,6 +17,7 @@ class PushCategories
         'finance' => 'Finance',
         'team' => 'Team',
         'marketing' => 'Marketing',
+        'mail' => 'Mail',
         'system' => 'System health',
         'other' => 'Other updates',
     ];
@@ -30,6 +31,7 @@ class PushCategories
         'mdm/employees' => 'team',
         'marketing/' => 'marketing',
         'system/' => 'system',
+        'mail' => 'mail',
     ];
 
     private const TYPES = [
