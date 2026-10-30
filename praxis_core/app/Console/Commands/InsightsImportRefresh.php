@@ -58,7 +58,7 @@ class InsightsImportRefresh extends Command
         $originals = DB::table('kaizen_articles')->whereIn('slug', array_column($articles, 'replaces'))->pluck('title', 'slug');
         $new = array_filter($articles, fn ($a) => !in_array($a['slug'], $existing, true)); // keeps each article's place in the file
 
-        $this->table(['Result', 'Section', 'Title', 'Replaces'], array_map(fn ($a) => [
+        $report = fn () => $this->table(['Result', 'Section', 'Title', 'Replaces'], array_map(fn ($a) => [
             in_array($a['slug'], $existing, true) ? 'already in HQ, skipped' : ($dryRun ? 'would create' : 'created'),
             $a['category'],
             $a['title'],
@@ -67,6 +67,7 @@ class InsightsImportRefresh extends Command
 
         $skipped = count($articles) - count($new);
         if ($dryRun) {
+            $report();
             $this->info('Dry run: ' . count($new) . " draft(s) would be created, {$skipped} already in HQ. Nothing was written.");
 
             return self::SUCCESS;
@@ -98,6 +99,8 @@ class InsightsImportRefresh extends Command
             }
         });
 
+        // Reported once the transaction has committed, so "created" is never shown for a failed import
+        $report();
         $this->info(count($new) . " draft(s) created, {$skipped} already in HQ. They stay unpublished until someone publishes them; the articles they replace are unchanged.");
 
         return self::SUCCESS;
