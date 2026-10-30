@@ -63,34 +63,28 @@ class WithoutFileinfoTest extends TestCase
         ], $out['files']);
     }
 
-    /** This PHP's command line without fileinfo; null when fileinfo is compiled in and cannot be left out */
+    /** This PHP without php.ini (-n), then the extensions it loads except fileinfo; null when fileinfo is compiled in */
     private function phpWithoutFileinfo(): ?array
     {
-        $command = [PHP_BINARY];
-        if (! extension_loaded('fileinfo')) {
-            return $command;
-        }
-
         $dir = (string) ini_get('extension_dir');
         if (! is_dir($dir)) {
             $dir = dirname(PHP_BINARY) . DIRECTORY_SEPARATOR . $dir;
         }
-        array_push($command, '-n', '-d', 'extension_dir=' . $dir, '-d', 'memory_limit=512M');
+        $shared = fn (string $name) => is_file("{$dir}/php_{$name}.dll") || is_file("{$dir}/{$name}.so");
+        if (extension_loaded('fileinfo') && ! $shared('fileinfo')) {
+            return null;
+        }
 
+        $command = [PHP_BINARY, '-n', '-d', 'extension_dir=' . $dir, '-d', 'memory_limit=512M'];
         $zend = array_map('strtolower', get_loaded_extensions(true));
-        $shared = false;
         foreach (get_loaded_extensions() as $extension) {
             $name = strtolower($extension);
-            if (in_array($name, $zend, true) || ! (is_file("{$dir}/php_{$name}.dll") || is_file("{$dir}/{$name}.so"))) {
-                continue; // compiled in, or a Zend extension (OPcache, Xdebug) the check does not need
-            }
-            if ($name === 'fileinfo') {
-                $shared = true;
-            } else {
+            // Compiled-in extensions stay without asking; Zend ones (OPcache, Xdebug) are not needed here
+            if ($name !== 'fileinfo' && ! in_array($name, $zend, true) && $shared($name)) {
                 array_push($command, '-d', 'extension=' . $name);
             }
         }
 
-        return $shared ? $command : null;
+        return $command;
     }
 }
