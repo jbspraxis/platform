@@ -33,7 +33,8 @@ svg { display: block; }
 .head { padding-bottom: 6mm; margin-bottom: 8mm; border-bottom: 0.25pt solid var(--hair); }
 .head h2 { font: 500 23pt/28pt var(--title); color: var(--ink); text-wrap: balance; max-width: 150mm; }
 .lead { font: 400 12.5pt/19pt var(--sans); color: var(--ink); margin-bottom: 5mm; }
-.main p + p { margin-top: 3.2mm; }
+.main p + p, .main ul + p { margin-top: 3.2mm; }
+.nobr { white-space: nowrap; }
 .main h3, .sub { font: 500 12.5pt/17pt var(--serif-text); color: var(--ink); margin: 7mm 0 2.5mm; break-after: avoid; }
 .small { font-size: 8.5pt; line-height: 12.5pt; color: var(--muted); }
 .label { font: 600 8.5pt/12pt var(--sans); color: var(--ink); margin-bottom: 1.5mm; }
@@ -92,7 +93,7 @@ svg { display: block; }
 .expect .ticks li + li { margin-top: 0; }
 
 /* ---------- stage pages ---------- */
-.tracker { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 2mm; margin-bottom: 11mm; }
+.tracker { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); column-gap: 2mm; margin-bottom: 8mm; }
 .tracker li { padding-top: 2mm; border-top: 1.2mm solid var(--line); font: 500 8pt/11pt var(--sans); color: var(--muted); }
 .tracker li.done { border-top-color: var(--petrol); }
 .tracker li.on { border-top-color: var(--teal); color: var(--ink); font-weight: 600; }
@@ -108,7 +109,7 @@ svg { display: block; }
 
 /* ---------- domains (Build) ---------- */
 .domains { list-style: none; padding: 0; }
-.domains li { display: grid; grid-template-columns: 6mm minmax(0, 1fr); column-gap: 4mm; padding: 2.6mm 0; border-top: 0.25pt solid var(--line); }
+.domains li { display: grid; grid-template-columns: 6mm minmax(0, 1fr); column-gap: 4mm; padding: 2.3mm 0; border-top: 0.25pt solid var(--line); }
 .domains li:last-child { border-bottom: 0.25pt solid var(--line); }
 .domains svg { width: 4.6mm; height: 4.6mm; color: var(--deep); margin-top: 0.4mm; }
 .domains strong { margin-right: 1mm; }

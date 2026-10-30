@@ -95,6 +95,29 @@ function lint(lang, html) {
   if (problems.length) throw new Error(`${lang}: ${problems.join('; ')}`);
 }
 
+// ---------- layout check (runs in Edge before it prints; only in the render copy) ----------
+// Each page is a fixed A4 box that hides what does not fit, so text that runs too long would be cut off quietly.
+// This script finds text that leaves its page or runs into the band or folio at the foot, and adds a last page
+// listing it; the page count check below then fails the build. It waits for the fonts, or it would measure the fallbacks.
+const LAYOUT_CHECK = `<script>
+document.fonts.ready.then(() => {
+  const mm = 96 / 25.4, bad = [];
+  document.querySelectorAll('.page').forEach((page, i) => {
+    const box = page.getBoundingClientRect();
+    const foot = page.querySelector(':scope > .outcome') || page.querySelector(':scope > .folio');
+    const limit = foot ? foot.getBoundingClientRect().top - 4 * mm : box.bottom - 15 * mm;
+    page.querySelectorAll('p, li, h1, h2, h3, a, .stage, .glance > div').forEach(el => {
+      if (foot && foot.contains(el)) return;
+      const r = el.getBoundingClientRect();
+      if (r.height && (r.bottom > limit || r.right > box.right - 15 * mm))
+        bad.push('page ' + (i + 1) + ': "' + el.textContent.trim().slice(0, 50) + '" ends ' + ((r.bottom - limit) / mm).toFixed(1) + ' mm too low');
+    });
+  });
+  if (bad.length) document.body.insertAdjacentHTML('beforeend',
+    '<section class="page"><h2>Layout check failed</h2><p>' + bad.join('</p><p>') + '</p></section>');
+});
+</script>`;
+
 // ---------- build ----------
 function page(lang) {
   const css = fs.readFileSync(path.join(SRC, 'method.css'), 'utf8');
@@ -106,7 +129,20 @@ function page(lang) {
     .replace('<link rel="stylesheet" href="method.css">', `<style>\n${fontCss}\n${css}</style>`)
     .replace(/<!--logo ([a-z-]+)-->/g, (_, n) => logo(n))
     .replace(/<!--bars-->/g, () => barStack())
-    .replace(/<!--icon ([a-z-]+)-->/g, (_, n) => icon(n));
+    .replace(/<!--icon ([a-z-]+)-->/g, (_, n) => icon(n))
+    .replace('</body>', `${LAYOUT_CHECK}\n</body>`);
+}
+
+// msedge.exe can hand the job to a background process and return at once, so wait until the file is written
+function waitForFile(file, ms = 120000) {
+  const sleep = t => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, t);
+  let last = -1;
+  for (const end = Date.now() + ms; Date.now() < end; sleep(500)) {
+    const size = fs.existsSync(file) ? fs.statSync(file).size : -1;
+    if (size > 0 && size === last) return;
+    last = size;
+  }
+  throw new Error(`${path.relative(ROOT, file)} was not written`);
 }
 
 function pdfFacts(file) {
@@ -127,12 +163,18 @@ for (const lang of LANGS) {
   fs.writeFileSync(src, page(lang));
   const pdf = path.join(OUT, `the-praxis-method-${lang}.pdf`);
   if (fs.existsSync(pdf)) fs.unlinkSync(pdf);
-  execFileSync(EDGE, ['--headless=new', '--disable-gpu', '--no-pdf-header-footer', '--run-all-compositor-stages-before-draw',
+  // Its own profile, so a running Edge (or its startup boost) cannot take the job and quietly drop it
+  execFileSync(EDGE, ['--headless=new', '--disable-gpu', `--user-data-dir=${path.join(RENDER, 'edge-profile')}`, '--no-first-run',
+    '--no-pdf-header-footer', '--run-all-compositor-stages-before-draw',
     '--generate-pdf-document-outline', '--virtual-time-budget=20000', `--print-to-pdf=${pdf}`, 'file:///' + src.replace(/\\/g, '/')],
   { stdio: 'ignore', timeout: 180000 });
+  waitForFile(pdf);
   const bytes = fs.statSync(pdf).size, f = pdfFacts(pdf);
   const issues = [];
-  if (f.pages !== PAGES) issues.push(`${f.pages} pages, expected ${PAGES} (a page overflowed)`);
+  if (f.pages !== PAGES) {
+    issues.push(`${f.pages} pages, expected ${PAGES} (text overflowed: the last page of the PDF lists where)`);
+    try { issues.push(execFileSync('pdftotext', ['-f', f.pages, '-l', f.pages, pdf, '-'], { encoding: 'utf8' }).trim()); } catch { /* pdftotext is optional */ }
+  }
   if (f.type3) issues.push(`${f.type3} Type 3 fonts`);
   if (f.fonts.some(n => !/^(Jakarta|Newsreader)/.test(n))) issues.push(`fallback fonts used: ${f.fonts.join(', ')}`);
   if (bytes > MAX_BYTES) issues.push(`${Math.round(bytes / 1024)} KB is over 2 MB`);

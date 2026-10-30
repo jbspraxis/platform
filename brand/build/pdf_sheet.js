@@ -41,7 +41,17 @@ fs.mkdirSync(RENDER, { recursive: true });
 const src = path.join(RENDER, 'pdf_sheet.html');
 fs.writeFileSync(src, html);
 const out = path.join(RENDER, `${process.argv[6] ? path.basename(PDF, '.pdf') + '_' : 'pdf_'}${first}-${last}.png`);
+if (fs.existsSync(out)) fs.unlinkSync(out);
+// Its own profile, so a running Edge (or its startup boost) cannot take the job and quietly drop it
 execFileSync('C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', ['--headless=new', '--disable-gpu', '--hide-scrollbars',
-  '--force-device-scale-factor=1', '--virtual-time-budget=60000', `--window-size=${W},${H}`, `--screenshot=${out}`,
+  `--user-data-dir=${path.join(RENDER, 'edge-profile')}`, '--no-first-run', '--force-device-scale-factor=1', '--virtual-time-budget=60000', `--window-size=${W},${H}`, `--screenshot=${out}`,
   'file:///' + src.replace(/\\/g, '/')], { stdio: 'ignore', timeout: 150000 });
+// msedge.exe can hand the job to a background process and return at once, so wait until the file is written
+const sleep = t => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, t);
+for (let last = -1, end = Date.now() + 150000; ; sleep(1000)) {
+  const size = fs.existsSync(out) ? fs.statSync(out).size : -1;
+  if (size > 0 && size === last) break;
+  if (Date.now() > end) throw new Error(`${out} was not written`);
+  last = size;
+}
 console.log(out);
