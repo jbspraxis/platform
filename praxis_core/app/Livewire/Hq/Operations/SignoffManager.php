@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Support\HtmlString;
 
 #[Layout('components.layouts.hq')]
 class SignoffManager extends Component
@@ -22,14 +23,33 @@ class SignoffManager extends Component
     public bool $canViewKaizen = false; // kaizen.view: AI marketing push tab and its ledgers (portfolio + Kaizen)
     #[Locked]
     public bool $canPushKaizen = false; // kaizen.create: generate and commit portfolio/Kaizen drafts
+    #[Locked]
+    public bool $canPublishKaizen = false; // kaizen.approve: publish and unpublish Insights articles
+
+    /** Stored Insights article statuses (kaizen_articles.status) and what staff read */
+    public const KAIZEN_STATUSES = ['Pending Moderation' => 'Waiting for review', 'Draft' => 'Draft', 'Published' => 'Published', 'Rejected' => 'Rejected'];
+
+    /** The only status changes HQ makes to an article: from these statuses to that one */
+    private const KAIZEN_CHANGES = [
+        'publish' => ['from' => ['Draft', 'Pending Moderation'], 'to' => 'Published', 'audit' => 'KAIZEN_ARTICLE_PUBLISHED'],
+        'unpublish' => ['from' => ['Published'], 'to' => 'Draft', 'audit' => 'KAIZEN_ARTICLE_UNPUBLISHED'],
+    ];
 
     public $mainTab = 'ledger';
-    public $marketingTab = 'portfolio_gen'; 
+    public $marketingTab = 'portfolio_gen';
 
     public $signoffs = [];
     public $eligibleProjects = [];
     public $portfolioLedger = [];
-    public $kaizenLedger = [];
+
+    // Insights articles: the status shown ('' = all), the article open in the reader, the change waiting for confirmation
+    public string $kaizenStatusFilter = '';
+    #[Locked]
+    public ?string $readingArticleId = null;
+    #[Locked]
+    public ?string $confirmArticleId = null;
+    #[Locked]
+    public ?string $confirmChange = null; // 'publish' or 'unpublish'
 
     public $isGenerating = false;
     public $draftSignatoryEmail = '';
@@ -51,6 +71,7 @@ class SignoffManager extends Component
         $this->canUnfreeze = $user->can('signoffs.approve');
         $this->canViewKaizen = $user->can('kaizen.view');
         $this->canPushKaizen = $user->can('kaizen.create');
+        $this->canPublishKaizen = $user->can('kaizen.approve');
         if (! $this->canPushKaizen) {
             $this->marketingTab = 'portfolio_ledger';
         }
@@ -99,14 +120,14 @@ class SignoffManager extends Component
             ->select('projects.id', 'projects.title', 'organizations.name as client_name')
             ->get()->toArray();
 
+        // The Insights articles are read in render(), with the status filter
         if ($this->canViewKaizen) {
             $this->portfolioLedger = DB::table('portfolio_case_studies')->orderBy('created_at', 'desc')->get()->toArray();
-            $this->kaizenLedger = DB::table('kaizen_articles')->orderBy('created_at', 'desc')->get()->toArray();
         }
     }
 
-    public function switchMainTab($tab) { $this->mainTab = $tab; $this->loadLedgers(); }
-    public function switchMarketingTab($tab) { $this->marketingTab = $tab; $this->loadLedgers(); }
+    public function switchMainTab($tab) { $this->mainTab = $tab; $this->closeArticle(); $this->loadLedgers(); }
+    public function switchMarketingTab($tab) { $this->marketingTab = $tab; $this->closeArticle(); $this->loadLedgers(); }
 
     public function generateSignoffDraft()
     {
@@ -305,5 +326,190 @@ class SignoffManager extends Component
         session()->flash('success', 'Sign-off unfrozen. The project is active again and its sprint board is open.');
     }
 
-    public function render() { return view('livewire.hq.operations.signoff-manager'); }
+    /** Opens an Insights article in the reader */
+    public function readArticle(string $articleId)
+    {
+        abort_unless(Auth::user()->can('kaizen.view'), 403);
+
+        $this->cancelArticleChange();
+        $this->readingArticleId = DB::table('kaizen_articles')->where('id', $articleId)->value('id');
+        if (! $this->readingArticleId) {
+            session()->flash('error', 'We couldn’t find this article; it may have been deleted. The list is up to date now.');
+        }
+    }
+
+    /** Closes the reader and any confirmation over it */
+    public function closeArticle()
+    {
+        $this->readingArticleId = null;
+        $this->cancelArticleChange();
+    }
+
+    /** Escape: the confirmation first, then the reader */
+    public function dismissArticle()
+    {
+        if ($this->confirmArticleId) {
+            $this->cancelArticleChange();
+        } else {
+            $this->closeArticle();
+        }
+    }
+
+    /** Opens the confirmation for publishing or unpublishing an article */
+    public function askArticleChange(string $articleId, string $change)
+    {
+        abort_unless(Auth::user()->can('kaizen.approve') && isset(self::KAIZEN_CHANGES[$change]), 403);
+
+        $article = DB::table('kaizen_articles')->where('id', $articleId)->first(['id', 'status']);
+        if (! $article || ! in_array($article->status, self::KAIZEN_CHANGES[$change]['from'], true)) {
+            $this->closeArticle();
+            session()->flash('error', $this->refusal($article, $change));
+            return;
+        }
+
+        $this->confirmArticleId = $article->id;
+        $this->confirmChange = $change;
+    }
+
+    public function cancelArticleChange()
+    {
+        $this->confirmArticleId = null;
+        $this->confirmChange = null;
+    }
+
+    /** Draft or waiting for review -> Published. The website caches articles, so it shows there within 10 minutes. */
+    public function publishArticle(string $articleId)
+    {
+        $this->changeArticleStatus($articleId, 'publish');
+    }
+
+    /** Published -> Draft: off the website within 10 minutes. The first publication date is kept. */
+    public function unpublishArticle(string $articleId)
+    {
+        $this->changeArticleStatus($articleId, 'unpublish');
+    }
+
+    private function changeArticleStatus(string $articleId, string $change)
+    {
+        abort_unless(Auth::user()->can('kaizen.approve'), 403);
+
+        $rule = self::KAIZEN_CHANGES[$change];
+        $article = DB::table('kaizen_articles')->where('id', $articleId)->first();
+        $this->closeArticle();
+
+        $values = ['status' => $rule['to'], 'is_public' => $change === 'publish' ? 1 : 0, 'updated_by' => Auth::id(), 'updated_at' => now()];
+        if ($change === 'publish' && empty($article?->published_at)) {
+            $values['published_at'] = now();
+        }
+
+        // Only from an allowed status, and only if nobody changed it a moment ago
+        $changed = $article && in_array($article->status, $rule['from'], true)
+            && DB::transaction(function () use ($article, $rule, $change, $values) {
+                if (DB::table('kaizen_articles')->where('id', $article->id)->where('status', $article->status)->update($values) !== 1) {
+                    return false;
+                }
+
+                DB::table('system_audit_logs')->insert([
+                    'user_id' => Auth::id(),
+                    'action' => $rule['audit'],
+                    'description' => ($change === 'publish' ? 'Published' : 'Unpublished') . " the Insights article ‘{$article->title}’.",
+                    'target_table' => 'kaizen_articles',
+                    'target_id' => $article->id,
+                    'old_values' => json_encode(['status' => $article->status, 'is_public' => (bool) $article->is_public]),
+                    'new_values' => json_encode(['status' => $rule['to'], 'is_public' => $change === 'publish']
+                        + (isset($values['published_at']) ? ['published_at' => $values['published_at']->toDateTimeString()] : [])),
+                    'ip_address' => request()?->ip(),
+                    'created_at' => now(),
+                ]);
+
+                return true;
+            });
+
+        if (! $changed) {
+            $current = $article ? DB::table('kaizen_articles')->where('id', $article->id)->first(['id', 'status']) : null;
+            session()->flash('error', $this->refusal($current, $change));
+            return;
+        }
+
+        if ($change === 'unpublish') {
+            session()->flash('success', "Unpublished ‘{$article->title}’. It’s a draft again and leaves the website within 10 minutes.");
+            return;
+        }
+
+        // There is no email for contributors (app/Mail), so the person who publishes tells them
+        $contributor = $article->contributor_id
+            ? DB::table('client_users')->where('id', $article->contributor_id)->first(['first_name', 'last_name', 'email'])
+            : null;
+        session()->flash('success', "Published ‘{$article->title}’. It appears on the website within 10 minutes."
+            . ($contributor ? ' HQ doesn’t email contributors, so let ' . trim("{$contributor->first_name} {$contributor->last_name}") . " know yourself ({$contributor->email})." : ''));
+    }
+
+    /** Why an article can't take this change: it was deleted, or its status isn't (or is no longer) one the change starts from */
+    private function refusal(?object $article, string $change): string
+    {
+        $reason = match (true) {
+            ! $article => 'We couldn’t find this article; it may have been deleted.',
+            $change === 'publish' && $article->status === 'Published' => 'This article is already published, so nothing changed.',
+            $change === 'publish' => 'Only a draft or an article waiting for review can be published, so nothing changed.',
+            default => 'This article isn’t published, so nothing changed.',
+        };
+
+        return $reason . ' The list is up to date now.';
+    }
+
+    /** The Insights articles tab: the list (status filter applied), how many per status, the reader and the confirmation */
+    private function kaizenView(): array
+    {
+        $withContributor = fn () => DB::table('kaizen_articles')
+            ->leftJoin('client_users as contributor', 'contributor.id', '=', 'kaizen_articles.contributor_id')
+            ->addSelect('contributor.first_name as contributor_first_name', 'contributor.last_name as contributor_last_name', 'contributor.job_title as contributor_job_title');
+
+        $status = array_key_exists($this->kaizenStatusFilter, self::KAIZEN_STATUSES) ? $this->kaizenStatusFilter : null;
+        $ledger = $withContributor()
+            ->addSelect('kaizen_articles.id', 'kaizen_articles.title', 'kaizen_articles.executive_summary', 'kaizen_articles.status',
+                'kaizen_articles.contributor_id', 'kaizen_articles.published_at', 'kaizen_articles.created_at')
+            ->when($status, fn ($q) => $q->where('kaizen_articles.status', $status))
+            ->orderBy('kaizen_articles.created_at', 'desc')
+            ->get()->all();
+
+        $reading = $this->readingArticleId ? $withContributor()->addSelect('kaizen_articles.*')->where('kaizen_articles.id', $this->readingArticleId)->first() : null;
+        // The same sections, in the same order and under the same headings, as the article page on the website
+        $sections = $reading ? array_filter(array_map(fn ($text) => self::paragraphs($text), [
+            'Summary' => $reading->executive_summary,
+            'The problem' => $reading->problem_statement,
+            'What was done' => $reading->engineered_solution,
+            'The result' => $reading->final_roi,
+        ]), fn (HtmlString $html) => $html->isNotEmpty()) : [];
+
+        return [
+            'kaizenLedger' => $ledger,
+            'kaizenCounts' => DB::table('kaizen_articles')->selectRaw('status, count(*) as n')->groupBy('status')->pluck('n', 'status')->all(),
+            'readingArticle' => $reading,
+            'readingSections' => $sections,
+            'confirmArticle' => $this->confirmArticleId ? DB::table('kaizen_articles')->where('id', $this->confirmArticleId)->first(['id', 'title', 'status']) : null,
+        ];
+    }
+
+    /** Article text as the website shows it: tags stripped, then paragraphs of escaped text with **bold** kept */
+    private static function paragraphs(?string $text): HtmlString
+    {
+        $text = trim(html_entity_decode(strip_tags((string) $text), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $html = '';
+        foreach ($text === '' ? [] : preg_split('/\R{2,}/', $text) as $paragraph) {
+            $p = e(trim($paragraph));
+            $html .= '<p>' . nl2br(preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $p) ?? $p, false) . '</p>';
+        }
+
+        return new HtmlString($html);
+    }
+
+    public function render()
+    {
+        $kaizen = ['kaizenLedger' => [], 'kaizenCounts' => [], 'readingArticle' => null, 'readingSections' => [], 'confirmArticle' => null];
+        if ($this->canViewKaizen && $this->mainTab === 'marketing' && $this->marketingTab === 'kaizen_ledger') {
+            $kaizen = $this->kaizenView();
+        }
+
+        return view('livewire.hq.operations.signoff-manager', $kaizen);
+    }
 }
