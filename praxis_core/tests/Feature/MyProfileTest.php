@@ -137,4 +137,23 @@ class MyProfileTest extends TestCase
         $this->assertNull($me->fresh()->avatar_path);
         \Illuminate\Support\Facades\Storage::disk('local')->assertMissing($old);
     }
+
+    public function test_photos_show_in_team_lists(): void
+    {
+        $owner = $this->staff('own', ['owner']);
+        $ada = $this->staff('ada', ['sales']);
+        $ada->forceFill(['avatar_path' => 'avatars/' . $ada->id . '-test.jpg'])->save();
+        $url = $ada->fresh()->avatarUrl();
+
+        // Accounts (the staff list is the second tab)
+        Livewire::actingAs($owner)->test(\App\Livewire\Hq\System\RoleManagement::class)->call('setTab', 'INTERNAL')->assertSee($url, false);
+
+        // Staff directory (the photo belongs to the account, not the HR row)
+        $this->insertRow('mdm_employees', ['id' => (string) \Illuminate\Support\Str::uuid(), 'user_id' => $ada->id, 'employee_code' => 'E-1', 'job_classification' => 'Sales', 'is_active' => 1]);
+        $this->actingAs($owner)->get('https://' . Hosts::hq() . '/mdm/employees')->assertOk()->assertSee($url, false);
+
+        // Someone without a photo keeps their initials
+        $html = \Illuminate\Support\Facades\Blade::render('<x-hq.avatar :user="$u" :size="24" />', ['u' => ['id' => 'x', 'first_name' => 'Ben', 'last_name' => 'Okafor']]);
+        $this->assertStringContainsString('>BO</span>', $html);
+    }
 }
