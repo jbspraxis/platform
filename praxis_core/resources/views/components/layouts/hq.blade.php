@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-<head>
+<head><meta charset="utf-8">
     @include('partials.app-head', ['app' => 'hq', 'title' => $title ?? null])
 </head>
 <body>
