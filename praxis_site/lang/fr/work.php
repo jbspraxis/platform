@@ -125,7 +125,7 @@ return [
             'changed' => [
                 ['title' => 'La comptabilité au cœur', 'text' => 'L’ancien système n’avait pas de couche comptable. Désormais, les factures, les coûts des dossiers, les achats et la paie sont comptabilisés dans un seul grand livre OHADA, au rythme du travail.'],
                 ['title' => 'Français et anglais', 'text' => 'Chaque écran existe dans les deux langues, et la recherche trouve une page, un onglet ou une donnée dans l’une comme dans l’autre.'],
-                ['title' => 'Des échéances fiscales qui se rappellent', 'text' => 'Les échéances déclaratives sont générées à partir de chaque immatriculation fiscale, attribuées à la personne responsable et annoncées bien avant leur date.'],
+                ['title' => 'Des échéances fiscales annoncées à temps', 'text' => 'Les échéances déclaratives sont générées à partir de chaque immatriculation fiscale, attribuées à la personne responsable et annoncées bien avant leur date.'],
                 ['title' => 'Testé avant chaque mise en production', 'text' => 'Chaque modification passe des tests automatisés avant sa mise en production, et les équipes peuvent s’exercer dans un environnement de test séparé, sans toucher aux données réelles.'],
             ],
             'role' => [
@@ -178,7 +178,7 @@ return [
             'role' => [
                 'see' => 'Nous avons présenté la plateforme au client lors d’un appel de découverte, puis passé ses besoins en revue avec son équipe, module par module.',
                 'design' => "Nous avons rédigé le plan des jalons\u{202F}: les décisions d’architecture, l’inventaire de chaque écran et une définition de «\u{202F}terminé\u{202F}» pour chaque jalon.",
-                'build' => 'Nous la construisons en onze jalons, chacun présenté au client lors d’une démonstration avant que le suivant ne commence.',
+                'build' => 'Nous le construisons en onze jalons, chacun présenté au client lors d’une démonstration avant que le suivant ne commence.',
                 'hold' => 'Le dernier jalon est consacré à la passation et à la formation, sur un environnement de test qui se comporte exactement comme le système en production.',
             ],
         ],

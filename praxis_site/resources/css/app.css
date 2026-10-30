@@ -521,7 +521,6 @@
     /* A case study: the facts beside the title */
     .case-hero-inner { display: grid; gap: 32px; }
     @media (min-width: 1000px) { .case-hero-inner { grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: 64px; align-items: end; } }
-    .case-facts div:last-child { border-bottom: 1px solid var(--color-line); }
     .case-facts dd a { color: var(--color-ink); }
     .case-facts dd a:hover { color: var(--color-deep-teal); }
 
