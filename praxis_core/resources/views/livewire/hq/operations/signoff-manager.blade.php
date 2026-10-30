@@ -430,7 +430,10 @@
                                             <dd>{{ $byline($readingArticle) }}@if($readingArticle->contributor_id && $readingArticle->contributor_job_title)<span class="help">, {{ $readingArticle->contributor_job_title }}</span>@endif</dd>
                                         </div>
                                         <div><dt>Created</dt><dd class="num">{{ $day($readingArticle->created_at) }}</dd></div>
-                                        <div><dt>Published</dt><dd class="num">{{ $day($readingArticle->published_at) ?? 'Not yet' }}</dd></div>
+                                        <div>
+                                            <dt>{{ $readingArticle->published_at && $readingArticle->status !== 'Published' ? 'First published' : 'Published' }}</dt>
+                                            <dd class="num">{{ $day($readingArticle->published_at) ?? 'Not yet' }}</dd>
+                                        </div>
                                         <div><dt>Last changed</dt><dd class="num">{{ $day($readingArticle->updated_at ?? $readingArticle->created_at) }}</dd></div>
                                     </dl>
                                     @if($readingArticle->contributor_id)
