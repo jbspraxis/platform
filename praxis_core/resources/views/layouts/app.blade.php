@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>@yield('title', __('JBS Praxis | Predictive Architecture & Enterprise Intelligence'))</title>
+    <title>@yield('title', __('JBS Praxis | Consulting and engineering for Africa’s institutions'))</title>
     <meta name="google-site-verification" content="0zhkJDJCDXms6Z9kFIqz74TxhvuMLBBNJxuIPIMadYY"/>
-    <meta name="description" content="@yield('meta_description', __('JBS Praxis engineers deterministic operational resilience. We deploy forensic COPQ diagnostics, relational data vaults, and zero-defect cognitive backends for global Tier-1 enterprises.'))">
-    <meta name="keywords" content="@yield('meta_keywords', __('Enterprise Architecture, Predictive Diagnostics, Zero-Defect Governance, Cognitive Backends, COPQ Analysis, Lean Six Sigma, RAG AI, Digital Poka-Yoke'))">
+    <meta name="description" content="@yield('meta_description', __('We design how your organisation runs, then build the system that answers for it: finance, people, operations and risk in one place. Book a free audit and demo.'))">
+    <meta name="keywords" content="@yield('meta_keywords', __('consulting, engineering, ERP, operations, finance systems, cost of poor quality, Nigeria, Cameroon, Africa'))">
 
     {{-- Strict Canonical (Strips query strings for pure SEO equity) --}}
     <link rel="canonical" href="@yield('canonical', request()->url())">
@@ -30,9 +30,9 @@
 
     <meta property="og:type" content="@yield('og_type', 'website')">
     <meta property="og:url" content="{{ request()->url() }}">
-    <meta property="og:site_name" content="JBS Praxis Intelligence">
-    <meta property="og:title" content="@yield('title', __('JBS Praxis | Predictive Architecture & Enterprise Intelligence'))">
-    <meta property="og:description" content="@yield('meta_description', __('JBS Praxis engineers deterministic operational resilience. We deploy forensic COPQ diagnostics, relational data vaults, and zero-defect cognitive backends for global Tier-1 enterprises.'))">
+    <meta property="og:site_name" content="JBS Praxis">
+    <meta property="og:title" content="@yield('title', __('JBS Praxis | Consulting and engineering for Africa’s institutions'))">
+    <meta property="og:description" content="@yield('meta_description', __('We design how your organisation runs, then build the system that answers for it: finance, people, operations and risk in one place. Book a free audit and demo.'))">
     
     {{-- Dynamically Injected Image --}}
     <meta property="og:image" content="@yield('og_image', $defaultImage)">
@@ -48,8 +48,8 @@
 
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="{{ request()->url() }}">
-    <meta name="twitter:title" content="@yield('title', __('JBS Praxis | Predictive Architecture & Enterprise Intelligence'))">
-    <meta name="twitter:description" content="@yield('meta_description', __('JBS Praxis engineers deterministic operational resilience. We deploy forensic COPQ diagnostics, relational data vaults, and zero-defect cognitive backends for global Tier-1 enterprises.'))">
+    <meta name="twitter:title" content="@yield('title', __('JBS Praxis | Consulting and engineering for Africa’s institutions'))">
+    <meta name="twitter:description" content="@yield('meta_description', __('We design how your organisation runs, then build the system that answers for it: finance, people, operations and risk in one place. Book a free audit and demo.'))">
     
     {{-- Twitter always prefers Landscape --}}
     <meta name="twitter:image" content="@yield('og_image', asset('assets/img/jbs-og-banner-ls.png'))">
