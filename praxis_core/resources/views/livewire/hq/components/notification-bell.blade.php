@@ -9,7 +9,7 @@
     };
 @endphp
 <div x-data="{ open: false }" class="relative flex items-center" @keydown.escape.window="open = false">
-    <button type="button" class="btn btn-ghost relative" style="padding: 8px;" @click="open = !open"
+    <button type="button" class="btn btn-ghost relative" style="padding: 8px;" @click="open = !open" data-hq-bell-button
             :aria-expanded="open.toString()" aria-haspopup="true" title="Notifications"
             aria-label="Notifications{{ $unreadCount > 0 ? ', ' . $unreadCount . ' unread' : '' }}">
         <i data-lucide="bell" style="width: 20px; height: 20px; color: var(--color-slate);"></i>
@@ -28,7 +28,7 @@
 
         <div style="max-height: 400px; overflow-y: auto;">
             @forelse ($notifications as $note)
-                <button type="button" wire:click="markAndRedirect(@js((string) $note->id), @js($note->link_url ?? '#'))"
+                <button type="button" wire:click="markAndRedirect(@js((string) $note->id))"
                         class="block w-full text-left border-b border-line hover:bg-mist {{ $note->is_read ? 'bg-paper' : 'bg-teal-tint' }}"
                         style="padding: 12px 16px; cursor: pointer; {{ $note->is_read ? '' : 'box-shadow: inset 2px 0 0 var(--color-deep-teal);' }}">
                     <span class="flex items-center justify-between gap-2" style="margin-bottom: 4px;">
@@ -48,5 +48,19 @@
                 </div>
             @endforelse
         </div>
+
+        {{-- The app on this device (docs/PWA.md): hq-pwa.js draws "Turn on notifications" and "Install the app"
+             in the first box (wire:ignore keeps them when the bell reloads) and closes the menu when an action
+             opens something else --}}
+        <div class="hqp-bell-foot">
+            <div wire:ignore data-hq-pwa="bell-actions" x-on:hq-pwa-close-menu="open = false"></div>
+            <button type="button" class="hqp-menu-item" x-on:click="open = false; $dispatch('open-notification-settings')">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>
+                Notification settings
+            </button>
+        </div>
     </div>
+
+    {{-- The settings panel lives with the bell, so it exists on every HQ page --}}
+    <livewire:hq.pwa.notification-settings />
 </div>

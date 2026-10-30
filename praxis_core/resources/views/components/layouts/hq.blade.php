@@ -4,6 +4,7 @@
     @include('partials.app-head', ['app' => 'hq', 'title' => $title ?? null])
 </head>
 <body>
+<x-pwa.launch />
 @php
     // The rail: each link shows only when the person can open that screen (roles & permissions, config/access.php).
     // Names follow docs/BRAND.md section 5: plain module names, sentence case.

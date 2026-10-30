@@ -1,0 +1,430 @@
+/* HQ as an app (docs/PWA.md), the "client" part: the install and notification cards, the offline notice, the
+   install steps for iPhone, iPad and Mac Safari, the app actions in the bell menu, the notification settings
+   panel, and the safe areas now that HQ uses viewport-fit=cover (notch, status bar, home indicator).
+   Served on the HQ host only and loaded before the compiled stylesheet (app.css), whose tokens and classes it
+   reuses. Its unlayered rules beat app.css's layered ones; rules that override app.css's 900px media query
+   start with "html" so they win whatever the order. Motion: opacity and transform only (docs/BRAND.md 11). */
+
+:root {
+    --hqp-safe-top: env(safe-area-inset-top, 0px);
+    --hqp-safe-right: env(safe-area-inset-right, 0px);
+    --hqp-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --hqp-safe-left: env(safe-area-inset-left, 0px);
+}
+
+/* ---- Safe areas -------------------------------------------------------------------------------------------
+   The insets are 0 in ordinary browser windows. They grow in the installed app on iPhone and iPad (the status
+   bar is see-through, so the page runs under it), in landscape (the notch) and above the home indicator. */
+
+/* The status bar's text is white: keep an Ink strip behind it while the page scrolls under it */
+body::after {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--hqp-safe-top);
+    background: var(--color-ink);
+    z-index: 10003;
+    pointer-events: none;
+}
+
+/* Computers and tablets in landscape: the Ink rail on the left, the top bar and the workspace on the right */
+@media not all and (max-width: 900px) {
+    html .rail { width: calc(var(--spacing-rail) + var(--hqp-safe-left)); padding-left: var(--hqp-safe-left); }
+    html .rail-head,
+    html .topbar { height: calc(64px + var(--hqp-safe-top)); padding-top: var(--hqp-safe-top); }
+    html .topbar { padding-right: calc(32px + var(--hqp-safe-right)); }
+    html .rail-nav { padding-bottom: calc(16px + var(--hqp-safe-bottom)); }
+    html .workspace { padding-right: calc(32px + var(--hqp-safe-right)); padding-bottom: calc(32px + var(--hqp-safe-bottom)); }
+}
+
+/* Phones and tablets in portrait: the rail folds into its header at the top; the menu opens full height */
+@media (max-width: 900px) {
+    html .rail-head {
+        height: calc(64px + var(--hqp-safe-top));
+        padding: var(--hqp-safe-top) calc(16px + var(--hqp-safe-right)) 0 calc(16px + var(--hqp-safe-left));
+    }
+    html .rail-nav { padding: 12px calc(16px + var(--hqp-safe-right)) calc(24px + var(--hqp-safe-bottom)) calc(16px + var(--hqp-safe-left)); }
+    html .topbar { padding-left: calc(16px + var(--hqp-safe-left)); padding-right: calc(16px + var(--hqp-safe-right)); }
+    html .workspace { padding: 20px calc(16px + var(--hqp-safe-right)) calc(20px + var(--hqp-safe-bottom)) calc(16px + var(--hqp-safe-left)); }
+}
+
+/* The sign-in and setup pages */
+html .auth-page {
+    padding: calc(32px + var(--hqp-safe-top)) calc(16px + var(--hqp-safe-right)) calc(32px + var(--hqp-safe-bottom)) calc(16px + var(--hqp-safe-left));
+}
+
+/* Dialogs and full-height side panels on HQ screens: keep them clear of the status bar and the notch. An Ink
+   edge (side panels) adds the space without touching each panel's own padding. */
+html .modal-backdrop {
+    padding: max(24px, var(--hqp-safe-top)) max(24px, var(--hqp-safe-right)) max(24px, var(--hqp-safe-bottom)) max(24px, var(--hqp-safe-left));
+}
+html aside[role="dialog"][aria-modal="true"] {
+    border-top: var(--hqp-safe-top) solid var(--color-ink);
+    border-right: var(--hqp-safe-right) solid var(--color-paper);
+}
+
+/* Livewire's page-change progress bar: below the status bar */
+html #nprogress .bar { top: var(--hqp-safe-top); }
+
+/* ---- Shared pieces --------------------------------------------------------------------------------------- */
+
+.hqp-cards,
+.hqp-toasts,
+.hqp-sheet,
+.hqp-panel { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+
+.hqp-cards [hidden],
+.hqp-sheet [hidden] { display: none !important; }
+
+.hqp-icon-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--color-slate);
+    cursor: pointer;
+}
+.hqp-icon-btn:hover { background: var(--color-mist); color: var(--color-ink); }
+.hqp-icon-btn svg { width: 20px; height: 20px; }
+
+/* A square tile for a glyph: Teal Tint with a Petrol glyph */
+.hqp-glyph {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: var(--radius-card);
+    background: var(--color-teal-tint);
+    color: var(--color-petrol);
+}
+.hqp-glyph svg { width: 22px; height: 22px; }
+.hqp-glyph.is-on { background: var(--color-success-tint); color: var(--color-success); }
+.hqp-glyph.is-blocked { background: var(--color-danger-tint); color: var(--color-danger); }
+.hqp-glyph img { display: block; width: 40px; height: 40px; border-radius: var(--radius-card); }
+
+/* ---- Invitation cards (install, notifications): one at a time, floating, no layout shift ------------------ */
+
+.hqp-cards {
+    position: fixed;
+    z-index: 39; /* under HQ's own dialogs and side panels (40 and up) */
+    right: calc(24px + var(--hqp-safe-right));
+    bottom: calc(24px + var(--hqp-safe-bottom));
+    width: 360px;
+    max-width: calc(100vw - 32px - var(--hqp-safe-left) - var(--hqp-safe-right));
+    pointer-events: none;
+}
+.hqp-card {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px;
+    background: var(--color-paper);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-float);
+    color: var(--color-slate);
+}
+.hqp-card-main { flex: 1; min-width: 0; }
+.hqp-card-title { margin: 0; font-size: 1rem; line-height: 1.5rem; font-weight: 600; color: var(--color-ink); }
+.hqp-card-title:focus { outline: none; }
+.hqp-card-title:focus-visible { outline: var(--focus-width, 2px) solid var(--color-focus); outline-offset: 2px; }
+.hqp-card-text { margin: 4px 0 0; font-size: 0.875rem; line-height: 1.375rem; color: var(--color-slate); }
+.hqp-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+/* Phones: the full width, 16px from the edges, above the home indicator */
+@media (max-width: 640px) {
+    .hqp-cards {
+        left: calc(16px + var(--hqp-safe-left));
+        right: calc(16px + var(--hqp-safe-right));
+        bottom: calc(16px + var(--hqp-safe-bottom));
+        width: auto;
+        max-width: none;
+    }
+}
+
+/* ---- Notices (offline, back online) --------------------------------------------------------------------- */
+
+.hqp-toasts {
+    position: fixed;
+    z-index: 10010; /* above everything: a person filling in a side panel must see it */
+    left: 50%;
+    bottom: calc(24px + var(--hqp-safe-bottom) + var(--hqp-lift, 0px));
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: calc(100vw - 32px - var(--hqp-safe-left) - var(--hqp-safe-right));
+    pointer-events: none;
+}
+.hqp-toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    max-width: 420px;
+    padding: 12px 16px;
+    border-radius: var(--radius-card);
+    background: var(--color-ink);
+    color: var(--color-fg-on-dark);
+    box-shadow: var(--shadow-float);
+    font-size: 0.875rem;
+    line-height: 1.375rem;
+}
+.hqp-toast svg { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; color: var(--color-accent-on-dark); }
+.hqp-toast.is-online svg { color: var(--color-success-on-dark); }
+
+@media (max-width: 640px) {
+    .hqp-toasts {
+        left: calc(16px + var(--hqp-safe-left));
+        right: calc(16px + var(--hqp-safe-right));
+        bottom: calc(16px + var(--hqp-safe-bottom) + var(--hqp-lift, 0px));
+        transform: none;
+        width: auto;
+        max-width: none;
+    }
+    .hqp-toast { max-width: none; }
+}
+
+/* ---- App actions in the bell menu ------------------------------------------------------------------------ */
+
+.hqp-bell-foot { border-top: 1px solid var(--color-line); padding: 4px 0; }
+.hqp-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 16px;
+    border: 0;
+    background: transparent;
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+}
+.hqp-menu-item:hover { background: var(--color-mist); }
+.hqp-menu-item:focus-visible { outline: var(--focus-width, 2px) solid var(--color-focus); outline-offset: -2px; }
+.hqp-menu-item svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--color-deep-teal); }
+.hqp-menu-item[aria-disabled="true"] { cursor: default; color: var(--color-muted); background: transparent; }
+.hqp-menu-item.is-status { cursor: default; color: var(--color-slate); font-weight: 400; }
+.hqp-menu-item.is-status:hover { background: transparent; }
+.hqp-menu-item.is-status svg { color: var(--color-success); }
+.hqp-menu-note { margin: 0; padding: 0 16px 10px 46px; font-size: 0.8125rem; line-height: 1.125rem; color: var(--color-danger); }
+
+/* ---- Notification settings (slide-over) ------------------------------------------------------------------ */
+
+.hqp-backdrop { position: fixed; inset: 0; z-index: 48; background: rgba(12, 20, 43, 0.4); }
+.hqp-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 49;
+    display: flex;
+    flex-direction: column;
+    width: 440px;
+    max-width: 100%;
+    background: var(--color-paper);
+    border-left: 1px solid var(--color-line);
+    box-shadow: var(--shadow-float);
+    color: var(--color-slate);
+}
+.hqp-panel-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 16px 20px 24px;
+    border-bottom: 1px solid var(--color-line);
+}
+.hqp-panel-title { margin: 0; font-size: 1.125rem; line-height: 1.625rem; font-weight: 600; color: var(--color-ink); }
+.hqp-panel-intro { margin: 4px 0 0; font-size: 0.875rem; line-height: 1.375rem; color: var(--color-muted); }
+.hqp-panel-head .hqp-icon-btn { margin-top: -8px; }
+.hqp-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    padding: 24px 24px calc(24px + var(--hqp-safe-bottom));
+}
+.hqp-section-title { margin: 0 0 4px; font-size: 1rem; line-height: 1.5rem; font-weight: 600; color: var(--color-ink); }
+.hqp-section-title:focus { outline: none; }
+.hqp-section-title:focus-visible { outline: var(--focus-width, 2px) solid var(--color-focus); outline-offset: 2px; }
+.hqp-panel .help { margin: 0; }
+.hqp-loading { margin: 12px 0 0; font-size: 0.875rem; color: var(--color-muted); }
+.hqp-empty { margin-top: 12px; padding: 16px; border: 1px dashed var(--color-line-strong); border-radius: var(--radius-card); font-size: 0.875rem; line-height: 1.375rem; color: var(--color-slate); }
+.hqp-empty strong { display: block; color: var(--color-ink); }
+.hqp-version { margin: 0; padding-top: 16px; border-top: 1px solid var(--color-line); font-size: 0.8125rem; line-height: 1.125rem; color: var(--color-muted); font-variant-numeric: tabular-nums; }
+
+/* This device (drawn by hq-pwa.js) */
+.hqp-this { margin-top: 12px; padding: 16px; border: 1px solid var(--color-line); border-radius: var(--radius-card); }
+.hqp-this-name { margin: 0 0 8px; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600; color: var(--color-ink); }
+.hqp-state { display: flex; align-items: flex-start; gap: 10px; margin: 0; font-size: 0.875rem; line-height: 1.375rem; color: var(--color-slate); }
+.hqp-state svg { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; color: var(--color-muted); }
+.hqp-state.is-on svg { color: var(--color-success); }
+.hqp-state.is-blocked svg { color: var(--color-danger); }
+.hqp-steps-help { margin: 10px 0 0; padding-left: 20px; font-size: 0.875rem; line-height: 1.375rem; color: var(--color-slate); }
+.hqp-steps-help li + li { margin-top: 4px; }
+.hqp-this-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.hqp-result { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0 0; font-size: 0.8125rem; line-height: 1.125rem; }
+.hqp-result svg { width: 16px; height: 16px; flex-shrink: 0; }
+.hqp-result.is-ok { color: var(--color-success); }
+.hqp-result.is-error { color: var(--color-danger); }
+
+/* Your devices */
+.hqp-devices,
+.hqp-switches { list-style: none; margin: 12px 0 0; padding: 0; border: 1px solid var(--color-line); border-radius: var(--radius-card); }
+.hqp-device { padding: 12px 8px 12px 16px; }
+.hqp-device + .hqp-device,
+.hqp-switches li + li { border-top: 1px solid var(--color-line); }
+.hqp-device-row { display: flex; align-items: center; gap: 12px; }
+.hqp-device-icon { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; background: var(--color-mist); color: var(--color-petrol); }
+.hqp-device-icon svg { width: 18px; height: 18px; }
+.hqp-device-text { flex: 1; min-width: 0; }
+.hqp-device-name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600; color: var(--color-ink); overflow-wrap: anywhere; }
+.hqp-device-meta { margin: 2px 0 0; font-size: 0.8125rem; line-height: 1.125rem; color: var(--color-muted); }
+.hqp-confirm { margin: 12px 8px 0 0; padding: 12px; border-radius: var(--radius-control); background: var(--color-danger-tint); font-size: 0.875rem; line-height: 1.375rem; color: var(--color-ink); }
+.hqp-confirm p { margin: 0; }
+.hqp-confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+/* What to notify me about: one switch per group (the whole row is the label) */
+.hqp-switch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 52px;
+    padding: 8px 16px;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 500;
+    color: var(--color-ink);
+    cursor: pointer;
+}
+.hqp-switch { position: relative; display: inline-block; flex-shrink: 0; width: 44px; height: 24px; }
+html .hqp-switch input {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+.hqp-switch-track { position: absolute; inset: 0; border-radius: 999px; background: var(--color-line-strong); }
+.hqp-switch-track::before {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--color-paper);
+    box-shadow: 0 1px 2px rgba(12, 20, 43, 0.25);
+    transition: transform var(--motion-instant) var(--ease-settle);
+}
+.hqp-switch input:checked + .hqp-switch-track { background: var(--color-deep-teal); }
+.hqp-switch input:checked + .hqp-switch-track::before { transform: translateX(20px); }
+.hqp-switch input:focus-visible + .hqp-switch-track { outline: var(--focus-width, 2px) solid var(--color-focus); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+    .hqp-panel { border-left: 0; }
+    .hqp-panel-head { padding: 16px 8px 16px 16px; }
+    .hqp-panel-body { padding: 20px 16px calc(24px + var(--hqp-safe-bottom)); }
+}
+
+/* ---- Install steps (iPhone and iPad, Mac Safari) --------------------------------------------------------- */
+
+.hqp-sheet-backdrop { position: fixed; inset: 0; z-index: 10004; background: rgba(12, 20, 43, 0.5); }
+.hqp-sheet {
+    position: fixed;
+    z-index: 10005;
+    inset: 0;
+    margin: auto;
+    width: min(480px, calc(100% - 32px));
+    height: fit-content;
+    max-height: calc(100% - 48px - var(--hqp-safe-top) - var(--hqp-safe-bottom));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 20px 16px 24px 24px;
+    background: var(--color-paper);
+    border-radius: var(--radius-dialog);
+    box-shadow: var(--shadow-float);
+    color: var(--color-slate);
+}
+.hqp-sheet:focus { outline: none; }
+.hqp-sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.hqp-sheet-title { margin: 8px 0 0; font-size: 1.125rem; line-height: 1.625rem; font-weight: 600; color: var(--color-ink); }
+.hqp-sheet-head .hqp-icon-btn { margin-top: -2px; }
+.hqp-steps { list-style: none; margin: 16px 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+.hqp-step { display: flex; align-items: flex-start; gap: 14px; }
+.hqp-step .hqp-glyph { width: 44px; height: 44px; }
+.hqp-step-text { margin: 0; padding-top: 2px; font-size: 0.9375rem; line-height: 1.5rem; color: var(--color-ink); }
+.hqp-step-text strong { font-weight: 600; }
+.hqp-step-num { font-weight: 600; color: var(--color-petrol); }
+.hqp-step-hint { display: block; margin-top: 2px; font-size: 0.8125rem; line-height: 1.125rem; color: var(--color-muted); }
+.hqp-sheet-note { margin: 20px 8px 0 0; padding: 12px 16px; border-radius: var(--radius-card); background: var(--color-mist); font-size: 0.875rem; line-height: 1.375rem; color: var(--color-slate); }
+.hqp-sheet-actions { display: flex; justify-content: flex-end; margin: 20px 8px 0 0; }
+
+/* Phones: a sheet from the bottom edge, above the home indicator */
+@media (max-width: 640px) {
+    .hqp-sheet {
+        inset: auto 0 0 0;
+        width: 100%;
+        max-height: calc(100% - 16px - var(--hqp-safe-top));
+        padding: 16px calc(8px + var(--hqp-safe-right)) calc(20px + var(--hqp-safe-bottom)) calc(20px + var(--hqp-safe-left));
+        border-radius: var(--radius-dialog) var(--radius-dialog) 0 0;
+    }
+    .hqp-sheet-actions .btn { flex: 1; }
+}
+
+/* ---- Touch: 44px targets --------------------------------------------------------------------------------- */
+
+@media (pointer: coarse) {
+    .hqp-card .btn,
+    .hqp-panel .btn,
+    .hqp-sheet .btn { min-height: 44px; }
+}
+
+/* ---- Motion: things settle into place; reduced motion keeps short fades only ----------------------------- */
+
+.hqp-enter { animation: hqp-rise var(--motion-standard) var(--ease-enter) both; }
+.hqp-leave { animation: hqp-fade-out var(--motion-quick) var(--ease-exit) both; pointer-events: none; }
+.hqp-sheet.hqp-enter { animation-name: hqp-rise-far; }
+
+@keyframes hqp-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes hqp-rise-far { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@keyframes hqp-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hqp-fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+/* The settings panel (Alpine x-transition classes) */
+.hqp-t-enter { transition: opacity var(--motion-standard) var(--ease-enter), transform var(--motion-standard) var(--ease-enter); }
+.hqp-t-leave { transition: opacity var(--motion-quick) var(--ease-exit), transform var(--motion-quick) var(--ease-exit); }
+.hqp-t-fade-start { opacity: 0; }
+.hqp-t-fade-end { opacity: 1; }
+.hqp-t-panel-start { opacity: 0; transform: translateX(24px); }
+.hqp-t-panel-end { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+    .hqp-enter,
+    .hqp-sheet.hqp-enter { animation: hqp-fade-in var(--motion-fade) linear both; }
+    .hqp-leave { animation: hqp-fade-out var(--motion-fade) linear both; }
+    .hqp-t-enter,
+    .hqp-t-leave { transition: opacity var(--motion-fade) linear; }
+    .hqp-t-panel-start { transform: none; }
+    .hqp-switch-track::before { transition: none; }
+}

@@ -2,8 +2,11 @@
 
 namespace App\Support\Monitor;
 
+use App\Support\Pwa\PushDispatcher;
+use App\Support\Pwa\VapidKeys;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * The checks behind HQ → System Health. Each returns
@@ -15,7 +18,7 @@ class HealthChecks
     public static function all(): array
     {
         $checks = [];
-        foreach (['scheduler', 'errors', 'email', 'ai', 'queue', 'logs', 'leads', 'rates', 'config'] as $key) {
+        foreach (['scheduler', 'errors', 'email', 'ai', 'queue', 'logs', 'leads', 'rates', 'config', 'push'] as $key) {
             try {
                 $checks[] = ['key' => $key] + self::$key();
             } catch (\Throwable $e) {
@@ -146,6 +149,38 @@ class HealthChecks
         return ['label' => 'Live settings', 'state' => $problems ? 'bad' : 'ok',
             'detail' => $problems ? implode('; ', $problems) . '.' : 'Production mode, debug off, warning-level logs.',
             'fix' => $problems ? 'Fix these lines in praxis_core/.env.' : null];
+    }
+
+    // HQ app notifications (docs/PWA.md). Never 'bad': a phone missing a notification is not an emergency.
+    private static function push(): array
+    {
+        $label = 'Push notifications';
+        if (!PushDispatcher::ready()) {
+            return ['label' => $label, 'state' => 'warn', 'detail' => 'The HQ app tables aren’t in the database yet, so nothing is pushed.',
+                'fix' => 'Run the database migration on the server (docs/PWA.md, Deploy).'];
+        }
+        try {
+            VapidKeys::generate();
+        } catch (\Throwable $e) {
+            return ['label' => $label, 'state' => 'warn', 'detail' => 'PHP’s OpenSSL can’t make the P-256 keys that push needs, so no notification can be sent.',
+                'fix' => 'Ask the host to enable OpenSSL with elliptic curves for PHP 8.3.'];
+        }
+
+        $devices = DB::table('push_subscriptions')->count();
+        $people = DB::table('push_subscriptions')->distinct()->count('user_id');
+        $last = collect([DB::table('push_deliveries')->max('sent_at'), DB::table('push_subscriptions')->max('last_sent_at')])->filter()->max();
+        $since = now()->subDay();
+        $failed = DB::table('push_deliveries')->where('created_at', '>=', $since)->where('status', 'failed')->count();
+        $reached = DB::table('push_deliveries')->where('created_at', '>=', $since)->whereIn('status', ['sent', 'partial'])->count();
+
+        $detail = $devices === 0
+            ? 'No device has notifications turned on yet. Each person turns them on from the bell menu in HQ.'
+            : $devices . ' ' . Str::plural('device', $devices) . ' for ' . $people . ' ' . Str::plural('person', $people) . '; ' . ($last ? 'last sent ' . self::ago($last) : 'nothing sent yet') . '.';
+        if ($failed >= 5 && $failed > $reached) {
+            return ['label' => $label, 'state' => 'warn', 'detail' => $detail . " In the last 24 hours {$failed} notifications reached no device and {$reached} did.",
+                'fix' => 'Send yourself a test notification from the bell menu. If it doesn’t arrive, check the Errors tab.'];
+        }
+        return ['label' => $label, 'state' => 'ok', 'detail' => $detail, 'fix' => null];
     }
 
     public static function ago($time): string

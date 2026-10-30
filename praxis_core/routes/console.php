@@ -22,3 +22,7 @@ Schedule::command('finance:sync-exchange-rates')->dailyAt('00:00');
 
 // HQ → System Health: heartbeat, new log errors, alerts, the 8am digest (app/Support/Monitor)
 Schedule::command('monitor:run')->everyFiveMinutes()->withoutOverlapping(10);
+
+// HQ app (docs/PWA.md): push bell notifications that weren't pushed as they were written, and tidy up old delivery records
+Schedule::command('pwa:push-pending')->everyMinute()->withoutOverlapping(5);
+Schedule::command('pwa:push-prune')->dailyAt('03:10');

@@ -3,10 +3,12 @@
 namespace App\Support\Monitor;
 
 use App\Mail\SystemAlert;
+use App\Support\Access;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 /**
  * Emails from the monitor, to MONITOR_ALERT_EMAIL (default: the leads inbox).
@@ -14,6 +16,8 @@ use Illuminate\Support\Facades\Mail;
  *   health()      a check turned red (each check at most every 6 hours)
  *   digest()      the 8am summary (Lagos time), once a day
  * At most 6 alert emails an hour, so an error storm cannot flood the inbox.
+ * newErrors() and health() also put a notification in the HQ bell of every staff member who can
+ * open System health (and so on their phones, docs/PWA.md), with or without an alert email address.
  */
 class MonitorAlerts
 {
@@ -32,9 +36,12 @@ class MonitorAlerts
             $errors[] = ['summary' => self::line($g), 'hint' => ErrorMonitor::explain($g)];
         }
 
-        if (self::send(SystemAlert::newErrors($errors))) {
+        $n = $groups->count();
+        $mailed = self::send(SystemAlert::newErrors($errors));
+        $notified = self::notifyStaff('New errors in HQ', "HQ recorded {$n} new or returning " . Str::plural('error type', $n) . '. Review ' . ($n === 1 ? 'it' : 'them') . ' in System health.');
+        if ($mailed || $notified) {
             DB::table('monitor_error_groups')->whereIn('id', $groups->pluck('id'))->update(['alerted_at' => now()]);
-            return $groups->count();
+            return $n;
         }
         return 0;
     }
@@ -55,7 +62,14 @@ class MonitorAlerts
             if ($last && Carbon::parse($last)->gt(now()->subHours(6))) {
                 continue;
             }
-            if (self::allowed() && self::send(SystemAlert::checkFailing($check['label'], $check['detail'], $check['fix']))) {
+            if (!self::allowed()) {
+                continue;
+            }
+            $mailed = self::send(SystemAlert::checkFailing($check['label'], $check['detail'], $check['fix']));
+            // "Live settings need attention", "Scheduler (cron) needs attention"
+            $plural = preg_match('/[^s]s$/i', trim(preg_replace('/\s*\(.*\)$/', '', $check['label'])));
+            $notified = self::notifyStaff($check['label'] . ($plural ? ' need' : ' needs') . ' attention', rtrim($check['detail']) . ' See how to fix it in System health.');
+            if ($mailed || $notified) {
                 ErrorMonitor::setState($key, now()->toDateTimeString());
                 $sent++;
             }
@@ -114,6 +128,25 @@ class MonitorAlerts
             return true;
         } catch (\Throwable $e) {
             Log::warning('Monitor: alert email failed', ['message' => $e->getMessage()]);
+            return false;
+        }
+    }
+
+    /** A bell notification (pushed like any other) for each staff member who can open System health. Never throws. */
+    private static function notifyStaff(string $title, string $message): bool
+    {
+        try {
+            $rows = array_map(fn ($userId) => [
+                'id' => (string) Str::uuid(), 'user_id' => $userId, 'title' => $title, 'message' => $message,
+                'link_url' => route('hq.system.health', [], false), 'type' => 'System', 'is_read' => 0, 'created_at' => now(),
+            ], Access::staffWith('system.view'));
+            if (!$rows) {
+                return false;
+            }
+            DB::table('notifications')->insert($rows);
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('Monitor: bell alert failed', ['message' => $e->getMessage()]);
             return false;
         }
     }

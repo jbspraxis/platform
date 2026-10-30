@@ -1,6 +1,6 @@
 # JBS Praxis brand architecture
 
-Version 1.1, 29 October 2026. Status: approved direction, revised after three independent reviews (strategy, visual and language). Decisions still open for the owner are listed in section 16.
+Version 1.2, 30 October 2026. Status: approved direction, revised after three independent reviews (strategy, visual and language). Decisions still open for the owner are listed in section 16.
 
 This is the reference for every word, screen, email, document and campaign JBS Praxis produces. When existing code, copy or design disagrees with this document, this document wins and the other thing gets changed. It replaces the "command centre" language and neon styling the products carry today.
 
@@ -516,6 +516,7 @@ The flat versions are built from the existing artwork: the same shapes, with the
 - **Minimum size**: the stacked logo 112px tall on screen and 25mm in print. Below that, and in every horizontal slot, use the horizontal lockup: minimum 24px tall on screen, 8mm in print. The monogram alone: minimum 16px (favicon).
 - **Backgrounds**: colour versions on Paper, Mist or Teal Tint. Reversed versions on Ink or Petrol. Never on Bright Teal, never on a busy photograph; on photography, place the logo on a solid Ink or Paper panel.
 - **Never** recolour outside these versions, stretch, rotate, outline, add shadows or glows, animate, separate the bars from the letters in the stacked logo, or place inside a container shape (the app icon tile in section 14 is the one exception).
+- **The HQ app launch** is the one exception to "animate" and "separate the bars from the letters", approved by the owner on 30 October 2026. When the installed HQ app starts, the reversed stacked logo shows its letters first and the ten bars arrive from both sides to meet at the split (section 11, "The HQ launch moment"). Nowhere else: not when HQ opens in a browser tab, not in the Client Portal, on the website, in emails, slides or social posts. Every other rule here still applies, and the moment ends on the logo exactly as drawn.
 - **Endorsement**: when JBS Praxis endorses a product, the product logo leads and "a JBS Praxis product" sits beneath it in Plus Jakarta Sans at body-text size.
 
 ---
@@ -799,6 +800,23 @@ Sector images, one each, chosen with intent:
 
 With reduced motion, the final frame shows at once.
 
+### The HQ launch moment (storyboard)
+
+The one place the logo moves (section 6): when the installed HQ app starts. It plays once per start of the app, never in a browser tab and never between pages. The owner chose it on 30 October 2026 ("B. Converge").
+
+| Time | What happens |
+|---|---|
+| Before 0ms | iPhone and iPad show the startup image (section 14). It is the first frame below, so the hand-off can’t be seen. |
+| 0ms | Ink. The letters (JBS and PRAXIS) centred, and "HQ" beneath in Plus Jakarta Sans 500 in the secondary text colour on Ink (`#BBBDC4`). No bars, no rule yet. |
+| 120 to 1060ms | The ten bars arrive from both sides and meet at the split: the white halves from the left, the Bright Teal halves from the right, each from 16% of the logo’s width away, fading in as it comes. The two bars nearest the letters go first and each pair after them 75ms later, outwards; each bar takes 640ms with `--ease-settle`. |
+| 820 to 1520ms | The Praxis rule draws beneath the logo, left to right, white then Bright Teal across the split (700ms, `--ease-settle`). |
+| 1650 to 1870ms | The launch screen fades out (220ms, `--ease-exit`) and HQ is in view. If HQ’s page is still loading, the logo holds until it has loaded, at most 4s from the start. |
+| After | Stillness. A tap, a click or Escape at any point goes straight to the fade. |
+
+With reduced motion, the complete logo, the rule and "HQ" show still for 400ms, then fade out over `--motion-fade` (150ms).
+
+The logo is drawn from its own shapes and "HQ" from the letter outlines, so the first frame never waits for a font. Source: `praxis_core/resources/views/components/pwa/launch.blade.php`.
+
 ### Tokens
 
 | Token | Duration | Use |
@@ -1011,6 +1029,7 @@ HQ and the Client Portal install as progressive web apps. The files are in `bran
 - **App icon**: the reversed monogram (white with Bright Teal) centred on an Ink tile, the one place the logo sits inside a shape. The maskable version keeps the monogram inside the central 80% safe zone so Android can crop it to any shape.
 - **Favicon**: the same Ink tile at 16, 32 and 48px (`favicon.ico`), plus `favicon.svg` for modern browsers and `apple-touch-icon.png` (180px) for iPhone and iPad.
 - **Splash screen**: Ink background, the reversed stacked logo centred, the app name beneath it in Plus Jakarta Sans 500 ("HQ" or "Client Portal"). Android builds it from the manifest (`background_color` Ink, the 512px icon, the app name); iPhone and iPad use the startup images in the kit.
+- **HQ launch** (version 1.2): the installed HQ app opens on the launch moment in section 11. Its iPhone and iPad startup images are that moment’s first frame: Ink, the letters (JBS and PRAXIS) and "HQ" beneath, without the bars, which then converge as HQ opens. There is one for every iPhone and iPad size, in portrait and in landscape (44 images), made from the launch screen itself by `praxis_core/scripts/pwa/startup_images.py`. The files are in `praxis_core/resources/pwa/startup/`; the Client Portal keeps the kit’s. On Android the device’s own splash (Ink and the app icon, from the manifest) comes first, then the launch moment.
 - **Manifest values**: name "JBS Praxis HQ" / "JBS Praxis Client Portal"; short name "HQ" / "Client Portal"; `theme_color` and `background_color` `#0C142B`; `display` standalone.
 
 ### Documents (proposals, reports, invoices)
@@ -1217,6 +1236,7 @@ The owner approves changes. Each change is a new version with a line in the log 
 |---|---|---|
 | 1.0 | 29 Oct 2026 | First version from the eight brand decisions |
 | 1.1 | 29 Oct 2026 | Revised after independent strategy, visual and language reviews: platform rebuilt around the name, method and descriptor added, claims register, canonical bilingual vocabulary, French typography, logo versions and icons, Praxis rule, accessible colour fixes, Tailwind v4 tokens, email catalogue and greetings |
+| 1.2 | 30 Oct 2026 | The HQ app launch: the logo’s one exception for the installed HQ app (section 6), the launch moment’s storyboard (section 11), HQ’s startup images (section 14), decision 9 |
 
 ---
 
@@ -1232,6 +1252,7 @@ The owner approves changes. Each change is a new version with a line in the log 
 | 6 | Motion | A hybrid of composed precision and living data |
 | 7 | Imagery | Layered system (structure, product, place); place photography on Industries, About and Careers, chosen with intent |
 | 8 | Naming | Plain names: JBS Praxis HQ, Client Portal, everyday words inside |
+| 9 | HQ app launch (30 Oct 2026) | B. Converge: the letters show first, the ten bars arrive from both sides and meet at the split, the Praxis rule draws, then HQ opens (about 1.9s). The one exception to "never animate" and "never separate the bars from the letters" (section 6), for the HQ app launch only |
 | — | Languages | English and French from launch, including email |
 | — | Email routing | Replies and all site alerts go to intelligence@; everything is sent from system@ |
 
