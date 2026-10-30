@@ -1,5 +1,5 @@
 /* JBS Praxis HQ and Client Portal: one compiled stylesheet (docs/BRAND.md sections 7 to 9, 12 and 15).
-   The marketing site still uses its own layout until the new site app replaces it (PR2b). */
+   The public site is its own app (praxis_site) with its own stylesheet. */
 @import 'tailwindcss';
 @import '@fontsource-variable/newsreader/opsz.css';
 @import '@fontsource-variable/plus-jakarta-sans/wght.css';
