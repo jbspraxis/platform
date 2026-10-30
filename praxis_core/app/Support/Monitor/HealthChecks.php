@@ -56,7 +56,8 @@ class HealthChecks
         $since = now()->subDay();
         $open = DB::table('monitor_error_groups')->whereIn('status', ['new', 'investigating'])->where('last_seen_at', '>=', $since);
         $groups = (clone $open)->count();
-        $new = DB::table('monitor_error_groups')->where('first_seen_at', '>=', $since)->count();
+        // New = first seen today and still open: errors already marked fixed or ignored no longer count
+        $new = (clone $open)->where('first_seen_at', '>=', $since)->count();
         $critical = (clone $open)->whereIn('level', ['critical', 'alert', 'emergency'])->count();
         $state = $critical > 0 || $new > 5 ? 'bad' : ($groups > 0 ? 'warn' : 'ok');
         return ['label' => 'Errors (last 24 h)', 'state' => $state,
