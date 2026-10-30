@@ -28,6 +28,9 @@ class LeadsRegister extends Component
     public $diffNew = null;
     public $mergeSelections = []; 
     
+    // The organisations the register lists (and the only ones its actions change)
+    private const REGISTER_STATUSES = ['Lead', 'Active Client'];
+
     // The only copq_assessments columns a merge may write, with their labels (sentence case, docs/BRAND.md section 12)
     private const MERGE_FIELDS = [
         'company_name' => 'Company name',
@@ -69,6 +72,8 @@ class LeadsRegister extends Component
 
     // All MDM Collections dynamically loaded
     public $dbIndustries = [], $dbArchitectures = [], $dbBottlenecks = [], $dbCurrencies = [];
+    // The stages someone can move a lead to by hand; locked so the browser cannot add its own
+    #[Locked]
     public $stages = ['Lead Captured', 'Qualifying', 'In Consultation', 'Proposal Sent', 'Won / Lost'];
 
     public function mount()
@@ -91,7 +96,7 @@ class LeadsRegister extends Component
         $organizations = DB::table('organizations')
             ->select('organizations.*', 'owner.first_name as owner_first', 'owner.last_name as owner_last', 'owner.id as owner_id')
             ->leftJoin('users as owner', 'organizations.assigned_to', '=', 'owner.id')
-            ->whereIn('organizations.status', ['Lead', 'Active Client'])
+            ->whereIn('organizations.status', self::REGISTER_STATUSES)
             ->get();
 
         // Map ONLY the latest COPQ assessment to avoid double-rendering duplicates
@@ -142,7 +147,14 @@ class LeadsRegister extends Component
     {
         abort_unless(Auth::user()->can('crm.edit'), 403);
 
-        DB::table('organizations')->where('id', $orgId)->update(['pipeline_stage' => $newStage, 'updated_at' => now()]);
+        // Only one of the register's stages, and only for an organisation the register shows
+        if (! in_array($newStage, $this->stages, true)) {
+            $this->loadLeads();
+            return;
+        }
+
+        DB::table('organizations')->where('id', $orgId)->whereIn('status', self::REGISTER_STATUSES)
+            ->update(['pipeline_stage' => $newStage, 'updated_at' => now()]);
         $this->loadLeads();
         if ($this->selectedLead && $this->selectedLead->org_id === $orgId) {
             $this->selectedLead->pipeline_stage = $newStage;
@@ -154,7 +166,8 @@ class LeadsRegister extends Component
         abort_unless(Auth::user()->can('crm.edit'), 403);
 
         $userId = Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c';
-        DB::table('organizations')->where('id', $orgId)->update(['assigned_to' => $userId, 'updated_at' => now()]);
+        DB::table('organizations')->where('id', $orgId)->whereIn('status', self::REGISTER_STATUSES)
+            ->update(['assigned_to' => $userId, 'updated_at' => now()]);
         $this->loadLeads();
         if ($this->selectedLead && $this->selectedLead->org_id === $orgId) { $this->openDrawer($orgId); }
     }
@@ -215,6 +228,19 @@ class LeadsRegister extends Component
         DB::table('organizations')->where('id', $targetOrgId)->update([
             'is_duplicate_suspect' => 0,
             'updated_at' => now()
+        ]);
+
+        $kept = array_keys(array_filter(array_intersect_key($this->mergeSelections, self::MERGE_FIELDS), fn ($pick) => $pick === 'old'));
+        DB::table('system_audit_logs')->insert([
+            'user_id' => Auth::id(),
+            'action' => 'LEAD_RECORDS_MERGED',
+            'description' => 'Merged two assessments for ' . ($finalData['company_name'] ?: 'a lead') . '.',
+            'target_table' => 'copq_assessments',
+            'target_id' => $this->diffNew->id,
+            'old_values' => json_encode(array_intersect_key((array) $this->diffNew, self::MERGE_FIELDS), JSON_UNESCAPED_UNICODE),
+            'new_values' => json_encode(['merged_from' => $this->diffOld->id, 'kept_from_older_record' => $kept]),
+            'ip_address' => request()?->ip(),
+            'created_at' => now(),
         ]);
 
         $this->closeDiffViewer();
