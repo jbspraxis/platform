@@ -315,6 +315,52 @@ class GoogleWorkspace
         return null;
     }
 
+    /**
+     * The timed events in the connected calendar between two moments, in start order: for importing meetings
+     * HQ did not create (opportunities:import). Each: id, title, start, end (Africa/Lagos), Meet code and link,
+     * attendees (email, name, response) and how many Google Docs are attached (Gemini's notes). Read-only.
+     *
+     * @return list<array{id: string, title: string, start: CarbonImmutable, end: CarbonImmutable, meet_code: ?string, meet_link: ?string, attendees: list<array{email: string, name: ?string, response: ?string}>, docs: int}>
+     */
+    public function listEvents(CarbonInterface $from, CarbonInterface $to): array
+    {
+        $events = [];
+        $pageToken = null;
+        do {
+            $page = $this->call('get', self::CALENDAR . '/calendars/primary/events', array_filter([
+                'timeMin' => $from->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+                'timeMax' => $to->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+                'singleEvents' => 'true',
+                'orderBy' => 'startTime',
+                'maxResults' => 250,
+                'pageToken' => $pageToken,
+            ]));
+            foreach ($page['items'] ?? [] as $event) {
+                // All-day entries (holidays, reminders) are not meetings
+                if (empty($event['start']['dateTime']) || ($event['status'] ?? '') === 'cancelled') {
+                    continue;
+                }
+                $events[] = [
+                    'id' => (string) $event['id'],
+                    'title' => trim((string) ($event['summary'] ?? '')),
+                    'start' => CarbonImmutable::parse($event['start']['dateTime'])->setTimezone(self::TIME_ZONE),
+                    'end' => CarbonImmutable::parse($event['end']['dateTime'] ?? $event['start']['dateTime'])->setTimezone(self::TIME_ZONE),
+                    'meet_code' => $event['conferenceData']['conferenceId'] ?? null,
+                    'meet_link' => $event['hangoutLink'] ?? null,
+                    'attendees' => array_values(array_map(fn ($a) => [
+                        'email' => strtolower((string) ($a['email'] ?? '')),
+                        'name' => $a['displayName'] ?? null,
+                        'response' => $a['responseStatus'] ?? null,
+                    ], array_filter($event['attendees'] ?? [], fn ($a) => ! empty($a['email']) && empty($a['resource'])))),
+                    'docs' => count(array_filter($event['attachments'] ?? [], fn ($a) => ($a['mimeType'] ?? '') === 'application/vnd.google-apps.document')),
+                ];
+            }
+            $pageToken = $page['nextPageToken'] ?? null;
+        } while ($pageToken);
+
+        return $events;
+    }
+
     // ---- Plumbing ---------------------------------------------------------------------------------------------
 
     /** One API call with a fresh access token; a 401 refreshes the token once and retries */
