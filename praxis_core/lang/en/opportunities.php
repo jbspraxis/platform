@@ -142,11 +142,17 @@ return [
         'OPPORTUNITY_OPENED' => 'Opened the opportunity.',
         'OPPORTUNITY_UPDATED' => 'Changed the details.',
         'OPPORTUNITY_STAGE_CHANGED' => 'Changed the stage.',
+        'QUESTIONNAIRE_REQUESTED' => 'Asked the AI to draft the questionnaire.',
+        'QUESTIONNAIRE_QUESTION_REDRAFTED' => 'Asked the AI to redraft a question.',
+        'QUESTIONNAIRE_ANSWERS_SUGGESTED' => 'Asked the AI to suggest answers to a question.',
+        'QUESTIONNAIRE_QUESTION_ADDED' => 'Added a question to the questionnaire.',
+        'QUESTIONNAIRE_QUESTION_REMOVED' => 'Removed a question from the questionnaire.',
+        'QUESTIONNAIRE_COMPLETED' => 'Marked the questionnaire complete.',
+        'QUESTIONNAIRE_RESTARTED' => 'Set the questionnaire aside to draft it again.',
     ],
 
     'stubs' => [
         'meetings' => 'Booking meetings from here, with a Google Meet link, invitations and transcripts collected automatically, is coming next. Meetings from earlier free audits are listed below.',
-        'questionnaire' => 'Once meetings are filed, the AI drafts the questions the lead answers before the proposal is written. This is coming soon.',
         'proposals' => 'Drafting the proposal from this opportunity is coming soon. Until then, proposals made in Proposals are listed here.',
         'sow' => 'The statement of work is drafted from the approved proposal and signed by the client. This is coming soon.',
         'project' => 'The project is drafted here once the statement of work is signed.',
@@ -170,13 +176,6 @@ return [
         ],
         'empty_title' => 'No meetings yet',
         'empty_text' => 'Meetings of this opportunity will be listed here.',
-    ],
-
-    'questionnaire' => [
-        'status' => 'Status',
-        'questions' => 'Questions',
-        'statuses' => ['drafting' => 'Being drafted', 'open' => 'Open', 'complete' => 'Complete'],
-        'empty_title' => 'No questionnaire yet',
     ],
 
     'proposals' => [

@@ -22,6 +22,7 @@ return [
         'meeting_notes' => "Notes de réunion",
         'client_minutes' => "Comptes rendus au client",
         'questionnaire' => "Questionnaire",
+        'questionnaire_question' => "Questionnaire\u{00A0}: une question",
         'proposal' => "Proposition",
         'proposal_changes' => "Modifications",
         'sow' => "Énoncé des travaux",

@@ -98,7 +98,7 @@ class OpportunityScreensTest extends TestCase
             ->assertSee('Governance review')->assertSee('Kilo Pharma')->assertSee('Ngozi Eze')->assertSee('No estimate yet')
             ->call('show', 'meetings')->assertSee('Free operations audit')->assertSee('1 October 2026')->assertSee('10:00 (WAT)')->assertSee('Add by hand')
             ->call('show', 'proposals')->assertSee('PRX-0042')->assertSee('Waiting for signature')->assertSee("USD\u{00A0}12,500")
-            ->call('show', 'questionnaire')->assertSee('No questionnaire yet')
+            ->call('show', 'questionnaire')->assertSee('Draft the questionnaire')
             ->call('show', 'sow')->assertSee('No statement of work yet')
             ->call('show', 'project')->assertSee('No project yet')
             ->call('show', 'nonsense')->assertSet('tab', 'overview');

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -66,6 +67,13 @@ class OpportunityPage extends Component
     public function show(string $tab): void
     {
         $this->tab = in_array($tab, self::TABS, true) ? $tab : 'overview';
+    }
+
+    /** A tab moved the stage (the questionnaire, when drafted and when complete): show it, and keep Move to current */
+    #[On('opportunity-stage-changed')]
+    public function stageChanged(): void
+    {
+        $this->stage = $this->opportunity()->stage;
     }
 
     public function edit(): void
@@ -167,7 +175,6 @@ class OpportunityPage extends Component
             'o' => $o,
             'meetings' => $meetings,
             'proposals' => $proposals,
-            'questionnaire' => $o->questionnaires()->first(),
             'sows' => $o->statementsOfWork()->get(['id', 'opportunity_id', 'reference', 'version', 'status', 'signed_at', 'created_at']),
             'project' => $o->project_id ? DB::table('projects')->where('id', $o->project_id)->first(['id', 'title', 'status', 'start_date', 'target_end_date']) : null,
             'copq' => $copq,

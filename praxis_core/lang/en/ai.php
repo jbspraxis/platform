@@ -22,6 +22,7 @@ return [
         'meeting_notes' => 'Meeting notes',
         'client_minutes' => 'Client minutes',
         'questionnaire' => 'Questionnaire',
+        'questionnaire_question' => 'Questionnaire: one question',
         'proposal' => 'Proposal',
         'proposal_changes' => 'What changed',
         'sow' => 'Statement of work',
