@@ -88,9 +88,20 @@ jobs:
       - name: Tests
         run: php artisan test
 
+  deployer:
+    name: Deployer tests (deploy/server)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax
+        run: bash -n deploy/server/jbspraxis-deploy.sh
+      - name: Releases against a throwaway server home (stubs for php, composer, curl, uapi)
+        run: bash deploy/server/tests/deploy-test.sh
+
   release:
     name: Release to production
-    needs: [hq, site]
+    needs: [hq, site, deployer]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
