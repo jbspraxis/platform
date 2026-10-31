@@ -1,0 +1,223 @@
+<?php
+
+// HQ › Prospects et propositions › Opportunités (docs/OPPORTUNITIES.md ; docs/BRAND.md, sections 4, 5 et 12).
+// Mêmes clés que lang/en/opportunities.php. Typographie : espace fine insécable (U+202F) avant ; ? ! % et à
+// l’intérieur des « », espace insécable (U+00A0) avant les deux-points, apostrophe typographique ’.
+
+return [
+    'nav' => "Opportunités",
+    'title' => "Opportunités",
+    'subtitle' => "Chaque mission avec un client, de la première réunion à l’énoncé des travaux signé et au projet doté de son équipe.",
+    'no_lead' => "Sans responsable",
+    'none_here' => "Aucune à cette étape",
+    'cancel' => "Annuler",
+    'count' => "{0} Aucune opportunité|{1} 1\u{00A0}opportunité|[2,*] :count\u{00A0}opportunités",
+    'meetings_count' => "{1} 1\u{00A0}réunion|[2,*] :count\u{00A0}réunions",
+    'proposals_count' => "{1} 1\u{00A0}proposition|[2,*] :count\u{00A0}propositions",
+
+    'filters' => [
+        'search' => "Rechercher",
+        'search_hint' => "Titre ou organisation",
+        'lead' => "Responsable",
+        'everyone' => "Toute l’équipe",
+        'mine' => "Les miennes",
+        'closed' => "Afficher les gagnées et les perdues",
+        'view' => "Affichage",
+        'board' => "Tableau",
+        'table' => "Liste",
+    ],
+
+    'empty' => [
+        'title' => "Aucune opportunité pour l’instant",
+        'text' => "Ouvrez-en une pour une organisation afin de réunir ses réunions, son questionnaire, sa proposition et son énoncé des travaux.",
+        'filtered_title' => "Aucune opportunité ne correspond",
+        'filtered_text' => "Modifiez la recherche ou le responsable, ou affichez aussi les opportunités gagnées et perdues.",
+        'clear' => "Effacer les filtres",
+    ],
+
+    'fields' => [
+        'title' => "Titre",
+        'organisation' => "Organisation",
+        'stage' => "Étape",
+        'lead' => "Responsable",
+        'language' => "Langue",
+        'updated' => "Mise à jour",
+        'lost_reason' => "Raison de la perte",
+    ],
+
+    'stages' => [
+        'discovery' => "Découverte",
+        'questionnaire' => "Questionnaire",
+        'proposal' => "Proposition en cours",
+        'proposal_sent' => "Proposition envoyée",
+        'proposal_approved' => "Proposition approuvée",
+        'sow' => "Énoncé des travaux en cours",
+        'sow_sent' => "Énoncé des travaux envoyé",
+        'won' => "Gagnée",
+        'lost' => "Perdue",
+        'on_hold' => "En attente",
+    ],
+
+    'languages' => [
+        'en' => "Anglais",
+        'fr' => "Français",
+    ],
+
+    'sources' => [
+        'backfill' => "Reprise des données antérieures",
+        'website_booking' => "Issue d’une réservation sur le site",
+    ],
+
+    'create' => [
+        'button' => "Ouvrir une opportunité",
+        'title' => "Ouvrir une opportunité",
+        'intro' => "Une opportunité par mission. Une organisation peut en avoir plusieurs.",
+        'find_organisation' => "Trouver l’organisation",
+        'find_hint' => "Saisissez une partie du nom",
+        'choose_organisation' => "Choisir une organisation",
+        'title_help' => "L’objet de la mission, par exemple «\u{202F}Paie de 3\u{00A0}filiales\u{202F}».",
+        'choose_lead' => "Choisir un collaborateur ou une collaboratrice",
+        'lead_help' => "Pilote l’opportunité, approuve ses documents et devient responsable de projet.",
+        'language_help' => "Les brouillons de l’IA et les e-mails au client sont rédigés dans cette langue.",
+        'submit' => "Ouvrir l’opportunité",
+        'submitting' => "Ouverture…",
+        'done' => "Opportunité «\u{202F}:title\u{202F}» ouverte.",
+        'errors' => [
+            'organisation' => "Choisissez l’organisation concernée par cette mission.",
+            'title' => "Ajoutez un titre pour que l’équipe sache de quoi il s’agit.",
+            'title_long' => "Raccourcissez le titre à 200\u{00A0}caractères au plus.",
+            'lead' => "Choisissez la personne responsable de cette opportunité.",
+            'language' => "Choisissez l’anglais ou le français.",
+        ],
+    ],
+
+    'tabs' => [
+        'overview' => "Vue d’ensemble",
+        'meetings' => "Réunions",
+        'questionnaire' => "Questionnaire",
+        'proposals' => "Propositions",
+        'sow' => "Énoncé des travaux",
+        'project' => "Projet",
+    ],
+
+    'page' => [
+        'back' => "Toutes les opportunités",
+        'led_by' => "Responsable\u{00A0}: :name",
+        'edit' => "Modifier les informations",
+        'sections' => "Sections de l’opportunité",
+        'save' => "Enregistrer les informations",
+        'saved' => "Informations enregistrées.",
+        'stage_title' => "Étape",
+        'opened' => "Ouverte le",
+        'closed' => "Clôturée le",
+        'move_to' => "Passer à l’étape",
+        'save_stage' => "Enregistrer l’étape",
+        'stage_saved' => "Étape modifiée\u{00A0}: «\u{202F}:stage\u{202F}».",
+        'organisation' => "Organisation",
+        'name' => "Nom",
+        'industry' => "Secteur",
+        'location' => "Localisation",
+        'contact' => "Interlocuteur principal",
+        'copq' => "Coût de la non-qualité",
+        'copq_amount' => "Coût annuel estimé",
+        'bottleneck' => "Principal goulet d’étranglement",
+        'estimated_on' => "Estimé le",
+        'no_copq' => "Aucune estimation pour l’instant. Ajoutez-en une pendant l’audit offert.",
+        'history' => "Historique",
+        'system' => "HQ",
+        'history_backfill' => "Créée à partir des propositions, projets et audits offerts enregistrés avant l’arrivée des opportunités.",
+        'history_none' => "Aucune modification pour l’instant.",
+        'errors' => [
+            'stage' => "Choisissez une étape dans la liste.",
+            'lost_reason' => "Indiquez pourquoi l’opportunité a été perdue, pour que l’équipe en tire les leçons.",
+            'lost_reason_long' => "Raccourcissez la raison à 2\u{202F}000\u{00A0}caractères au plus.",
+        ],
+    ],
+
+    'formats' => [
+        'date' => 'j F Y',
+        'time' => 'G \h i',
+    ],
+
+    'history' => [
+        'OPPORTUNITY_OPENED' => "Opportunité ouverte.",
+        'OPPORTUNITY_UPDATED' => "Informations modifiées.",
+        'OPPORTUNITY_STAGE_CHANGED' => "Étape modifiée.",
+    ],
+
+    'stubs' => [
+        'meetings' => "La planification des réunions depuis cette page, avec un lien Google Meet, les invitations et la récupération automatique des transcriptions, arrive prochainement. Les réunions des audits offerts précédents figurent ci-dessous.",
+        'questionnaire' => "Une fois les réunions classées, l’IA rédige les questions auxquelles le responsable répond avant la rédaction de la proposition. Cette fonction arrive prochainement.",
+        'proposals' => "La rédaction de la proposition à partir de cette opportunité arrive prochainement. En attendant, les propositions créées dans Propositions figurent ici.",
+        'sow' => "L’énoncé des travaux est rédigé à partir de la proposition approuvée, puis signé par le client. Cette fonction arrive prochainement.",
+        'project' => "Le projet est préparé ici une fois l’énoncé des travaux signé.",
+    ],
+
+    'meetings' => [
+        'when' => "Date",
+        'title' => "Réunion",
+        'kind' => "Type",
+        'status' => "Statut",
+        'transcript' => "Transcription",
+        'attendees' => "{0} Aucun participant enregistré|{1} 1\u{00A0}participant|[2,*] :count\u{00A0}participants",
+        'kinds' => ['client' => "Client", 'internal' => "Interne"],
+        'statuses' => ['requested' => "Demandée", 'scheduled' => "Planifiée", 'held' => "Tenue", 'cancelled' => "Annulée"],
+        'transcripts' => [
+            'waiting' => "En attente de la fin de la réunion",
+            'collecting' => "Récupération en cours",
+            'ready' => "Classée",
+            'not_found' => "Introuvable\u{00A0}: à ajouter manuellement",
+            'manual' => "À ajouter manuellement",
+        ],
+        'empty_title' => "Aucune réunion pour l’instant",
+        'empty_text' => "Les réunions de cette opportunité figureront ici.",
+    ],
+
+    'questionnaire' => [
+        'status' => "Statut",
+        'questions' => "Questions",
+        'statuses' => ['drafting' => "En cours de rédaction", 'open' => "Ouvert", 'complete' => "Terminé"],
+        'empty_title' => "Aucun questionnaire pour l’instant",
+    ],
+
+    'proposals' => [
+        'reference' => "Référence",
+        'title' => "Titre",
+        'status' => "Statut",
+        'value' => "Montant",
+        'created' => "Créée le",
+        'draft_ref' => "Sans référence",
+        'statuses' => [
+            'draft' => "Brouillon",
+            'pending_auth' => "En attente de signature",
+            'authorized' => "Signée",
+            'converted' => "Signée, projet créé",
+            'expired' => "Expirée",
+            'rejected' => "Refusée",
+        ],
+        'empty_title' => "Aucune proposition pour l’instant",
+        'empty_text' => "Les propositions de cette opportunité figureront ici.",
+    ],
+
+    'sow' => [
+        'empty_title' => "Aucun énoncé des travaux pour l’instant",
+        'version' => "version :n",
+        'statuses' => [
+            'draft' => "Brouillon",
+            'awaiting_approval' => "En attente d’approbation",
+            'sent' => "Envoyé",
+            'changes_requested' => "Modifications demandées",
+            'signed' => "Signé",
+            'superseded' => "Remplacé par une version ultérieure",
+        ],
+    ],
+
+    'project' => [
+        'status' => "Statut",
+        'start' => "Début",
+        'end' => "Fin prévue",
+        'open_board' => "Ouvrir le tableau des sprints",
+        'empty_title' => "Aucun projet pour l’instant",
+        'statuses' => ['scoping' => "Cadrage", 'active' => "En cours", 'locked' => "Verrouillé", 'completed' => "Terminé", 'cancelled' => "Annulé"],
+    ],
+];

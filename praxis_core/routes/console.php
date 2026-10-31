@@ -35,6 +35,14 @@ Schedule::command('mail:sync')->everyMinute()->withoutOverlapping(10);
 Schedule::command('mail:send-due')->everyMinute()->withoutOverlapping(5);
 Schedule::command('mail:prune')->dailyAt('03:40');
 
+// Opportunities (docs/OPPORTUNITIES.md 8.3): AI jobs wait on their own 'ai' queue and run here, a minute at most per
+// pass; a long document keeps its worker until it is done (no overlap). Only the 'ai' queue: anything else in the jobs
+// table is left alone. Each job is tried once (RunAiJob). Runs left behind by a worker that stopped fail after 30
+// minutes, so screens stop waiting.
+Schedule::command('queue:work ' . config('ai.queue.connection') . ' --queue=' . config('ai.queue.name') . ' --stop-when-empty --max-time=50 --tries=2')
+    ->everyMinute()->withoutOverlapping(30);
+Schedule::call(fn () => \App\Support\Ai\Ai::expireStuck())->name('ai:expire-stuck')->everyTenMinutes()->withoutOverlapping(5);
+
 // The privacy policy on jbspraxis.com: the website's visitor limits keep IP addresses 24 hours at most, so expired
 // cache rows (whose keys hold them) go within minutes instead of whenever the same key is read again
 Schedule::command('cache:prune-expired')->everyFiveMinutes()->withoutOverlapping(5);

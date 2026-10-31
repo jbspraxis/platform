@@ -48,7 +48,7 @@ class MonitorAlerts
 
     // Checks worth an immediate email when red. The rest (enquiries, logs, old jobs,
     // exchange rates) only appear in the 8am digest, so they cannot nag every 6 hours.
-    private const URGENT_CHECKS = ['scheduler', 'email', 'ai', 'config'];
+    private const URGENT_CHECKS = ['scheduler', 'email', 'ai', 'integrations', 'config'];
 
     public static function health(): int
     {
