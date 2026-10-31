@@ -1,0 +1,121 @@
+# Tests on every push and pull request; on main, a green run is released to the `production` branch,
+# which the server polls and deploys (deploy/server/jbspraxis-deploy.sh). No secrets: the release push
+# uses the workflow's own token, and the server reads the repository with its own read-only deploy key.
+name: Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hq:
+    name: HQ tests (praxis_core)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: praxis_test_ci
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    defaults:
+      run:
+        working-directory: praxis_core
+    env:
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: praxis_test_ci
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      MAIL_MAILER: array
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql, intl, fileinfo, gd, zip, sqlite3
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: praxis_core/package-lock.json
+      - name: Composer
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Assets (the page tests read the Vite manifest)
+        run: npm ci --no-audit --no-fund && npm run build
+      - name: App key
+        run: cp .env.example .env && php artisan key:generate --ansi
+      - name: Tests
+        run: php artisan test
+
+  site:
+    name: Website tests (praxis_site)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: praxis_site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, intl, fileinfo
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: praxis_site/package-lock.json
+      - name: Composer
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Assets
+        run: npm ci --no-audit --no-fund && npm run build
+      - name: App key
+        run: cp .env.example .env && php artisan key:generate --ansi
+      - name: Tests
+        run: php artisan test
+
+  release:
+    name: Release to production
+    needs: [hq, site]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build both apps' assets
+        run: |
+          (cd praxis_core && npm ci --no-audit --no-fund && npm run build)
+          (cd praxis_site && npm ci --no-audit --no-fund && npm run build)
+      - name: Commit the build on top of main and publish it as `production`
+        run: |
+          git config user.name "jbspraxis-release"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B release
+          git add -f praxis_core/public/build praxis_site/public/build
+          git add -u
+          git commit -q -m "Release ${GITHUB_SHA::7}: built assets for ${GITHUB_SHA}"
+          git push -f origin HEAD:production
+          echo "### Released ${GITHUB_SHA::7}" >> "$GITHUB_STEP_SUMMARY"
+          echo "The server picks up \`production\` within a minute and reports in HQ → System health." >> "$GITHUB_STEP_SUMMARY"
