@@ -143,11 +143,17 @@ return [
         'OPPORTUNITY_OPENED' => "Opportunité ouverte.",
         'OPPORTUNITY_UPDATED' => "Informations modifiées.",
         'OPPORTUNITY_STAGE_CHANGED' => "Étape modifiée.",
+        'QUESTIONNAIRE_REQUESTED' => "Rédaction du questionnaire demandée à l’IA.",
+        'QUESTIONNAIRE_QUESTION_REDRAFTED' => "Reformulation d’une question demandée à l’IA.",
+        'QUESTIONNAIRE_ANSWERS_SUGGESTED' => "Suggestions de réponses à une question demandées à l’IA.",
+        'QUESTIONNAIRE_QUESTION_ADDED' => "Question ajoutée au questionnaire.",
+        'QUESTIONNAIRE_QUESTION_REMOVED' => "Question retirée du questionnaire.",
+        'QUESTIONNAIRE_COMPLETED' => "Questionnaire marqué comme terminé.",
+        'QUESTIONNAIRE_RESTARTED' => "Questionnaire mis de côté pour être rédigé à nouveau.",
     ],
 
     'stubs' => [
         'meetings' => "La planification des réunions depuis cette page, avec un lien Google Meet, les invitations et la récupération automatique des transcriptions, arrive prochainement. Les réunions des audits offerts précédents figurent ci-dessous.",
-        'questionnaire' => "Une fois les réunions classées, l’IA rédige les questions auxquelles le responsable répond avant la rédaction de la proposition. Cette fonction arrive prochainement.",
         'proposals' => "La rédaction de la proposition à partir de cette opportunité arrive prochainement. En attendant, les propositions créées dans Propositions figurent ici.",
         'sow' => "L’énoncé des travaux est rédigé à partir de la proposition approuvée, puis signé par le client. Cette fonction arrive prochainement.",
         'project' => "Le projet est préparé ici une fois l’énoncé des travaux signé.",
@@ -171,13 +177,6 @@ return [
         ],
         'empty_title' => "Aucune réunion pour l’instant",
         'empty_text' => "Les réunions de cette opportunité figureront ici.",
-    ],
-
-    'questionnaire' => [
-        'status' => "Statut",
-        'questions' => "Questions",
-        'statuses' => ['drafting' => "En cours de rédaction", 'open' => "Ouvert", 'complete' => "Terminé"],
-        'empty_title' => "Aucun questionnaire pour l’instant",
     ],
 
     'proposals' => [

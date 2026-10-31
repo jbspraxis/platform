@@ -26,6 +26,18 @@ $nextSteps = ['type' => 'array', 'items' => [
     'required' => ['action', 'owner', 'due'],
     'additionalProperties' => false,
 ]];
+$question = [
+    'type' => 'object',
+    'properties' => [
+        'question' => ['type' => 'string'],
+        'why_it_matters' => ['type' => 'string'],
+        'options' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => '3 to 5 suggested answers'],
+        'recommended_option' => ['type' => 'integer', 'description' => 'Index in options of the answer you recommend, from 0'],
+        'recommendation_reason' => ['type' => 'string'],
+    ],
+    'required' => ['question', 'why_it_matters', 'options', 'recommended_option', 'recommendation_reason'],
+    'additionalProperties' => false,
+];
 $sections = ['type' => 'array', 'items' => [
     'type' => 'object',
     'properties' => [
@@ -104,16 +116,26 @@ return [
             ], 'required' => ['subject', 'summary', 'decisions', 'next_steps'], 'additionalProperties' => false],
         ],
 
+        // PR 3: the whole questionnaire, from the opportunity's context (meeting notes, not full transcripts). The
+        // lead's count and focus areas come as instructions. App\Support\Opportunities\Questionnaires keeps the
+        // first N questions that have 3 or more distinct answers and a recommendation that points at one of them.
         'questionnaire' => [
             'provider' => 'claude', 'model' => 'claude-sonnet-5-5', 'effort' => 'medium', 'max_tokens' => 16000,
-            'stream' => true, 'sync' => false, 'expected_chars' => 9000,
-            'task' => 'Draft the questions the opportunity\'s lead must answer before we write the proposal: what is still unclear or undecided after the meetings. Each question says why it matters, offers at least 3 suggested answers, and names the one you recommend (its index in options, from 0) and why.',
+            'stream' => true, 'sync' => false, 'expected_chars' => 12000,
+            'task' => 'Draft the questions the opportunity’s lead answers before we write the proposal: what is still unclear, undecided or only assumed after the meetings, most important first. Ask exactly as many questions as the lead asks for, and never what the meetings already settled. Each question is one decision or fact, in plain words; why_it_matters says what it changes in the proposal (scope, approach, timeline, team or price). Offer 3 to 5 suggested answers that are realistic, distinct and specific to this client (never “other” or “not sure”: the lead can always write their own). Name the one you recommend (recommended_option is its index in options, from 0) and why, from what was said in the meetings or, when nothing was said, from good practice for a client like this one.',
             'schema' => ['type' => 'object', 'properties' => [
-                'questions' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
-                    'question' => ['type' => 'string'], 'why_it_matters' => ['type' => 'string'], 'options' => $line,
-                    'recommended_option' => ['type' => 'integer'], 'recommendation_reason' => ['type' => 'string'],
-                ], 'required' => ['question', 'why_it_matters', 'options', 'recommended_option', 'recommendation_reason'], 'additionalProperties' => false]],
+                'questions' => ['type' => 'array', 'items' => $question],
             ], 'required' => ['questions'], 'additionalProperties' => false],
+        ],
+
+        // PR 3: one question again, for "Redraft" (an AI question) or "Suggest answers" (the lead's own question).
+        // Only that question goes with it (6.2, cost rule 3): the organisation, the questionnaire's focus, the
+        // question and the others' wording, not the meetings.
+        'questionnaire_question' => [
+            'provider' => 'claude', 'model' => 'claude-sonnet-5-5', 'effort' => 'medium', 'max_tokens' => 6000,
+            'stream' => false, 'sync' => false, 'expected_chars' => 1200,
+            'task' => 'Write one question of the lead’s questionnaire, as MATERIAL says. To replace a question: ask a better one about what the old one was after, or what the lead’s instructions ask for, different from the other questions listed. For the lead’s own question: keep its wording exactly and suggest the answers. Either way, why_it_matters says what it changes in the proposal; offer 3 to 5 suggested answers that are realistic, distinct and specific to this client (never “other” or “not sure”); name the one you recommend (recommended_option is its index in options, from 0) and why.',
+            'schema' => $question,
         ],
 
         'proposal' => [

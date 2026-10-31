@@ -240,16 +240,7 @@
             @endif
 
         @elseif ($tab === 'questionnaire')
-            @if ($questionnaire)
-                <div class="card">
-                    <dl class="opp-dl">
-                        <dt>{{ __('opportunities.questionnaire.status') }}</dt><dd>{{ __('opportunities.questionnaire.statuses.' . $questionnaire->status) }}</dd>
-                        <dt>{{ __('opportunities.questionnaire.questions') }}</dt><dd>{{ $questionnaire->question_count }}</dd>
-                    </dl>
-                </div>
-            @else
-                <div class="card empty-state"><strong>{{ __('opportunities.questionnaire.empty_title') }}</strong>{{ __('opportunities.stubs.questionnaire') }}</div>
-            @endif
+            <livewire:hq.opportunities.questionnaire-tab :opportunity-id="$o->id" :key="'questionnaire-' . $o->id" />
 
         @elseif ($tab === 'proposals')
             <div class="callout opp-callout mb-6" role="note"><i data-lucide="info"></i><span>{{ __('opportunities.stubs.proposals') }}</span></div>
