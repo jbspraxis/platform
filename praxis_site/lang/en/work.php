@@ -335,7 +335,7 @@ return [
             'h1' => 'An ERP rebuilt in stages, while the business kept using it.',
             'lead' => 'An FMCG distributor in Cameroon runs its orders, deliveries, returnable containers, fleet, payroll and accounts on one system. It was already live when we started. We audited it, then rebuilt it sprint by sprint without stopping the business.',
             'needed' => [
-                'The system worked, but it had grown without guard rails. Access was controlled by a few broad roles, entries could be saved without balancing, and a closed financial year could still change.',
+                'The system was already running the business, and it needed to grow safely: access set by role, entries that must balance, and financial years that stay closed once they are closed.',
                 'The business also needed to account for the returnable containers its customers hold, and for the trucks, fuel and drivers that carry its goods.',
             ],
             'map' => [
@@ -365,7 +365,7 @@ return [
                 ['title' => 'Safer releases', 'text' => 'Each release checks the database and the chart of accounts, and runs smoke tests, before it goes live.'],
             ],
             'role' => [
-                'see' => 'We audited the live system first, its code, its data and its security, and wrote down every risk we found.',
+                'see' => 'We audited the live system first and wrote down every risk we found.',
                 'design' => 'We set the order of work by risk: access and security first, then the integrity of the accounts.',
                 'build' => 'We rebuilt it in sprints on the live system, adding payroll, fixed assets and printed documents along the way.',
                 'hold' => 'We keep releasing improvements, with help articles inside the system for the team.',

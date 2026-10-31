@@ -1,6 +1,6 @@
 <?php
 
-// La politique de confidentialité (/fr/privacy), version du 30 octobre 2026, version française complète de lang/en/legal.php
+// La politique de confidentialité (/fr/privacy), version du 31 octobre 2026, version française complète de lang/en/legal.php
 // (mêmes clés, mêmes marqueurs :company, :email, :offices, :session_cookie, :session_minutes). Règles du français de
 // docs/BRAND.md : vouvoiement, guillemets « », espace fine insécable (U+202F) avant ; : ! ? et à l’intérieur des guillemets.
 return [
@@ -11,7 +11,7 @@ return [
         'eyebrow' => 'Confidentialité',
         'h1' => 'Politique de confidentialité',
         'lead' => 'Comment nous collectons, utilisons, partageons et protégeons les données personnelles sur ce site, dans notre portail client et dans nos missions pour nos clients au Nigeria et au Cameroun.',
-        'effective' => 'Version du 30 octobre 2026, en vigueur à compter de cette date.',
+        'effective' => 'Version du 31 octobre 2026, en vigueur à compter de cette date.',
         'summary_title' => 'En bref',
         'summary' => [
             'Nous collectons ce que vous nous envoyez par nos formulaires, les questions que vous posez à Praxis AI et les données techniques nécessaires au fonctionnement et à la protection de nos systèmes.',
@@ -123,7 +123,7 @@ return [
                 ['items' => [
                     'Notre hébergeur, dont les serveurs font fonctionner ce site, HQ et le portail client, et stockent leurs données et leurs sauvegardes.',
                     'Nos prestataires de messagerie, qui acheminent nos e-mails et hébergent nos boîtes aux lettres.',
-                    'Google : Analytics, seulement si vous l’acceptez ; Gemini, pour Praxis AI et le résumé de votre rapport de coûts, ainsi que lorsque notre équipe l’utilise dans HQ pour l’aider à rédiger des propositions, des notes de projet et des e-mails (il reçoit alors le texte nécessaire à cette tâche) ; YouTube, seulement lorsque vous ouvrez la vidéo de démonstration.',
+                    'Google : Analytics, seulement si vous l’acceptez ; Gemini, pour Praxis AI et le résumé de votre rapport de coûts, ainsi que lorsque notre équipe l’utilise dans HQ pour résumer ou rédiger des e-mails (y compris ceux que vous nous envoyez) et pour préparer les notes de nos échanges avec vous, des propositions et des documents de projet (il reçoit alors le texte nécessaire à cette tâche) ; YouTube, seulement lorsque vous ouvrez la vidéo de démonstration.',
                     'DeepSeek, pour Praxis AI lorsque Gemini ne répond pas.',
                     'Le service de notifications de votre navigateur, exploité par l’éditeur de celui-ci, si vous activez les notifications dans HQ ou le portail.',
                     'Cloudflare, seulement si nous activons son contrôle Turnstile sur nos formulaires.',
@@ -159,6 +159,7 @@ return [
                     ['Limites contre les abus', 'Adresses IP : 24 heures au plus. Adresses e-mail brouillées : 7 jours au plus.'],
                     ['Cookies', 'Voir la section Cookies.'],
                 ]],
+                'Notre système supprime les CV de lui-même au terme de leurs 12 mois. Nous contrôlons les autres données ci-dessus au moins une fois par an et supprimons celles dont la durée est écoulée.',
                 'Vous pouvez nous demander de supprimer vos données plus tôt (voir Vos droits). Nous pouvons conserver ce que la loi nous oblige à garder, ou ce dont nous avons besoin pour établir ou défendre un droit en justice, tant que ce besoin existe.',
             ]],
 

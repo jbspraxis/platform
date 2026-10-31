@@ -18,7 +18,7 @@ class PrivacyPolicyTest extends TestCase
             $response = $this->get($path)->assertOk()->assertSee('<html lang="' . $locale . '">', false);
 
             $response->assertSee('<h1 class="page-h1">' . ($locale === 'fr' ? 'Politique de confidentialité' : 'Privacy policy') . '</h1>', false)
-                ->assertSee($locale === 'fr' ? 'Version du 30 octobre 2026' : 'Version of 30 October 2026')
+                ->assertSee($locale === 'fr' ? 'Version du 31 octobre 2026' : 'Version of 31 October 2026')
                 ->assertSee('<h2 id="summary">', false)
                 ->assertSee('<nav class="policy-toc" aria-labelledby="contents-title">', false);
 

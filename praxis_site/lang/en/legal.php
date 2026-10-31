@@ -1,6 +1,6 @@
 <?php
 
-// The privacy policy (/privacy), version of 30 October 2026: Nigeria Data Protection Act 2023 and the NDPC's GAID 2025,
+// The privacy policy (/privacy), version of 31 October 2026: Nigeria Data Protection Act 2023 and the NDPC's GAID 2025,
 // Cameroon's Law No. 2024/017 of 23 December 2024. It describes what the site and HQ really do (praxis_site routes,
 // praxis_core app/Services/Site, the portal); change it together with the code. The CV period is config('praxis.
 // cv_retention_months') in praxis_core, enforced by careers:purge-cvs. Placeholders, filled by pages/privacy.blade.php:
@@ -15,7 +15,7 @@ return [
         'eyebrow' => 'Privacy',
         'h1' => 'Privacy policy',
         'lead' => 'How we collect, use, share and protect personal data on this website, in our client portal and in our work for clients in Nigeria and Cameroon.',
-        'effective' => 'Version of 30 October 2026, in effect from that date.',
+        'effective' => 'Version of 31 October 2026, in effect from that date.',
         'summary_title' => 'In short',
         'summary' => [
             'We collect what you send us through our forms, the questions you ask Praxis AI, and the technical data needed to run and protect our systems.',
@@ -127,7 +127,7 @@ return [
                 ['items' => [
                     'Our hosting provider, whose servers run this website, HQ and the client portal, and store their data and backups.',
                     'Our email providers, which deliver our emails and host our mailboxes.',
-                    'Google: Analytics, only if you accept it; Gemini, for Praxis AI and the summary in your cost report, and when our team uses it in HQ to help draft proposals, project notes and emails (it then receives the text that task needs); YouTube, only when you open the demo video.',
+                    'Google: Analytics, only if you accept it; Gemini, for Praxis AI and the summary in your cost report, and when our team uses it in HQ to summarise or draft emails (including the emails you send us) and to prepare notes of our conversations with you, proposals and project documents (it then receives the text that task needs); YouTube, only when you open the demo video.',
                     'DeepSeek, for Praxis AI when Gemini doesn’t answer.',
                     'Your browser’s push service, run by the company that makes your browser, if you turn on notifications in HQ or the portal.',
                     'Cloudflare, only if we turn on its Turnstile check on our forms.',
@@ -163,6 +163,7 @@ return [
                     ['Limits against abuse', 'IP addresses: 24 hours at most. Scrambled email addresses: 7 days at most.'],
                     ['Cookies', 'As listed under Cookies.'],
                 ]],
+                'Our system deletes CVs by itself when their 12 months are up. We check the other records above at least once a year and delete those whose time has passed.',
                 'You can ask us to delete your data sooner (see Your rights). We may keep what the law requires us to keep, or what we need to establish or defend a legal claim, for as long as that need lasts.',
             ]],
 

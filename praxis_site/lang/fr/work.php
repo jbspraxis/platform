@@ -331,7 +331,7 @@ return [
             'h1' => 'Un ERP reconstruit par étapes, pendant que l’entreprise continuait de s’en servir.',
             'lead' => 'Un distributeur de biens de consommation au Cameroun gère ses commandes, ses livraisons, ses emballages consignés, sa flotte, sa paie et sa comptabilité dans un seul système. Celui-ci était déjà en service quand nous sommes arrivés. Nous l’avons audité, puis reconstruit sprint après sprint, sans arrêter l’activité.',
             'needed' => [
-                'Le système fonctionnait, mais il avait grandi sans garde-fous. L’accès reposait sur quelques rôles très larges, une écriture pouvait être enregistrée sans être équilibrée, et un exercice clôturé pouvait encore changer.',
+                "Le système faisait déjà tourner l’entreprise, qui voulait le faire grandir en toute sécurité\u{202F}: des accès par rôle, des écritures toujours équilibrées et des exercices qui restent clos une fois clôturés.",
                 'L’entreprise devait aussi suivre les emballages consignés détenus par ses clients, ainsi que les camions, le carburant et les chauffeurs qui transportent ses marchandises.',
             ],
             'map' => [
@@ -361,7 +361,7 @@ return [
                 ['title' => 'Des mises en production plus sûres', 'text' => 'Avant chaque mise en production, la base de données et le plan de comptes sont vérifiés et des tests de bon fonctionnement sont lancés.'],
             ],
             'role' => [
-                'see' => 'Nous avons d’abord audité le système en service, son code, ses données et sa sécurité, et consigné chaque risque relevé.',
+                'see' => 'Nous avons d’abord audité le système en service et consigné chaque risque relevé.',
                 'design' => "Nous avons ordonné le travail selon le risque\u{202F}: l’accès et la sécurité d’abord, puis l’intégrité de la comptabilité.",
                 'build' => 'Nous l’avons reconstruit sprint après sprint sur le système en service, en ajoutant en chemin la paie, les immobilisations et les documents imprimés.',
                 'hold' => 'Nous continuons de publier des améliorations, avec des articles d’aide intégrés au système pour les équipes.',
