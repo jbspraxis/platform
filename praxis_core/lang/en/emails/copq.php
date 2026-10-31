@@ -12,7 +12,7 @@ return [
     'explain' => 'The cost of poor quality is what an organisation loses to manual checking, to errors fixed internally, and to errors that reach its customers or the people it serves. Your full report shows how we reached this estimate and where the cost comes from.',
     'label_amount' => 'Estimated cost per year',
     'label_date' => 'Prepared on',
-    'report_language' => '', // the report page is in English
+    'report_language' => '', // the link opens the report on the site in the email's language
     'button' => 'View your report',
     'share' => 'Anyone with this link can open the report, so share it only with the people in your organisation who need it.',
     'estimate_note' => 'These figures are estimates based on the details provided and standard assumptions for your sector. Reply to this email if you’d like to go through them with us in a free audit and demo.',

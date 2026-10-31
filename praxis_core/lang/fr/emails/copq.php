@@ -12,7 +12,7 @@ return [
     'explain' => 'Le coût de la non-qualité correspond à ce qu’une organisation perd en contrôles manuels, en erreurs corrigées en interne et en erreurs qui atteignent ses clients ou ses bénéficiaires. Votre rapport complet détaille le calcul de cette estimation et l’origine de ce coût.',
     'label_amount' => 'Coût estimé par an',
     'label_date' => 'Date du rapport',
-    'report_language' => 'Le rapport complet est pour l’instant disponible en anglais.',
+    'report_language' => '', // le lien ouvre le rapport en français sur le site (/fr/dossier)
     'button' => 'Consulter votre rapport',
     'share' => "Toute personne disposant de ce lien peut ouvrir le rapport\u{00A0}: ne le partagez qu’avec les personnes de votre organisation qui en ont besoin.",
     'estimate_note' => 'Ces chiffres sont des estimations fondées sur les informations fournies et sur des hypothèses courantes pour votre secteur. Répondez à cet e-mail si vous souhaitez les examiner avec nous lors d’un audit et d’une démonstration offerts.',
