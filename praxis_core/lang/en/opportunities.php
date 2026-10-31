@@ -139,6 +139,17 @@ return [
     ],
 
     'history' => [
+        // Meetings (PR 2)
+        'MEETING_SCHEDULED' => 'Scheduled a meeting.',
+        'MEETING_REQUESTED' => 'The client asked for a follow-up meeting.',
+        'MEETING_CONFIRMED' => 'Scheduled the meeting the client asked for.',
+        'MEETING_RESCHEDULED' => 'Changed a meeting.',
+        'MEETING_CANCELLED' => 'Cancelled a meeting.',
+        'MEETING_DECLINED' => 'Declined the client’s meeting request.',
+        'TRANSCRIPT_COLLECTED' => 'Collected a meeting transcript from Google.',
+        'TRANSCRIPT_ADDED' => 'Added a meeting transcript.',
+        'TRANSCRIPT_NOT_FOUND' => 'No transcript was found in Google for a meeting.',
+        'MINUTES_SENT' => 'Sent the minutes of a meeting to the client.',
         'OPPORTUNITY_OPENED' => 'Opened the opportunity.',
         'OPPORTUNITY_UPDATED' => 'Changed the details.',
         'OPPORTUNITY_STAGE_CHANGED' => 'Changed the stage.',

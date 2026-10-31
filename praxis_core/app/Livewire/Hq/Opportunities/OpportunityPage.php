@@ -155,6 +155,10 @@ class OpportunityPage extends Component
         $this->resetErrorBag();
     }
 
+    /** The Meetings tab added or changed a meeting: redraw the tab count and the history */
+    #[On('meetings-changed')]
+    public function meetingsChanged(): void {}
+
     public function render()
     {
         $o = $this->opportunity();

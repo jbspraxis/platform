@@ -140,6 +140,17 @@ return [
     ],
 
     'history' => [
+        // Meetings (PR 2)
+        'MEETING_SCHEDULED' => "Réunion planifiée.",
+        'MEETING_REQUESTED' => "Le client a demandé une réunion de suivi.",
+        'MEETING_CONFIRMED' => "Réunion demandée par le client planifiée.",
+        'MEETING_RESCHEDULED' => "Réunion modifiée.",
+        'MEETING_CANCELLED' => "Réunion annulée.",
+        'MEETING_DECLINED' => "Demande de réunion du client refusée.",
+        'TRANSCRIPT_COLLECTED' => "Transcription d’une réunion récupérée auprès de Google.",
+        'TRANSCRIPT_ADDED' => "Transcription d’une réunion ajoutée.",
+        'TRANSCRIPT_NOT_FOUND' => "Aucune transcription trouvée dans Google pour une réunion.",
+        'MINUTES_SENT' => "Compte rendu d’une réunion envoyé au client.",
         'OPPORTUNITY_OPENED' => "Opportunité ouverte.",
         'OPPORTUNITY_UPDATED' => "Informations modifiées.",
         'OPPORTUNITY_STAGE_CHANGED' => "Étape modifiée.",

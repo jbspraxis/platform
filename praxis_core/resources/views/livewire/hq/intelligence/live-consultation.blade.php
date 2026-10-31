@@ -341,15 +341,21 @@
     <div class="modal-backdrop" id="approveModal" style="display: none;">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="approve-title" style="max-width: 500px;">
             <h2 id="approve-title" class="modal-title">Approve free audit</h2>
-            <p class="text-small text-muted" style="margin: 0 0 16px;">Approve the free audit for <strong id="appClientName" class="text-ink"></strong>. Paste the meeting link and we’ll email it to the client.</p>
             <input type="hidden" id="appIdInput">
-            <div class="field">
-                <label class="label" for="appLinkInput">Meeting link</label>
-                <input type="url" id="appLinkInput" class="input" placeholder="e.g. https://meet.google.com/abc-defg-hij">
-            </div>
+            @if ($googleConnected)
+                {{-- PR 2: HQ creates the Google Meet meeting itself --}}
+                <p class="text-small text-muted" style="margin: 0 0 16px;">{{ __('meetings.approval.intro_before') }} <strong id="appClientName" class="text-ink"></strong>{{ __('meetings.approval.intro_after') }}</p>
+            @else
+                <p class="text-small text-muted" style="margin: 0 0 16px;">Approve the free audit for <strong id="appClientName" class="text-ink"></strong>. Paste the meeting link and we’ll email it to the client.</p>
+                <div class="field">
+                    <label class="label" for="appLinkInput">Meeting link</label>
+                    <input type="url" id="appLinkInput" class="input" placeholder="e.g. https://meet.google.com/abc-defg-hij">
+                    <span class="help">{{ __('meetings.approval.connect_hint') }}</span>
+                </div>
+            @endif
             <div class="modal-actions">
                 <button type="button" onclick="document.getElementById('approveModal').style.display = 'none'" class="btn btn-secondary">Cancel</button>
-                <button type="button" onclick="submitApproval()" class="btn btn-primary">Approve and send link</button>
+                <button type="button" onclick="submitApproval()" class="btn btn-primary">{{ $googleConnected ? __('meetings.approval.submit') : 'Approve and send link' }}</button>
             </div>
         </div>
     </div>
@@ -436,7 +442,7 @@
         }
         function submitApproval() {
             const id = document.getElementById('appIdInput').value;
-            const link = document.getElementById('appLinkInput').value;
+            const link = document.getElementById('appLinkInput')?.value ?? '';
             @this.approveMeeting(id, link);
             document.getElementById('approveModal').style.display = 'none';
         }

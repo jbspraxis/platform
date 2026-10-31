@@ -2,6 +2,7 @@
 
 namespace App\Support\Ai;
 
+use App\Events\Ai\AiRunFinished;
 use App\Jobs\RunAiJob;
 use App\Models\AiRun;
 use Illuminate\Database\Eloquent\Model;
@@ -106,6 +107,13 @@ final class Ai
         } catch (Throwable $e) {
             report($e);
             $run->forceFill(['status' => 'failed', 'error' => 'ai.errors.failed', 'finished_at' => now()])->save();
+        }
+
+        // Listeners file the output where it belongs (a meeting's notes, …); one that fails doesn't undo the run
+        try {
+            AiRunFinished::dispatch($run);
+        } catch (Throwable $e) {
+            report($e);
         }
 
         return $run;

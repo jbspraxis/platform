@@ -25,6 +25,7 @@ class PushCategories
     // Path prefixes on the HQ host (links are stored as full HQ addresses or as host-relative paths)
     private const PATHS = [
         'intelligence/' => 'leads',
+        'opportunities' => 'leads',
         'operations/' => 'projects',
         'finance/' => 'finance',
         'hr/' => 'team',
