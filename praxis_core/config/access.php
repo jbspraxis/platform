@@ -28,6 +28,9 @@ return [
         'delete' => 'Delete',
         'approve' => 'Approve',
         'export' => 'Export',
+        // Opportunities (docs/OPPORTUNITIES.md 8.1): edit, meetings, questionnaire and drafts; read full meeting transcripts
+        'manage' => 'Manage',
+        'transcripts' => 'Transcripts',
     ],
 
     'modules' => [
@@ -41,6 +44,10 @@ return [
             'signoffs' => ['label' => 'Project sign-offs', 'actions' => ['view', 'create', 'edit', 'approve']],
             'kaizen' => ['label' => 'Kaizen articles', 'actions' => ['view', 'create', 'edit', 'delete', 'approve']],
             'crm' => ['label' => 'Leads & proposals', 'actions' => $all],
+            // One record per piece of work with a client (docs/OPPORTUNITIES.md 8.1). approve = approve proposals and SOWs
+            // before they go out (the opportunity's lead may approve their own too); transcripts = read full meeting transcripts.
+            // Roles that already exist get them from the migration 2026_10_31_800002_grant_opportunity_permissions.
+            'opportunities' => ['label' => 'Opportunities', 'actions' => ['view', 'create', 'manage', 'approve', 'transcripts']],
             'broadcasts' => ['label' => 'Broadcasts', 'actions' => ['view', 'create', 'approve']],
             'marketing' => ['label' => 'Marketing campaigns', 'actions' => ['view', 'create', 'edit', 'delete', 'approve']],
             // What jbspraxis.com shows: company details, contact, social links, leadership (HQ → Marketing → Website settings).
@@ -58,6 +65,8 @@ return [
             'mdm' => ['label' => 'Master data', 'actions' => ['view', 'create', 'edit', 'delete']],
             'access' => ['label' => 'Accounts, roles & permissions', 'actions' => ['view', 'create', 'edit', 'delete']],
             'system' => ['label' => 'System health', 'actions' => ['view']],
+            // System › Integrations: the Google connection, the Claude key and the AI budget (owner only unless granted)
+            'integrations' => ['label' => 'Integrations', 'actions' => ['manage']],
         ],
 
         // Client portal (client accounts); permission names start with "portal."
@@ -81,10 +90,11 @@ return [
             'owner' => ['name' => 'Owner', 'protected' => true, 'description' => 'Full access, always. Cannot be edited or deleted.', 'grant' => ['*']],
             'partner' => ['name' => 'Partner / Director', 'description' => 'Runs the firm: every module.', 'grant' => ['*']],
             'finance' => ['name' => 'Finance & Payroll', 'description' => 'Money in, money out, payroll and tax.', 'grant' => [
-                'dashboard.*', 'audit.view', 'expenses.*', 'finance.*', 'payroll.*', 'mdm.view', 'mdm.create', 'mdm.edit', 'projects.view', 'crm.view', 'mail.view',
+                'dashboard.*', 'audit.view', 'expenses.*', 'finance.*', 'payroll.*', 'mdm.view', 'mdm.create', 'mdm.edit', 'projects.view', 'crm.view', 'mail.view', 'opportunities.view',
             ]],
             'delivery' => ['name' => 'Delivery Lead', 'description' => 'Runs projects, sprints, QA and sign-offs.', 'grant' => [
                 'dashboard.view', 'projects.*', 'qa.*', 'timesheets.*', 'signoffs.*', 'kaizen.view', 'kaizen.create', 'kaizen.edit', 'crm.view', 'expenses.create', 'mail.view',
+                'opportunities.view', 'opportunities.transcripts',
             ]],
             'engineer' => ['name' => 'Engineer', 'description' => 'Works on assigned tasks and QA tickets.', 'grant' => [
                 'projects.view', 'projects.edit', 'qa.view', 'qa.create', 'qa.edit', 'timesheets.view', 'timesheets.create', 'kaizen.view', 'kaizen.create', 'expenses.create', 'mail.view',
@@ -93,6 +103,7 @@ return [
             'sales' => ['name' => 'Sales & Marketing', 'description' => 'Leads, proposals, broadcasts, campaigns and website settings.', 'grant' => [
                 'dashboard.view', 'crm.*', 'broadcasts.*', 'marketing.view', 'marketing.create', 'marketing.edit', 'marketing.approve',
                 'website.*', 'kaizen.*', 'projects.view', 'expenses.create', 'mail.view',
+                'opportunities.view', 'opportunities.create', 'opportunities.manage', 'opportunities.transcripts',
             ]],
             'hr' => ['name' => 'HR', 'description' => 'People records, attendance, contracts and appraisals.', 'grant' => [
                 'hr.*', 'payroll.view', 'timesheets.view', 'timesheets.approve', 'timesheets.export', 'mdm.view', 'expenses.create', 'mail.view',

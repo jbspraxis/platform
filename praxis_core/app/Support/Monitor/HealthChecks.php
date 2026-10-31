@@ -18,7 +18,7 @@ class HealthChecks
     public static function all(): array
     {
         $checks = [];
-        foreach (['scheduler', 'errors', 'email', 'ai', 'queue', 'logs', 'leads', 'rates', 'config', 'push'] as $key) {
+        foreach (['scheduler', 'errors', 'email', 'ai', 'integrations', 'queue', 'logs', 'leads', 'rates', 'config', 'push'] as $key) {
             try {
                 $checks[] = ['key' => $key] + self::$key();
             } catch (\Throwable $e) {
@@ -91,15 +91,48 @@ class HealthChecks
             'fix' => $deepseek ? 'Both providers failed for some visitors: check the DeepSeek balance and the Gemini quota.' : null];
     }
 
+    /** Opportunities (docs/OPPORTUNITIES.md 6): the Google connection, the Claude key and the month's AI budget */
+    private static function integrations(): array
+    {
+        $google = app(\App\Support\Google\GoogleWorkspace::class);
+        $cap = \App\Support\Ai\Budget::cap();
+        $spent = \App\Support\Ai\Budget::spent();
+        $claude = \App\Support\Integrations::get('anthropic.api_key') !== null;
+        $refused = DB::table('ai_runs')->where('created_at', '>=', now()->subDay())->whereIn('error', ['ai.errors.key', 'ai.errors.credit'])->count();
+
+        $detail = ($google->isConnected() ? 'Google: connected as ' . ($google->accountEmail() ?? 'the company account') . '.' : ($google->needsReconnect() ? 'Google: access withdrawn, reconnect needed.' : 'Google: not connected yet.'))
+            . ' Claude key: ' . ($claude ? 'saved' : 'missing') . '.'
+            . sprintf(' AI this month: $%s of $%s.', number_format($spent, 2), number_format($cap, 2));
+
+        [$state, $fix] = match (true) {
+            $google->needsReconnect() => ['bad', 'Google withdrew HQ’s access, so meetings and transcripts are stopped. HQ › System › Integrations → Connect Google.'],
+            $cap > 0 && $spent >= $cap => ['bad', 'The month’s AI budget is spent, so AI jobs are stopped. Raise it in HQ › System › Integrations, or wait for the 1st.'],
+            $refused > 0 => ['bad', 'Claude refused the key or the credit has run out. Check platform.claude.com, then the key in HQ › System › Integrations.'],
+            $cap > 0 && $spent >= 0.8 * $cap => ['warn', 'Over 80% of the month’s AI budget is spent.'],
+            ! $google->isConnected() || ! $claude => ['warn', 'Not set up yet: enter the Google client and the Claude key in HQ › System › Integrations, then click Connect Google.'],
+            default => ['ok', null],
+        };
+
+        return ['label' => 'Integrations (Google, Claude)', 'state' => $state, 'detail' => $detail, 'fix' => $fix];
+    }
+
     private static function queue(): array
     {
-        $waiting = DB::table('jobs')->count();
-        $oldest = $waiting ? DB::table('jobs')->min('created_at') : null;
+        // AI jobs (queue 'ai') are run every minute by the scheduler; nothing else should wait here
+        $other = DB::table('jobs')->where('queue', '!=', config('ai.queue.name', 'ai'));
+        $waiting = (clone $other)->count();
+        $oldest = $waiting ? (clone $other)->min('created_at') : null;
+        $ai = DB::table('jobs')->where('queue', config('ai.queue.name', 'ai'));
+        $aiWaiting = (clone $ai)->count();
+        $aiOldest = $aiWaiting ? (clone $ai)->min('created_at') : null;
         $failed = DB::table('failed_jobs')->count();
         $stale = $oldest && (time() - (int) $oldest) > 3600;
-        return ['label' => 'Background jobs', 'state' => $stale || $failed ? 'warn' : 'ok',
-            'detail' => "{$waiting} waiting" . ($oldest ? ' (oldest ' . self::ago(Carbon::createFromTimestamp((int) $oldest)) . ')' : '') . ", {$failed} failed. Emails are sent straight away; nothing should wait here.",
-            'fix' => $stale ? 'Old waiting jobs will never run (no queue worker on this host). Review and clear them.' : null];
+        $aiStale = $aiOldest && (time() - (int) $aiOldest) > 600;
+        return ['label' => 'Background jobs', 'state' => $stale || $aiStale || $failed ? 'warn' : 'ok',
+            'detail' => "{$aiWaiting} AI job(s) waiting" . ($aiOldest ? ' (oldest ' . self::ago(Carbon::createFromTimestamp((int) $aiOldest)) . ')' : '')
+                . ", {$waiting} other waiting" . ($oldest ? ' (oldest ' . self::ago(Carbon::createFromTimestamp((int) $oldest)) . ')' : '') . ", {$failed} failed. Emails are sent straight away; AI jobs start within a minute.",
+            'fix' => $aiStale ? 'AI jobs are not being picked up: check that the cron job runs "schedule:run" every minute.'
+                : ($stale ? 'Old waiting jobs outside the AI queue will never run (no worker for them). Review and clear them.' : null)];
     }
 
     private static function logs(): array

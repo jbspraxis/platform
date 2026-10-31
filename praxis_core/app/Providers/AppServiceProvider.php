@@ -36,5 +36,16 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::before(function ($user, string $ability) {
             return \App\Support\Access::isPermission($ability) ? \App\Support\Access::allows($user, $ability) : null;
         });
+
+        // What an AI run is about (ai_runs.subject_type): short names, not class names (docs/OPPORTUNITIES.md 8.3)
+        \Illuminate\Database\Eloquent\Relations\Relation::morphMap([
+            'opportunity' => \App\Models\Opportunity::class,
+            'meeting' => \App\Models\Meeting::class,
+            'meeting_transcript' => \App\Models\MeetingTranscript::class,
+            'questionnaire' => \App\Models\Questionnaire::class,
+            'proposal' => \App\Models\Proposal::class,
+            'statement_of_work' => \App\Models\StatementOfWork::class,
+            'project_draft' => \App\Models\ProjectDraft::class,
+        ]);
     }
 }

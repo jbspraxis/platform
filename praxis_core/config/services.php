@@ -41,6 +41,18 @@ return [
         'chat_model' => env('GEMINI_CHAT_MODEL', 'gemini-3.1-flash-lite'),
     ],
 
+    // Opportunities (docs/OPPORTUNITIES.md 6): the owner enters these in HQ › System › Integrations (stored
+    // encrypted); the .env values are read only when nothing is saved there (App\Support\Integrations)
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        // The account that owns meetings (decision 1); connecting another one shows a warning
+        'account' => env('GOOGLE_ACCOUNT', 'praxisjbs@gmail.com'),
+    ],
+    'anthropic' => [
+        'api_key' => env('ANTHROPIC_API_KEY'),
+    ],
+
     // Fallback for the website chat when Gemini is busy or down
     'deepseek' => [
         'api_key' => env('DEEPSEEK_API_KEY'),

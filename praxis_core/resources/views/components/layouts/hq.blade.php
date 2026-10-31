@@ -80,12 +80,16 @@
                 @endif
             @endcanany
 
-            @canany(['crm.view', 'broadcasts.view'])
-                <a href="{{ $user->can('crm.view') ? route('hq.crm.leads') : route('hq.crm.broadcast') }}" class="rail-link {{ $on('hq.crm.*') }}" wire:navigate>
+            @canany(['crm.view', 'broadcasts.view', 'opportunities.view'])
+                <a href="{{ $user->can('opportunities.view') ? route('hq.crm.opportunities') : ($user->can('crm.view') ? route('hq.crm.leads') : route('hq.crm.broadcast')) }}" class="rail-link {{ $on('hq.crm.*') }}" wire:navigate>
                     <i data-lucide="target"></i> Leads and proposals
                 </a>
                 @if (request()->routeIs('hq.crm.*'))
                     <div class="rail-sub">
+                        {{-- docs/OPPORTUNITIES.md: one record per piece of work with a client --}}
+                        @can('opportunities.view')
+                            <a href="{{ route('hq.crm.opportunities') }}" class="{{ $on('hq.crm.opportunities', 'hq.crm.opportunity') }}" wire:navigate>{{ __('opportunities.nav') }}</a>
+                        @endcan
                         @can('crm.view')
                             <a href="{{ route('hq.crm.leads') }}" class="{{ $on('hq.crm.leads') }}" wire:navigate>Leads</a>
                             <a href="{{ route('hq.crm.consult') }}" class="{{ $on('hq.crm.consult') }}" wire:navigate>Free audits</a>
@@ -212,9 +216,9 @@
                 @endif
             @endcan
 
-            @canany(['access.view', 'system.view'])
+            @canany(['access.view', 'system.view', 'integrations.manage'])
                 <div class="rail-foot">
-                    <a href="{{ $user->can('access.view') ? route('hq.system.roles') : route('hq.system.health') }}" class="rail-link {{ $on('hq.system.*') }}" wire:navigate>
+                    <a href="{{ $user->can('access.view') ? route('hq.system.roles') : ($user->can('system.view') ? route('hq.system.health') : route('hq.system.integrations')) }}" class="rail-link {{ $on('hq.system.*') }}" wire:navigate>
                         <i data-lucide="settings"></i> Settings and access
                     </a>
                     @if (request()->routeIs('hq.system.*'))
@@ -225,6 +229,9 @@
                             @endcan
                             @can('system.view')
                                 <a href="{{ route('hq.system.health') }}" class="{{ $on('hq.system.health') }}" wire:navigate>System health</a>
+                            @endcan
+                            @can('integrations.manage')
+                                <a href="{{ route('hq.system.integrations') }}" class="{{ $on('hq.system.integrations') }}" wire:navigate>{{ __('integrations.nav') }}</a>
                             @endcan
                         </div>
                     @endif

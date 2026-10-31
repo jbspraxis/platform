@@ -1,0 +1,25 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+/** The AI's draft of the project once the SOW is signed (PR 5): the lead edits it, then clicks Create project */
+class ProjectDraft extends Model
+{
+    use HasUuids, SoftDeletes;
+
+    protected $fillable = [
+        'opportunity_id', 'sow_id', 'payload', 'status', 'ai_run_id', 'created_project_id', 'created_by', 'updated_by', 'deleted_by',
+    ];
+
+    protected $casts = ['payload' => 'array'];
+
+    public function opportunity(): BelongsTo
+    {
+        return $this->belongsTo(Opportunity::class);
+    }
+}

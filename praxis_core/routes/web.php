@@ -113,6 +113,12 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
             Route::get('/broadcast-ledger', \App\Livewire\Hq\Intelligence\BroadcastLedger::class)->middleware('can:broadcasts.view')->name('hq.crm.broadcast');
         });
 
+        // Opportunities (docs/OPPORTUNITIES.md): one record per piece of work with a client, under Leads and proposals
+        Route::prefix('opportunities')->middleware('can:opportunities.view')->group(function () {
+            Route::get('/', \App\Livewire\Hq\Opportunities\OpportunityBoard::class)->name('hq.crm.opportunities');
+            Route::get('/{opportunity}', \App\Livewire\Hq\Opportunities\OpportunityPage::class)->whereUuid('opportunity')->name('hq.crm.opportunity');
+        });
+
         // 5. MARKETING & ROAS
         // Each screen checks its own module, so someone with only website.view can open Website settings
         Route::prefix('marketing')->group(function () {
@@ -139,6 +145,15 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
             Route::get('/role-management', \App\Livewire\Hq\System\RoleManagement::class)->middleware('can:access.view')->name('hq.system.roles');
             Route::get('/roles-permissions', \App\Livewire\Hq\System\RolesPermissions::class)->middleware('can:access.view')->name('hq.system.permissions');
             Route::get('/health', \App\Livewire\Hq\System\SystemHealth::class)->middleware('can:system.view')->name('hq.system.health');
+            // Google connection, Claude key and AI budget (docs/OPPORTUNITIES.md 6)
+            Route::get('/integrations', \App\Livewire\Hq\System\Integrations::class)->middleware('can:integrations.manage')->name('hq.system.integrations');
+        });
+
+        // Google OAuth for praxisjbs@gmail.com. The callback path is registered on the OAuth client in Google Cloud
+        // (https://hq.jbspraxis.com/integrations/google/callback): don't change it without changing it there.
+        Route::prefix('integrations/google')->middleware('can:integrations.manage')->group(function () {
+            Route::get('/connect', [\App\Http\Controllers\Integrations\GoogleOAuthController::class, 'connect'])->name('hq.integrations.google.connect');
+            Route::get('/callback', [\App\Http\Controllers\Integrations\GoogleOAuthController::class, 'callback'])->name('hq.integrations.google.callback');
         });
 
         // 8. MAIL (docs/MAIL.md): own and shared mailboxes; routes/mail.php
