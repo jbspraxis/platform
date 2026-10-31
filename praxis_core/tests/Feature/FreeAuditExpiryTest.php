@@ -2,11 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Hq\Intelligence\LiveConsultation;
+use App\Mail\MeetingApprovedMail;
 use Carbon\Carbon;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -76,6 +79,24 @@ class FreeAuditExpiryTest extends TestCase
         // A second run finds nothing more to close and logs nothing twice
         $this->artisan('crm:expire-audit-requests')->expectsOutput('expire-audit-requests: 0 request(s) closed')->assertSuccessful();
         $this->assertSame(2, DB::table('system_audit_logs')->where('action', 'FREE_AUDIT_EXPIRED')->count());
+    }
+
+    public function test_a_closed_request_cannot_be_approved_from_a_stale_hub_screen(): void
+    {
+        Mail::fake();
+        $this->actingAs($this->staff('sales', ['sales']));
+        $passed = $this->appointment('Requested', '2026-11-04 09:50:00');
+
+        // The hub was opened while the request still waited; the hourly run then closes it
+        $hub = Livewire::test(LiveConsultation::class);
+        $this->artisan('crm:expire-audit-requests')->assertSuccessful();
+
+        $hub->call('approveMeeting', $passed, 'https://meet.google.com/abc-defg-hij')
+            ->assertSee('This request was already approved, declined or closed because its time passed, so nothing changed. The list is up to date now.');
+
+        $this->assertSame('Cancelled', DB::table('appointments')->where('id', $passed)->value('status'));
+        $this->assertNull(DB::table('appointments')->where('id', $passed)->value('meeting_link'));
+        Mail::assertNotSent(MeetingApprovedMail::class);
     }
 
     public function test_the_closing_runs_every_hour(): void

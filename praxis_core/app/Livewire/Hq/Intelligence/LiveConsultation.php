@@ -86,12 +86,18 @@ class LiveConsultation extends Component
             return;
         }
 
-        DB::table('appointments')->where('id', $appointmentId)->update([
+        // Only a request still waiting: it may have been declined, or closed hourly once its start time passed
+        $approved = DB::table('appointments')->where('id', $appointmentId)->where('status', 'Requested')->update([
             'status' => 'Scheduled',
             'meeting_link' => trim($meetingLink),
             'updated_by' => Auth::id() ?? 'system',
             'updated_at' => now()
-        ]);
+        ]) === 1;
+        if (! $approved) {
+            session()->flash('error', 'This request was already approved, declined or closed because its time passed, so nothing changed. The list is up to date now.');
+            $this->loadLobby();
+            return;
+        }
 
         // Find the client’s email address and send the meeting link
         $appt = DB::table('appointments')->where('id', $appointmentId)->first();
