@@ -57,7 +57,6 @@ return [
         'calculator_cta' => 'Utiliser le calculateur',
         'final_title' => 'Voyez-le sur vos propres opérations.',
         'final_text' => 'L’audit gratuit et la démo durent environ une heure. Nous étudions un domaine de votre organisation et vous montrons à quoi ressemble une réponse claire.',
-        'or_call' => 'ou appelez',
     ],
 
     'services' => [

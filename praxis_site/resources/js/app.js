@@ -270,8 +270,29 @@ function enhanceConsent() {
     }));
 }
 
+/* ---- Header disclosures (language, menu) ----
+ * Plain <details>, so they open without JavaScript; this only closes them on Escape (focus back on the
+ * button), on a click outside, and when the other one opens. */
+function enhanceHeaderMenus() {
+    const menus = [...document.querySelectorAll('details.lang-menu, details.nav-menu')];
+    menus.forEach((menu) => menu.addEventListener('toggle', () => {
+        if (menu.open) menus.forEach((other) => { if (other !== menu) other.open = false; });
+    }));
+    document.addEventListener('click', (event) => {
+        menus.forEach((menu) => { if (menu.open && !menu.contains(event.target)) menu.open = false; });
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        const open = menus.find((menu) => menu.open);
+        if (!open) return;
+        open.open = false;
+        open.querySelector('summary')?.focus();
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     drawIcons();
+    enhanceHeaderMenus();
     enhanceChat();
     toggleOtherFields();
     enhanceLoop();

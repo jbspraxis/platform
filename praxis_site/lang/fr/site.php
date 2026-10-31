@@ -26,6 +26,7 @@ return [
         'menu' => 'Menu',
         'client_login' => 'Espace client',
         'language' => 'Langue',
+        'language_current' => 'Langue : français. Choisir une autre langue',
     ],
     'languages' => ['en' => 'English', 'fr' => 'Français'],
 
