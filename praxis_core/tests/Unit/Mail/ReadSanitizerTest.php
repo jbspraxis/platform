@@ -77,7 +77,8 @@ class ReadSanitizerTest extends TestCase
         $this->assertGreaterThanOrEqual(3, $out['blocked']);
 
         $allowed = $this->clean('<div style="background-image: url(https://cdn.test/bg.png)">a</div>', true);
-        $this->assertStringContainsString('url("https://cdn.test/bg.png")', $allowed['html']);
+        // libxml writes the quotes inside the attribute as " or &quot; depending on its version; browsers read both alike
+        $this->assertStringContainsString('url("https://cdn.test/bg.png")', html_entity_decode($allowed['html'], ENT_QUOTES | ENT_HTML5));
     }
 
     public function test_style_blocks_cannot_break_out(): void
