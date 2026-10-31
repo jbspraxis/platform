@@ -1,4 +1,6 @@
-{{-- Built from GET /settings (App\Support\SiteSettings). Only registrations with a number are shown; social links are logos. --}}
+{{-- Built from GET /settings (App\Support\SiteSettings). Only registrations with a number are shown; social links are logos.
+     Each office is a regional desk (its region from its country, lang site.footer.regions) with its address and the
+     phones whose label in Website settings is its city. --}}
 <footer class="site-footer">
     <div class="container">
         <div class="footer-grid">
@@ -6,18 +8,26 @@
                 <a class="footer-logo" href="{{ route('home') }}">
                     <img src="{{ asset('img/logo/jbs-praxis-horizontal-reversed.svg') }}" alt="{{ __('site.home_link') }}" width="141" height="28" loading="lazy">
                 </a>
-                <p>{{ __('site.tagline') }}</p>
-                @if ($site->legalName)
-                    <p class="footer-legal">{{ $site->legalName }}</p>
-                @endif
+                <p class="footer-tagline">{{ __('site.footer.tagline') }}</p>
             </div>
 
             <div>
                 @if ($site->offices)
-                    <h2>{{ __('site.footer.offices') }}</h2>
-                    <ul>
+                    <h2>{{ __('site.footer.desks') }}</h2>
+                    <ul class="footer-desks">
                         @foreach ($site->offices as $office)
-                            <li>{{ $office['city'] }}@if ($office['country'] !== ''), {{ $office['country'] }}@endif</li>
+                            <li>
+                                @if (Lang::has('site.footer.regions.' . $office['code']))
+                                    <p class="footer-desk-region">{{ __('site.footer.regions.' . $office['code']) }}</p>
+                                @endif
+                                <p>{{ $office['city'] }}@if ($office['country'] !== ''), {{ $office['country'] }}@endif</p>
+                                @if ($office['address'] !== '')
+                                    <p>{{ $office['address'] }}</p>
+                                @endif
+                                @foreach ($site->phonesFor($office['city']) as $phone)
+                                    <p><a href="tel:{{ preg_replace('/[^0-9+]/', '', $phone['number']) }}">{{ $phone['number'] }}</a></p>
+                                @endforeach
+                            </li>
                         @endforeach
                     </ul>
                 @endif
@@ -38,7 +48,7 @@
                 <h2>{{ __('site.footer.contact') }}</h2>
                 <ul>
                     <li><a href="mailto:{{ $site->email }}">{{ $site->email }}</a></li>
-                    @foreach ($site->phones as $phone)
+                    @foreach ($site->otherPhones() as $phone)
                         <li>@if ($phone['label'] !== ''){{ $phone['label'] }}: @endif<a href="tel:{{ preg_replace('/[^0-9+]/', '', $phone['number']) }}">{{ $phone['number'] }}</a></li>
                     @endforeach
                 </ul>
@@ -74,6 +84,7 @@
             @if (config('site.noindex'))
                 <p>{{ __('site.footer.preview_note') }}</p>
             @endif
+            <a class="back-to-top" href="#top">{{ __('site.footer.back_to_top') }}<i data-lucide="arrow-up" aria-hidden="true"></i></a>
         </div>
     </div>
 </footer>

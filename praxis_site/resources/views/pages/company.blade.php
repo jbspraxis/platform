@@ -24,8 +24,10 @@
                 @if ($site->offices)
                     <div><dt>{{ __('pages.company.offices') }}</dt><dd>
                         @foreach ($site->offices as $office)
+                            @if (Lang::has('site.footer.regions.' . $office['code'])){{ __('site.footer.regions.' . $office['code']) }}<br>@endif
                             {{ $office['city'] . ($office['country'] !== '' ? ', ' . $office['country'] : '') }}
-                            @if (! $loop->last)<br>@endif
+                            @if ($office['address'] !== '')<br>{{ $office['address'] }}@endif
+                            @if (! $loop->last)<br><br>@endif
                         @endforeach
                     </dd></div>
                 @endif

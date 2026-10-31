@@ -10,7 +10,7 @@ namespace App\Support;
 final class SiteSettings
 {
     /**
-     * @param  list<array{city: string, country: string}>  $offices
+     * @param  list<array{city: string, country: string, code: string, address: string}>  $offices
      * @param  list<array{label: string, country: string, number: ?string}>  $registrations
      * @param  list<array{label: string, number: string}>  $phones
      * @param  list<array{label: string, number: string}>  $whatsapp
@@ -42,7 +42,12 @@ final class SiteSettings
         foreach (self::list($company['offices'] ?? []) as $office) {
             $city = self::str($office['city'] ?? null);
             if ($city !== null) {
-                $offices[] = ['city' => $city, 'country' => self::country($office['country'] ?? null)];
+                $offices[] = [
+                    'city' => $city,
+                    'country' => self::country($office['country'] ?? null),
+                    'code' => strtoupper(self::str($office['country'] ?? null) ?? ''),
+                    'address' => self::str($office['address'] ?? null) ?? '',
+                ];
             }
         }
 
@@ -106,6 +111,28 @@ final class SiteSettings
     public function registered(): array
     {
         return array_values(array_filter($this->registrations, fn (array $registration) => $registration['number'] !== null));
+    }
+
+    /**
+     * The phone numbers of one office: those whose label in Website settings is the office's city ("Lagos").
+     *
+     * @return list<array{label: string, number: string}>
+     */
+    public function phonesFor(string $city): array
+    {
+        return array_values(array_filter($this->phones, fn (array $phone) => strcasecmp($phone['label'], $city) === 0));
+    }
+
+    /**
+     * Phone numbers not tied to an office (shown under Contact).
+     *
+     * @return list<array{label: string, number: string}>
+     */
+    public function otherPhones(): array
+    {
+        $cities = array_map(fn (array $office) => mb_strtolower($office['city']), $this->offices);
+
+        return array_values(array_filter($this->phones, fn (array $phone) => ! in_array(mb_strtolower($phone['label']), $cities, true)));
     }
 
     private static function str(mixed $value): ?string
