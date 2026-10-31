@@ -28,6 +28,20 @@
                 'email' => $site->email,
                 'slogan' => __('site.tagline'),
                 'sameAs' => array_values(array_map(fn ($link) => $link['url'], $site->social)),
+                // The regional desks: street addresses and their phones (local search in each country)
+                'address' => array_values(array_map(fn ($office) => array_filter([
+                    '@type' => 'PostalAddress',
+                    'streetAddress' => $office['address'] ?: null,
+                    'addressLocality' => $office['city'],
+                    'addressCountry' => $office['code'] ?: null,
+                ]), array_filter($site->offices, fn ($office) => $office['address'] !== ''))),
+                'contactPoint' => array_merge(...array_map(fn ($office) => array_map(fn ($phone) => array_filter([
+                    '@type' => 'ContactPoint',
+                    'telephone' => $phone['number'],
+                    'contactType' => 'sales',
+                    'areaServed' => $office['code'] ?: null,
+                    'availableLanguage' => ['en', 'fr'],
+                ]), $site->phonesFor($office['city'])), $site->offices)),
             ]),
             [
                 '@type' => 'WebSite',
@@ -81,7 +95,7 @@
         <script src="{{ config('services.turnstile.script_url') }}" async defer></script>
     @endif
 </head>
-<body>
+<body id="top">
     <a class="skip-link" href="#main">{{ __('site.skip') }}</a>
 
     <header class="site-header">

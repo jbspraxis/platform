@@ -28,7 +28,6 @@ class LayoutAndSecurityTest extends TestCase
         $this->fakeHq();
 
         $this->get('/contact')->assertOk()
-            ->assertSee('JBS Praxis LLC')
             ->assertSee('Lagos, Nigeria')
             ->assertSee('Douala, Cameroon')
             // Registrations still in progress are not shown (owner, 30 Oct 2026)
@@ -41,6 +40,44 @@ class LayoutAndSecurityTest extends TestCase
             ->assertSee('https://x.com/jbspraxis', false)
             ->assertSee('https://www.youtube.com/@jbspraxis', false)
             ->assertSee('<svg class="social-icon"', false);
+    }
+
+    public function test_the_footer_lists_the_regional_desks_with_their_addresses_and_phones(): void
+    {
+        // Phones labelled with an office's city belong to that desk; any other phone stays under Contact
+        $settings = $this->settingsData();
+        $settings['company']['offices'] = [
+            ['city' => 'Lagos', 'country' => 'NG', 'address' => '21B Bode Ajakaiye Street, Lekki'],
+            ['city' => 'Douala', 'country' => 'CM', 'address' => '1030 Avenue Douala Manga Bell, Bali'],
+        ];
+        $settings['contact']['phones'] = [
+            ['label' => 'Lagos', 'number' => '+234 816 978 9106'],
+            ['label' => 'Douala', 'number' => '+237 696 12 25 11'],
+            ['label' => 'Support', 'number' => '+234 800 000 0000'],
+        ];
+        Http::fake([self::HQ . '/settings' => Http::response(['data' => $settings])]);
+
+        $html = $this->get('/contact')->assertOk()->getContent();
+        $footer = substr($html, strpos($html, '<footer'));
+
+        $this->assertStringContainsString('Regional desks', $footer);
+        $this->assertMatchesRegularExpression('~West Africa \(ECOWAS\).*Lagos, Nigeria.*21B Bode Ajakaiye Street, Lekki.*href="tel:\+2348169789106">\+234 816 978 9106<~s', $footer);
+        $this->assertMatchesRegularExpression('~Central Africa \(CEMAC\).*Douala, Cameroon.*1030 Avenue Douala Manga Bell, Bali.*href="tel:\+237696122511">\+237 696 12 25 11<~s', $footer);
+        $this->assertMatchesRegularExpression('~Contact.*Support: <a href="tel:\+2348000000000">~s', $footer);
+        // The longer line under the logo; the legal name (JBS Praxis LLC) is no longer printed in the footer
+        $this->assertStringContainsString('We design how your organisation runs, then build the system that answers for it.', $footer);
+        $this->assertStringNotContainsString('LLC', $footer);
+        // A quiet way back up, and Google gets the same addresses and phones
+        $this->assertStringContainsString('<a class="back-to-top" href="#top">Back to top', $footer);
+        $this->assertStringContainsString('<body id="top">', $html);
+        $this->assertStringContainsString('"streetAddress":"21B Bode Ajakaiye Street, Lekki","addressLocality":"Lagos","addressCountry":"NG"', $html);
+        $this->assertStringContainsString('"telephone":"+237 696 12 25 11","contactType":"sales","areaServed":"CM"', $html);
+
+        $fr = $this->get('/fr/contact')->assertOk()->getContent();
+        $this->assertStringContainsString('Bureaux régionaux', $fr);
+        $this->assertStringContainsString('Afrique de l’Ouest (CEDEAO)', $fr);
+        $this->assertStringContainsString('Haut de page', $fr);
+        $this->assertMatchesRegularExpression('~West Africa \(ECOWAS\)<br>\s*Lagos, Nigeria\s*<br>21B Bode Ajakaiye Street, Lekki~', $this->get('/company')->getContent());
     }
 
     public function test_a_registration_number_is_shown_once_it_is_registered(): void
