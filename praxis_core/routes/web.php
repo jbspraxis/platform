@@ -195,10 +195,14 @@ Route::domain(Hosts::portal())->group(function () use ($notOwnRoute, $legacy) {
         Route::get('/verify/{hash}', \App\Livewire\Portal\ContractVerification::class)->name('portal.verify.contract');
 
         // The COPQ Executive Dossier
-        Route::get('/dossier/{token}', function ($token) {
+        Route::get('/dossier/{token}', function (Request $request, $token) {
+            $isExecMode = $request->query('exec') === 'true';
+            // Visitors' links (cost report emails sent before 31 Oct 2026) open the report on the site; HQ's own links add ?exec=true
+            if (!$isExecMode) {
+                return redirect()->away(Hosts::url(Hosts::site(), 'dossier/' . rawurlencode($token), $request), 301);
+            }
             $assessment = DB::table('copq_assessments')->where('report_token', $token)->first();
             if (!$assessment) abort(404, 'Dossier not found.');
-            $isExecMode = request()->query('exec') === 'true';
             return view('copq-report', ['assessment' => $assessment, 'isExecMode' => $isExecMode]);
         })->name('dossier.show');
 

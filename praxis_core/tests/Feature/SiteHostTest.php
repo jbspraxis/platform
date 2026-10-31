@@ -67,6 +67,10 @@ class SiteHostTest extends TestCase
             ->assertStatus(301)->assertRedirect('https://' . Hosts::hq() . '/dashboard/workspace');
         $this->get($this->site('/client/login'))
             ->assertStatus(301)->assertRedirect('https://' . Hosts::portal() . '/login');
+
+        // A cost report link from an email sent before the site had its own report page
+        $this->get('https://' . Hosts::portal() . '/dossier/PRX-ABC123-2026')
+            ->assertStatus(301)->assertRedirect($this->site('/dossier/PRX-ABC123-2026'));
     }
 
     public function test_the_unsubscribe_page_still_answers(): void
