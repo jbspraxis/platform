@@ -7,6 +7,7 @@ use App\Support\Google\GoogleUnavailable;
 use App\Support\Google\GoogleWorkspace;
 use App\Support\Google\MeetingRequest;
 use App\Support\Google\Transcript;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use PHPUnit\Framework\Assert;
 
@@ -35,6 +36,7 @@ class FakeGoogle extends GoogleWorkspace
     public array $lookups = [];
 
     private array $busy = [];
+    private array $events = [];
 
     private array $transcripts = ['meet_api' => [], 'calendar_doc' => []];
 
@@ -79,6 +81,28 @@ class FakeGoogle extends GoogleWorkspace
     public function busy(string $email, ?array $periods): self
     {
         $this->busy[$email] = $periods;
+
+        return $this;
+    }
+
+    /**
+     * Calendar events listEvents() returns: id, title, start and end ('2026-10-28 14:00', Africa/Lagos), and
+     * optionally meet_code, attendees ([['email' => …, 'name' => …]]) and docs (attached Google Docs)
+     */
+    public function events(array $events): self
+    {
+        foreach ($events as $e) {
+            $this->events[] = [
+                'id' => $e['id'],
+                'title' => $e['title'],
+                'start' => CarbonImmutable::parse($e['start'], self::TIME_ZONE),
+                'end' => CarbonImmutable::parse($e['end'], self::TIME_ZONE),
+                'meet_code' => $e['meet_code'] ?? null,
+                'meet_link' => isset($e['meet_code']) ? 'https://meet.google.com/' . $e['meet_code'] : null,
+                'attendees' => array_map(fn ($a) => $a + ['name' => null, 'response' => null], $e['attendees'] ?? []),
+                'docs' => $e['docs'] ?? 1,
+            ];
+        }
 
         return $this;
     }
@@ -190,6 +214,13 @@ class FakeGoogle extends GoogleWorkspace
         $this->lookups[] = ['route' => 'meet_api', 'key' => $meetCode];
 
         return $this->transcripts['meet_api'][$meetCode] ?? null;
+    }
+
+    public function listEvents(CarbonInterface $from, CarbonInterface $to): array
+    {
+        $this->guard('listEvents');
+
+        return array_values(array_filter($this->events, fn ($e) => $e['start']->betweenIncluded($from, $to)));
     }
 
     public function eventAttachmentText(string $eventId): ?Transcript
