@@ -17,13 +17,6 @@ class PraxisFrameworkDispatch extends BrandedMail
         'fr' => ['file' => 'the-praxis-method-fr.pdf', 'name' => 'JBS-Praxis-Methode.pdf'],
     ];
 
-    public $bookUrl;
-
-    public function __construct()
-    {
-        $this->bookUrl = route('schedule');
-    }
-
     protected function subjectLine(): string
     {
         return __('emails.method.subject');
@@ -31,7 +24,13 @@ class PraxisFrameworkDispatch extends BrandedMail
 
     public function content(): Content
     {
-        return new Content(view: 'emails.framework-dispatch');
+        // The booking page in the email's language: /schedule, or /fr/schedule on the site
+        $book = route('schedule');
+        if (app()->getLocale() === 'fr') {
+            $book = preg_replace('~/schedule$~', '/fr/schedule', $book);
+        }
+
+        return new Content(view: 'emails.framework-dispatch', with: ['bookUrl' => $book]);
     }
 
     /** The edition in this mail's language (set with ->locale()), English otherwise */

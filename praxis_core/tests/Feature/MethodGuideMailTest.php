@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Mail\EnquiryReceived;
 use App\Mail\PraxisFrameworkDispatch;
 use Illuminate\Mail\Mailables\Attachment;
 use Tests\TestCase;
@@ -33,6 +34,20 @@ class MethodGuideMailTest extends TestCase
         $parts = (new PraxisFrameworkDispatch())->locale('fr')->renderParts();
         $this->assertStringContainsString('Vous trouverez en pièce jointe la méthode Praxis, au format PDF.', $parts['html']);
         $this->assertStringNotContainsString('anglais', $parts['html'] . $parts['text']);
+    }
+
+    public function test_the_booking_button_opens_the_booking_page_in_the_mails_language(): void
+    {
+        // The guide email and the contact form's copy both end on Book a free audit and demo
+        foreach ([new PraxisFrameworkDispatch(), new PraxisFrameworkDispatch(), new EnquiryReceived('Ada'), new EnquiryReceived('Ada')] as $i => $mail) {
+            $french = $i % 2 === 1;
+            $html = $mail->locale($french ? 'fr' : 'en')->renderParts()['html'];
+
+            $this->assertStringContainsString($french ? '/fr/schedule"' : '/schedule"', $html, get_class($mail));
+            if (! $french) {
+                $this->assertStringNotContainsString('/fr/schedule', $html, get_class($mail));
+            }
+        }
     }
 
     public function test_any_other_language_gets_the_english_guide(): void
