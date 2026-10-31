@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Mail\CopqReportMail;
 use App\Support\Hosts;
 use Tests\TestCase;
 
@@ -35,6 +36,19 @@ class SiteHostTest extends TestCase
         $url = route('kaizen.show', ['slug' => 'closing-the-month']);
         $this->assertSame(Hosts::site(), parse_url($url, PHP_URL_HOST));
         $this->assertSame('/kaizen/closing-the-month', parse_url($url, PHP_URL_PATH));
+    }
+
+    public function test_the_cost_report_email_links_to_the_report_on_the_site_in_its_language(): void
+    {
+        $assessment = (object) ['report_token' => 'PRX-ABC123-2026', 'company_name' => 'Acme Ltd (test)', 'executive_name' => 'Ada Test',
+            'copq_currency' => 'NGN', 'calculated_leakage' => 1000, 'created_at' => '2026-10-29 14:05:00'];
+
+        // Not the portal's old dossier view (HQ keeps that for its own links)
+        foreach (['en' => '/dossier/PRX-ABC123-2026', 'fr' => '/fr/dossier/PRX-ABC123-2026'] as $locale => $path) {
+            $html = (new CopqReportMail($assessment))->locale($locale)->renderParts()['html'];
+            $this->assertStringContainsString('//' . Hosts::site() . $path . '"', $html, $locale);
+            $this->assertStringNotContainsString(Hosts::portal(), $html, $locale);
+        }
     }
 
     public function test_the_old_pages_are_not_served_here(): void
