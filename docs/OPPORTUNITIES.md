@@ -1,0 +1,168 @@
+# Opportunities: from the first meeting to a staffed project (runbook for PRs 1–5)
+
+Agreed with the owner on 31 October 2026. Today HQ joins the client journey by **organisation**: a website booking becomes a free audit with a meeting link pasted by hand, four typed note boxes feed one AI call (`LiveConsultation::closeAndSynthesize`), the proposal doubles as the statement of work, signing it creates the project and an invoice at once (`ProposalGateway::verifyOtpAndExecuteLaunch`), and *Scrum master* drafts sprints from "the organisation's latest signed proposal" (wrong as soon as a client has two pieces of work). There are no internal meetings, no attendee lists, no calendar invites and no transcripts.
+
+This runbook replaces that with an **opportunity**: one record per piece of work with a client, holding its meetings, transcripts, questionnaire, proposal versions and SOW, and finally the project. Five PRs. **PR 1 is built first and alone; PRs 2 and 3 then run in parallel; PR 4 follows PR 3; PR 5 follows PR 4.**
+
+> **Every chat working on opportunities reads this whole file first and follows it.** Change a contract only in the PR that owns it, and record the change in section 12 in the same commit.
+
+## 1. Owner decisions (31 Oct 2026, binding)
+
+| # | Question | Decision |
+|---|---|---|
+| 1 | Google account that owns meetings | **praxisjbs@gmail.com** (Google AI Pro: Meet already writes "Notes by Gemini" and transcripts for it). HQ creates every meeting in its calendar. |
+| 2 | How transcripts reach HQ | **Meet transcribes, HQ fetches**, starting **20–30 minutes after the meeting ends** (Google takes 15–20). Upload or paste stays as the fallback. |
+| 3 | Invitations | **Google Calendar invite + HQ branded email** (EN/FR) to the client. |
+| 4 | What clients see | **Minutes only**: short minutes (decisions, next steps) by email and in the portal. Full transcripts stay in HQ. Internal meetings never reach the client. |
+| 5 | The record that holds the work | **Opportunity** (until the SOW is signed; then it is Won and points at its project). A client can have several. |
+| 6 | Who answers the AI's questionnaire | **Our team only: the opportunity's lead.** The lead sets **how many questions**; every question comes with **at least 3 suggested answers**, the **AI's recommendation** and why, plus a free answer. |
+| 7 | Who approves before a proposal or SOW goes out | **The owner or the opportunity's designated lead.** |
+| 8 | How the client reviews a proposal | **Both**: in the portal (comments by section; approve, ask for changes, or book a follow-up), and a **PDF** attached to the email. |
+| 9 | Where the binding signature goes | **The client approves the proposal** (one click, name recorded) and **signs the SOW** with the one-time code, as proposals are signed today. |
+| 10 | When the SOW is signed | **Deposit invoice raised automatically** (as today) and **the project drafted by AI**; the lead reviews it and clicks *Create project*. |
+| 11 | Which AI writes the long documents | **Claude Sonnet** (`claude-sonnet-5-5`), not Opus: affordable. Gemini stays for the website chat, Mail and quick jobs. **Every AI job runs in the background** with progress shown, so nothing times out (today's 15-second limit is ours, not Gemini's). The owner starts with **$5 of credit**: "performant yet minimal cost" (section 6.2, *Keeping the cost down*). |
+| 12 | How a follow-up meeting is booked | **Both**: the client picks a free time in the portal (HQ creates the meeting, Meet link and invites at once), or asks us to propose times. |
+
+Defaults set without asking (change them here if the owner disagrees): the lead is named when the opportunity is opened and becomes the project lead; no project exists before the SOW is signed; AI documents are written in the opportunity's language (English or French, from the organisation's `preferred_language`); sprints are two weeks; internal meetings get the Google invite only (no branded email); every client invite carries a one-line transcription notice.
+
+## 2. The flow
+
+1. **Open an opportunity** for an organisation (from *Leads register*, from an approved website booking, or by hand): title, lead, language.
+2. **Discovery meeting**: pick a time, attendees (staff from HQ, client contacts, any other email), agenda. HQ creates the Google Calendar event with a Meet link in praxisjbs@gmail.com's calendar; Google sends the invite; HQ sends the branded email.
+3. **Transcript**: 20–30 minutes after the end, HQ collects the transcript (section 6.1) and files it under the opportunity. The AI writes **internal notes** (decisions, needs, risks, open questions) and **draft client minutes**; the lead edits and sends the minutes.
+4. **Internal meeting**: from the opportunity, the lead creates an internal meeting the same way (agenda prefilled from the client meeting's notes), picks staff and adds any email. Its transcript is filed too and never shown to the client.
+5. **Questionnaire**: the lead chooses how many questions; the AI drafts them from everything filed so far, each with ≥3 suggested answers and its recommendation; the lead answers.
+6. **Proposal**: the AI drafts it from the transcripts, notes and answers; the lead edits; the owner or the lead approves; HQ sends it (portal link + PDF).
+7. **Review**: the client comments by section, approves, asks for changes (→ version 2, with "what changed"), or books a follow-up meeting (back to step 2; the transcript joins the same opportunity).
+8. **SOW**: from the approved proposal, transcripts and answers, the AI drafts the SOW; approval as in step 6; the client signs it with the one-time code.
+9. **Project**: signing raises the deposit invoice and queues the **project draft** (phases, milestones, two-week sprints, tasks, roles). The lead reviews and clicks *Create project*. The opportunity is Won and links to the project; the project shows every transcript of the opportunity. Assigning work then happens on the sprint board, as today.
+
+## 3. What changes, by PR
+
+| Today | Target | PR |
+|---|---|---|
+| Proposals, projects and bookings hang off the organisation | Everything hangs off an **opportunity**; existing records are attached by a backfill | 1 |
+| AI calls inline in each screen, 15 s timeout, Gemini only, prompt text copied around | One **AI service** (Claude Sonnet for documents, Gemini kept), background jobs with progress (`ai_runs`), one copy of the company brief | 1 |
+| No Google connection | **System › Integrations**: connect praxisjbs@gmail.com, Claude key, status and tests | 1 |
+| Meeting link pasted by hand; client free audits only | **Meetings** (client and internal) with attendees, Calendar event, Meet link, invites, reschedule, cancel | 2 |
+| Four note boxes | **Transcripts** collected automatically, AI notes, client minutes, all together per opportunity and project | 2 |
+| Client cannot ask for another meeting | **Portal booking**: free times from Google, or "propose times" | 2 |
+| — | **Questionnaire** with a chosen number of questions, ≥3 answers each and the AI's recommendation | 3 |
+| Proposal = SOW, signed with OTP, signing creates the project | **Proposal v2**: AI draft from the opportunity, versions, approval, portal review by section, PDF, one-click client approval | 4 |
+| — | **SOW** drafted by AI, approved, signed with OTP; deposit invoice; **project draft** → *Create project*; *Scrum master* reads the opportunity | 5 |
+
+## 4. The five PRs
+
+| PR | Branch | Scope | Depends on | Status |
+|---|---|---|---|---|
+| **1 Foundation** | `opp/pr1-foundation` | **All tables** (section 7) and the backfill; models; permissions; **Opportunities** list (board by stage + table) and the opportunity page with its tabs (Overview built; Meetings, Questionnaire, Proposals, SOW and project as stubs for PRs 2–5); **System › Integrations** (Google connect, Claude key, tests); the **Google client** (OAuth, token refresh, Calendar, Free/busy, Meet, Docs; section 8.2); the **AI service** (Claude and Gemini providers, `ai_runs`, the queue runner, cost tracking, budget cap; section 8.3); `OpportunityContext` and `CompanyBrief` (section 8.4); fakes for tests (section 10); this runbook. | — | Not started |
+| **2 Meetings and transcripts** | `opp/pr2-meetings` | Meetings tab: create, reschedule and cancel client and internal meetings (attendees from staff, client contacts and free emails; agenda; Calendar event + Meet link; Google invite + branded EN/FR email for clients); *Live consultation* approval creates the meeting through Google instead of a pasted link; `meetings:collect-transcripts` (section 6.1) and upload/paste fallback; AI notes and client minutes (review, send, portal); transcripts listed together on the opportunity and later the project; **portal follow-up booking** (free times or "propose times"). | 1 | Not started |
+| **3 Questionnaire** | `opp/pr3-questionnaire` | Questionnaire tab: the lead picks the number of questions (3–25) and optional focus areas; AI drafts questions from `OpportunityContext`, each with ≥3 suggested answers, the recommended one and why; the lead answers (pick, edit, or write their own), regenerates one question, adds their own; answers are saved as they go; *Mark complete* locks it and feeds PR 4. | 1 | Not started |
+| **4 Proposals** | `opp/pr4-proposals` | Proposal drafted by AI from the opportunity (transcripts, notes, answers, COPQ, approved proof); sections editable; line items suggested from the financial dictionary (prices come from the dictionary, people adjust); **versions** with "what changed"; approval by the owner or the lead; **send**: portal link + PDF; **portal review**: comments by section, approve (name, title, email), ask for changes, book a follow-up (PR 2's booking); legacy proposals keep today's signing until they close. | 1, 3 | Not started |
+| **5 SOW and project** | `opp/pr5-sow-project` | SOW drafted by AI from the approved proposal + `OpportunityContext`; versions, approval, send (portal + PDF); **signing with the one-time code** (moved from `ProposalGateway`, HQ countersignature kept); deposit invoice (extracted from `ProposalGateway`); opportunity Won; **project draft** (phases, milestones, two-week sprints, tasks, roles) → lead edits → *Create project* (writes through the logic extracted from `ScrumMaster::commitBacklogToDatabase`); *Scrum master* reads `OpportunityContext`; the project page lists the opportunity's transcripts and minutes. | 4 | Not started |
+
+**Done means** for every PR: the scope above works end to end on a local server in English and French, desktop and 375 px; tests cover it (section 10); CI is green; the PR description lists what the owner should click to check it live; section 11 gets a line once it is live.
+
+## 5. Starting a PR chat
+
+Paste this into a new chat: *"You are building HQ Opportunities PR N. Read docs/OPPORTUNITIES.md (all of it) and follow it; your scope is section 4, row N."*
+
+- **Repository**: `jbspraxis/platform` on GitHub, branch `main`. Local checkout `C:\Users\Tom-Blake\jbspraxis_github` (never work in it directly; other chats use it). Local chats make a worktree: `git -C /c/Users/Tom-Blake/jbspraxis_github worktree add -b opp/prN-<name> ../jbspraxis_opp/prN origin/main`. Cloud chats branch from `main` and rely on CI.
+- **Runnable locally**: as `docs/MAIL.md` section 3 steps 2–7, with these values: PHP is Laragon 8.3; MySQL on `127.0.0.1:3307`; your databases `praxis_opp_prN` and `praxis_test_opp_prN`; your port `810N` (`http://hq.localhost:810N`). Copy `vendor` from PR 1's worktree once PR 1 has added the Claude SDK (before that, from `jbspraxis_project/praxis_core/vendor`).
+- **Composer is allowed now**: the deploy runs `composer install` when `composer.lock` changes. Only PR 1 adds packages (the Claude SDK); PR 4 may add a PDF library (section 9). The live PHP lacks `intl`, `fileinfo`, `exif`, `sodium` and `gmp`: check a package's `require` before adding it.
+- **Front-end**: Vite builds in CI, so `resources/css` and `resources/js` changes ship. Keep to the brand tokens and Lucide icons already in use.
+- **At most 5 agents at once on this PC, all chats together** (owner's standing rule).
+- **Ship**: push the branch, `gh pr create`, wait for green (`gh pr checks --watch`), then `gh pr merge --merge --delete-branch`. Merging to `main` deploys live within about a minute, with migrations. Merge only with the owner's go-ahead in your chat.
+- **Never** put a real key, token, password or transcript in code, tests, logs, commits or chat.
+
+## 6. Integrations
+
+### 6.1 Google (owner account praxisjbs@gmail.com)
+
+- **Cloud project**: `jbs-praxis-hq` ("JBS Praxis HQ", organisation praxisjbs-org), created 31 Oct 2026. APIs on: **Google Calendar API, Google Meet API, Google Docs API**. Leave the other projects in that account alone.
+- **OAuth consent**: app "JBS Praxis HQ", audience **External**, support and contact email praxisjbs@gmail.com, published **In production** (in Testing, Google expires refresh tokens after 7 days). Unverified is fine for our own account; the owner clicks through Google's "unverified app" notice once when connecting.
+- **Scopes** (all "sensitive", none "restricted"): `openid`, `email`, `https://www.googleapis.com/auth/calendar.events`, `https://www.googleapis.com/auth/calendar.freebusy`, `https://www.googleapis.com/auth/meetings.space.readonly`, `https://www.googleapis.com/auth/documents.readonly`. Do not add Gmail or Drive scopes (restricted: they need a paid security review).
+- **OAuth client**: web application "HQ (hq.jbspraxis.com)", redirect URI `https://hq.jbspraxis.com/integrations/google/callback` (PR 1 must serve exactly this path). The client ID and secret are entered by the owner in **System › Integrations** (stored encrypted); `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in `.env` are read only as a fallback. Google shows a new client secret only once: if it was not kept, use *Add secret* on the client.
+- **Connecting**: System › Integrations › *Connect Google* (access type offline, `prompt=consent`). HQ stores the refresh token encrypted, shows the connected email and scopes, and alerts in System health when a call fails with `invalid_grant` (reconnect needed).
+- **Creating a meeting**: Calendar `events.insert` on `primary` with `conferenceDataVersion=1`, `sendUpdates=all`, `conferenceData.createRequest` (`hangoutsMeet`, a fresh `requestId`), attendees, time zone `Africa/Lagos` (WAT; Douala is the same offset). Reschedule `events.patch`, cancel `events.delete`, both `sendUpdates=all`. Store `google_event_id`, `meet_link`, `meet_code`.
+- **Collecting transcripts** (`meetings:collect-transcripts`, every 5 minutes): for meetings that ended at least 20 minutes ago without a transcript, try in order, then retry every 10 minutes until 6 hours after the end, then mark *Not found* and notify the lead to upload or paste it:
+  1. **Meet API**: `conferenceRecords.list` filtered by `space.meeting_code`, then `transcripts.list` and `transcripts.entries.list` (speaker and time per line; names from `participants`).
+  2. **Calendar attachments**: `events.get` → the Google Docs attached by Gemini (notes, and the transcript tab) → Docs `documents.get` with `includeTabsContent=true`.
+  3. **Upload or paste** (`.txt`, `.vtt`, or text) on the meeting.
+  Which route works for this account is confirmed by PR 2 on a real test meeting and written in section 12.
+- **Free/busy** for portal booking: `freeBusy.query` on praxisjbs@gmail.com's calendar and the chosen staff, within the working hours already kept in `calendar_availability`. Staff who want their busy times respected share free/busy with praxisjbs@gmail.com; otherwise only the company calendar and working hours count.
+- **In the meeting**: Meet's transcript and Gemini notes must be on (the owner already does this; turn it on by default in Meet settings where the plan allows).
+
+### 6.2 Claude (Anthropic API)
+
+- **Console**: platform.claude.com, organisation **JBS Praxis**, signed in as praxisjbs@gmail.com. The owner adds credits, sets a **monthly spend limit**, creates a workspace **HQ** and an API key in it, and enters the key in **System › Integrations** (stored encrypted; `ANTHROPIC_API_KEY` in `.env` only as a fallback).
+- **Models**: `claude-sonnet-5-5` ($2 per million input tokens, $10 per million output; cache reads $0.20) for the documents that win or lose work: **questionnaire, proposal, SOW, project draft**. `claude-haiku-5-5` ($0.10 / $0.50 for prompts under 100,000 tokens) for the short, high-volume jobs: **meeting notes, client minutes, "what changed" between versions**. One hour of talk is about 12,000 tokens: notes for it cost well under a cent on Haiku; a proposal draft over three meetings and the answers about $0.20 on Sonnet; a whole opportunity about $0.50–1.
+- **Keeping the cost down** (the owner starts with $5): (1) **prompt caching**: the company brief, then the opportunity context, sit at the start of every request with cache breakpoints, so drafts, redrafts and the SOW reread them at a tenth of the price; keep anything that changes (dates, the lead's instructions) after the last breakpoint; (2) **effort per purpose** (`low` for minutes, `medium` for notes and the questionnaire, `high` only for proposal, SOW and project draft); (3) **one draft per click**: no automatic redrafts or retries of a whole document; regenerating one section or one question sends only that part; (4) **later documents read the notes, not every transcript twice**: the proposal reads full transcripts once; the SOW and project draft read the approved proposal, the answers and the meeting notes, plus full transcripts only when the lead ticks *Include full transcripts*; (5) **the budget cap** in System › Integrations (start at $5 a month) stops AI jobs with a clear message before the Console's own limit is hit, and System › Integrations shows the month's spend per purpose from `ai_runs`.
+- **SDK**: the official PHP SDK, `composer require anthropic-ai/sdk` (PR 1). Named arguments are camelCase (`maxTokens`, `outputConfig`). Read the SDK's README before writing the provider; do not guess method names.
+- **Every request**: adaptive thinking (`thinking: {type: 'adaptive'}`); model and effort per purpose in `config/ai.php` (above); **structured output** (`outputConfig.format` with a JSON schema) for every document, so HQ never parses free text; **streaming** for long documents; no `temperature` (Sonnet 5.5 rejects it); on Sonnet, the server-side fallback (`fallbacks: 'default'` with beta `server-side-fallback-2026-07-01`) so a request its safety checks decline is retried on another model (Haiku has no server-side fallback: show the decline); handle `stop_reason: refusal` and `max_tokens`. The company brief goes first in the system prompt with prompt caching, then the opportunity context.
+- **Gemini** stays configured as today (`services.gemini`) for the website chat, Mail AI and the cost calculator.
+
+## 7. Tables (all created by PR 1)
+
+All ids are UUID strings like the rest of HQ; every table has `created_by`, `updated_by`, timestamps and soft deletes where the existing tables do.
+
+- `opportunities`: `organization_id`, `title`, `stage` (`discovery`, `questionnaire`, `proposal`, `proposal_sent`, `proposal_approved`, `sow`, `sow_sent`, `won`, `lost`, `on_hold`), `lead_user_id`, `language` (`en`|`fr`), `source` (`website_booking`|`manual`|`backfill`), `project_id` (set when created), `lost_reason`, `closed_at`.
+- `meetings`: `opportunity_id`, `organization_id`, `kind` (`client`|`internal`), `title`, `agenda`, `starts_at`, `ends_at`, `time_zone`, `status` (`requested`, `scheduled`, `held`, `cancelled`), `appointment_id` (website booking it came from), `google_event_id`, `meet_link`, `meet_code`, `transcript_status` (`waiting`, `collecting`, `ready`, `not_found`, `manual`), `transcript_next_try_at`, `transcript_tries`.
+- `meeting_attendees`: `meeting_id`, `user_id` (staff, nullable), `client_user_id` (nullable), `email`, `name`, `role` (`staff`|`client`|`guest`), `response` (from Google).
+- `meeting_transcripts`: `meeting_id`, `source` (`meet_api`|`calendar_doc`|`upload`|`paste`), `google_doc_id`, `language`, `text` (long text), `entries` (JSON lines: speaker, time, text), `notes` (AI internal notes, JSON), `minutes` (client minutes, text), `minutes_sent_at`, `collected_at`.
+- `questionnaires`: `opportunity_id`, `question_count`, `focus`, `status` (`drafting`, `open`, `complete`), `ai_run_id`, `completed_by`, `completed_at`.
+- `questionnaire_questions`: `questionnaire_id`, `position`, `question`, `why_it_matters`, `options` (JSON, ≥3), `recommended_option`, `recommendation_reason`, `answer_option` (nullable), `answer_text`, `answered_by`, `answered_at`, `origin` (`ai`|`lead`).
+- `proposals` (existing): add `opportunity_id`, `version`, `previous_version_id`, `sections` (JSON), `signing_mode` (`legacy`|`approve`), `approved_by`, `approved_at`, `sent_at`, `client_approved_name`, `client_approved_title`, `client_approved_email`, `client_approved_at`, `changes_summary`.
+- `proposal_comments`: `proposal_id`, `section_key`, `author_type` (`client`|`staff`), `author_name`, `author_email`, `body`, `resolved_by`, `resolved_at`.
+- `statements_of_work`: `opportunity_id`, `proposal_id`, `version`, `previous_version_id`, `sections` (JSON), `status` (`draft`, `awaiting_approval`, `sent`, `changes_requested`, `signed`, `superseded`), `token_hash`, OTP and signature fields as on `proposals` (client and HQ), `signed_at`, `deposit_invoice_id`.
+- `project_drafts`: `opportunity_id`, `sow_id`, `payload` (JSON: project, phases, milestones, sprints, tasks, roles), `status` (`drafting`, `ready`, `created`), `ai_run_id`, `created_project_id`.
+- `ai_runs`: `purpose`, `provider`, `model`, `subject_type`, `subject_id`, `status` (`queued`, `running`, `done`, `failed`), `progress`, `input_tokens`, `output_tokens`, `cost_usd`, `output` (JSON), `error`, `started_at`, `finished_at`, `requested_by`.
+- `integration_settings`: `key` (`google.client_id`, `google.client_secret`, `google.refresh_token`, `google.account_email`, `google.scopes`, `anthropic.api_key`, `ai.monthly_budget_usd`), `value` (encrypted with `Crypt` for secrets), `updated_by`.
+- `projects` (existing): add `opportunity_id`.
+- **Backfill** (in PR 1's migration, idempotent): one opportunity per organisation that has proposals, projects or appointments, `source = backfill`, stage from the data (a project or an Authorized/Converted proposal → `won`; a proposal → `proposal_sent`; else `discovery`), lead from the proposal's or appointment's creator, and those records linked to it. Past appointments with a link become `meetings` (`transcript_status = manual`).
+
+## 8. Contracts (PR 1 provides; PRs 2–5 call)
+
+### 8.1 Access (`App\Support\Opportunities\OpportunityAccess`)
+
+Permissions seeded by PR 1 and granted to existing roles as the owner's roles already imply: `opportunities.view`, `opportunities.create`, `opportunities.manage` (edit, meetings, questionnaire, drafts), `opportunities.approve` (owner), `opportunities.transcripts` (read full transcripts), `integrations.manage` (owner). Methods: `canView`, `canManage`, `canApprove` (has `opportunities.approve` **or** is the opportunity's lead), `canReadTranscripts`. Every action that changes an opportunity writes `system_audit_logs`.
+
+### 8.2 Google (`App\Support\Google\GoogleWorkspace`)
+
+`isConnected()`, `accountEmail()`, `createMeeting(MeetingRequest): CalendarEvent` (event id, Meet link, Meet code), `updateMeeting(eventId, MeetingRequest)`, `cancelMeeting(eventId)`, `freeBusy(array $emails, from, to): array`, `conferenceTranscript(meetCode, startedAfter, endedBefore): ?Transcript`, `eventAttachmentText(eventId): ?Transcript`. Token refresh is internal. Errors throw `GoogleUnavailable` (not connected, revoked, quota) with a message fit for a toast.
+
+### 8.3 AI (`App\Support\Ai\Ai`)
+
+`Ai::queue(string $purpose, Model|array $subject, array $input): AiRun` dispatches a job; the screen polls `AiRun` (`status`, `progress`) and reads `output` (validated against the purpose's schema). `Ai::now(...)` runs short purposes synchronously. Purposes, models, effort, schemas and price table in `config/ai.php`: `meeting_notes`, `client_minutes`, `questionnaire`, `proposal`, `proposal_changes`, `sow`, `project_draft`. Over the monthly budget (`ai.monthly_budget_usd`), jobs stop with a clear message and System health alerts. The queue runs from the scheduler: `queue:work --stop-when-empty --max-time=50 --tries=2` every minute, without overlapping.
+
+### 8.4 Context (`App\Support\Opportunities\OpportunityContext`, `App\Support\Ai\CompanyBrief`)
+
+`OpportunityContext::for($opportunity, include: [...])` returns the text the AI reads: organisation profile and COPQ, every meeting in date order (kind, attendees, transcript, notes), questionnaire questions and answers, the approved proposal and SOW when they exist. `CompanyBrief::text()` is the one copy of who JBS Praxis is, the voice rules and the approved proof (moved out of `LiveConsultation`); never name a client, never invent a figure, never guarantee an outcome (`docs/BRAND.md`).
+
+### 8.5 Events
+
+`MeetingScheduled`, `MeetingEnded` (scheduled job at `ends_at`), `TranscriptCollected`, `QuestionnaireCompleted`, `ProposalSent`, `ProposalApprovedByClient`, `ProposalChangesRequested`, `SowSigned`, `ProjectCreatedFromOpportunity`. The lead gets a bell notification (and so a phone push) for transcripts, client comments, approvals and signatures.
+
+## 9. Rules for every PR
+
+- **Voice and language**: sentence case, British English, `docs/BRAND.md`; every string in `lang/en` and `lang/fr`; emails through `BrandedMail` in the recipient's language (`docs/MAIL.md` and the email system notes).
+- **Security**: permissions on every screen and action; `#[Locked]` on server-set Livewire state; portal pages by signed, expiring token links (as `ProposalGateway`); clients never see internal meetings, transcripts or notes; secrets only in `integration_settings` (encrypted).
+- **Privacy**: transcripts are personal data under Nigeria's NDPA and Cameroon's data protection law. Each client invite carries the transcription notice; transcripts of lost opportunities are kept until the owner sets a retention period (open decision, section 12).
+- **PDF (PR 4)**: HQ has no PDF library. Pick a pure-PHP one that installs without `intl`, `fileinfo`, `gd` or `imagick` on the live PHP, or render with the browser's print and say so in section 12 before building on it.
+- **Legacy**: proposals created before PR 4 keep `signing_mode = legacy` and today's gateway until they close. Nothing already signed changes.
+
+## 10. Testing
+
+- **Fakes** (PR 1): `Tests\Support\Google\FakeGoogle::install()` (records created events, returns Meet links, scripted free/busy, scripted transcripts per route, failures: `revoked`, `quota`, `not_found`); `Tests\Support\Ai\FakeAi::install()->respond('proposal', [...])` (schema-checked output, token counts, `refusal` and `max_tokens` cases). No test calls Google or Anthropic.
+- **Feature tests** on MySQL (CI has the service): permissions per role, the backfill on a copy of today's shapes, meeting creation and invites (Google + branded email), the transcript collector's retry and *Not found* path, questionnaire rules (count, ≥3 options, one recommended), proposal versions and approval rules (owner or lead), portal comment/approve/changes, SOW signing with OTP, deposit invoice, project creation from the draft, EN and FR.
+- **Look at it**: your local server in the built-in browser, desktop and 375 px.
+
+## 11. Deployed
+
+Nothing yet.
+
+## 12. Changes to contracts, PR notes and requests
+
+- 31 Oct 2026: runbook written. Google side done: project `jbs-praxis-hq` (billing account linked; these APIs are free), Calendar, Meet and Docs APIs enabled, consent screen "JBS Praxis HQ" (External, home page and privacy policy on jbspraxis.com, authorised domain jbspraxis.com, the six scopes of section 6.1, **In production**, unverified), OAuth client "HQ (hq.jbspraxis.com)" created; the owner keeps its downloaded JSON until PR 1's Integrations screen exists.
+- 31 Oct 2026: owner starts the Claude account with $5 of credit; Haiku for notes, minutes and change summaries, Sonnet for the four documents; HQ budget cap starts at $5 a month.
+- Open owner decision: retention period for transcripts of lost opportunities.
