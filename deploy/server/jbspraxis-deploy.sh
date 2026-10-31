@@ -5,17 +5,19 @@
 #   1. diffs the live commit (~/deploy/LIVE) against the new one,
 #   2. refuses to touch a live file that someone changed by hand since the last deploy (conflict),
 #   3. backs up every file it replaces or removes (~/deploy/backups/<time>_<sha>/), then copies the new files,
-#   4. runs composer (only if a composer.lock changed) and migrations (only if one was added or changed),
+#   4. builds new packages (only if a composer.lock changed) in a staging folder before any live change, and
+#      swaps that vendor folder in next to the file copy; runs migrations (only if one was added or changed),
 #      clears the caches, and checks HQ, the portal and the site answer 200,
-#   5. on any failure restores the backup and logs an error in HQ (System health emails it).
+#   5. on any failure restores the backup (and the old vendor folder) and logs an error in HQ (System health emails it).
 # Pause:  touch ~/deploy/PAUSED      Dry run:  DRY=1 ~/deploy/jbspraxis-deploy.sh
 # A failed release is not retried; the next release (a new push to main) is.
+# Test: deploy/server/tests/deploy-test.sh runs this against a throwaway home with stubs (DEPLOY_HOME, DEPLOY_PHP).
 set -uo pipefail
 
-H=/home/smartqaq
+H=${DEPLOY_HOME:-/home/smartqaq}
 REPO=$H/repositories/jbspraxis
 STATE=$H/deploy
-PHP=/usr/local/bin/ea-php83
+PHP=${DEPLOY_PHP:-/usr/local/bin/ea-php83}
 DRY=${DRY:-0}
 STAMP=$(date +%Y%m%d-%H%M%S)
 mkdir -p "$STATE/logs" "$STATE/backups"
@@ -110,27 +112,52 @@ if [ "${#CONFLICTS[@]}" -gt 0 ]; then
   alert "release ${NEW:0:7} stopped before any change: ${#CONFLICTS[@]} live file(s) were changed outside the pipeline (first: ${CONFLICTS[0]}). Commit those changes to the repository, then push again. Log: ~/deploy/logs."
   exit 1
 fi
-if [ "$DRY" = 1 ]; then for p in "${PLAN[@]}"; do echo "  $p"; done; exit 0; fi
-
-# Apply, with a backup of everything replaced or removed and a list of what was added
-mkdir -p "$BK"; : > "$BK/added.txt"
-CORE=0; SITE=0; MIGRATE=0; COMPOSER_CORE=0; COMPOSER_SITE=0
+# The apps whose packages change (their composer.lock is in the plan)
+declare -a STAGED=()
 for p in "${PLAN[@]}"; do
-  IFS='|' read -r op path d <<< "$p"
-  case "$path" in praxis_core/*|public_html_PRAXIS/*) CORE=1 ;; praxis_site/*) SITE=1 ;; esac
-  case "$path" in praxis_core/database/migrations/*) MIGRATE=1 ;; esac
-  [ "$path" = praxis_core/composer.lock ] && COMPOSER_CORE=1
-  [ "$path" = praxis_site/composer.lock ] && COMPOSER_SITE=1
-  if [ "$op" != A ]; then mkdir -p "$BK/files$(dirname "$d")" && cp -p "$d" "$BK/files$d"; fi
-  if [ "$op" = D ]; then rm -f "$d"; continue; fi
-  mkdir -p "$(dirname "$d")"
-  git show "$NEW:$path" > "$d.deploy-tmp" && mv -f "$d.deploy-tmp" "$d"
-  [ "$op" = A ] && echo "$d" >> "$BK/added.txt"
+  case "$p" in *"|praxis_core/composer.lock|"*) STAGED+=(praxis_core) ;; *"|praxis_site/composer.lock|"*) STAGED+=(praxis_site) ;; esac
 done
-log "applied ${#PLAN[@]} file(s); backup $BK"
+if [ "$DRY" = 1 ]; then
+  for p in "${PLAN[@]}"; do echo "  $p"; done
+  for app in "${STAGED[@]}"; do echo "  composer install for $app in $STATE/stage/$app, then its vendor folder is swapped in"; done
+  exit 0
+fi
 
+# Composer never runs in the live app. In place (release 570aa23, 31 Oct 2026) the old autoloader went on
+# loading packages Composer was removing, and every HQ page answered 500 for about a minute. So the new vendor
+# folder is built under ~/deploy/stage/<app>, from the release's own files and a copy of the live vendor (only
+# the difference is downloaded), while the live release keeps serving. Composer's scripts are skipped there
+# (the app can't boot in the stage); package discovery runs in the live app after the swap.
+STAGE="$STATE/stage"
+stage_vendor() {
+  local dir="$STAGE/$1"
+  rm -rf "$dir" && mkdir -p "$STAGE" || return 1
+  git archive "$NEW" "$1" | tar -x -C "$STAGE" || return 1
+  if [ -d "$H/$1/vendor" ]; then cp -a "$H/$1/vendor" "$dir/vendor" || return 1; fi
+  (cd "$dir" && $PHP "$H/composer.phar" install --no-dev --optimize-autoloader --no-interaction --no-progress --no-scripts \
+    --ignore-platform-req=ext-fileinfo --ignore-platform-req=ext-intl >> "$LOG" 2>&1)
+}
+for app in "${STAGED[@]}"; do
+  log "composer install for $app in $STAGE/$app (nothing live has changed)"
+  if ! stage_vendor "$app"; then
+    rm -rf "$STAGE"; echo "$NEW" > "$STATE/FAILED"
+    alert "release ${NEW:0:7} stopped before any change: composer install for $app failed in the staging folder. Log: ~/deploy/logs."
+    exit 1
+  fi
+done
+
+mkdir -p "$BK"; : > "$BK/added.txt"
+declare -a SWAPPED=()
 rollback() {
   log "ROLLBACK: $1"
+  # The old vendor folder goes back first (it waited in the backup), then the files
+  for app in "${SWAPPED[@]}"; do
+    rm -rf "$BK/vendor-$app-failed"
+    mv "$H/$app/vendor" "$BK/vendor-$app-failed" && mv "$BK/vendor-$app" "$H/$app/vendor"
+    rm -f "$H/$app/bootstrap/cache/packages.php" "$H/$app/bootstrap/cache/services.php"
+    rm -rf "$BK/vendor-$app-failed"
+  done
+  rm -rf "$STAGE"
   while read -r f; do [ -n "$f" ] && rm -f "$f"; done < "$BK/added.txt"
   (cd "$BK/files" 2>/dev/null && find . -type f | while read -r f; do mkdir -p "$(dirname "/${f#./}")"; cp -p "$f" "/${f#./}"; done)
   (cd "$H/praxis_core" && $PHP artisan optimize:clear >/dev/null 2>&1)
@@ -141,10 +168,38 @@ rollback() {
   exit 1
 }
 
-composer_install() { (cd "$H/$1" && $PHP "$H/composer.phar" install --no-dev --optimize-autoloader --no-interaction --no-progress \
-  --ignore-platform-req=ext-fileinfo --ignore-platform-req=ext-intl >> "$LOG" 2>&1); }
-[ "$COMPOSER_CORE" = 1 ] && { composer_install praxis_core || rollback "composer install (HQ) failed"; }
-[ "$COMPOSER_SITE" = 1 ] && { composer_install praxis_site || rollback "composer install (site) failed"; }
+# Apply, with a backup of everything replaced or removed and a list of what was added
+CORE=0; SITE=0; MIGRATE=0
+for p in "${PLAN[@]}"; do
+  IFS='|' read -r op path d <<< "$p"
+  case "$path" in praxis_core/*|public_html_PRAXIS/*) CORE=1 ;; praxis_site/*) SITE=1 ;; esac
+  case "$path" in praxis_core/database/migrations/*) MIGRATE=1 ;; esac
+  if [ "$op" != A ]; then mkdir -p "$BK/files$(dirname "$d")" && cp -p "$d" "$BK/files$d"; fi
+  if [ "$op" = D ]; then rm -f "$d"; continue; fi
+  mkdir -p "$(dirname "$d")"
+  git show "$NEW:$path" > "$d.deploy-tmp" && mv -f "$d.deploy-tmp" "$d"
+  [ "$op" = A ] && echo "$d" >> "$BK/added.txt"
+done
+log "applied ${#PLAN[@]} file(s); backup $BK"
+
+# The staged vendor folder goes live with two renames (same disk, so instant); the old one waits in the backup
+# until the health checks pass. Laravel's package caches describe the old folder: removed, they are rebuilt.
+swap_vendor() {
+  local live="$H/$1/vendor"
+  if [ -d "$live" ]; then mv "$live" "$BK/vendor-$1" || return 1; fi
+  if ! mv "$STAGE/$1/vendor" "$live"; then
+    [ -d "$BK/vendor-$1" ] && mv "$BK/vendor-$1" "$live"
+    return 1
+  fi
+  SWAPPED+=("$1")
+  rm -f "$H/$1/bootstrap/cache/packages.php" "$H/$1/bootstrap/cache/services.php"
+}
+for app in "${STAGED[@]}"; do
+  swap_vendor "$app" || rollback "the new vendor folder for $app could not be moved in"
+  (cd "$H/$app" && $PHP artisan package:discover --ansi >> "$LOG" 2>&1) || rollback "package discovery ($app) failed"
+done
+rm -rf "$STAGE"
+
 if [ "$MIGRATE" = 1 ]; then
   (cd "$H/praxis_core" && $PHP artisan migrate --force >> "$LOG" 2>&1) || rollback "migrations failed (check the database by hand)"
 fi
@@ -157,7 +212,9 @@ for u in https://hq.jbspraxis.com/login https://portal.jbspraxis.com/login https
   ok "$u" || rollback "$u did not answer 200 after the deploy"
 done
 
+# Healthy: the old vendor folders are no longer needed (they are the size of the app's packages)
+for app in "${SWAPPED[@]}"; do rm -rf "$BK/vendor-$app"; done
 echo "$NEW" > "$STATE/LIVE"; rm -f "$STATE/FAILED"
 printf '{"live":"%s","previous":"%s","deployed_at":"%s","files":%d,"backup":"%s"}\n' "$NEW" "$OLD" "$(date -Is)" "${#PLAN[@]}" "$BK" > "$STATE/status.json"
-log "LIVE ${NEW:0:7}: ${#PLAN[@]} file(s), migrations=$MIGRATE, composer core/site=$COMPOSER_CORE/$COMPOSER_SITE"
+log "LIVE ${NEW:0:7}: ${#PLAN[@]} file(s), migrations=$MIGRATE, new packages: ${STAGED[*]:-none}"
 exit 0
