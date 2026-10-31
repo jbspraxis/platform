@@ -35,6 +35,21 @@ OLD=$(cat "$STATE/LIVE" 2>/dev/null || true)
 [ "$NEW" = "$(cat "$STATE/FAILED" 2>/dev/null)" ] && [ "$DRY" != 1 ] && exit 0
 git cat-file -e "$OLD^{commit}" 2>/dev/null || { log "live commit $OLD not in the server clone"; exit 1; }
 
+# The deployer updates itself from the release before deploying it, so fixes to this script ship through the
+# pipeline too. The new version must pass a syntax check; it then runs once in place of this one.
+SELF="$STATE/jbspraxis-deploy.sh"
+if [ "$DRY" != 1 ] && [ -z "${DEPLOYER_UPDATED:-}" ] && git cat-file -e "$NEW:deploy/server/jbspraxis-deploy.sh" 2>/dev/null; then
+  git show "$NEW:deploy/server/jbspraxis-deploy.sh" > "$SELF.new"
+  if cmp -s "$SELF.new" "$SELF"; then rm -f "$SELF.new"
+  elif bash -n "$SELF.new" 2>>"$LOG"; then
+    chmod 700 "$SELF.new" && mv -f "$SELF.new" "$SELF" && log "deployer updated from release ${NEW:0:7}"
+    exec 9>&-
+    DEPLOYER_UPDATED=1 exec "$SELF"
+  else
+    rm -f "$SELF.new"; log "the deployer in release ${NEW:0:7} has a syntax error: kept the current one"
+  fi
+fi
+
 # Repository path -> live path ('' = not deployed)
 dest() {
   case "$1" in
@@ -51,6 +66,9 @@ dest() {
 is_build() { case "$1" in praxis_core/public/build/*|praxis_site/public/build/*) return 0 ;; esac; return 1; }
 # The blob id of a live file, also with CRLF line ends removed (files uploaded by hand from Windows)
 live_ids() { git hash-object -- "$1" 2>/dev/null; tr -d '\r' < "$1" | git hash-object --stdin 2>/dev/null; }
+# Whether a blob id is among them. Compared in memory: piping into `grep -q` under pipefail fails at random
+# (grep stops reading after the first match and the writer dies of SIGPIPE), which flagged unchanged files.
+has_id() { [[ $'\n'"$1"$'\n' == *$'\n'"$2"$'\n'* ]]; }
 
 BK="$STATE/backups/${STAMP}_${NEW:0:7}"
 CHANGES=$(git diff --name-status --no-renames "$OLD" "$NEW")
@@ -60,17 +78,20 @@ while IFS=$'\t' read -r st path; do
   d=$(dest "$path"); [ -n "$d" ] || continue
   if [ "$st" = D ]; then
     [ -e "$d" ] || continue
+    # Old built files stay: pages already open in a browser (or cached) still ask for them
+    is_build "$path" && continue
     want=$(git rev-parse "$OLD:$path")
-    live_ids "$d" | grep -qx "$want" && PLAN+=("D|$path|$d") || CONFLICTS+=("$path (changed by hand before its removal)")
+    if has_id "$(live_ids "$d")" "$want"; then PLAN+=("D|$path|$d")
+    else CONFLICTS+=("$path (changed by hand before its removal)"); fi
     continue
   fi
   new_id=$(git rev-parse "$NEW:$path")
   if [ -e "$d" ]; then
     ids=$(live_ids "$d")
-    if echo "$ids" | grep -qx "$new_id"; then continue; fi                        # already live
+    if has_id "$ids" "$new_id"; then continue; fi                                  # already live
     if is_build "$path"; then PLAN+=("R|$path|$d"); continue; fi
     old_id=$(git rev-parse -q --verify "$OLD:$path" 2>/dev/null || true)
-    if [ -n "$old_id" ] && echo "$ids" | grep -qx "$old_id"; then PLAN+=("R|$path|$d")
+    if [ -n "$old_id" ] && has_id "$ids" "$old_id"; then PLAN+=("R|$path|$d")
     else CONFLICTS+=("$path (live differs from the last deploy)"); fi
   else
     PLAN+=("A|$path|$d")
