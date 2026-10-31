@@ -130,7 +130,7 @@ return [
         'replaces' => 'praxis-ai-the-assistant-that-works-inside-your-erp',
         'category' => 'The Server Room',
         'title' => 'Praxis AI: an assistant that works inside your system, not beside it',
-        'executive_summary' => 'Praxis AI is the assistant built into the systems we deliver. It reads data, drafts documents and starts routine tasks, but only within the permissions of the person asking. Account, card, tax and phone numbers are removed before any text leaves, and it keeps no copy of your database.',
+        'executive_summary' => 'In the client systems we build, Praxis AI reads data, drafts documents and starts routine tasks, but only within the permissions of the person asking. Account, card, tax and phone numbers are removed before any text leaves, and it keeps no copy of your database.',
         'problem_statement' => [
             'Many AI features added to business software fail one of the tests below. Organisations tend to find out after the fact.',
             '**Where does the data go?** A member of staff asks the assistant to summarise a customer’s history. The tool collects the full record, recent invoices, payment disputes and the account number, and sends them to a model provider in another country. Nobody in the organisation knows it happened, and there is no record of it. The provider’s terms may allow it to keep that text for a period.',
@@ -147,6 +147,7 @@ return [
             '**5. The assistant has tools, not a copy of your data.** It works through a list of named actions, each with its own permission. To answer a question, it runs one action as the person asking, returns the answer and keeps no copy of the data. There is no copy of your books in someone else’s cloud.',
             '**6. Everything is logged.** Questions sent to the model, actions taken, refusals and results are all recorded. If an auditor asks what the assistant did for a given person on a given day, there is an answer.',
             '**7. The model can run where you need it.** For banks, public bodies and health organisations that cannot send text abroad, the same design can use a model hosted on their own servers or by a local provider. The code stays the same; only the address of the model changes.',
+            'The Praxis AI assistant on jbspraxis.com is different: it answers only from our public pages and sees no client data, and our privacy policy explains where its questions go.',
         ],
         'final_roi' => 'Teams can trust the assistant with real work, such as drafting quotations, opening files and chasing payments, because it can never do more than the person asking and everything it does is logged.',
     ],
