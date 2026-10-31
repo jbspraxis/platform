@@ -3,6 +3,9 @@
 namespace App\Livewire\ClientOs;
 
 use App\Support\Access;
+use App\Support\SignIn\Passkeys;
+use App\Support\SignIn\SignIn;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Illuminate\Support\Facades\App;
@@ -17,6 +20,8 @@ use Illuminate\Support\Str;
 class LoginMatrix extends Component
 {
     use \App\Livewire\Concerns\ThrottlesLogins;
+    // A passkey or the PIN instead of the password (docs/SIGN_IN.md)
+    use \App\Livewire\Concerns\SignsInWithPasskeyOrPin;
     use PortalLanguage;
 
     public $viewState = 'login'; // login, forgot_password, redline_sos, redline_success
@@ -58,6 +63,8 @@ class LoginMatrix extends Component
     {
         $this->viewState = $state;
         $this->authMessage = '';
+        $this->usePin = false;
+        $this->pin = '';
     }
 
     // --- 1. AUTHENTICATION ENGINE ---
@@ -78,14 +85,44 @@ class LoginMatrix extends Component
 
         // Client accounts only (client_users). Leads have no password, so they cannot sign in.
         if (Auth::guard('client')->attempt(['email' => $this->email, 'password' => $this->password, 'status' => 'Active'])) {
-            $this->clearLoginAttempts('client');
-            Auth::guard('client')->user()->forceFill(['last_login_at' => now()])->save();
-            session()->regenerate();
-            return redirect()->route('client.dashboard');
+            return $this->openSession(Auth::guard('client')->user(), 'password');
         } else {
             $this->recordFailedLogin('client');
             $this->addError('email', __('portal.login.failed'));
         }
+    }
+
+    protected function signInGuard(): string
+    {
+        return SignIn::CLIENT;
+    }
+
+    protected function signInErrorField(): string
+    {
+        return 'email';
+    }
+
+    /** A passkey or the PIN proved who this is: the same session as after the password */
+    protected function finishSignIn(Authenticatable $account, string $via)
+    {
+        Auth::guard('client')->login($account);
+
+        return $this->openSession($account, $via);
+    }
+
+    private function openSession($client, string $via)
+    {
+        $this->clearLoginAttempts('client');
+        $client->forceFill(['last_login_at' => now()])->save();
+        session()->regenerate();
+        SignIn::markFresh();
+        // A password sign-in by someone with no passkey yet: offer one (the card on the dashboard)
+        session(['sign_in.offer_passkey.client' => $via === 'password' && ! Passkeys::has(SignIn::CLIENT, (string) $client->id)]);
+        if ($via !== 'password') {
+            SignIn::audit(SignIn::CLIENT, (string) $client->id, 'AUTH_LOGIN', $via === 'pin' ? 'Signed in to the Client Portal with their PIN.' : 'Signed in to the Client Portal with a passkey.');
+        }
+
+        return redirect()->route('client.dashboard');
     }
 
     // There is no self-service reset page yet, so a request alerts HQ, who re-send

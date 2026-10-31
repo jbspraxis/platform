@@ -16,6 +16,8 @@
 @include('pwa.head', ['pwaApp' => $app])
 {{-- Views may call lucide.createIcons() while the page is still loading; the bundle (deferred) replaces this stub --}}
 <script>window.lucide = window.lucide || { createIcons: function () {} };</script>
+{{-- Passkeys on HQ and the Client Portal (docs/SIGN_IN.md) --}}
+@include('partials.passkey-script')
 @vite(['resources/css/app.css', 'resources/js/app.js'])
 @livewireStyles
 @stack('styles')

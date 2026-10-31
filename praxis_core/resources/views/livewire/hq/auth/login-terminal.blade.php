@@ -4,7 +4,7 @@
         <h1 class="page-title">Sign in to JBS Praxis HQ</h1>
         <p class="page-subtitle" style="margin-bottom: 24px;">For JBS Praxis staff. Clients sign in to the <a href="{{ route('client.login') }}" class="text-deep-teal underline">Client Portal</a>.</p>
 
-        <form wire:submit="authenticate" class="flex flex-col gap-4">
+        <form wire:submit="{{ $usePin ? 'signInWithPin' : 'authenticate' }}" class="flex flex-col gap-4">
             @error('auth')
                 <div class="alert alert-danger" role="alert">
                     <i data-lucide="circle-alert"></i>
@@ -28,20 +28,38 @@
                 @error('email') <span class="field-error">{{ $message }}</span> @enderror
             </div>
 
-            <div class="field">
-                <div class="flex items-center justify-between gap-3">
-                    <label for="password" class="label">Password</label>
-                    <button type="button" wire:click.prevent="toggleView('recovery')" class="btn btn-ghost btn-sm">Forgot your password?</button>
+            @if ($usePin)
+                <div class="field">
+                    <label for="pin" class="label">{{ __('sign_in.login.pin_label') }}</label>
+                    <input type="password" id="pin" wire:model="pin" class="input" inputmode="numeric" maxlength="4" autocomplete="off" required
+                           style="max-width: 160px; letter-spacing: 0.5em;" autofocus
+                           @error('pin') aria-invalid="true" aria-describedby="pin-error" @else aria-describedby="pin-help" @enderror>
+                    @error('pin') <span class="field-error" id="pin-error">{{ $message }}</span> @else <span class="help" id="pin-help">{{ __('sign_in.login.pin_help') }}</span> @enderror
                 </div>
-                <input type="password" id="password" wire:model="password" class="input" required autocomplete="current-password">
-                @error('password') <span class="field-error">{{ $message }}</span> @enderror
-            </div>
 
-            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px;" wire:loading.attr="disabled" wire:target="authenticate">
-                <span wire:loading.remove wire:target="authenticate">Sign in</span>
-                <span wire:loading wire:target="authenticate">Signing in…</span>
-            </button>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px;" wire:loading.attr="disabled" wire:target="signInWithPin">
+                    <span wire:loading.remove wire:target="signInWithPin">{{ __('sign_in.login.pin_submit') }}</span>
+                    <span wire:loading wire:target="signInWithPin">{{ __('sign_in.login.pin_submitting') }}</span>
+                </button>
+            @else
+                <div class="field">
+                    <div class="flex items-center justify-between gap-3">
+                        <label for="password" class="label">Password</label>
+                        <button type="button" wire:click.prevent="toggleView('recovery')" class="btn btn-ghost btn-sm">Forgot your password?</button>
+                    </div>
+                    <input type="password" id="password" wire:model="password" class="input" required autocomplete="current-password">
+                    @error('password') <span class="field-error">{{ $message }}</span> @enderror
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px;" wire:loading.attr="disabled" wire:target="authenticate">
+                    <span wire:loading.remove wire:target="authenticate">Sign in</span>
+                    <span wire:loading wire:target="authenticate">Signing in…</span>
+                </button>
+            @endif
         </form>
+
+        {{-- A passkey or the PIN instead of the password (docs/SIGN_IN.md) --}}
+        @include('livewire.sign-in.alternatives')
     @else
         <h1 class="page-title">Reset your password</h1>
         <p class="page-subtitle" style="margin-bottom: 24px;">Enter the email address you use to sign in to HQ.</p>

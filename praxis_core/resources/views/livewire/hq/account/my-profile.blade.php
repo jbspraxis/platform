@@ -25,7 +25,7 @@
     <div class="page-header">
         <div>
             <h1 class="page-title">My profile</h1>
-            <p class="page-subtitle">Your details in HQ, your phone numbers and your password.</p>
+            <p class="page-subtitle">Your details in HQ, your phone numbers and how you sign in.</p>
         </div>
     </div>
 
@@ -162,6 +162,13 @@
                     <button type="submit" class="btn btn-primary" wire:loading.attr="disabled" wire:target="changePassword"><i data-lucide="key-round"></i> Change password</button>
                 </div>
             </form>
+        </section>
+
+        {{-- Passkeys and the PIN (docs/SIGN_IN.md) --}}
+        <section class="card" aria-labelledby="mp-sign-in">
+            <h2 id="mp-sign-in" class="mp-section-title">Sign-in</h2>
+            <p class="help mp-section-help">Sign in with your fingerprint, face or a PIN instead of your password.</p>
+            <livewire:account.sign-in-methods guard="web" />
         </section>
 
         <section class="card" aria-labelledby="mp-notify">

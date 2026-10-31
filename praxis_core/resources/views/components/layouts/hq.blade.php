@@ -310,6 +310,10 @@
         </header>
 
         <main class="workspace" id="content">
+            {{-- After a password sign-in with no passkey yet: offer one (docs/SIGN_IN.md) --}}
+            @if (\App\Livewire\Account\PasskeyOffer::due('web'))
+                <livewire:account.passkey-offer guard="web" />
+            @endif
             {{ $slot }}
         </main>
     </div>
