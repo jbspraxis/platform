@@ -2,6 +2,10 @@
 
 namespace App\Livewire\Hq\Auth;
 
+use App\Http\Middleware\HqStaff;
+use App\Support\SignIn\Passkeys;
+use App\Support\SignIn\SignIn;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Validate;
@@ -13,6 +17,8 @@ use Illuminate\Support\Str;
 class LoginTerminal extends Component
 {
     use \App\Livewire\Concerns\ThrottlesLogins;
+    // A passkey or the PIN instead of the password (docs/SIGN_IN.md)
+    use \App\Livewire\Concerns\SignsInWithPasskeyOrPin;
 
     // --- AUTH STATE ---
     #[Validate('required|email')]
@@ -33,6 +39,8 @@ class LoginTerminal extends Component
         $this->resetErrorBag();
         $this->recoveryMessage = '';
         $this->password = ''; // Purge password field for security
+        $this->pin = '';
+        $this->usePin = false;
     }
 
     /**
@@ -68,27 +76,64 @@ class LoginTerminal extends Component
             }
             // ==========================================
 
-            // HQ CLEARANCE VERIFIED - Proceed with session
-            session()->regenerate();
-            
-            // 2. Update Last Login Timestamp
-            $user->update(['last_login_at' => now()]);
-
-            // 3. Log the system action (Forensic Audit)
-            DB::table('system_audit_logs')->insert([
-                'user_id' => $user->id,
-                'action' => 'AUTH_LOGIN',
-                'ip_address' => request()->ip(),
-                'created_at' => now(),
-            ]);
-
-            // 4. Route to the Command Overview (dashboard.view) or the personal workspace
-            return redirect()->route($user->can('dashboard.view') ? 'hq.dash.admin' : 'hq.dash.workspace');
+            return $this->openSession($user, 'password');
         }
 
         // Brute force is handled by the rate limit above (5 tries per email and IP per 15 minutes)
         $this->recordFailedLogin('hq');
         $this->addError('auth', "That email address and password don’t match. Check them and try again.");
+    }
+
+    protected function signInGuard(): string
+    {
+        return SignIn::HQ;
+    }
+
+    protected function signInErrorField(): string
+    {
+        return 'auth';
+    }
+
+    /** A passkey or the PIN proved who this is: the same checks and session as after the password */
+    protected function finishSignIn(Authenticatable $account, string $via)
+    {
+        if (! HqStaff::allows($account)) {
+            $this->addError('auth', __('sign_in.passkey.inactive'));
+
+            return null;
+        }
+        Auth::guard('web')->login($account);
+
+        return $this->openSession($account, $via);
+    }
+
+    /** After any way in: a new session id, the sign-in recorded, then the right first screen */
+    private function openSession($user, string $via)
+    {
+        $this->clearLoginAttempts('hq');
+        session()->regenerate();
+        SignIn::markFresh();
+        // A password sign-in by someone with no passkey yet: offer one (the card in the HQ layout)
+        session(['sign_in.offer_passkey.web' => $via === 'password' && ! Passkeys::has(SignIn::HQ, (string) $user->id)]);
+
+        // Update Last Login Timestamp
+        $user->update(['last_login_at' => now()]);
+
+        // Log the system action (Forensic Audit)
+        DB::table('system_audit_logs')->insert([
+            'user_id' => $user->id,
+            'action' => 'AUTH_LOGIN',
+            'description' => match ($via) {
+                'passkey' => 'Signed in with a passkey.',
+                'pin' => 'Signed in with their PIN.',
+                default => 'Signed in with their password.',
+            },
+            'ip_address' => request()->ip(),
+            'created_at' => now(),
+        ]);
+
+        // Route to the Command Overview (dashboard.view) or the personal workspace
+        return redirect()->route($user->can('dashboard.view') ? 'hq.dash.admin' : 'hq.dash.workspace');
     }
 
     /**

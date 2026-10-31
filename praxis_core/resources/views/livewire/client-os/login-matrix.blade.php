@@ -12,7 +12,7 @@
                 <h1 class="page-title">{{ __('portal.login.title') }}</h1>
                 <p class="page-subtitle mb-6">{{ __('portal.login.intro') }}</p>
 
-                <form wire:submit.prevent="authenticate" class="flex flex-col gap-4">
+                <form wire:submit.prevent="{{ $usePin ? 'signInWithPin' : 'authenticate' }}" class="flex flex-col gap-4">
                     @error('email')
                         <div class="alert alert-danger" role="alert">
                             <i data-lucide="circle-alert"></i>
@@ -25,26 +25,43 @@
                         <input type="email" id="client-email" wire:model="email" class="input" required autocomplete="username" autofocus>
                     </div>
 
-                    <div class="field" x-data="{ show: false }">
-                        <div class="flex items-center justify-between gap-3">
-                            <label for="client-password" class="label">{{ __('portal.login.password') }}</label>
-                            <button type="button" wire:click="switchState('forgot_password')" class="btn btn-ghost btn-sm">{{ __('portal.login.forgot') }}</button>
+                    @if ($usePin)
+                        <div class="field">
+                            <label for="client-pin" class="label">{{ __('sign_in.login.pin_label') }}</label>
+                            <input type="password" id="client-pin" wire:model="pin" class="input max-w-[160px] tracking-[0.5em]" inputmode="numeric" maxlength="4" autocomplete="off" required autofocus
+                                   @error('pin') aria-invalid="true" aria-describedby="client-pin-error" @else aria-describedby="client-pin-help" @enderror>
+                            @error('pin') <span class="field-error" id="client-pin-error" role="alert">{{ $message }}</span> @else <span class="help" id="client-pin-help">{{ __('sign_in.login.pin_help') }}</span> @enderror
                         </div>
-                        <div class="relative">
-                            <input type="password" :type="show ? 'text' : 'password'" id="client-password" wire:model="password" class="input pr-11" required autocomplete="current-password">
-                            <button type="button" @click="show = !show" :aria-pressed="show.toString()" aria-label="{{ __('portal.login.show_password') }}" title="{{ __('portal.login.show_password') }}"
-                                    class="absolute inset-y-0 right-0 flex w-11 cursor-pointer items-center justify-center border-0 bg-transparent text-muted hover:text-ink">
-                                <i data-lucide="eye" class="h-4 w-4"></i>
-                            </button>
-                        </div>
-                        @error('password') <span class="field-error" role="alert">{{ $message }}</span> @enderror
-                    </div>
 
-                    <button type="submit" class="btn btn-primary mt-2 w-full whitespace-normal" wire:loading.attr="disabled" wire:target="authenticate">
-                        <span wire:loading.remove wire:target="authenticate">{{ __('portal.login.submit') }}</span>
-                        <span wire:loading wire:target="authenticate">{{ __('portal.login.submitting') }}</span>
-                    </button>
+                        <button type="submit" class="btn btn-primary mt-2 w-full whitespace-normal" wire:loading.attr="disabled" wire:target="signInWithPin">
+                            <span wire:loading.remove wire:target="signInWithPin">{{ __('sign_in.login.pin_submit') }}</span>
+                            <span wire:loading wire:target="signInWithPin">{{ __('sign_in.login.pin_submitting') }}</span>
+                        </button>
+                    @else
+                        <div class="field" x-data="{ show: false }">
+                            <div class="flex items-center justify-between gap-3">
+                                <label for="client-password" class="label">{{ __('portal.login.password') }}</label>
+                                <button type="button" wire:click="switchState('forgot_password')" class="btn btn-ghost btn-sm">{{ __('portal.login.forgot') }}</button>
+                            </div>
+                            <div class="relative">
+                                <input type="password" :type="show ? 'text' : 'password'" id="client-password" wire:model="password" class="input pr-11" required autocomplete="current-password">
+                                <button type="button" @click="show = !show" :aria-pressed="show.toString()" aria-label="{{ __('portal.login.show_password') }}" title="{{ __('portal.login.show_password') }}"
+                                        class="absolute inset-y-0 right-0 flex w-11 cursor-pointer items-center justify-center border-0 bg-transparent text-muted hover:text-ink">
+                                    <i data-lucide="eye" class="h-4 w-4"></i>
+                                </button>
+                            </div>
+                            @error('password') <span class="field-error" role="alert">{{ $message }}</span> @enderror
+                        </div>
+
+                        <button type="submit" class="btn btn-primary mt-2 w-full whitespace-normal" wire:loading.attr="disabled" wire:target="authenticate">
+                            <span wire:loading.remove wire:target="authenticate">{{ __('portal.login.submit') }}</span>
+                            <span wire:loading wire:target="authenticate">{{ __('portal.login.submitting') }}</span>
+                        </button>
+                    @endif
                 </form>
+
+                {{-- A passkey or the PIN instead of the password (docs/SIGN_IN.md) --}}
+                @include('livewire.sign-in.alternatives')
 
             @elseif ($viewState === 'forgot_password')
                 <h1 class="page-title">{{ __('portal.login.reset_title') }}</h1>

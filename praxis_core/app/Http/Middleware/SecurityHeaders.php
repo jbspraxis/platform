@@ -23,7 +23,7 @@ class SecurityHeaders
         $headers->set('X-Content-Type-Options', 'nosniff');
         $headers->set('X-Frame-Options', 'SAMEORIGIN');
         $headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
-        $headers->set('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=(self), payment=()');
+        $headers->set('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=(self), payment=(), publickey-credentials-create=(self), publickey-credentials-get=(self)');
         $headers->set('Content-Security-Policy', "frame-ancestors 'self'");
         if ($request->isSecure()) {
             $headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');

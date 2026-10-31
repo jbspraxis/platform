@@ -43,9 +43,9 @@
 @endphp
 <div class="portal-app"
      style="--portal-accent: {{ $clientColour ?? 'var(--color-deep-teal)' }}; --portal-indicator: {{ $clientColour ?? 'var(--color-bright-teal)' }};"
-     x-data="{ showGuide: false, showQaOffcanvas: false, mobileMenuOpen: false }"
+     x-data="{ showGuide: false, showSignIn: false, showQaOffcanvas: false, mobileMenuOpen: false }"
      @open-qa.window="showQaOffcanvas = true" @close-qa.window="showQaOffcanvas = false"
-     @keydown.escape.window="showGuide = false; showQaOffcanvas = false">
+     @keydown.escape.window="showGuide = false; showSignIn = false; showQaOffcanvas = false">
 
     <style>
         /* Portal-only layout on top of the shared shell (resources/css/app.css); brand tokens only */
@@ -128,6 +128,10 @@
                 <button type="button" class="rail-link" @click="showGuide = true; mobileMenuOpen = false">
                     <i data-lucide="help-circle"></i> <span>{{ __('portal.nav.guide') }}</span>
                 </button>
+                {{-- Passkeys and the PIN (docs/SIGN_IN.md) --}}
+                <button type="button" class="rail-link" @click="showSignIn = true; mobileMenuOpen = false">
+                    <i data-lucide="fingerprint"></i> <span>{{ __('sign_in.settings.open') }}</span>
+                </button>
                 @if ($can['support.create'] ?? false)
                     <button type="button" class="rail-link" wire:click="$set('showRedlineModal', true)" @click="mobileMenuOpen = false">
                         <i data-lucide="triangle-alert"></i> <span>{{ __('portal.nav.urgent') }}</span>
@@ -177,6 +181,11 @@
                 @endif
 
                 <x-flash :keys="['lockout_error']" class="mb-4" />
+
+                {{-- After a password sign-in with no passkey yet: offer one (docs/SIGN_IN.md) --}}
+                @if (\App\Livewire\Account\PasskeyOffer::due('client'))
+                    <livewire:account.passkey-offer guard="client" />
+                @endif
 
                 <div class="page-header">
                     <div class="min-w-0">
@@ -926,6 +935,19 @@
                 </div>
             @endif
         @endif
+    </aside>
+
+    {{-- ===== Sign-in settings: passkeys and the PIN (docs/SIGN_IN.md) ===== --}}
+    <div class="portal-overlay" :class="{ 'is-open': showSignIn }" @click="showSignIn = false"></div>
+    <aside class="portal-drawer" :class="{ 'is-open': showSignIn }" role="dialog" aria-modal="true" aria-labelledby="sign-in-title">
+        <div class="portal-drawer-head">
+            <h2 id="sign-in-title" class="m-0 flex items-center gap-2 text-lg font-semibold text-ink"><i data-lucide="fingerprint" class="h-5 w-5 text-deep-teal"></i> {{ __('sign_in.settings.title') }}</h2>
+            <button type="button" @click="showSignIn = false" class="btn btn-ghost btn-sm" aria-label="{{ __('portal.common.close') }}" title="{{ __('portal.common.close') }}"><i data-lucide="x"></i></button>
+        </div>
+        <div class="portal-drawer-body text-sm text-slate">
+            <p class="m-0 mb-6">{{ __('sign_in.settings.intro') }}</p>
+            <livewire:account.sign-in-methods guard="client" />
+        </div>
     </aside>
 
     {{-- ===== How the portal works ===== --}}
