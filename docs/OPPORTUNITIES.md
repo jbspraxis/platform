@@ -159,7 +159,8 @@ Permissions seeded by PR 1 and granted to existing roles as the owner's roles al
 
 ## 11. Deployed
 
-Nothing yet.
+- **PR 1 foundation**: merged 31 Oct 2026 (PR #6, merge 570aa23).
+- **PR 3 questionnaire**: merged 31 Oct 2026, 23:00 UTC, with the owner's go-ahead (PR #8, merge 52098c6, release 3d59267). Migration `2026_11_01_830000` adds `questionnaire_questions.ai_run_id`. Live had no opportunities yet, so the tab itself was not opened on live; the owner's first check is the list in the PR.
 
 ## 12. Changes to contracts, PR notes and requests
 
