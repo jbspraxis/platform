@@ -17,7 +17,7 @@ class MeetingTranscript extends Model
     use HasUuids, SoftDeletes;
 
     protected $fillable = [
-        'meeting_id', 'source', 'google_doc_id', 'language', 'text', 'entries', 'notes', 'minutes', 'minutes_sent_at', 'collected_at',
+        'meeting_id', 'source', 'google_doc_id', 'language', 'text', 'entries', 'notes', 'minutes', 'minutes_sent_at', 'minutes_unsent', 'collected_at',
         'created_by', 'updated_by', 'deleted_by',
     ];
 
@@ -25,6 +25,7 @@ class MeetingTranscript extends Model
         'entries' => 'array',
         'notes' => 'array',
         'minutes_sent_at' => 'datetime',
+        'minutes_unsent' => 'array',
         'collected_at' => 'datetime',
     ];
 

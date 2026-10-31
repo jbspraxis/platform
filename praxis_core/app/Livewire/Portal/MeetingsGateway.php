@@ -109,7 +109,7 @@ class MeetingsGateway extends Component
     public function book(): void
     {
         $o = $this->opportunity();
-        if (! $this->open($o) || ! $this->person()) {
+        if (! $this->open($o) || ! $this->person() || ! $this->known($o)) {
             return;
         }
         $start = collect($this->free ?? [])->flatten()->contains($this->chosen) ? CarbonImmutable::parse($this->chosen)->utc() : null;
@@ -144,11 +144,13 @@ class MeetingsGateway extends Component
     public function propose(): void
     {
         $o = $this->opportunity();
-        if (! $this->open($o) || ! $this->person()) {
+        if (! $this->open($o) || ! $this->person() || ! $this->known($o)) {
             return;
         }
         $times = [];
-        foreach ($this->proposed as $i => $p) {
+        // The page offers PROPOSED rows; anything a crafted request adds beyond them is ignored
+        foreach (array_slice((array) $this->proposed, 0, self::PROPOSED, true) as $i => $p) {
+            $p = is_array($p) ? $p : [];
             $date = trim((string) ($p['date'] ?? ''));
             $time = trim((string) ($p['time'] ?? ''));
             if ($date === '' && $time === '') {
@@ -203,6 +205,24 @@ class MeetingsGateway extends Component
         ]);
 
         return true;
+    }
+
+    /**
+     * Only someone HQ already knows for this work books: a contact of the organisation, or someone invited to one of
+     * its meetings. A forwarded link can't make HQ send JBS Praxis invitations to any address it is given.
+     */
+    private function known(Opportunity $o): bool
+    {
+        $email = mb_strtolower($this->email);
+        $known = DB::table('client_users')->where('organization_id', $o->organization_id)->whereNull('deleted_at')->whereRaw('LOWER(email) = ?', [$email])->exists()
+            || DB::table('meeting_attendees')->join('meetings', 'meetings.id', '=', 'meeting_attendees.meeting_id')
+                ->where('meetings.opportunity_id', $o->id)->whereIn('meeting_attendees.role', ['client', 'guest'])
+                ->whereRaw('LOWER(meeting_attendees.email) = ?', [$email])->exists();
+        if (! $known) {
+            $this->addError('email', __('meetings.portal.errors.unknown_email'));
+        }
+
+        return $known;
     }
 
     /** The opportunity takes follow-ups (not lost), and this link hasn't booked too many today */

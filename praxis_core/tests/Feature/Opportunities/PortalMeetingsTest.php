@@ -94,10 +94,17 @@ class PortalMeetingsTest extends TestCase
     public function test_the_client_proposes_times_and_the_lead_schedules_one_in_hq(): void
     {
         [$o, $lead] = $this->opportunity();
+        // Bola, from a partner firm, was a guest at an earlier meeting of this work: HQ knows the address
+        $earlier = Meeting::create(['opportunity_id' => $o->id, 'organization_id' => $o->organization_id, 'kind' => 'client', 'title' => 'Earlier',
+            'starts_at' => now()->subWeek(), 'ends_at' => now()->subWeek()->addHour(), 'status' => 'cancelled', 'transcript_status' => 'manual', 'created_by' => $lead->id]);
+        $earlier->attendees()->create(['email' => 'bola@partner.test', 'name' => 'Bola Guest', 'role' => 'guest']);
 
         Livewire::test(MeetingsGateway::class, ['opportunity' => $o->id])
             ->call('choose', 'propose')
             ->call('propose')->assertHasErrors(['name', 'email'])
+            // An address HQ doesn't know for this work can't book: a forwarded link can't invite anyone
+            ->set('name', 'Someone')->set('email', 'someone@elsewhere.test')
+            ->call('propose')->assertHasErrors(['email'])->assertSee('Use the email address our invitation was sent to.')
             ->set('name', 'Bola Guest')->set('email', 'bola@partner.test')
             ->call('propose')->assertHasErrors(['proposed'])
             ->set('proposed.0.date', '2026-11-05')->set('proposed.0.time', '13:30')
@@ -107,7 +114,7 @@ class PortalMeetingsTest extends TestCase
             ->call('propose')->assertHasNoErrors()->assertSee('We’ll confirm one of your times by email.')
             ->assertSee('Waiting for us to confirm a time');
 
-        $m = Meeting::with('attendees')->sole();
+        $m = Meeting::with('attendees')->where('status', '!=', 'cancelled')->sole();
         $this->assertSame(['requested', null], [$m->status, $m->google_event_id]);
         $this->assertStringContainsString('Tuesday 10 November 2026, 15:00 WAT', $m->agenda);
         $this->assertSame(['bola@partner.test' => 'guest', mb_strtolower($lead->email) => 'staff'], $m->attendees->pluck('role', 'email')->sortKeys()->all());
@@ -115,8 +122,13 @@ class PortalMeetingsTest extends TestCase
         Mail::assertNothingSent();
         $this->assertSame('The client proposed meeting times', DB::table('notifications')->where('user_id', $lead->id)->value('title'));
 
-        // The lead schedules it at the client's time: now it is in Google, with the invitations
+        // The request stays on top in HQ even once its first proposed time has gone by
         $this->actingAs($lead);
+        $this->travelTo(CarbonImmutable::parse('2026-11-11 12:00', 'Africa/Lagos'));
+        $this->assertContains($m->id, Livewire::test(MeetingsTab::class, ['opportunityId' => $o->id])->viewData('upcoming')->pluck('id')->all());
+        $this->travelTo(CarbonImmutable::parse('2026-11-05 12:00:00', 'UTC'));
+
+        // The lead schedules it at the client's time: now it is in Google, with the invitations
         Livewire::test(MeetingsTab::class, ['opportunityId' => $o->id])
             ->call('openEdit', $m->id)->assertSet('date', '2026-11-10')->assertSet('time', '15:00')->assertSee('Schedule the requested meeting')
             ->call('save')->assertHasNoErrors()->assertSee('Meeting scheduled');
@@ -163,6 +175,23 @@ class PortalMeetingsTest extends TestCase
         Livewire::test(MeetingsGateway::class, ['opportunity' => $o->id])->set('mode', 'propose')
             ->set('name', 'Ada')->set('email', 'ada@kribi.test')->set('proposed.0.date', '2026-11-10')->set('proposed.0.time', '10:00')
             ->call('propose')->assertSee('This piece of work is closed');
+    }
+
+    public function test_only_the_three_proposed_times_the_page_offers_are_read(): void
+    {
+        [$o] = $this->opportunity();
+        // A crafted request adds a fourth (and fifth) row: they are ignored
+        $page = Livewire::test(MeetingsGateway::class, ['opportunity' => $o->id])->call('choose', 'propose')
+            ->set('name', 'Ada')->set('email', 'ada@kribi.test');
+        foreach (['2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-16'] as $i => $day) {
+            $page->set("proposed.{$i}", ['date' => $day, 'time' => '10:00']);
+        }
+        $page->set('proposed.5', 'not a row')->call('propose')->assertHasNoErrors();
+
+        $agenda = Meeting::sole()->agenda;
+        $this->assertStringContainsString('Thursday 12 November 2026, 10:00 WAT', $agenda);
+        $this->assertStringNotContainsString('13 November', $agenda);
+        $this->assertStringNotContainsString('16 November', $agenda);
     }
 
     public function test_french(): void

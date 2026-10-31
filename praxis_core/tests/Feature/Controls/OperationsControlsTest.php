@@ -124,6 +124,29 @@ class OperationsControlsTest extends TestCase
         $switch->call('switchSprint', (string) Str::uuid())->assertForbidden();
     }
 
+    public function test_the_sprint_menu_shows_that_sprints_tasks(): void
+    {
+        // Two sprints: the board opens on the active one, and the menu moves it to the other at once
+        [$active, $done] = [(string) Str::uuid(), (string) Str::uuid()];
+        foreach ([[$active, 'M4', 'Active', '2026-11-02'], [$done, 'M2', 'Completed', '2026-10-20']] as [$id, $title, $status, $start]) {
+            $this->insertRow('sprints', ['id' => $id, 'project_id' => $this->ownProject, 'title' => $title, 'start_date' => $start, 'end_date' => $start, 'status' => $status]);
+        }
+        DB::table('tasks')->where('id', $this->ownTask)->update(['sprint_id' => $active]);
+        DB::table('tasks')->where('id', $this->openTask)->update(['sprint_id' => $done]);
+        $ids = fn ($board) => collect($board->get('tasks'))->flatten(1)->pluck('id')->all();
+
+        $this->actingAs($this->engineer);
+        $board = Livewire::test(SprintBoard::class, ['id' => $this->ownProject])->assertSet('activeSprintId', $active);
+        $this->assertSame([$this->ownTask], $ids($board));
+
+        $board->set('activeSprintId', $done);
+        $this->assertSame([$this->openTask], $ids($board));
+
+        // Another project's sprint (or any made-up id) falls back to the active sprint
+        $board->set('activeSprintId', (string) Str::uuid())->assertSet('activeSprintId', $active);
+        $this->assertSame([$this->ownTask], $ids($board));
+    }
+
     public function test_the_qa_hub_lists_and_opens_only_tickets_the_person_may_see(): void
     {
         $this->actingAs($this->engineer);

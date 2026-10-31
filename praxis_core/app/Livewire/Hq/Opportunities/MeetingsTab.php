@@ -22,6 +22,7 @@ use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use LogicException;
 
 /**
  * The opportunity's Meetings tab (docs/OPPORTUNITIES.md section 4, row 2): schedule, change and cancel client and
@@ -410,7 +411,14 @@ class MeetingsTab extends Component
             return;
         }
 
-        $unsent = Transcripts::sendMinutes($t, $this->minutes[$t->id]);
+        try {
+            $unsent = Transcripts::sendMinutes($t, $this->minutes[$t->id]);
+        } catch (LogicException) {
+            // Someone else sent them a moment ago (or a second click got here first)
+            $this->say(__('meetings.errors.minutes_sent'), 'warning');
+
+            return;
+        }
         $sent = $recipients - count($unsent);
         if ($sent === 0) {
             $this->say(__('meetings.done.minutes_failed'), 'error');
@@ -420,6 +428,24 @@ class MeetingsTab extends Component
             $this->say(trans_choice('meetings.done.minutes_sent', $sent, ['count' => $sent]));
         }
         unset($this->minutes[$t->id], $this->minutesSeen[$t->id]);
+    }
+
+    /** Sent minutes that didn't reach everyone: try only the addresses that failed */
+    public function resendMinutes(string $transcriptId): void
+    {
+        $this->authorizeManage();
+        $t = $this->transcript($transcriptId);
+        $tried = count((array) $t->minutes_unsent);
+        if ($t->minutes_sent_at === null || $tried === 0) {
+            return;
+        }
+        $unsent = Transcripts::resendMinutes($t);
+        $sent = $tried - count($unsent);
+        if ($unsent) {
+            $this->say(__('meetings.done.minutes_partly', ['count' => $sent, 'emails' => implode(', ', $unsent)]), 'warning');
+        } else {
+            $this->say(trans_choice('meetings.done.minutes_sent', $sent, ['count' => $sent]));
+        }
     }
 
     private function validMinutes(MeetingTranscript $t): bool
@@ -443,6 +469,8 @@ class MeetingsTab extends Component
     private function draft(string $transcriptId, string $purpose): void
     {
         $this->authorizeManage();
+        // The AI's notes and minutes retell the transcript, so drafting them needs the right to read it
+        abort_unless(OpportunityAccess::canReadTranscripts(Auth::user(), $this->opportunity()), 403);
         $t = $this->transcript($transcriptId);
         $running = Transcripts::latestRuns([$t->id])[$t->id][$purpose] ?? null;
         if ($running && ! $running->isFinished()) {
@@ -578,7 +606,8 @@ class MeetingsTab extends Component
             ->with(['attendees' => fn ($q) => $q->orderByRaw("FIELD(role, 'staff', 'client', 'guest')")->orderBy('name'), 'transcripts'])
             ->orderBy('starts_at')->get();
         $now = now();
-        [$upcoming, $past] = $meetings->partition(fn ($m) => in_array($m->status, ['requested', 'scheduled'], true) && $m->ends_at->greaterThanOrEqualTo($now));
+        // A client's request stays on top until the lead schedules or declines it, even once its first time has passed
+        [$upcoming, $past] = $meetings->partition(fn ($m) => $m->status === 'requested' || ($m->status === 'scheduled' && $m->ends_at->greaterThanOrEqualTo($now)));
         $transcripts = $meetings->flatMap->transcripts;
         $runs = Transcripts::latestRuns($transcripts->pluck('id')->all());
 

@@ -122,6 +122,7 @@ return [
         'question' => "Rédigez la question à laquelle vous voulez répondre.",
         'question_long' => "Raccourcissez la question à 1\u{202F}000\u{00A0}caractères au plus.",
         'answer_long' => "Raccourcissez la réponse à 5\u{202F}000\u{00A0}caractères au plus pour qu’elle soit enregistrée.",
+        'not_saved' => "Non enregistré\u{202F}: cette question est en cours de réécriture, ou le questionnaire est clos. Répondez-y de nouveau une fois la nouvelle version arrivée.",
         'incomplete' => "{1} Il reste 1\u{00A0}question sans réponse.|[2,*] Il reste :count\u{00A0}questions sans réponse.",
         'redrafting' => "Attendez que l’IA ait fini de reformuler, puis marquez-le comme terminé.",
         'empty' => "Ajoutez au moins une question, puis marquez-le comme terminé.",
