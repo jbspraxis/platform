@@ -113,6 +113,14 @@ class LayoutAndSecurityTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/<style\b/i', $html);
     }
 
+    public function test_no_lang_file_holds_a_control_character(): void
+    {
+        // A stray byte (once \x01 where a French : or ? belonged) shows as nothing or a box on the page
+        foreach (glob(lang_path('*/*.php')) as $file) {
+            $this->assertDoesNotMatchRegularExpression('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', file_get_contents($file), $file);
+        }
+    }
+
     public function test_an_unknown_page_is_a_calm_404(): void
     {
         $this->fakeHq();

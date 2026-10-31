@@ -1,7 +1,7 @@
 <?php
 
 // Texte des pages Accueil, Services, Entreprise et Confidentialité (docs/LAUNCH_COPY.md). Règles du français de
-// docs/BRAND.md  guillemets « », espace fine insécable avant     (\u{202F}).
+// docs/BRAND.md : guillemets « », espace fine insécable avant ; : ! ? (\u{202F}).
 return [
 
     'domains' => [
@@ -108,9 +108,9 @@ return [
                 ':company édite ce site et décide de l’usage des données personnelles qu’il collecte. Vous pouvez nous écrire à :email.',
             ]],
             'what' => ['title' => 'Ce que nous collectons', 'body' => [
-                'Ce que vous nous envoyez par les formulaires  messages de contact, demandes d’audit gratuit et de démo, calculateur du coût de la non-qualité, candidatures avec votre CV, articles proposés pour nos analyses, avis sur le site et demandes du guide de la méthode Praxis. Chaque formulaire ne demande que ce dont il a besoin, et les champs facultatifs sont indiqués.',
+                'Ce que vous nous envoyez par les formulaires : messages de contact, demandes d’audit gratuit et de démo, calculateur du coût de la non-qualité, candidatures avec votre CV, articles proposés pour nos analyses, avis sur le site et demandes du guide de la méthode Praxis. Chaque formulaire ne demande que ce dont il a besoin, et les champs facultatifs sont indiqués.',
                 'Les questions que vous posez à Praxis AI, l’assistant du site, et ses réponses. Merci de ne pas lui communiquer de mots de passe ni de données de paiement.',
-                'Les données techniques nécessaires pour protéger les formulaires  votre adresse IP, utilisée pour limiter le nombre de demandes qu’une même connexion peut envoyer, conservée 24 heures au plus.',
+                'Les données techniques nécessaires pour protéger les formulaires : votre adresse IP, utilisée pour limiter le nombre de demandes qu’une même connexion peut envoyer, conservée 24 heures au plus.',
             ]],
             'why' => ['title' => 'Pourquoi nous les utilisons', 'body' => [
                 'Pour vous répondre, réaliser l’audit gratuit et la démo, vous envoyer ce que vous avez demandé (le rapport de coûts, le guide de la méthode Praxis), étudier votre candidature et assurer la sécurité du site et de ses formulaires.',
@@ -131,7 +131,7 @@ return [
                 'Pour exercer ces droits, écrivez à :email. Nous répondons sous quelques jours ouvrés.',
             ]],
             'cookies' => ['title' => 'Cookies', 'body' => [
-                'Le site utilise les cookies nécessaires à son fonctionnement  un cookie de session et un jeton de sécurité pour les formulaires, ainsi qu’un cookie qui retient votre choix dans le bandeau cookies.',
+                'Le site utilise les cookies nécessaires à son fonctionnement : un cookie de session et un jeton de sécurité pour les formulaires, ainsi qu’un cookie qui retient votre choix dans le bandeau cookies.',
                 'Google Analytics, qui nous indique quelles pages sont consultées, ne se charge que si vous choisissez Accepter dans le bandeau. Ses cookies (_ga et _ga_…) sont alors conservés jusqu’à deux ans. Si vous choisissez Refuser, ou si vous ne faites aucun choix, il ne se charge jamais.',
                 'La vidéo de démonstration de la page d’accueil est lue depuis YouTube (youtube-nocookie.com), qui peut enregistrer ses propres cookies. Rien n’est chargé depuis YouTube tant que vous ne choisissez pas Voir la démo de 3 minutes.',
                 'Vous pouvez modifier votre choix à tout moment avec le lien Paramètres des cookies en bas de chaque page.',

@@ -1,7 +1,7 @@
 <?php
 
-// Tout le texte du site en français (mêmes clés que lang/en/site.php). Règles de docs/BRAND.md  vouvoiement,
-// guillemets « », espace fine insécable (U+202F) avant    ?, « Réserver un audit gratuit et une démo ».
+// Tout le texte du site en français (mêmes clés que lang/en/site.php). Règles de docs/BRAND.md : vouvoiement,
+// guillemets « », espace fine insécable (U+202F) avant ; : ! ?, « Réserver un audit gratuit et une démo ».
 // Les clés des listes envoyées à HQ (étapes, sujets, compétences…) restent exactement celles de l'anglais.
 return [
 
@@ -93,7 +93,7 @@ return [
         'check_fields' => 'Certaines informations sont à vérifier. Regardez les champs signalés ci-dessous.',
         'unavailable_title' => 'Cette page n’est pas disponible pour le moment',
         'unavailable_body' => 'Nous n’avons pas pu joindre nos systèmes pour charger cette page. Réessayez dans quelques minutes, ou écrivez-nous à :email.',
-        'unavailable_form' => 'Nous n’avons pas pu envoyer ce formulaire, car nos systèmes n’ont pas répondu. Vos informations sont toujours dans le formulaire  réessayez dans quelques minutes, ou écrivez-nous à :email.',
+        'unavailable_form' => 'Nous n’avons pas pu envoyer ce formulaire, car nos systèmes n’ont pas répondu. Vos informations sont toujours dans le formulaire : réessayez dans quelques minutes, ou écrivez-nous à :email.',
         'too_many' => 'Nous avons reçu plusieurs demandes de votre connexion en peu de temps. Attendez quelques minutes avant de réessayer, ou écrivez-nous à :email.',
         'conflict' => 'Quelque chose a changé pendant que vous remplissiez le formulaire. Vérifiez vos informations et renvoyez-le, ou écrivez-nous à :email.',
         'stale' => 'Nous n’avons pas pu actualiser cette page, vous voyez donc la dernière version enregistrée.',
@@ -124,7 +124,7 @@ return [
             'careers' => ['label' => 'Carrières', 'text' => 'Postulez avec votre CV.'],
             'feedback' => ['label' => 'Votre avis sur le site', 'text' => 'Dites-nous ce qu’il faut corriger ou améliorer.'],
         ],
-        'chat_hint' => 'Praxis AI, l’assistant du site, est sur chaque page  choisissez Demander à Praxis AI en bas de l’écran.',
+        'chat_hint' => 'Praxis AI, l’assistant du site, est sur chaque page : choisissez Demander à Praxis AI en bas de l’écran.',
     ],
 
     'contact' => [
@@ -140,8 +140,8 @@ return [
         'city' => 'Ville',
         'language' => 'Langue de notre réponse',
         'languages' => ['English (EN)' => 'English', 'Français (FR)' => 'Français'],
-        'message' => 'Que souhaitez-vous accomplir ',
-        'message_hint' => 'Quelques phrases suffisent  par exemple, le processus qui prend trop de temps ou le rapport que vous n’arrivez pas à obtenir.',
+        'message' => 'Que souhaitez-vous accomplir ?',
+        'message_hint' => 'Quelques phrases suffisent : par exemple, le processus qui prend trop de temps ou le rapport que vous n’arrivez pas à obtenir.',
         'diagnostic' => 'Votre organisation',
         'diagnostic_hint' => 'Ces questions sont facultatives. Si vous y répondez, indiquez au moins le stade et le problème principal. Vos réponses nous aident à préparer l’échange.',
         'stage' => 'Stade de votre organisation',
@@ -174,7 +174,7 @@ return [
             'Procedures built into our systems' => 'Procédures intégrées à nos systèmes',
             'Certified or preparing for an audit (ISO, ESG)' => 'Certifiés ou en préparation d’un audit (ISO, ESG)',
         ],
-        'start_timing' => 'Quand souhaitez-vous commencer ',
+        'start_timing' => 'Quand souhaitez-vous commencer ?',
         'start_timings' => [
             'this_quarter' => 'Ce trimestre',
             'next_quarter' => 'Le trimestre prochain',
@@ -208,7 +208,7 @@ return [
         'phone' => 'Téléphone',
         'phone_hint' => 'p. ex. +237 6 99 00 00 00',
         'enterprise_name' => 'Nom de l’organisation',
-        'focus' => 'Sur quoi souhaitez-vous travailler ',
+        'focus' => 'Sur quoi souhaitez-vous travailler ?',
         'focuses' => [
             'Performance Audit' => 'Audit de performance et conformité',
             'Data Architecture' => 'Revue de l’ingénierie des données',
@@ -223,7 +223,7 @@ return [
         'already_booked' => 'Vous avez déjà une demande d’audit gratuit et de démo chez nous. Nous la confirmerons par e-mail. Pour la modifier, écrivez-nous à :email.',
         'when' => ':date, :time (WAT)',
         'sent_title' => 'Nous avons bien reçu votre demande d’audit gratuit et de démo',
-        'sent_time' => 'Créneau demandé  :when.',
+        'sent_time' => 'Créneau demandé : :when.',
         'sent_body' => 'Notre équipe vous confirmera le rendez-vous par e-mail et vous enverra le lien pour vous connecter.',
         'book_another' => 'Réserver un autre créneau',
         'next_title' => 'La suite',
@@ -232,7 +232,7 @@ return [
 
     'calculator' => [
         'title' => 'Calculateur du coût de la non-qualité',
-        'intro' => 'Estimez ce que la non-qualité coûte chaque année à votre organisation  contrôles manuels, erreurs corrigées en interne, et erreurs qui atteignent vos clients ou les personnes que vous servez. Nous vous montrons le rapport et vous en envoyons une copie par e-mail.',
+        'intro' => 'Estimez ce que la non-qualité coûte chaque année à votre organisation : contrôles manuels, erreurs corrigées en interne, et erreurs qui atteignent vos clients ou les personnes que vous servez. Nous vous montrons le rapport et vous en envoyons une copie par e-mail.',
         'about_org' => 'Votre organisation',
         'figures' => 'Vos chiffres',
         'figures_hint' => 'Des chiffres approximatifs suffisent. Laissez un champ vide si vous ne le connaissez pas.',
@@ -294,8 +294,8 @@ return [
         ],
         'estimate_note' => 'Ces chiffres sont des estimations fondées sur les informations fournies et sur des hypothèses courantes pour votre secteur.',
         'sent' => 'Votre rapport est prêt. Nous en avons aussi envoyé une copie à votre adresse e-mail.',
-        'not_emailed' => 'Votre rapport est prêt. Nous n’avons pas pu en envoyer une copie par e-mail  enregistrez cette page.',
-        'share_note' => 'Toute personne disposant de ce lien peut ouvrir le rapport  ne le partagez qu’avec les personnes de votre organisation qui en ont besoin.',
+        'not_emailed' => 'Votre rapport est prêt. Nous n’avons pas pu en envoyer une copie par e-mail : enregistrez cette page.',
+        'share_note' => 'Toute personne disposant de ce lien peut ouvrir le rapport : ne le partagez qu’avec les personnes de votre organisation qui en ont besoin.',
         'next' => 'Étudier ces chiffres avec nous',
         'next_body' => 'Lors d’un audit gratuit et d’une démo, nous regardons d’où vient ce coût dans votre organisation et ce qui le réduirait.',
     ],
@@ -344,7 +344,7 @@ return [
             'solution' => 'Ce qui a été fait',
             'solution_hint' => 'Les changements, dans l’ordre où ils ont été faits.',
             'roi' => 'Le résultat',
-            'roi_hint' => 'Une phrase  par exemple, les heures ou l’argent économisés.',
+            'roi_hint' => 'Une phrase : par exemple, les heures ou l’argent économisés.',
             'send' => 'Envoyer l’article pour relecture',
             'sent_title' => 'Merci. Votre article est en relecture',
             'sent_body' => 'Nous relisons chaque article avant de le publier. Si nous avons des questions, nous vous écrirons.',
@@ -393,7 +393,7 @@ return [
         'praxis_answer_hint' => 'Ce qui n’allait pas, ce que vous avez changé et ce qui s’est passé ensuite. 1 000 caractères au plus.',
         'cv' => 'CV',
         'cv_hint' => 'PDF, DOC ou DOCX, 5 Mo au plus.',
-        'cv_again' => 'Joignez de nouveau votre CV  les fichiers ne sont pas conservés quand un formulaire doit être corrigé.',
+        'cv_again' => 'Joignez de nouveau votre CV : les fichiers ne sont pas conservés quand un formulaire doit être corrigé.',
         'cv_required' => 'Joignez votre CV.',
         'cv_type' => 'Votre CV doit être un fichier PDF, DOC ou DOCX.',
         'cv_size' => 'Votre CV doit faire 5 Mo au plus.',
@@ -417,13 +417,13 @@ return [
             'Unclear wording' => 'Texte peu clair',
             'Idea or suggestion' => 'Idée ou suggestion',
         ],
-        'severity' => 'Quelle gêne cela vous cause-t-il ',
+        'severity' => 'Quelle gêne cela vous cause-t-il ?',
         'severities' => [
             '1' => 'Un peu',
             '2' => 'Beaucoup',
             '3' => 'Je ne peux pas continuer',
         ],
-        'description' => 'Que s’est-il passé ',
+        'description' => 'Que s’est-il passé ?',
         'description_hint' => '10 caractères au moins. Indiquez l’adresse de la page si vous le pouvez.',
         'send' => 'Envoyer mon avis',
         'sent_title' => 'Merci pour votre avis',
@@ -434,7 +434,7 @@ return [
     'chat' => [
         'open' => 'Demander à Praxis AI',
         'title' => 'Praxis AI',
-        'intro' => 'Posez vos questions sur nos services, la méthode Praxis ou l’audit gratuit et la démo. Les réponses peuvent contenir des erreurs  vérifiez les points importants avec notre équipe. Merci de ne pas communiquer de mots de passe ni de données de paiement.',
+        'intro' => 'Posez vos questions sur nos services, la méthode Praxis ou l’audit gratuit et la démo. Les réponses peuvent contenir des erreurs : vérifiez les points importants avec notre équipe. Merci de ne pas communiquer de mots de passe ni de données de paiement.',
         'you' => 'Vous',
         'assistant' => 'Praxis AI',
         'links' => 'Pages utiles',
@@ -449,7 +449,7 @@ return [
 
     'unsubscribe' => [
         'title' => 'Préférences e-mail',
-        'heading' => 'Vous désabonner des e-mails de JBS Praxis ',
+        'heading' => 'Vous désabonner des e-mails de JBS Praxis ?',
         'body' => 'Confirmez ci-dessous et nous cesserons de vous envoyer nos e-mails.',
         'button' => 'Me désabonner',
         'done_heading' => 'Vous êtes désabonné',
