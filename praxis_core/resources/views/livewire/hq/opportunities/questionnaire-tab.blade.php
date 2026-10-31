@@ -68,6 +68,10 @@
         <div wire:poll.3s="check" hidden></div>
     @endif
 
+    {{-- An answer that couldn't be saved (its question is being redrafted, or the questionnaire closed meanwhile) --}}
+    @error('answer')
+        <div class="alert alert-danger" role="alert"><i data-lucide="circle-alert"></i><span>{{ $message }}</span></div>
+    @enderror
     @if ($notice)
         <div class="alert alert-success" role="status"><i data-lucide="circle-check"></i><span>{{ $notice }}</span></div>
     @endif

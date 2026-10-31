@@ -166,16 +166,76 @@ final class Transcripts
     /**
      * Send the minutes, as edited, to everyone invited who isn't staff (branded email, the opportunity's language),
      * and show them in the portal. Returns the addresses it could not send to; nothing counts as sent if none went.
+     * The row is claimed under a lock before any email goes, so a double click or two staff at once send it once.
+     * Addresses that fail are kept (minutes_unsent) for resendMinutes().
      */
     public static function sendMinutes(MeetingTranscript $transcript, string $text): array
     {
-        $meeting = $transcript->meeting()->with('attendees', 'opportunity.organization')->first();
-        if ($meeting->kind !== 'client' || $transcript->minutes_sent_at !== null) {
+        $claimed = DB::transaction(function () use ($transcript, $text) {
+            $locked = MeetingTranscript::whereKey($transcript->id)->lockForUpdate()->first();
+            if (! $locked || $locked->minutes_sent_at !== null || $transcript->meeting->kind !== 'client') {
+                return false;
+            }
+            $locked->forceFill(['minutes' => trim($text), 'minutes_sent_at' => now(), 'minutes_unsent' => null, 'updated_by' => Auth::guard('web')->id()])->save();
+
+            return true;
+        });
+        if (! $claimed) {
             throw new LogicException('Only unsent minutes of a client meeting can be sent');
         }
+        $transcript->refresh();
+        $meeting = $transcript->meeting()->with('attendees', 'opportunity.organization')->first();
         $recipients = $meeting->attendees->whereIn('role', Meetings::EMAILED_ROLES);
-        $transcript->forceFill(['minutes' => trim($text), 'updated_by' => Auth::guard('web')->id()])->save();
 
+        $unsent = self::mailMinutes($transcript, $meeting, $recipients);
+        if (count($unsent) === $recipients->count()) {
+            // Nothing went: not sent, so the lead can try again as it is
+            $transcript->forceFill(['minutes_sent_at' => null])->save();
+
+            return $unsent;
+        }
+        $transcript->forceFill(['minutes_unsent' => $unsent ?: null])->save();
+        OpportunityAccess::log('MINUTES_SENT', sprintf('Sent the minutes of “%s” to %d %s.', $meeting->title, $recipients->count() - count($unsent),
+            $recipients->count() - count($unsent) === 1 ? 'person' : 'people'), 'opportunities', $meeting->opportunity_id, [], ['transcript_id' => $transcript->id]);
+
+        return $unsent;
+    }
+
+    /**
+     * Send sent minutes again, only to the addresses they didn't reach (minutes_unsent), claimed under a lock like
+     * sendMinutes(). Returns the addresses that failed again; an address no longer on the meeting is dropped.
+     */
+    public static function resendMinutes(MeetingTranscript $transcript): array
+    {
+        $emails = DB::transaction(function () use ($transcript) {
+            $locked = MeetingTranscript::whereKey($transcript->id)->lockForUpdate()->first();
+            $emails = $locked && $locked->minutes_sent_at !== null ? array_map('mb_strtolower', (array) $locked->minutes_unsent) : [];
+            if ($emails) {
+                $locked->forceFill(['minutes_unsent' => null, 'updated_by' => Auth::guard('web')->id()])->save();
+            }
+
+            return $emails;
+        });
+        if (! $emails) {
+            return [];
+        }
+        $transcript->refresh();
+        $meeting = $transcript->meeting()->with('attendees', 'opportunity.organization')->first();
+        $recipients = $meeting->attendees->whereIn('role', Meetings::EMAILED_ROLES)->filter(fn ($a) => in_array(mb_strtolower($a->email), $emails, true));
+
+        $unsent = self::mailMinutes($transcript, $meeting, $recipients);
+        $transcript->forceFill(['minutes_unsent' => $unsent ?: null])->save();
+        if (count($unsent) < $recipients->count()) {
+            OpportunityAccess::log('MINUTES_SENT', sprintf('Sent the minutes of “%s” again to %d %s.', $meeting->title, $recipients->count() - count($unsent),
+                $recipients->count() - count($unsent) === 1 ? 'person' : 'people'), 'opportunities', $meeting->opportunity_id, [], ['transcript_id' => $transcript->id]);
+        }
+
+        return $unsent;
+    }
+
+    /** One branded email per recipient; returns the addresses that failed */
+    private static function mailMinutes(MeetingTranscript $transcript, Meeting $meeting, $recipients): array
+    {
         $unsent = [];
         foreach ($recipients as $a) {
             try {
@@ -185,11 +245,6 @@ final class Transcripts
                 Log::warning('Meetings: minutes could not be sent', ['transcript' => $transcript->id, 'error' => $e->getMessage()]);
                 $unsent[] = $a->email;
             }
-        }
-        if (count($unsent) < $recipients->count()) {
-            $transcript->forceFill(['minutes_sent_at' => now()])->save();
-            OpportunityAccess::log('MINUTES_SENT', sprintf('Sent the minutes of “%s” to %d %s.', $meeting->title, $recipients->count() - count($unsent),
-                $recipients->count() - count($unsent) === 1 ? 'person' : 'people'), 'opportunities', $meeting->opportunity_id, [], ['transcript_id' => $transcript->id]);
         }
 
         return $unsent;

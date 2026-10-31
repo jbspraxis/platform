@@ -93,10 +93,25 @@ class SprintBoard extends Component
     public function switchSprint($sprintId)
     {
         $this->activeSprintId = $sprintId;
+        $this->updatedActiveSprintId($sprintId);
+    }
+
+    /**
+     * The Sprint menu (wire:model.live="activeSprintId"): the board follows at once. Only this project's sprints;
+     * anything else falls back to the active one. Without this the menu changed but the tasks stayed on the
+     * sprint chosen when the page opened.
+     */
+    public function updatedActiveSprintId($sprintId): void
+    {
+        $sprints = collect($this->sprints);
+        if (! $sprints->contains(fn ($s) => data_get($s, 'id') === $sprintId)) {
+            $fallback = $sprints->first(fn ($s) => data_get($s, 'status') === 'Active') ?? $sprints->first();
+            $this->activeSprintId = data_get($fallback, 'id');
+        }
         $this->loadBoardData();
     }
 
-    // Triggers every 10 seconds via wire:poll in the UI (and on switchSprint), so access is checked again here too
+    // Runs when the page opens, when the sprint changes and after every move, so access is checked again here too
     public function loadBoardData()
     {
         $this->authoriseBoard();

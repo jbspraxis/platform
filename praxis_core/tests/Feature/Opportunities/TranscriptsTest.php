@@ -13,9 +13,14 @@ use App\Support\Google\Transcript;
 use App\Support\Opportunities\Meetings;
 use App\Support\Opportunities\Transcripts;
 use Carbon\CarbonImmutable;
+use Illuminate\Mail\Events\MessageSending;
+use Illuminate\Mail\MailManager;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
+use LogicException;
+use RuntimeException;
 use Tests\Feature\UsesThrowawayDatabase;
 use Tests\Support\Ai\FakeAi;
 use Tests\Support\Google\FakeGoogle;
@@ -174,6 +179,63 @@ class TranscriptsTest extends TestCase
         // Sent minutes don't change
         $tab->call('sendMinutes', $t->id)->assertSee('already sent');
         Mail::assertSent(MeetingMinutesMail::class, 2);
+    }
+
+    public function test_minutes_go_once_and_an_address_that_failed_can_be_sent_again(): void
+    {
+        [$o, $lead, $m] = $this->meetingThatEnded(minutesAgo: 60);
+        $this->actingAs($lead);
+        $t = Transcripts::fromText($m, 'Ada: hello', 'paste');
+        // A real (array) mailer where Ada's mailbox refuses mail until it is fixed
+        Mail::swap(new MailManager($this->app));
+        $failing = 'ada@client.test';
+        $delivered = [];
+        Event::listen(MessageSending::class, function (MessageSending $e) use (&$failing, &$delivered) {
+            $to = $e->message->getTo()[0]->getAddress();
+            if ($to === $failing) {
+                throw new RuntimeException('Mailbox unavailable');
+            }
+            $delivered[] = $to;
+        });
+
+        $this->assertSame(['ada@client.test'], Transcripts::sendMinutes($t, 'Thank you for today.'));
+        $t->refresh();
+        $this->assertNotNull($t->minutes_sent_at);
+        $this->assertSame(['ada@client.test'], $t->minutes_unsent);
+        $this->assertSame(['guest@partner.test'], $delivered);
+
+        // A second send (a double click, or a colleague at the same moment) sends nothing
+        try {
+            Transcripts::sendMinutes($t, 'Thank you for today.');
+            $this->fail('Minutes were sent twice');
+        } catch (LogicException) {
+        }
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $o->id])->set("minutes.{$t->id}", 'Again')
+            ->call('sendMinutes', $t->id)->assertSee('already sent');
+        $this->assertSame(['guest@partner.test'], $delivered);
+
+        // Send again: only the address that failed
+        $failing = null;
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $o->id])->set('open', $m->id)
+            ->assertSee('Not delivered to ada@client.test.')
+            ->call('resendMinutes', $t->id)->assertSee('Minutes sent to 1 person.')->assertDontSee('Not delivered to');
+        $this->assertSame(['guest@partner.test', 'ada@client.test'], $delivered);
+        $this->assertNull($t->fresh()->minutes_unsent);
+    }
+
+    public function test_drafting_notes_or_minutes_needs_the_right_to_read_the_transcript(): void
+    {
+        [$o, $lead, $m] = $this->meetingThatEnded(minutesAgo: 60);
+        $t = Transcripts::fromText($m, 'Ada: hello', 'paste');
+        // A colleague who manages opportunities but may not read transcripts, and isn't this one's lead
+        DB::table('role_permissions')->where('role_id', DB::table('roles')->where('audience', 'staff')->where('slug', 'sales')->value('id'))
+            ->whereIn('permission_id', DB::table('permissions')->where('module', 'opportunities')->where('action', 'transcripts')->pluck('id'))->delete();
+        $this->actingAs($this->staff('colleague', ['sales']));
+        $runs = AiRun::count();
+
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $o->id])->call('draftNotes', $t->id)->assertForbidden();
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $o->id])->call('draftMinutes', $t->id)->assertForbidden();
+        $this->assertSame($runs, AiRun::count());
     }
 
     public function test_without_a_key_nothing_is_drafted_and_the_lead_can_try_again(): void

@@ -42,6 +42,16 @@
             @if ($t->minutes_sent_at)
                 <div class="mtg-sent">
                     <div class="mtg-status"><i data-lucide="circle-check"></i><span>{{ __('meetings.minutes.sent_on', ['date' => $at($t->minutes_sent_at, $m->time_zone)]) }}</span></div>
+                    @if (filled($t->minutes_unsent))
+                        <div class="mtg-status" role="status"><i data-lucide="circle-alert"></i><span>{{ __('meetings.minutes.unsent', ['emails' => implode(', ', (array) $t->minutes_unsent)]) }}</span></div>
+                        @if ($canManage)
+                            <div class="mtg-buttons" style="margin: 4px 0 12px">
+                                <button type="button" class="btn btn-secondary btn-sm" wire:click="resendMinutes('{{ $t->id }}')" wire:loading.attr="disabled" wire:target="resendMinutes('{{ $t->id }}')">
+                                    <i data-lucide="send"></i> {{ __('meetings.minutes.resend') }}
+                                </button>
+                            </div>
+                        @endif
+                    @endif
                     @foreach (\App\Mail\MeetingMinutesMail::blocks((string) $t->minutes) as $block)
                         @if (isset($block['items']))
                             @if ($block['heading'])<p><strong>{{ $block['heading'] }}</strong></p>@endif

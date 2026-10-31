@@ -121,6 +121,7 @@ return [
         'question' => 'Write the question you want to answer.',
         'question_long' => 'Shorten the question to 1,000 characters or fewer.',
         'answer_long' => 'Shorten the answer to 5,000 characters or fewer, so it can be saved.',
+        'not_saved' => 'Not saved: this question is being redrafted, or the questionnaire is closed. Answer it again once the new version is in.',
         'incomplete' => '{1} 1 question still needs an answer.|[2,*] :count questions still need an answer.',
         'redrafting' => 'Wait for the AI to finish redrafting, then mark it complete.',
         'empty' => 'Add at least one question, then mark it complete.',

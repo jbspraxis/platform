@@ -101,6 +101,8 @@ return [
         'send' => 'Envoyer au client',
         'save' => 'Enregistrer',
         'sent_on' => 'Envoyé au client le :date',
+        'unsent' => 'Non remis à :emails.',
+        'resend' => 'Renvoyer à ces personnes',
         'not_sent' => 'Pas encore envoyé.',
     ],
 
@@ -213,7 +215,7 @@ return [
         'transcript' => 'Transcription ajoutée. L’IA rédige les notes.',
         'minutes_saved' => 'Compte rendu enregistré.',
         'minutes_sent' => '{1} Compte rendu envoyé à :count personne.|[2,*] Compte rendu envoyé à :count personnes.',
-        'minutes_partly' => 'Compte rendu envoyé à :count personne(s), mais pas à :emails : envoyez-le-leur vous-même.',
+        'minutes_partly' => 'Compte rendu envoyé à :count personne(s), mais pas à :emails. Utilisez « Renvoyer à ces personnes » pour réessayer.',
         'minutes_failed' => 'Le compte rendu n’a pas pu être envoyé par e-mail ; il n’est donc pas marqué comme envoyé. Réessayez dans un instant.',
     ],
 
@@ -315,6 +317,7 @@ return [
             'note_long' => 'Raccourcissez votre message à 2 000 caractères au plus.',
             'closed' => 'Ce dossier est clos : aucune réunion ne peut être réservée ici. Répondez à notre dernier e-mail pour nous joindre.',
             'too_many' => 'Plusieurs réunions ont été réservées depuis cette page aujourd’hui. Répondez à notre dernier e-mail et nous organiserons la suivante.',
+            'unknown_email' => 'Indiquez l’adresse e-mail à laquelle nous avons envoyé notre invitation. Pour ajouter un collègue, répondez à notre dernier e-mail.',
         ],
     ],
 ];

@@ -100,6 +100,8 @@ return [
         'send' => 'Send to the client',
         'save' => 'Save',
         'sent_on' => 'Sent to the client on :date',
+        'unsent' => 'Not delivered to :emails.',
+        'resend' => 'Send again to them',
         'not_sent' => 'Not sent yet.',
     ],
 
@@ -212,7 +214,7 @@ return [
         'transcript' => 'Transcript added. The AI is writing the notes.',
         'minutes_saved' => 'Minutes saved.',
         'minutes_sent' => '{1} Minutes sent to :count person.|[2,*] Minutes sent to :count people.',
-        'minutes_partly' => 'Minutes sent to :count, but not to :emails: send them yourself.',
+        'minutes_partly' => 'Minutes sent to :count, but not to :emails. Use Send again to them to retry.',
         'minutes_failed' => 'The minutes couldn’t be emailed, so they weren’t marked as sent. Try again in a moment.',
     ],
 
@@ -314,6 +316,7 @@ return [
             'note_long' => 'Shorten your message to 2,000 characters or fewer.',
             'closed' => 'This piece of work is closed, so meetings can’t be booked here. Reply to our last email to reach us.',
             'too_many' => 'Several meetings were booked from this page today. Reply to our last email and we’ll arrange the next one.',
+            'unknown_email' => 'Use the email address our invitation was sent to. To add a colleague, reply to our last email.',
         ],
     ],
 ];

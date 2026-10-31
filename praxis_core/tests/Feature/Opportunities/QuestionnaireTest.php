@@ -236,8 +236,10 @@ class QuestionnaireTest extends TestCase
         $run = AiRun::where('purpose', 'questionnaire_question')->sole();
         $this->assertSame(['queued', $run->id], [$run->status, $q3->fresh()->ai_run_id]);
 
-        // While it runs, the question can't be answered or redrafted again
-        $tab->set("answers.{$q3->id}.choice", '0')->call('openRedraft', $q3->id)->call('redraft');
+        // While it runs, the question can't be answered (and the lead is told so) or redrafted again
+        $tab->set("answers.{$q3->id}.choice", '0')->assertHasErrors(['answer'])
+            ->assertSee('Not saved: this question is being redrafted');
+        $tab->call('openRedraft', $q3->id)->call('redraft');
         $this->assertFalse($q3->fresh()->isAnswered());
         $this->assertSame(1, AiRun::where('purpose', 'questionnaire_question')->count());
 

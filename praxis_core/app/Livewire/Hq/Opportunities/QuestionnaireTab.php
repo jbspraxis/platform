@@ -124,7 +124,12 @@ class QuestionnaireTab extends Component
             return;
         }
         $choice = (string) ($entry['choice'] ?? '');
-        Questionnaires::answer($question, ctype_digit($choice) ? (int) $choice : null, $text, Auth::user());
+        if (! Questionnaires::answer($question, ctype_digit($choice) ? (int) $choice : null, $text, Auth::user())) {
+            // Being redrafted, or the questionnaire is no longer open: say so, and show what is saved
+            // (at the top of the tab: a question being redrafted shows no answer box to put it under)
+            unset($this->answers[$id]);
+            $this->addError('answer', __('questionnaire.errors.not_saved'));
+        }
     }
 
     public function openRedraft(string $id): void
