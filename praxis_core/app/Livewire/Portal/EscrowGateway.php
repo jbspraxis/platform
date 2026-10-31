@@ -33,7 +33,7 @@ class EscrowGateway extends Component
         // Soft Expiration Logic (Question 8-C)
         $link = DB::table('project_magic_links')->where('token_hash', $token)->first();
         if ($link && now()->greaterThan($link->expires_at)) {
-            session()->flash('warning', 'TOKEN EXPIRED: Prices subject to HQ re-validation.');
+            session()->flash('warning', 'This link has expired, so the prices may change until JBS Praxis confirms them again.');
         }
 
         $this->organization = DB::table('organizations')->where('id', $this->proposal->organization_id)->first();
@@ -58,14 +58,14 @@ class EscrowGateway extends Component
         // Mail::raw("Your JBS Praxis Authorization Code is: $otp", function($msg) { $msg->to('client@email.com')->subject('Signature OTP'); });
 
         $this->showOtpInput = true;
-        session()->flash('success', 'Verification code dispatched to corporate email.');
+        session()->flash('success', 'We sent a signing code to your work email.');
     }
 
     // --- 2. AUTHORIZE & EXECUTE AUTOMATION (Questions 13-A, 14-A, 15-A) ---
     public function authorizeSignature(Request $request)
     {
         if ($this->otpCode !== $this->proposal->auth_otp || now()->greaterThan($this->proposal->otp_expires_at)) {
-            session()->flash('error', 'Invalid or Expired OTP.'); return;
+            session()->flash('error', 'That code isn’t right or has expired. Ask for a new code.'); return;
         }
 
         // IP & VPN Flagging (13-A)

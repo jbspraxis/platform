@@ -4,12 +4,7 @@
     <p class="page-subtitle" style="margin-bottom: 24px;">For the delivery team: JBS Praxis staff and consultants working on a client project.</p>
 
     <form wire:submit.prevent="authenticate" class="flex flex-col gap-4">
-        @if (session()->has('error'))
-            <div class="alert alert-warning" role="alert">
-                <i data-lucide="info"></i>
-                <span>{{ session('error') }}</span>
-            </div>
-        @endif
+        <x-flash :tones="['error' => 'warning']" />
 
         <div class="field">
             <label for="tracker-email" class="label">Email address</label>

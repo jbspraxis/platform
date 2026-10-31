@@ -25,12 +25,7 @@
         @endforeach
     </div>
 
-    @if (session()->has('success'))
-        <div class="alert alert-success" role="status" style="margin-bottom: 16px;"><i data-lucide="check-circle"></i><span>{{ session('success') }}</span></div>
-    @endif
-    @if (session()->has('error'))
-        <div class="alert alert-danger" role="alert" style="margin-bottom: 16px;"><i data-lucide="circle-alert"></i><span>{{ session('error') }}</span></div>
-    @endif
+    <x-flash style="margin-bottom: 16px;" />
 
     @if($activeTab === 'composer')
 
@@ -99,6 +94,16 @@
                 <h2 class="card-title" style="margin-bottom: 16px;">Email</h2>
 
                 <div class="flex flex-col gap-4">
+                    <div class="field">
+                        <label class="label" for="bl-language">Language</label>
+                        <select id="bl-language" wire:model="language" class="select" style="max-width: 240px;">
+                            <option value="en">English</option>
+                            <option value="fr">French</option>
+                        </select>
+                        <span class="help">Write the subject and the email text in this language. The sign-off and the footer follow it, and the assistant writes in it.</span>
+                        @error('language') <span class="field-error">{{ $message }}</span> @enderror
+                    </div>
+
                     <div class="field">
                         <label class="label" for="bl-subject">Subject</label>
                         <input id="bl-subject" type="text" wire:model="subject" class="input" placeholder="e.g. An update for @{{ company_name }}">

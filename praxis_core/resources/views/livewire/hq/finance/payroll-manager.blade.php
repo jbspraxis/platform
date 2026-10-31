@@ -31,9 +31,7 @@
         <button type="button" role="tab" wire:click="setTab('inspector')" class="tab {{ $activeTab === 'inspector' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'inspector' ? 'true' : 'false' }}">Payslips</button>
     </div>
 
-    @if(session()->has('error'))
-        <div class="alert alert-danger mb-6" role="alert"><i data-lucide="circle-alert"></i><span>{{ session('error') }}</span></div>
-    @endif
+    <x-flash class="mb-6" />
 
     @if($activeTab === 'ledger')
 
@@ -173,9 +171,13 @@
                         <button type="button" wire:click="rejectRun('{{ $selectedRunId }}')" class="btn btn-secondary">
                             <i data-lucide="rotate-ccw"></i> Withdraw approval
                         </button>
-                        <button type="button" wire:click="disburseRun('{{ $selectedRunId }}')" class="btn btn-primary">
-                            <i data-lucide="banknote"></i> Mark as paid
-                        </button>
+                        @if($preparedByMe)
+                            <span class="help">You prepared this run, so someone else marks it as paid.</span>
+                        @else
+                            <button type="button" wire:click="disburseRun('{{ $selectedRunId }}')" class="btn btn-primary">
+                                <i data-lucide="banknote"></i> Mark as paid
+                            </button>
+                        @endif
                     @endif
 
                     @if($runDetails['status'] === 'Disbursed')

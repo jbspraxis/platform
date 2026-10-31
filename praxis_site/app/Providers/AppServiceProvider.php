@@ -18,6 +18,12 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // The live web PHP has no fileinfo extension: a stand-in for finfo (App\Support\Polyfill\Finfo, the same as
+        // HQ's) lets the careers CV's "mimes" rule read the file's type
+        if (! extension_loaded('fileinfo')) {
+            require_once app_path('Support/Polyfill/fileinfo.php');
+        }
+
         // One client per request (it remembers whether the last read was served from the saved copy)
         $this->app->scoped(HqApi::class, fn ($app) => new HqApi(
             (array) $app['config']->get('hq_api', []),

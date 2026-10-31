@@ -11,7 +11,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\HtmlString;
 
 /**
- * Every email the site sends (docs/BRAND.md section 13): from system@, replies to the team,
+ * Every email the site sends (docs/BRAND.md section 13): from "JBS Praxis" <system@…>, replies to the team,
  * one branded HTML layout (<x-mail.layout>) and a plain-text part generated from the same view.
  * Wording lives in lang/{en,fr}/emails/*.php; send with ->locale(MailLocale::...) to pick the language.
  */
@@ -38,7 +38,7 @@ abstract class BrandedMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            from: new Address(config('mail.from.address'), config('mail.from.name')),
+            from: new Address(config('mail.from.address'), config('mail.brand.from_name')),
             replyTo: $this->replyToAddresses(),
             subject: $this->subjectLine(),
         );

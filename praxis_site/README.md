@@ -15,12 +15,15 @@ through the private, signed Site API on HQ (`docs/SITE_API.md`), through one cli
 | `/dossier/{token}` | Cost of poor quality report | `GET /reports/{token}` |
 | `/kaizen`, `/kaizen/{slug}`, `/kaizen/write` | JBS Praxis Insights and the submission form | `GET /kaizen/articles…`, `POST /kaizen/submissions` |
 | `/services` | Praxis Method PDF by email | `POST /whitepaper` |
+| `/work`, `/work/{slug}`, `/industries` | The proof pages (PR4): the work as a register, one case study per client (`App\Support\Work`, text in `lang/{en,fr}/work.php`), and the sectors with the domains their work covers | none |
 | `/careers` | Application with a CV (multipart) | `POST /careers/applications` |
 | `/feedback` | Feedback on the site | `POST /feedback` |
 | `POST /chat` | Praxis AI, the website assistant, on every page (last 20 turns and a question counter in the session; the reply's links as buttons) | `POST /chat` |
 | `/tracking/open/{c}/{u}?t=…` | Email open pixel (2 s, failures ignored; the link's token `t` is passed on). Always returns the image: past 60 a minute per visitor only the call to HQ is skipped, because mail image proxies fetch for many readers from a few addresses | `GET /tracking/open/…` |
 | `/tracking/unsubscribe/{u}?campaign=…&t=…` | Confirm page, then unsubscribe (campaign and token passed on) | `POST /tracking/unsubscribe/…` |
 | `/robots.txt` | `Disallow: /` while `SITE_NOINDEX=true` | none |
+| `/sitemap.xml`, `/llms.txt` | Every page in English and French, then the published Insights; a summary for AI crawlers | `GET /kaizen/articles` (sitemap) |
+| `/{key}.txt` | IndexNow's key file: only the key in `config/site.php` (`indexnow.key`, or `INDEXNOW_KEY`) is found | none |
 
 Every form: CSRF, a light limit per visitor, a honeypot (`website`), a signed page-load time (`form_ts`, at
 least 3 seconds before submit), Cloudflare Turnstile when its keys are set, Post/Redirect/Get, a label on
@@ -63,6 +66,32 @@ Never use `*`: anyone reaching the origin could then pick any visitor IP and get
 site ignores `*` and logs a warning. `CF-IPCountry` (the open pixel's country) is believed only from
 Cloudflare's ranges too. Compare `cloudflare_ranges` in `config/site.php` with
 https://www.cloudflare.com/ips/ before each deploy.
+
+## IndexNow
+
+`php artisan site:indexnow` tells the IndexNow engines (Bing, Yandex, Seznam, Naver…) which addresses are new
+or changed: every address in the sitemap, built on `https://jbspraxis.com` whatever `APP_URL` says, or only the
+addresses or paths given (`php artisan site:indexnow /careers /fr/careers`). `--dry-run` lists them without
+sending. Run it on the live server after a deploy that adds or changes pages. While `SITE_NOINDEX=true` it sends
+nothing. Addresses on any other host are refused before anything is sent.
+
+The key (32 hex characters, generated once) is public by design: it is in `config/site.php` and served at
+`https://jbspraxis.com/{key}.txt`, where the engines check it. To change it, set `INDEXNOW_KEY` (8 to 128
+letters, digits or dashes) and clear the config cache; the key file follows.
+
+## PHP without fileinfo
+
+The live web PHP has no `fileinfo` extension, and the careers CV's `mimes:pdf,doc,docx` rule needs it to read
+a file's type. When it is missing, `AppServiceProvider` loads `app/Support/Polyfill/fileinfo.php`: a global
+`finfo`, `finfo_*()` and `mime_content_type()` backed by `App\Support\Polyfill\Finfo` (the same stand-in as
+HQ's). `tests/Feature/WithoutFileinfoTest.php` runs the CV check in a second PHP started without fileinfo.
+
+## Production caches
+
+`php artisan config:cache`, `route:cache` and `view:cache` all work: `tests/Feature/ProductionCachesTest.php`
+builds the three into a folder of its own and boots the site from them, and checks that `env()` is read only in
+`config/`. Once the configuration is cached the `.env` file is no longer read, so after any `.env` change on the
+server run `php artisan config:cache` again (or `config:clear`).
 
 ## Cloudflare Turnstile
 

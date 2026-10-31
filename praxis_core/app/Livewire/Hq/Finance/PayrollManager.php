@@ -105,17 +105,18 @@ class PayrollManager extends Component
         $periodStart = "{$this->draftPeriodYear}-" . str_pad($this->draftPeriodMonth, 2, '0', STR_PAD_LEFT) . "-01";
         $periodEnd = date('Y-m-t', strtotime($periodStart));
 
-        // Prevent Duplicate Ledger Generation
+        // One run per month and country, paid ones included, so nobody is paid twice:
+        // a run for all countries overlaps every country's run, and the other way round
         $existingRun = DB::table('payroll_runs')
             ->where('pay_period_start', $periodStart)
-            ->where('region_code', $this->targetRegion)
-            ->whereIn('status', ['Draft', 'Pending_Review', 'Approved'])
+            ->when($this->targetRegion !== 'ALL', fn ($q) => $q->whereIn('region_code', [$this->targetRegion, 'ALL']))
+            ->whereIn('status', ['Draft', 'Pending_Review', 'Approved', 'Disbursed', 'Locked'])
             ->exists();
 
         if ($existingRun) {
             $periodLabel = date('F Y', strtotime($periodStart));
-            $regionLabel = $this->targetRegion === 'ALL' ? 'all countries' : $this->targetRegion;
-            session()->flash('error', "A payroll run for {$periodLabel} ({$regionLabel}) already exists. Open it from the list below instead of creating another.");
+            $regionLabel = ['ALL' => 'all countries', 'NG' => 'Nigeria', 'CM' => 'Cameroon', 'KE' => 'Kenya'][$this->targetRegion] ?? $this->targetRegion;
+            session()->flash('error', "A payroll run for {$periodLabel} that covers {$regionLabel} already exists. Open it from the list below instead of creating another.");
             return;
         }
 
@@ -130,6 +131,7 @@ class PayrollManager extends Component
                     'reference_number' => $refNumber,
                     'pay_period_start' => $periodStart,
                     'pay_period_end' => $periodEnd,
+                    'payment_date' => $periodEnd, // planned pay day: the last day of the month (required by the schema)
                     'status' => 'Draft',
                     'maker_id' => Auth::id() ?? null,
                     'region_code' => $this->targetRegion,
@@ -161,8 +163,8 @@ class PayrollManager extends Component
                         'base_salary' => $emp->base_salary,
                         'allowance_housing' => $emp->allowance_housing,
                         'allowance_transport' => $emp->allowance_transport,
-                        'allowance_utility' => $emp->allowance_utility,
                         'benefits_in_kind' => 0, // Calculated later
+                        // payroll_lines has no utility allowance column: it is counted in gross pay only
                         'gross_pay' => $emp->base_salary + $emp->allowance_housing + $emp->allowance_transport + $emp->allowance_utility,
                         'created_at' => now(),
                         'updated_at' => now()
@@ -224,6 +226,8 @@ class PayrollManager extends Component
             $this->viewRun($runId);
             return;
         }
+
+        $this->logDecision('PAYROLL_RUN_CHECKED', $run, 'Draft', 'Pending_Review', "Checked payroll run {$run->reference_number} and sent it for approval.");
 
         $this->successMessage = "Payroll run checked and sent for approval.";
         $this->showSuccessModal = true;
@@ -301,6 +305,8 @@ class PayrollManager extends Component
                 return;
             }
 
+            $this->logDecision('PAYROLL_RUN_APPROVED', $run, 'Pending_Review', 'Approved', "Approved payroll run {$run->reference_number}.");
+
             $this->successMessage = "Payroll run approved. Variable pay for this month is now locked.";
             $this->showSuccessModal = true;
             $this->loadPayrollRuns();
@@ -319,6 +325,20 @@ class PayrollManager extends Component
     {
         abort_unless(Auth::user()->can('payroll.approve'), 403);
 
+        // Read the run from the database, not from component state
+        $run = DB::table('payroll_runs')->where('id', $runId)->first();
+
+        if (! $run) {
+            session()->flash('error', "We couldn’t find that payroll run. Refresh the page and try again.");
+            return;
+        }
+
+        // Segregation of duties: whoever prepared the run cannot also record it as paid
+        if ((string) $run->maker_id === (string) Auth::id()) {
+            session()->flash('error', "You prepared this payroll run, so someone else must mark it as paid.");
+            return;
+        }
+
         $updated = DB::table('payroll_runs')
             ->where('id', $runId)
             ->where('status', 'Approved')
@@ -334,6 +354,8 @@ class PayrollManager extends Component
             $this->viewRun($runId);
             return;
         }
+
+        $this->logDecision('PAYROLL_RUN_PAID', $run, 'Approved', 'Disbursed', "Marked payroll run {$run->reference_number} as paid.");
 
         $this->successMessage = "Payroll run marked as paid. It can no longer be changed.";
         $this->showSuccessModal = true;
@@ -390,6 +412,8 @@ class PayrollManager extends Component
                 return;
             }
 
+            $this->logDecision('PAYROLL_RUN_RETURNED', $run, $run->status, 'Draft', "Returned payroll run {$run->reference_number} to draft.");
+
             $this->successMessage = "Payroll run returned to draft. Variable pay for this month is unlocked so it can be corrected.";
             $this->showSuccessModal = true;
             $this->loadPayrollRuns();
@@ -404,6 +428,22 @@ class PayrollManager extends Component
     public function closeSuccessModal()
     {
         $this->showSuccessModal = false;
+    }
+
+    /** Each step of a run goes to the audit log: who moved it, from which status to which */
+    private function logDecision(string $action, object $run, string $from, string $to, string $description): void
+    {
+        DB::table('system_audit_logs')->insert([
+            'user_id' => Auth::id(),
+            'action' => $action,
+            'description' => $description,
+            'target_table' => 'payroll_runs',
+            'target_id' => $run->id,
+            'old_values' => json_encode(['status' => $from]),
+            'new_values' => json_encode(['status' => $to]),
+            'ip_address' => request()?->ip(),
+            'created_at' => now(),
+        ]);
     }
 
     /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */

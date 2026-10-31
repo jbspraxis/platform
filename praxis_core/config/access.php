@@ -5,7 +5,10 @@
 | Roles and permissions (RBAC)
 |--------------------------------------------------------------------------
 | A permission is "<module>.<action>" for staff (HQ) and "portal.<module>.<action>"
-| for client accounts. Roles grant permissions; there is no record scope.
+| for client accounts. Roles grant permissions; there is no record scope, with one
+| exception in Operations: sprint boards and QA tickets show only projects where the
+| person has an assigned task, unless they have projects.approve or projects.export
+| (QA tickets: also qa.approve). See App\Support\ProjectAccess.
 | The Owner role is protected: it always has every staff permission, including
 | modules added later, and cannot be edited or deleted.
 |

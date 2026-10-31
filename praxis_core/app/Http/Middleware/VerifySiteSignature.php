@@ -21,7 +21,7 @@ use Symfony\Component\HttpFoundation\Response;
  *   3. known key, 300-second window, the 9-line HMAC signature, then the one-time nonce.
  * A failure is 401 unauthorised with no detail; the reason is logged at most once a minute per reason.
  * Reads are then limited per visitor (120 a minute, 1200 for everyone); the forms and chat are limited
- * in their shared services (App\Services\Site\SiteLimits), with the old pages.
+ * in their services (App\Services\Site\SiteLimits), on the old pages' limiter keys.
  * On success the app locale is X-Site-Locale and the visitor IP is the 'site_visitor_ip' request attribute.
  *
  *   ->middleware('site.signed:read')    // or :write, :chat

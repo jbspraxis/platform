@@ -82,7 +82,6 @@
         .portal-drawer-foot { padding: 16px 24px; border-top: 1px solid var(--color-line); }
 
         .portal-fab { position: fixed; right: 24px; bottom: 24px; z-index: 40; box-shadow: var(--shadow-float); }
-        .portal-toast { position: fixed; top: 80px; right: 24px; z-index: 70; max-width: 420px; box-shadow: var(--shadow-float); }
 
         @media (max-width: 900px) {
             .portal-menu-btn { display: inline-flex; }
@@ -92,7 +91,6 @@
             .portal-desktop-only { display: none !important; }
             .portal-mobile-only { display: flex; }
             .portal-fab { right: 16px; bottom: 16px; }
-            .portal-toast { top: 16px; left: 16px; right: 16px; max-width: none; }
         }
     </style>
 
@@ -178,12 +176,7 @@
                     </div>
                 @endif
 
-                @if (session()->has('lockout_error'))
-                    <div class="alert alert-danger mb-4" role="alert">
-                        <i data-lucide="circle-alert"></i>
-                        <span>{{ session('lockout_error') }}</span>
-                    </div>
-                @endif
+                <x-flash :keys="['lockout_error']" class="mb-4" />
 
                 <div class="page-header">
                     <div class="min-w-0">
@@ -335,12 +328,7 @@
                         <section class="card">
                             <div class="card-header"><h2 class="card-title">{{ __('portal.qa.form_title') }}</h2></div>
 
-                            @if (session()->has('qa_success'))
-                                <div class="alert alert-success mb-4" role="status">
-                                    <i data-lucide="circle-check"></i>
-                                    <span>{{ session('qa_success') }}</span>
-                                </div>
-                            @endif
+                            <x-flash :keys="['qa_success']" class="mb-4" />
 
                             @if ($can['qa.create'] ?? false)
                                 <form wire:submit.prevent="submitQaTicket" class="flex flex-col gap-4">
@@ -431,12 +419,7 @@
 
                 {{-- ===================== INVOICES AND PAYMENTS ===================== --}}
                 @elseif ($activeTab === 'financials' && $activeProject)
-                    @if (session()->has('finance_success'))
-                        <div class="alert alert-success mb-6" role="status">
-                            <i data-lucide="circle-check"></i>
-                            <span>{{ session('finance_success') }}</span>
-                        </div>
-                    @endif
+                    <x-flash :keys="['finance_success']" class="mb-6" />
 
                     <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
                         <section class="card lg:col-span-2">
@@ -619,12 +602,7 @@
                                 <h2 class="card-title flex items-center gap-2"><i data-lucide="palette" class="h-4 w-4 text-deep-teal"></i> {{ __('portal.documents.appearance') }}</h2>
                             </div>
 
-                            @if (session()->has('brand_success'))
-                                <div class="alert alert-success mb-4" role="status">
-                                    <i data-lucide="circle-check"></i>
-                                    <span>{{ session('brand_success') }}</span>
-                                </div>
-                            @endif
+                            <x-flash :keys="['brand_success']" class="mb-4" />
 
                             @if ($can['settings.edit'] ?? false)
                                 <p class="help m-0 mb-4">{{ __('portal.documents.appearance_intro') }}</p>
@@ -664,12 +642,7 @@
                         <section class="card lg:col-span-2">
                             <div class="card-header"><h2 class="card-title">{{ __('portal.team.members', ['count' => count($teamMembers ?? [])]) }}</h2></div>
 
-                            @if (session()->has('team_success'))
-                                <div class="alert alert-success mb-4" role="status">
-                                    <i data-lucide="circle-check"></i>
-                                    <span>{{ session('team_success') }}</span>
-                                </div>
-                            @endif
+                            <x-flash :keys="['team_success']" class="mb-4" />
 
                             @foreach ($teamMembers ?? [] as $member)
                                 @php $manageable = !$member->is_primary_client && ($can['team.edit'] ?? false) && $member->id !== $this->user->id; @endphp
@@ -744,12 +717,7 @@
                                 <h2 class="card-title flex items-center gap-2"><i data-lucide="user-plus" class="h-4 w-4 text-deep-teal"></i> {{ __('portal.team.invite_title') }}</h2>
                             </div>
 
-                            @if (session()->has('team_error'))
-                                <div class="alert alert-danger mb-4" role="alert">
-                                    <i data-lucide="circle-alert"></i>
-                                    <span>{{ session('team_error') }}</span>
-                                </div>
-                            @endif
+                            <x-flash :keys="['team_error']" class="mb-4" />
                             @if ($errors->any())
                                 <div class="alert alert-danger mb-4" role="alert">
                                     <i data-lucide="circle-alert"></i>
@@ -826,12 +794,7 @@
         </button>
     @endif
 
-    @if (session()->has('global_success'))
-        <div class="alert alert-success portal-toast" role="status" x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)">
-            <i data-lucide="circle-check"></i>
-            <span>{{ session('global_success') }}</span>
-        </div>
-    @endif
+    <x-flash toast :keys="['global_success']" />
 
     {{-- ===== Urgent support (signed-in client) ===== --}}
     @if ($showRedlineModal)

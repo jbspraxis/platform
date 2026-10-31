@@ -29,7 +29,7 @@ note wins.
 | `/how-we-work` | How we work | Engagement steps, ownership of code and data, support, no per-user dollar licences, no prices. |
 | `/company` | Company | Facts from Website settings (legal name, registrations "in progress" until set, offices, founded); leadership block shown only when switched on; "Our products: nfelia". |
 | `/security` | Security and data | How data is protected, roles and audit logs, hosting, "processes aligned with ISO 27001". |
-| `/privacy` | Privacy policy | Port of the current policy text, cleaned to the brand voice, contacts from settings, NDPA wording kept; a full legal rewrite stays in PR4. |
+| `/privacy` | Privacy policy | The full legal policy since 30 Oct 2026 (`praxis_site/lang/{en,fr}/legal.php`): Nigeria Data Protection Act 2023 and GAID 2025, Cameroon Law No. 2024/017; summary, contents and 13 sections; legal name, offices, email and the session cookie filled in from Website settings and config. CVs: 12 months, made true by HQ `careers:purge-cvs` once `CV_RETENTION_PURGE=true`. |
 | `/schedule`, `/contact` | Book a free audit and demo; contact | Existing flows (PR2b). |
 | `/cost-calculator`, `/dossier/{token}` | Calculator and report | Existing flows. |
 | `/kaizen`, `/kaizen/{slug}`, `/kaizen/write` | Insights | Existing flows, titled "Insights". |
@@ -50,7 +50,7 @@ pages. The cost report and Insights articles keep their stored language (article
 
 ## 2. Must not break (the domain switch)
 
-- **301s** from old paths: `/about` → `/company`, `/trust-center` → `/security`, `/portfolio` → `/#work`,
+- **301s** from old paths: `/about` → `/company`, `/trust-center` → `/security`, `/portfolio` → `/work` (the proof pages since PR4; `/#work` before),
   `/framework` → `/services#method`, the old calculator at `/` keeps a link from the home page; the legacy HQ and
   portal paths (`/hq/*`, `/client/*`, `/portal/*`, `/signoff/*`, `/verify/*`, `/taskforce/*`) redirect to
   `hq.` / `portal.` exactly as `praxis_core` does today (`App\Support\Hosts::LEGACY_PATTERN`); `www.` → apex.

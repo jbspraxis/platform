@@ -516,6 +516,7 @@ class ProposalBuilder extends Component
             session()->flash('error', "This proposal is no longer a draft, so it wasn’t signed. Its current status is shown above.");
             return;
         }
+        $this->logProposalStep('PROPOSAL_SIGNED_BY_HQ', 'Draft', 'Pending Auth', "Signed proposal {$this->proposal->proposal_ref} and sent it for the client’s signature.");
         // The client's approvers with a portal account find it in their portal, with its signing link (docs/PWA.md)
         \App\Support\Pwa\ClientNotify::proposal($this->proposalId);
         session()->flash('dispatch_success', 'Proposal signed and locked. Send the client the signing link below.');
@@ -530,15 +531,22 @@ class ProposalBuilder extends Component
 
         // Prevent unlocking if the client already signed it (status read from the database, not the page)
         $status = DB::table('proposals')->where('id', $this->proposalId)->value('status');
+        $statusBefore = $status;
         if ($status === null || in_array($status, ['Authorized', 'Converted'])) {
             session()->flash('error', "This proposal can’t be unlocked because the client has already signed it.");
+            return;
+        }
+        // A draft stays as it is: no new signing link, nothing in the audit log
+        if ($status === 'Draft') {
+            $this->loadProposalData();
+            session()->flash('error', "This proposal is already a draft.");
             return;
         }
 
         // Back to draft: remove the HQ signature, any signature or code the client had started, and
         // replace the signing link (token_hash), so the link already sent can no longer be used.
-        // The status guard covers a client who signs between the check above and this update
-        $unlocked = DB::table('proposals')->where('id', $this->proposalId)->whereNotIn('status', ['Authorized', 'Converted'])->update([
+        // The status guard covers a client who signs (or someone else unlocks) between the check above and this update
+        $unlocked = DB::table('proposals')->where('id', $this->proposalId)->whereNotIn('status', ['Authorized', 'Converted', 'Draft'])->update([
             'status' => 'Draft',
             'token_hash' => 'TKN-' . strtoupper(Str::random(10)),
             'hq_signer_name' => null,
@@ -561,7 +569,24 @@ class ProposalBuilder extends Component
                 : "This proposal is already a draft.");
             return;
         }
+        $this->logProposalStep('PROPOSAL_UNLOCKED', $statusBefore, 'Draft', "Unlocked proposal {$this->proposal->proposal_ref}: back to draft, signatures removed and the old signing link cancelled.");
         session()->flash('success', 'Proposal unlocked and back to draft. Your signature was removed and the old signing link no longer works; sign it again to get a new link.');
+    }
+
+    /** Signing and unlocking go to the audit log: who, which proposal, from which status to which */
+    private function logProposalStep(string $action, ?string $from, string $to, string $description): void
+    {
+        DB::table('system_audit_logs')->insert([
+            'user_id' => Auth::id(),
+            'action' => $action,
+            'description' => $description,
+            'target_table' => 'proposals',
+            'target_id' => $this->proposalId,
+            'old_values' => json_encode(['status' => $from]),
+            'new_values' => json_encode(['status' => $to]),
+            'ip_address' => Request::ip(),
+            'created_at' => now(),
+        ]);
     }
 
     public function render() { return view('livewire.hq.intelligence.proposal-builder'); }

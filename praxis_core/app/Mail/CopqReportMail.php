@@ -7,20 +7,18 @@ use Illuminate\Mail\Mailables\Content;
 
 /**
  * Cost of poor quality report: the estimate and the private report link. Sent from the calculator on
- * jbspraxis.com (ConversionHub) or re-sent from HQ (Live consultation, $fromHq).
+ * jbspraxis.com (through the site API) or re-sent from HQ (Live consultation, $fromHq).
  */
 class CopqReportMail extends BrandedMail
 {
     public $assessment;
     public $fromHq;
-    public $reportUrl;
 
     /** $assessment is the copq_assessments row (company_name, executive_name, copq_currency, calculated_leakage, report_token, created_at). */
     public function __construct($assessment, bool $fromHq = false)
     {
         $this->assessment = $assessment;
         $this->fromHq = $fromHq;
-        $this->reportUrl = route('dossier.show', ['token' => $assessment->report_token]);
     }
 
     protected function subjectLine(): string
@@ -37,7 +35,11 @@ class CopqReportMail extends BrandedMail
         $locale = app()->getLocale();
         $prepared = Carbon::parse($this->assessment->created_at ?? now(), 'UTC')->setTimezone('Africa/Lagos');
 
+        // The report page on the site, in the email's language (the portal's dossier.show is HQ's internal view)
+        $reportUrl = rtrim(route('home'), '/') . ($locale === 'fr' ? '/fr' : '') . '/dossier/' . rawurlencode((string) $this->assessment->report_token);
+
         return new Content(view: 'emails.copq-report', with: [
+            'reportUrl' => $reportUrl,
             'company' => $this->company(),
             'firstName' => $this->firstName(),
             'amount' => self::money((float) ($this->assessment->calculated_leakage ?? 0), $this->assessment->copq_currency ?? null, $locale),

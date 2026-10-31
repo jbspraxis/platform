@@ -6,9 +6,8 @@ use Illuminate\Support\Facades\Validator;
 
 /**
  * What the site API says to visitors, in the request's language (X-Site-Locale, set as the app
- * locale by VerifySiteSignature). English validation messages are Laravel's own, as on the old
- * Livewire pages; French ones are here, because the app has no French validation file and adding
- * one would change the old pages too. Voice: docs/BRAND.md sections 4, 5 and 12.
+ * locale by VerifySiteSignature). English validation messages are Laravel's own; French ones are
+ * here, because the app has no French validation file. Voice: docs/BRAND.md sections 4, 5 and 12.
  */
 final class SiteText
 {

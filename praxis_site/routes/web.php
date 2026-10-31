@@ -11,6 +11,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\ServicesController;
 use App\Http\Controllers\TrackingController;
+use App\Http\Controllers\WorkController;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
@@ -40,6 +41,11 @@ $pages = function () {
     Route::get('/company', [PageController::class, 'company'])->name('company');
     Route::get('/security', [PageController::class, 'security'])->name('security');
     Route::get('/privacy', [PageController::class, 'privacy'])->name('privacy');
+
+    // The proof pages: the work, one page per case study (App\Support\Work), and the sectors behind them
+    Route::get('/work', [WorkController::class, 'index'])->name('work');
+    Route::get('/work/{slug}', [WorkController::class, 'show'])->where('slug', '[a-z0-9-]{1,100}')->name('work.show');
+    Route::get('/industries', [WorkController::class, 'industries'])->name('industries');
 
     Route::get('/contact', [ContactController::class, 'show'])->name('contact');
     Route::post('/contact', [ContactController::class, 'store'])->middleware(['throttle:forms', 'guard:contact'])->name('contact.store');
@@ -75,7 +81,7 @@ Route::prefix('fr')->name('fr.')->group($pages);
 // Old addresses of the previous site (search results, links in emails already sent)
 Route::permanentRedirect('/about', '/company');
 Route::permanentRedirect('/trust-center', '/security');
-Route::permanentRedirect('/portfolio', '/#work');
+Route::permanentRedirect('/portfolio', '/work');
 Route::permanentRedirect('/framework', '/how-we-work#method');
 Route::permanentRedirect('/kaizen-hub', '/kaizen');
 Route::permanentRedirect('/privacy-policy', '/privacy');
@@ -83,6 +89,9 @@ Route::permanentRedirect('/privacy-policy', '/privacy');
 // Search engines and AI crawlers
 Route::get('/sitemap.xml', [PageController::class, 'sitemap'])->withoutMiddleware($stateless)->name('sitemap');
 Route::get('/llms.txt', [PageController::class, 'llms'])->withoutMiddleware($stateless)->name('llms');
+// IndexNow's key file (php artisan site:indexnow): only the key in config site.indexnow is found
+Route::get('/{key}.txt', [PageController::class, 'indexNowKey'])->where('key', '[A-Za-z0-9-]{8,128}')
+    ->withoutMiddleware($stateless)->name('indexnow.key');
 
 // Broadcast email links (same paths as today). The pixel counts its own limit: past it the image is still
 // returned and only the call to HQ is skipped (TrackingController::open)

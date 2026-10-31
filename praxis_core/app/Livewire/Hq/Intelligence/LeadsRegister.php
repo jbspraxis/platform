@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use App\Services\Site\BookingService;
 
 #[Layout('components.layouts.hq')]
 class LeadsRegister extends Component
@@ -28,6 +29,9 @@ class LeadsRegister extends Component
     public $diffNew = null;
     public $mergeSelections = []; 
     
+    // The organisations the register lists (and the only ones its actions change)
+    private const REGISTER_STATUSES = ['Lead', 'Active Client'];
+
     // The only copq_assessments columns a merge may write, with their labels (sentence case, docs/BRAND.md section 12)
     private const MERGE_FIELDS = [
         'company_name' => 'Company name',
@@ -58,17 +62,27 @@ class LeadsRegister extends Component
     public $hourlyCost = ''; 
     public $errorRate = ''; 
     
+    // Book a free audit from HQ: the date and time are entered in Lagos time (WAT), like website bookings
+    public $showBookingModal = false;
+    #[Locked]
+    public $bookingOrgId = null;
+    #[Locked]
+    public $bookingCompany = '';
+    public $bookingDate = '', $bookingTime = '';
+
     // Field names in validation messages (sentence case, docs/BRAND.md section 12)
     protected $validationAttributes = [
         'company' => 'organisation name', 'name' => 'contact name', 'email' => 'work email',
         'industry' => 'industry', 'tool' => 'system in use', 'bottleneck' => 'main bottleneck',
         'turnover' => 'annual turnover', 'headcount' => 'total headcount', 'mgmtNodes' => 'number of managers who approve work',
         'acv' => 'average contract value', 'manualHrs' => 'manual hours a week', 'hourlyCost' => 'hourly cost of a manager',
-        'errorRate' => 'error rate', 'currency' => 'currency',
+        'errorRate' => 'error rate', 'currency' => 'currency', 'bookingDate' => 'date', 'bookingTime' => 'time',
     ];
 
     // All MDM Collections dynamically loaded
     public $dbIndustries = [], $dbArchitectures = [], $dbBottlenecks = [], $dbCurrencies = [];
+    // The stages someone can move a lead to by hand; locked so the browser cannot add its own
+    #[Locked]
     public $stages = ['Lead Captured', 'Qualifying', 'In Consultation', 'Proposal Sent', 'Won / Lost'];
 
     public function mount()
@@ -91,7 +105,7 @@ class LeadsRegister extends Component
         $organizations = DB::table('organizations')
             ->select('organizations.*', 'owner.first_name as owner_first', 'owner.last_name as owner_last', 'owner.id as owner_id', 'owner.avatar_path as owner_avatar')
             ->leftJoin('users as owner', 'organizations.assigned_to', '=', 'owner.id')
-            ->whereIn('organizations.status', ['Lead', 'Active Client'])
+            ->whereIn('organizations.status', self::REGISTER_STATUSES)
             ->get();
 
         // Map ONLY the latest COPQ assessment to avoid double-rendering duplicates
@@ -142,7 +156,14 @@ class LeadsRegister extends Component
     {
         abort_unless(Auth::user()->can('crm.edit'), 403);
 
-        DB::table('organizations')->where('id', $orgId)->update(['pipeline_stage' => $newStage, 'updated_at' => now()]);
+        // Only one of the register's stages, and only for an organisation the register shows
+        if (! in_array($newStage, $this->stages, true)) {
+            $this->loadLeads();
+            return;
+        }
+
+        DB::table('organizations')->where('id', $orgId)->whereIn('status', self::REGISTER_STATUSES)
+            ->update(['pipeline_stage' => $newStage, 'updated_at' => now()]);
         $this->loadLeads();
         if ($this->selectedLead && $this->selectedLead->org_id === $orgId) {
             $this->selectedLead->pipeline_stage = $newStage;
@@ -153,8 +174,27 @@ class LeadsRegister extends Component
     {
         abort_unless(Auth::user()->can('crm.edit'), 403);
 
-        $userId = Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c';
-        DB::table('organizations')->where('id', $orgId)->update(['assigned_to' => $userId, 'updated_at' => now()]);
+        $userId = Auth::id();
+        $lead = DB::table('organizations')->where('id', $orgId)->whereIn('status', self::REGISTER_STATUSES)->first();
+
+        // Only a lead nobody owns yet ("Assign to me" is offered only for those): an owned lead can't be taken over
+        $claimed = $lead ? DB::table('organizations')->where('id', $lead->id)->whereIn('status', self::REGISTER_STATUSES)
+            ->whereNull('assigned_to')
+            ->update(['assigned_to' => $userId, 'updated_at' => now()]) : 0;
+
+        if ($claimed) {
+            DB::table('system_audit_logs')->insert([
+                'user_id' => $userId,
+                'action' => 'LEAD_CLAIMED',
+                'description' => "Took ownership of the lead {$lead->name}.",
+                'target_table' => 'organizations',
+                'target_id' => $lead->id,
+                'old_values' => json_encode(['assigned_to' => $lead->assigned_to]),
+                'new_values' => json_encode(['assigned_to' => $userId]),
+                'ip_address' => request()?->ip(),
+                'created_at' => now(),
+            ]);
+        }
         $this->loadLeads();
         if ($this->selectedLead && $this->selectedLead->org_id === $orgId) { $this->openDrawer($orgId); }
     }
@@ -215,6 +255,19 @@ class LeadsRegister extends Component
         DB::table('organizations')->where('id', $targetOrgId)->update([
             'is_duplicate_suspect' => 0,
             'updated_at' => now()
+        ]);
+
+        $kept = array_keys(array_filter(array_intersect_key($this->mergeSelections, self::MERGE_FIELDS), fn ($pick) => $pick === 'old'));
+        DB::table('system_audit_logs')->insert([
+            'user_id' => Auth::id(),
+            'action' => 'LEAD_RECORDS_MERGED',
+            'description' => 'Merged two assessments for ' . ($finalData['company_name'] ?: 'a lead') . '.',
+            'target_table' => 'copq_assessments',
+            'target_id' => $this->diffNew->id,
+            'old_values' => json_encode(array_intersect_key((array) $this->diffNew, self::MERGE_FIELDS), JSON_UNESCAPED_UNICODE),
+            'new_values' => json_encode(['merged_from' => $this->diffOld->id, 'kept_from_older_record' => $kept]),
+            'ip_address' => request()?->ip(),
+            'created_at' => now(),
         ]);
 
         $this->closeDiffViewer();
@@ -340,27 +393,83 @@ class LeadsRegister extends Component
     }
 
     // --- AD-HOC CONSULTATION PIPELINE ---
+    // Opens the booking dialog, suggesting 15 minutes from now on the next 5 minutes (Lagos time)
     public function requestConsultation($orgId)
     {
         abort_unless(Auth::user()->can('crm.create'), 403);
 
-        $appointmentId = (string) Str::uuid();
-        
-        // 1. Create a Pending Appointment in the Lobby.
-        // Appointment times are stored as Lagos wall-clock time (WAT), like website bookings; the app runs in UTC.
-        $start = Carbon::now('Africa/Lagos')->addMinutes(15); // Buffers the start time slightly
+        $org = DB::table('organizations')->where('id', $orgId)->first();
+        if (! $org) {
+            return;
+        }
+
+        $suggested = Carbon::now(BookingService::TIMEZONE)->addMinutes(15)->second(0);
+        $suggested->addMinutes((5 - $suggested->minute % 5) % 5);
+
+        $this->bookingOrgId = $org->id;
+        $this->bookingCompany = $org->name;
+        $this->bookingDate = $suggested->format('Y-m-d');
+        $this->bookingTime = $suggested->format('H:i');
+        $this->resetErrorBag(['bookingDate', 'bookingTime']);
+        $this->showBookingModal = true;
+    }
+
+    public function closeBookingModal()
+    {
+        $this->showBookingModal = false;
+        $this->reset(['bookingOrgId', 'bookingCompany', 'bookingDate', 'bookingTime']);
+    }
+
+    /**
+     * Books the free audit as a request in the Consultation hub, where it is approved with the meeting link.
+     * The time is entered and stored as Lagos wall-clock time (WAT), the same way as website bookings
+     * (BookingService; the app itself runs in UTC), so the hub, My workspace, the website's free times and
+     * the client's emails all show the same time.
+     */
+    public function bookConsultation()
+    {
+        abort_unless(Auth::user()->can('crm.create'), 403);
+        if (! $this->bookingOrgId) {
+            return;
+        }
+
+        $this->validate([
+            'bookingDate' => 'required|date_format:Y-m-d',
+            'bookingTime' => 'required|date_format:H:i',
+        ]);
+
+        $start = Carbon::createFromFormat('Y-m-d H:i', $this->bookingDate . ' ' . $this->bookingTime, BookingService::TIMEZONE)->second(0);
+        if ($start->lt(Carbon::now(BookingService::TIMEZONE)->subMinutes(5))) {
+            $this->addError('bookingTime', 'That time has passed. Choose a time that is still ahead (Lagos time).');
+            return;
+        }
+
+        // The hour must not overlap a free audit that is waiting or approved (a meeting ending at the start is fine)
+        $end = $start->copy()->addMinutes(60);
+        $clash = DB::table('appointments')->whereIn('status', ['Requested', 'Scheduled'])->whereNull('deleted_at')
+            ->where('start_time', '<', $end->format('Y-m-d H:i:s'))
+            ->where('end_time', '>', $start->format('Y-m-d H:i:s'))
+            ->orderBy('start_time')->first();
+        if ($clash) {
+            $this->addError('bookingTime', 'That time overlaps another free audit (' . Carbon::parse($clash->start_time)->format('H:i')
+                . ' to ' . Carbon::parse($clash->end_time)->format('H:i') . ' WAT). Choose another time.');
+            return;
+        }
+
         DB::table('appointments')->insert([
-            'id' => $appointmentId,
-            'organization_id' => $orgId,
+            'id' => (string) Str::uuid(),
+            'organization_id' => $this->bookingOrgId,
             'title' => 'Free audit (booked from HQ)',
             'start_time' => $start->format('Y-m-d H:i:s'),
-            'end_time' => $start->copy()->addMinutes(60)->format('Y-m-d H:i:s'),
+            'end_time' => $end->format('Y-m-d H:i:s'),
             'status' => 'Requested',
             'created_at' => now(),
             'updated_at' => now()
         ]);
 
-        // 2. Deep-Link redirect natively to the Consultation Hub
+        session()->flash('success', "Free audit booked for {$this->bookingCompany} on {$start->format('D j M, H:i')} WAT. Approve it with the meeting link to email the client.");
+
+        // Deep-link to the Consultation hub
         return $this->redirect(route('hq.crm.consult'), navigate: true);
     }
 

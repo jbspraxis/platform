@@ -4,16 +4,14 @@ namespace App\Mail;
 
 use Illuminate\Mail\Mailables\Content;
 
-/** The visitor's copy after the website contact form (ContactHub), with the free audit and demo as the next step. */
+/** The visitor's copy after the website contact form, with the free audit and demo as the next step. */
 class EnquiryReceived extends BrandedMail
 {
     public $firstName;
-    public $bookUrl;
 
     public function __construct($firstName)
     {
         $this->firstName = $firstName;
-        $this->bookUrl = route('schedule');
     }
 
     protected function subjectLine(): string
@@ -23,7 +21,13 @@ class EnquiryReceived extends BrandedMail
 
     public function content(): Content
     {
-        return new Content(view: 'emails.enquiry-received');
+        // The booking page in the email's language: /schedule, or /fr/schedule on the site
+        $book = route('schedule');
+        if (app()->getLocale() === 'fr') {
+            $book = preg_replace('~/schedule$~', '/fr/schedule', $book);
+        }
+
+        return new Content(view: 'emails.enquiry-received', with: ['bookUrl' => $book]);
     }
 
     public static function samples(): array

@@ -12,20 +12,19 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 /**
- * The cost of poor quality calculator: the old home page (ConversionHub) and the site API
+ * The cost of poor quality calculator on the site API
  * (GET /calculator/reference, POST /calculator/assessments, GET /reports/{token}).
- * Inputs use the API names; FIELDS maps the old page's payload keys onto them.
  * Limits (docs/SITE_API.md section 6.2): 3 an hour and 8 a day per visitor, 3 reports a day per email,
  * 60 an hour for everyone, on the old page's limiter key; the AI summary uses the shared daily AI budget.
  */
 final class CostReportService
 {
-    /** ConversionHub payload key => API field */
+    /** The site API's fields */
     public const FIELDS = [
-        'name' => 'name', 'company' => 'company', 'email' => 'email', 'industry' => 'industry', 'tool' => 'tool',
-        'bottleneck' => 'bottleneck', 'acv' => 'acv', 'headcount' => 'headcount', 'mgmtNodes' => 'mgmt_nodes',
-        'turnover' => 'turnover', 'manualHrs' => 'manual_hrs', 'hourlyCost' => 'hourly_cost',
-        'errorRate' => 'error_rate', 'currency' => 'currency',
+        'name', 'company', 'email', 'industry', 'tool',
+        'bottleneck', 'acv', 'headcount', 'mgmt_nodes',
+        'turnover', 'manual_hrs', 'hourly_cost',
+        'error_rate', 'currency',
     ];
 
     public static function rules(): array

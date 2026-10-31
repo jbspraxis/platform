@@ -13,7 +13,7 @@
     $title = $fullTitle !== '' ? $fullTitle : (trim($__env->yieldContent('title')) !== '' ? trim($__env->yieldContent('title')) . ' | ' . __('site.title_suffix') : __('site.title_suffix'));
     $description = trim($__env->yieldContent('description')) ?: e(__('pages.home.description'));
     $ogImage = asset('img/og/jbs-praxis-og-' . $locale . '-1200x630.png');
-    $nav = ['services' => 'services', 'how-we-work' => 'how', 'company' => 'company', 'kaizen' => 'insights'];
+    $nav = ['services' => 'services', 'how-we-work' => 'how', 'work' => 'work', 'company' => 'company', 'kaizen' => 'insights'];
     $ga4 = (string) config('site.ga4_id');
     $schema = [
         '@context' => 'https://schema.org',

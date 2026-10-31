@@ -13,6 +13,9 @@ use App\Support\Access;
 #[Layout('components.layouts.hq')]
 class InvoiceLedger extends Component
 {
+    /** Statuses an invoice can be cancelled from: unpaid ones only */
+    private const CANCELLABLE = ['Pending', 'Overdue'];
+
     public $activeTab = 'Pending'; // Pending, Overdue, Paid, Cancelled
     public $invoices = [];
     
@@ -201,14 +204,14 @@ class InvoiceLedger extends Component
     {
         abort_unless(Auth::user()->can('finance.delete'), 403);
 
-        // Only an invoice that is neither paid nor already cancelled can be cancelled
+        // Only an unpaid invoice (pending or overdue) can be cancelled: never a paid one, never twice
         $invoice = DB::table('invoices')->where('id', $invoiceId)->first();
         if (! $invoice) {
             session()->flash('error', "We couldn’t find that invoice. Refresh the page and try again.");
             $this->loadInvoices();
             return;
         }
-        if (in_array($invoice->status, ['Paid', 'Cancelled'], true)) {
+        if (! in_array($invoice->status, self::CANCELLABLE, true)) {
             session()->flash('error', $invoice->status === 'Paid'
                 ? "Invoice {$invoice->invoice_number} is paid, so it can’t be cancelled."
                 : "Invoice {$invoice->invoice_number} is already cancelled.");
@@ -218,7 +221,7 @@ class InvoiceLedger extends Component
 
         $updated = DB::table('invoices')
             ->where('id', $invoiceId)
-            ->whereNotIn('status', ['Paid', 'Cancelled'])
+            ->whereIn('status', self::CANCELLABLE)
             ->update([
                 'status' => 'Cancelled',
                 'updated_by' => Auth::id(),
@@ -235,9 +238,12 @@ class InvoiceLedger extends Component
             // Safe null UUID handling
             'user_id' => Auth::check() ? Auth::id() : null, 
             'action' => 'INVOICE_CANCELLED',
+            'description' => "Cancelled invoice {$invoice->invoice_number}.",
             'target_table' => 'invoices',
-            'target_id' => $invoiceId,
-            'ip_address' => request()->ip(),
+            'target_id' => $invoice->id,
+            'old_values' => json_encode(['status' => $invoice->status]),
+            'new_values' => json_encode(['status' => 'Cancelled']),
+            'ip_address' => request()?->ip(),
             'created_at' => now()
         ]);
         \App\Support\Pwa\ClientNotify::invoice($invoiceId, 'invoice_cancelled');
@@ -266,13 +272,18 @@ class InvoiceLedger extends Component
             return;
         }
 
-        DB::transaction(function () use ($expiredInvoices) {
+        $count = 0;
+        DB::transaction(function () use ($expiredInvoices, &$count) {
             foreach ($expiredInvoices as $invoice) {
-                // 1. Mark the invoice overdue
-                DB::table('invoices')->where('id', $invoice->id)->update([
+                // 1. Mark the invoice overdue (only if it is still unpaid: a payment may have landed meanwhile)
+                $marked = DB::table('invoices')->where('id', $invoice->id)->where('status', 'Pending')->update([
                     'status' => 'Overdue',
                     'updated_at' => now()
                 ]);
+                if (! $marked) {
+                    continue;
+                }
+                $count++;
 
                 // 2. Alert finance approvers
                 $admins = Access::staffWith('finance.approve');
@@ -296,13 +307,15 @@ class InvoiceLedger extends Component
                     'description' => "Invoice {$invoice->invoice_number} is past its due date and was marked overdue. Client Portal access for the project is on hold.",
                     'target_table' => 'invoices',
                     'target_id' => $invoice->id,
+                    'old_values' => json_encode(['status' => 'Pending']),
+                    'new_values' => json_encode(['status' => 'Overdue']),
+                    'ip_address' => request()?->ip(),
                     'created_at' => now()
                 ]);
             }
         });
 
         $this->loadInvoices();
-        $count = $expiredInvoices->count();
         session()->flash('error', $count . ($count === 1 ? ' invoice was' : ' invoices were') . " marked overdue. Client Portal access for those projects is on hold until they’re paid.");
     }
     /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */

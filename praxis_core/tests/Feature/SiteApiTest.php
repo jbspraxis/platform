@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\SiteApi\ApiErrors;
-use App\Livewire\Services as ServicesPage;
 use App\Mail\AuditRequested;
 use App\Mail\CopqReportMail;
 use App\Mail\EnquiryAlert;
@@ -18,6 +17,7 @@ use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -200,20 +200,6 @@ class SiteApiTest extends TestCase
             ->assertStatus(429)->assertJsonPath('error.message', 'Vous avez envoyé plusieurs demandes en peu de temps. Réessayez plus tard.');
     }
 
-    public function test_the_old_page_and_the_api_share_one_budget(): void
-    {
-        // Livewire tests come from 127.0.0.1: the same visitor as these API requests
-        foreach ([1, 2, 3] as $i) {
-            $this->api('POST', '/whitepaper', ['email' => "shared{$i}@example.test"], ip: '127.0.0.1')->assertCreated();
-        }
-
-        Livewire::test(ServicesPage::class)
-            ->set('email', 'shared9@example.test')
-            ->call('processWhitepaper')
-            ->assertHasErrors('email');
-        $this->assertSame(0, DB::table('whitepaper_downloads')->where('email_captured', 'shared9@example.test')->count());
-    }
-
     public function test_a_global_limit_is_a_circuit_breaker_with_an_alert(): void
     {
         config(['site_api.limits.feedback.global.hour' => 2]);
@@ -250,6 +236,28 @@ class SiteApiTest extends TestCase
     }
 
     // ------------------------------------------------------------------ endpoints (6.4)
+
+    public function test_the_method_guide_goes_out_in_the_visitors_language(): void
+    {
+        $this->api('POST', '/whitepaper', ['email' => 'guide.en@example.test'], ip: '198.51.100.61')
+            ->assertCreated()->assertJsonPath('data.sent', true);
+        $this->api('POST', '/whitepaper', ['email' => 'guide.fr@example.test'], ip: '198.51.100.62', locale: 'fr')
+            ->assertCreated()->assertJsonPath('data.sent', true);
+
+        $this->assertSame(['The Praxis Method'], DB::table('whitepaper_downloads')
+            ->whereIn('email_captured', ['guide.en@example.test', 'guide.fr@example.test'])->distinct()->pluck('document_name')->all());
+
+        // The French page gets the French email with the French edition, under its French name
+        foreach ([
+            'en' => ['guide.en@example.test', 'the-praxis-method-en.pdf', 'JBS-Praxis-Method.pdf'],
+            'fr' => ['guide.fr@example.test', 'the-praxis-method-fr.pdf', 'JBS-Praxis-Methode.pdf'],
+        ] as $locale => [$email, $file, $name]) {
+            $guide = Attachment::fromPath(resource_path("pdf/{$file}"))->as($name)->withMime('application/pdf');
+            Mail::assertSent(PraxisFrameworkDispatch::class, fn (PraxisFrameworkDispatch $mail) => $mail->hasTo($email)
+                && $mail->locale === $locale && $mail->hasAttachment($guide));
+        }
+        Mail::assertSent(PraxisFrameworkDispatch::class, 2);
+    }
 
     public function test_enquiry_stores_start_timing_and_emails_only_the_first_name(): void
     {

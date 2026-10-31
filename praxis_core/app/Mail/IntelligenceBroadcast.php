@@ -56,7 +56,10 @@ class IntelligenceBroadcast extends BrandedMail
 
     /**
      * Lets inboxes show their own unsubscribe button (it opens the confirmation page).
-     * One-click unsubscribe (List-Unsubscribe-Post) is left out: the POST route needs a CSRF token, which an inbox cannot send.
+     * One-click unsubscribe (List-Unsubscribe-Post, RFC 8058) is left out: the link opens the public site (praxis_site),
+     * whose POST route needs a CSRF token and passes the form guard, neither of which an inbox can send. Adding it needs
+     * a site route that takes the POST with only the link's token (campaign and t) and calls HQ's unsubscribe API;
+     * then this header can add 'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click'.
      */
     public function headers(): Headers
     {

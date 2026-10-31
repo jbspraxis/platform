@@ -13,8 +13,8 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 /**
- * Free audit bookings: the old /schedule page (ScheduleConsultation) and the site API
- * (GET /booking/slots, POST /bookings). Slots are shown and booked in Lagos time (WAT);
+ * Free audit bookings on the site API (GET /booking/slots, POST /bookings), as the old /schedule page
+ * took them. Slots are shown and booked in Lagos time (WAT);
  * the app itself runs in UTC.
  * Rules (docs/SITE_API.md sections 6.2 and 6.4): weekdays from today up to 92 days ahead; one open
  * (Requested, still ahead) request per email and per organisation; 2 a day per visitor and 20 an
@@ -25,11 +25,11 @@ final class BookingService
     public const TIMEZONE = 'Africa/Lagos';
     public const SLOTS = ['09:00', '10:30', '13:00', '14:30', '16:00'];
 
-    /** ScheduleConsultation property => API field */
+    /** The site API's fields */
     public const FIELDS = [
-        'fullName' => 'full_name', 'title' => 'title', 'email' => 'email', 'phone' => 'phone',
-        'enterpriseName' => 'enterprise_name', 'focus' => 'focus', 'customFocus' => 'custom_focus',
-        'selectedDate' => 'date', 'selectedTime' => 'time',
+        'full_name', 'title', 'email', 'phone',
+        'enterprise_name', 'focus', 'custom_focus',
+        'date', 'time',
     ];
 
     public static function rules(): array

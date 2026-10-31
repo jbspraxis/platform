@@ -44,12 +44,7 @@
         </div>
     </div>
 
-    @if(session()->has('success'))
-        <div class="alert alert-success mb-6" role="status"><i data-lucide="check-circle"></i><span>{{ session('success') }}</span></div>
-    @endif
-    @if(session()->has('error'))
-        <div class="alert alert-warning mb-6" role="alert"><i data-lucide="triangle-alert"></i><span>{{ session('error') }}</span></div>
-    @endif
+    <x-flash :tones="['error' => 'warning']" class="mb-6" />
 
     <div class="tabs" role="tablist">
         <button type="button" role="tab" wire:click="setTab('Pending')" class="tab {{ $activeTab === 'Pending' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'Pending' ? 'true' : 'false' }}">Sent</button>

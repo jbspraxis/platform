@@ -9,19 +9,19 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Job applications: the old /careers page (Careers) and POST /careers/applications. The CV is stored
+ * Job applications: POST /careers/applications on the site API. The CV is stored
  * on the private disk (storage/app/private/vault/dossiers), read in HQ through the checked file route.
  * Limits (docs/SITE_API.md section 6.2): 2 a day per visitor, 30 an hour for everyone; one application
  * per email: a repeat updates the existing application and adds the new CV (never an error).
  */
 final class CareersService
 {
-    /** Careers (Livewire) property => API field */
+    /** The site API's fields */
     public const FIELDS = [
-        'fullName' => 'full_name', 'email' => 'email', 'countryCode' => 'country_code', 'phone' => 'phone',
-        'city' => 'city', 'primaryWeapon' => 'primary_skill', 'otherWeapon' => 'other_skill',
-        'secondarySkillset' => 'secondary_skillset', 'linkedinUrl' => 'linkedin_url',
-        'portfolioUrl' => 'portfolio_url', 'praxisAnswer' => 'praxis_answer', 'resume' => 'cv',
+        'full_name', 'email', 'country_code', 'phone',
+        'city', 'primary_skill', 'other_skill',
+        'secondary_skillset', 'linkedin_url',
+        'portfolio_url', 'praxis_answer', 'cv',
     ];
 
     public static function rules(): array
@@ -42,18 +42,7 @@ final class CareersService
         ];
     }
 
-    /** The old page's own messages (kept as they are there) */
-    public static function messages(): array
-    {
-        return [
-            'cv.required'   => 'ASSET UPLOAD REQUIRED: You must attach a dossier (PDF/DOC).',
-            'phone.required'    => 'COMM CHANNEL REQUIRED: Enter a valid phone number.',
-            'city.required'     => 'GEO-LOCATION REQUIRED: Select your current city.',
-            'other_skill.required_if' => 'SPECIFICATION REQUIRED: Define your unlisted discipline.',
-        ];
-    }
-
-    /** The same messages for the site API, in plain words and in the request's language */
+    /** The site API's messages for these fields, in plain words and in the request's language */
     public static function apiMessages(): array
     {
         return [

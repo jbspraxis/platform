@@ -41,7 +41,7 @@ class ProcessBroadcastQueue extends Command
                 }
                 $org = DB::table('organizations')->where('id', $user->organization_id)->first();
 
-                // The frame (sign-off, footer) follows the campaign's language; campaigns have no language field yet, so English
+                // The frame (sign-off, footer) follows the language chosen in the composer (English for campaigns sent before)
                 $locale = MailLocale::forRecipient($campaign->language ?? null);
 
                 // 2. Parse Dynamic Variables (Regex makes it immune to AI spacing errors)

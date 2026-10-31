@@ -20,6 +20,9 @@ Schedule::command('finance:sync-exchange-rates')->dailyAt('00:00');
 // 'finance:run-automations' (00:30) was removed: no such command exists, so it failed every night.
 // Add it back here once the ledger automation command is built.
 
+// Free audit requests nobody approved before their start time close by themselves (Cancelled, logged, no email)
+Schedule::command('crm:expire-audit-requests')->hourly()->withoutOverlapping(10);
+
 // HQ → System Health: heartbeat, new log errors, alerts, the 8am digest (app/Support/Monitor)
 Schedule::command('monitor:run')->everyFiveMinutes()->withoutOverlapping(10);
 
@@ -31,3 +34,13 @@ Schedule::command('pwa:push-prune')->dailyAt('03:10');
 Schedule::command('mail:sync')->everyMinute()->withoutOverlapping(10);
 Schedule::command('mail:send-due')->everyMinute()->withoutOverlapping(5);
 Schedule::command('mail:prune')->dailyAt('03:40');
+
+// The privacy policy on jbspraxis.com: the website's visitor limits keep IP addresses 24 hours at most, so expired
+// cache rows (whose keys hold them) go within minutes instead of whenever the same key is read again
+Schedule::command('cache:prune-expired')->everyFiveMinutes()->withoutOverlapping(5);
+
+// Careers (the privacy policy on jbspraxis.com): CVs deleted and applications anonymised 12 months after they
+// arrive. Only once the owner sets CV_RETENTION_PURGE=true (config/praxis.php); try it with --dry-run first
+if (config('praxis.cv_retention_purge')) {
+    Schedule::command('careers:purge-cvs')->dailyAt('03:25')->withoutOverlapping(30);
+}

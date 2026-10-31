@@ -5,18 +5,17 @@ namespace App\Mail;
 use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 
-/** The Praxis Method PDF, sent to the address a visitor gives on the Services page. Sent straight away: no queue worker runs on this host. */
+/** The Praxis Method guide (PDF), sent to the address a visitor gives on the Services page. Sent straight away: no queue worker runs on this host. */
 class PraxisFrameworkDispatch extends BrandedMail
 {
-    /** The name the visitor sees on the attachment (the file on disk keeps its old name). */
-    public const ATTACHMENT_NAME = 'JBS-Praxis-Method.pdf';
-
-    public $bookUrl;
-
-    public function __construct()
-    {
-        $this->bookUrl = route('schedule');
-    }
+    /**
+     * The guide in each language: its file in resources/pdf (built by brand/build/build_method.js) and the name the
+     * visitor sees on the attachment. Any other locale gets the English edition.
+     */
+    public const EDITIONS = [
+        'en' => ['file' => 'the-praxis-method-en.pdf', 'name' => 'JBS-Praxis-Method.pdf'],
+        'fr' => ['file' => 'the-praxis-method-fr.pdf', 'name' => 'JBS-Praxis-Methode.pdf'],
+    ];
 
     protected function subjectLine(): string
     {
@@ -25,14 +24,28 @@ class PraxisFrameworkDispatch extends BrandedMail
 
     public function content(): Content
     {
-        return new Content(view: 'emails.framework-dispatch');
+        // The booking page in the email's language: /schedule, or /fr/schedule on the site
+        $book = route('schedule');
+        if (app()->getLocale() === 'fr') {
+            $book = preg_replace('~/schedule$~', '/fr/schedule', $book);
+        }
+
+        return new Content(view: 'emails.framework-dispatch', with: ['bookUrl' => $book]);
+    }
+
+    /** The edition in this mail's language (set with ->locale()), English otherwise */
+    public function edition(): array
+    {
+        return self::EDITIONS[$this->locale] ?? self::EDITIONS['en'];
     }
 
     public function attachments(): array
     {
+        $edition = $this->edition();
+
         return [
-            Attachment::fromPath(storage_path('app/Praxis_Framework.pdf'))
-                    ->as(self::ATTACHMENT_NAME)
+            Attachment::fromPath(resource_path('pdf/' . $edition['file']))
+                    ->as($edition['name'])
                     ->withMime('application/pdf'),
         ];
     }

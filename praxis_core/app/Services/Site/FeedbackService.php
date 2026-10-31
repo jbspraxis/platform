@@ -5,13 +5,14 @@ namespace App\Services\Site;
 use App\Models\KaizenTelemetry;
 
 /**
- * The site feedback form: the old /feedback page (TelemetryNode) and POST /feedback.
- * The field names are the same on both. Limits (docs/SITE_API.md section 6.2): 3 an hour and 10 a day
+ * The site feedback form: POST /feedback on the site API.
+ * Limits (docs/SITE_API.md section 6.2): 3 an hour and 10 a day
  * per visitor, 60 an hour for everyone, on the old page's limiter key.
  */
 final class FeedbackService
 {
-    public const FIELDS = ['identity' => 'identity', 'email' => 'email', 'category' => 'category', 'severity' => 'severity', 'description' => 'description'];
+    /** The site API's fields */
+    public const FIELDS = ['identity', 'email', 'category', 'severity', 'description'];
 
     public static function rules(): array
     {

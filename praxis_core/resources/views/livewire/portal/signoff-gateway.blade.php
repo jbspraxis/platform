@@ -67,18 +67,7 @@
             @endif
         </div>
 
-        @if (session()->has('error'))
-            <div class="alert alert-danger" role="alert" style="margin-bottom: 16px;">
-                <i data-lucide="circle-alert"></i>
-                <span>{{ session('error') }}</span>
-            </div>
-        @endif
-        @if (session()->has('success'))
-            <div class="alert alert-success" role="status" style="margin-bottom: 16px;">
-                <i data-lucide="circle-check"></i>
-                <span>{{ session('success') }}</span>
-            </div>
-        @endif
+        <x-flash style="margin-bottom: 16px;" />
 
         <div class="card" style="margin-bottom: 24px;">
             <dl class="doc-facts">
