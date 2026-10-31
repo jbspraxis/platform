@@ -42,6 +42,23 @@ class LayoutAndSecurityTest extends TestCase
             ->assertSee('<svg class="social-icon"', false);
     }
 
+    public function test_the_header_language_menu_shows_the_current_code_and_links_to_each_language(): void
+    {
+        $this->fakeHq();
+
+        $en = $this->get('/how-we-work')->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('~<details class="lang-menu">\s*<summary aria-label="Language: English. Choose another">.*?<span>EN</span>~s', $en);
+        $this->assertStringContainsString('href="' . url('/fr/how-we-work') . '" hreflang="fr" lang="fr" ><i data-lucide="check"></i>Français</a>', $en);
+        $this->assertStringContainsString('href="' . url('/how-we-work') . '" hreflang="en" lang="en"  aria-current="true" ><i data-lucide="check"></i>English</a>', $en);
+
+        $fr = $this->get('/fr/how-we-work')->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('~<summary aria-label="Langue\x{202F}: français\. Choisir une autre langue">.*?<span>FR</span>~su', $fr);
+
+        // The closing band is one call to action: the phones are in the footer, under their desks
+        $this->assertStringNotContainsString('or call', $en);
+        $this->assertStringNotContainsString('ou appelez', $fr);
+    }
+
     public function test_the_footer_lists_the_regional_desks_with_their_addresses_and_phones(): void
     {
         // Phones labelled with an office's city belong to that desk; any other phone stays under Contact

@@ -119,11 +119,17 @@
 
             <div class="site-tools">
                 @if ($alternates)
-                    <ul class="lang-switch" aria-label="{{ __('site.nav.language') }}">
-                        @foreach (\App\Http\Middleware\SiteLocale::LOCALES as $code)
-                            <li><a href="{{ $alternates[$code] }}" hreflang="{{ $code }}" lang="{{ $code }}" @if ($code === $locale) aria-current="true" @endif>{{ __('site.languages.' . $code) }}</a></li>
-                        @endforeach
-                    </ul>
+                    {{-- Wide screens: the globe shows the current language's code; the panel links to this page in each language --}}
+                    <details class="lang-menu">
+                        <summary aria-label="{{ __('site.nav.language_current') }}">
+                            <i data-lucide="globe"></i><span>{{ strtoupper($locale) }}</span><i data-lucide="chevron-down"></i>
+                        </summary>
+                        <ul class="lang-menu-panel">
+                            @foreach (\App\Http\Middleware\SiteLocale::LOCALES as $code)
+                                <li><a href="{{ $alternates[$code] }}" hreflang="{{ $code }}" lang="{{ $code }}" @if ($code === $locale) aria-current="true" @endif><i data-lucide="check"></i>{{ __('site.languages.' . $code) }}</a></li>
+                            @endforeach
+                        </ul>
+                    </details>
                 @endif
                 <a class="client-login" href="{{ config('site.portal_url') }}/login">{{ __('site.nav.client_login') }}</a>
                 <a class="btn btn-primary" href="{{ route('schedule') }}">

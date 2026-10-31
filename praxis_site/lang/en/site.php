@@ -28,6 +28,7 @@ return [
         'menu' => 'Menu',
         'client_login' => 'Client login',
         'language' => 'Language',
+        'language_current' => 'Language: English. Choose another',
     ],
     'languages' => ['en' => 'English', 'fr' => 'Français'],
 

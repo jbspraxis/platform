@@ -59,7 +59,6 @@ return [
         'calculator_cta' => 'Use the calculator',
         'final_title' => 'See it on your own operations.',
         'final_text' => 'The free audit and demo takes about an hour. We look at one area of your organisation and show you what a straight answer looks like.',
-        'or_call' => 'or call',
     ],
 
     'services' => [
