@@ -207,37 +207,8 @@
             </div>
 
         @elseif ($tab === 'meetings')
-            <div class="callout opp-callout mb-6" role="note"><i data-lucide="info"></i><span>{{ __('opportunities.stubs.meetings') }}</span></div>
-            @if ($meetings->isNotEmpty())
-                <div class="card" style="padding: 0">
-                    <div class="table-wrap">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th scope="col">{{ __('opportunities.meetings.when') }}</th>
-                                    <th scope="col">{{ __('opportunities.meetings.title') }}</th>
-                                    <th scope="col">{{ __('opportunities.meetings.kind') }}</th>
-                                    <th scope="col">{{ __('opportunities.meetings.status') }}</th>
-                                    <th scope="col">{{ __('opportunities.meetings.transcript') }}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($meetings as $m)
-                                    <tr wire:key="meeting-{{ $m->id }}">
-                                        <td style="white-space: nowrap">{{ $day($m->starts_at, $m->time_zone) }}<br><span class="muted">{{ $time($m->starts_at, $m->time_zone) }} (WAT)</span></td>
-                                        <td>{{ $m->title }}<br><span class="muted">{{ trans_choice('opportunities.meetings.attendees', $m->attendees->count()) }}</span></td>
-                                        <td><span class="tag">{{ __('opportunities.meetings.kinds.' . $m->kind) }}</span></td>
-                                        <td>{{ __('opportunities.meetings.statuses.' . $m->status) }}</td>
-                                        <td>{{ __('opportunities.meetings.transcripts.' . $m->transcript_status) }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            @else
-                <div class="card empty-state"><strong>{{ __('opportunities.meetings.empty_title') }}</strong>{{ __('opportunities.meetings.empty_text') }}</div>
-            @endif
+            {{-- PR 2: App\Livewire\Hq\Opportunities\MeetingsTab --}}
+            <livewire:hq.opportunities.meetings-tab :opportunity-id="$o->id" :key="'meetings-' . $o->id" />
 
         @elseif ($tab === 'questionnaire')
             <livewire:hq.opportunities.questionnaire-tab :opportunity-id="$o->id" :key="'questionnaire-' . $o->id" />

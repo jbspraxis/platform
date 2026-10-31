@@ -43,6 +43,10 @@ Schedule::command('queue:work ' . config('ai.queue.connection') . ' --queue=' . 
     ->everyMinute()->withoutOverlapping(30);
 Schedule::call(fn () => \App\Support\Ai\Ai::expireStuck())->name('ai:expire-stuck')->everyTenMinutes()->withoutOverlapping(5);
 
+// Meetings (docs/OPPORTUNITIES.md 6.1): ended meetings become held; transcripts are collected from Google from 20
+// minutes after the end, every 10 minutes until 6 hours after it, then the lead is asked to add it by hand
+Schedule::command('meetings:collect-transcripts')->everyFiveMinutes()->withoutOverlapping(10);
+
 // The privacy policy on jbspraxis.com: the website's visitor limits keep IP addresses 24 hours at most, so expired
 // cache rows (whose keys hold them) go within minutes instead of whenever the same key is read again
 Schedule::command('cache:prune-expired')->everyFiveMinutes()->withoutOverlapping(5);

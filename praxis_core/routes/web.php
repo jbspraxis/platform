@@ -223,6 +223,11 @@ Route::domain(Hosts::portal())->group(function () use ($notOwnRoute, $legacy) {
 
         // The Client Project Tracker (Mobile-First Portal)
         Route::get('/tracker/{token}', \App\Livewire\Portal\ProjectTracker::class)->name('portal.tracker');
+
+        // A client's meetings for one opportunity: upcoming, minutes, book a follow-up (docs/OPPORTUNITIES.md, PR 2).
+        // Signed, expiring links from HQ's emails (App\Support\Opportunities\PortalLinks); the signature covers path and query
+        Route::get('/meetings/{opportunity}', \App\Livewire\Portal\MeetingsGateway::class)->whereUuid('opportunity')
+            ->middleware('signed:relative')->name('portal.meetings');
     });
 
     // Client accounts only (guard 'client', table client_users)

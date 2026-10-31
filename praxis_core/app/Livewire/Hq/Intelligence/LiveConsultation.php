@@ -14,6 +14,12 @@ use App\Mail\MeetingApprovedMail;
 // use App\Mail\CopqReportMail; // Commented out for now until logic is finalized
 use App\Support\MailLocale;
 use App\Support\Ai\CompanyBrief;
+use App\Models\Opportunity;
+use App\Support\Google\GoogleUnavailable;
+use App\Support\Google\GoogleWorkspace;
+use App\Support\Opportunities\Meetings;
+use App\Support\Opportunities\OpportunityAccess;
+use Carbon\CarbonImmutable;
 
 #[Layout('components.layouts.hq')]
 class LiveConsultation extends Component
@@ -65,14 +71,20 @@ class LiveConsultation extends Component
         $this->scheduledAppointments = (clone $baseQuery)->where('appointments.status', 'Scheduled')->orderBy('start_time', 'asc')->get();
     }
 
-    public function approveMeeting($appointmentId, $meetingLink)
+    public function approveMeeting($appointmentId, $meetingLink = '')
     {
         if (! Auth::user()->can('crm.approve')) {
             session()->flash('error', "You don’t have permission to approve free audits. Ask an administrator to change your role.");
             return;
         }
 
-        if(empty(trim($meetingLink))) {
+        // With Google connected, HQ creates the meeting itself (docs/OPPORTUNITIES.md, PR 2); otherwise a pasted link, as before
+        if (app(GoogleWorkspace::class)->isConnected()) {
+            $this->approveWithGoogle((string) $appointmentId);
+            return;
+        }
+
+        if(empty(trim((string) $meetingLink))) {
             session()->flash('error', 'Add the meeting link, then approve the free audit again.');
             return;
         }
@@ -121,6 +133,100 @@ class LiveConsultation extends Component
         }
 
         $this->loadLobby();
+    }
+
+    /**
+     * Approve through Google: the booking joins the organisation's open opportunity (or opens one, source
+     * website_booking, led by whoever approves), becomes a client meeting in praxisjbs@gmail.com's calendar with a Meet
+     * link (Google invites the client), and the client gets the free audit email with that link. If Google refuses,
+     * the request waits again and nothing is sent.
+     */
+    private function approveWithGoogle(string $appointmentId): void
+    {
+        // Claim the request first, so two people approving at once can't create two meetings
+        $claimed = DB::table('appointments')->where('id', $appointmentId)->where('status', 'Requested')->update([
+            'status' => 'Scheduled', 'updated_by' => Auth::id() ?? 'system', 'updated_at' => now(),
+        ]) === 1;
+        if (! $claimed) {
+            session()->flash('error', 'This request was already approved, declined or closed because its time passed, so nothing changed. The list is up to date now.');
+            $this->loadLobby();
+            return;
+        }
+
+        $appt = DB::table('appointments')->where('id', $appointmentId)->first();
+        $org = DB::table('organizations')->where('id', $appt->organization_id)->first();
+        $clientEmail = $this->clientEmail($appt, $org);
+        $booker = $appt->created_by && DB::table('client_users')->where('id', $appt->created_by)->where('organization_id', $org->id)->whereNull('deleted_at')->exists()
+            ? $appt->created_by : null;
+        $starts = CarbonImmutable::parse($appt->start_time, Meetings::TIME_ZONE);
+        $ends = $appt->end_time ? CarbonImmutable::parse($appt->end_time, Meetings::TIME_ZONE) : null;
+        $ends = $ends && $ends->greaterThan($starts) ? $ends : $starts->addHour();
+
+        try {
+            $opportunity = DB::transaction(fn () => $this->opportunityForBooking($org, $appt));
+            $change = Meetings::schedule($opportunity, [
+                'kind' => 'client',
+                'title' => $appt->title ?: 'Free audit',
+                'starts_at' => $starts,
+                'ends_at' => $ends,
+                'staff' => array_values(array_unique(array_filter([Auth::id(), $opportunity->lead_user_id]))),
+                'contacts' => $booker ? [$booker] : [],
+                'guests' => ! $booker && $clientEmail ? [['email' => $clientEmail, 'name' => null]] : [],
+                'appointment_id' => $appt->id,
+            ], brandedEmail: false);
+        } catch (\Throwable $e) {
+            DB::table('appointments')->where('id', $appt->id)->update(['status' => 'Requested', 'updated_at' => now()]);
+            if (! $e instanceof GoogleUnavailable) {
+                report($e);
+            }
+            session()->flash('error', __('meetings.approval.google_failed', ['reason' => $e instanceof GoogleUnavailable ? $e->getMessage() : __('integrations.google.errors.failed')]));
+            $this->loadLobby();
+            return;
+        }
+
+        $link = $change->meeting->meet_link;
+        DB::table('appointments')->where('id', $appt->id)->update(['meeting_link' => $link]);
+        $appt = DB::table('appointments')->where('id', $appt->id)->first();
+
+        if (! $clientEmail) {
+            session()->flash('success', __('meetings.approval.done_no_email'));
+        } else {
+            try {
+                $firstName = DB::table('client_users')->where('email', $clientEmail)->value('first_name');
+                Mail::to($clientEmail)
+                    ->locale(MailLocale::forRecipient($org->preferred_language ?? null))
+                    ->send(new MeetingApprovedMail($appt, $org->name, $link, $firstName));
+                session()->flash('success', __('meetings.approval.done', ['email' => $clientEmail]));
+            } catch (\Exception $e) {
+                session()->flash('error', __('meetings.approval.done_not_emailed', ['email' => $clientEmail]));
+            }
+        }
+
+        $this->loadLobby();
+    }
+
+    /** The organisation's open opportunity, else a new one from this booking */
+    private function opportunityForBooking(object $org, object $appt): Opportunity
+    {
+        $open = Opportunity::where('organization_id', $org->id)->whereNotIn('stage', Opportunity::CLOSED)->orderByDesc('updated_at')->first();
+        if ($open) {
+            return $open;
+        }
+
+        $title = trim(Str::after((string) $appt->title, ':')) ?: $org->name;
+        $opportunity = Opportunity::create([
+            'organization_id' => $org->id,
+            'title' => Str::limit($title, 200, ''),
+            'stage' => 'discovery',
+            'lead_user_id' => Auth::id(),
+            'language' => MailLocale::parse($org->preferred_language ?? null) ?? 'en',
+            'source' => 'website_booking',
+            'created_by' => Auth::id(),
+        ]);
+        OpportunityAccess::log('OPPORTUNITY_OPENED', "Opened the opportunity “{$opportunity->title}” for {$org->name} from its website booking.", 'opportunities', $opportunity->id,
+            [], $opportunity->only(['organization_id', 'title', 'stage', 'lead_user_id', 'language', 'source']));
+
+        return $opportunity;
     }
 
     /**
@@ -607,6 +713,8 @@ class LiveConsultation extends Component
 
     public function render()
     {
-        return view('livewire.hq.intelligence.live-consultation');
+        return view('livewire.hq.intelligence.live-consultation', [
+            'googleConnected' => app(GoogleWorkspace::class)->isConnected(),
+        ]);
     }
 }
