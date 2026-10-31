@@ -8,7 +8,9 @@ use Tests\TestCase;
 
 /**
  * The Claude SDK (anthropic-ai/sdk) on a PHP like the live web PHP, without intl, fileinfo, exif, sodium or gmp
- * (docs/OPPORTUNITIES.md section 5): the client builds, a request is shaped and a stream accumulates.
+ * (docs/OPPORTUNITIES.md section 5): the client builds, a request is shaped and a stream accumulates. An extension
+ * compiled into the PHP running the tests (sodium on GitHub's runners) can't be left out, so the second test reads
+ * the SDK and its dependencies instead: none of them calls any of the five, on any machine.
  */
 class ClaudeSdkWithoutExtensionsTest extends TestCase
 {
@@ -16,17 +18,23 @@ class ClaudeSdkWithoutExtensionsTest extends TestCase
 
     private const MISSING_ON_LIVE = ['intl', 'fileinfo', 'exif', 'sodium', 'gmp'];
 
+    /** The SDK and the packages it brought in (composer.lock, 31 Oct 2026) */
+    private const SDK_PACKAGES = ['anthropic-ai/sdk', 'open-telemetry/api', 'open-telemetry/context', 'php-http/discovery', 'standard-webhooks/standard-webhooks', 'symfony/polyfill-php82'];
+
     public function test_the_sdk_works_without_the_extensions_live_lacks(): void
     {
-        $base = $this->phpWithout('intl');
-        if ($base === null) {
-            $this->markTestSkipped('intl is built into this PHP: it cannot be left out');
+        // phpWithout() is null for an extension compiled into this PHP: those stay, the rest are left out
+        $builtIn = array_values(array_filter(self::MISSING_ON_LIVE, fn ($ext) => $this->phpWithout($ext) === null));
+        $removable = array_values(array_diff(self::MISSING_ON_LIVE, $builtIn));
+        if (! $removable) {
+            $this->markTestSkipped('intl, fileinfo, exif, sodium and gmp are all built into this PHP: none can be left out');
         }
-        // phpWithout leaves out one extension; drop the '-d extension=…' pairs of the other four as well
+        $base = $this->phpWithout($removable[0]);
+        // phpWithout leaves out one extension; drop the '-d extension=…' pairs of the other removable ones as well
         $php = [];
         for ($i = 0; $i < count($base); $i++) {
             $next = $base[$i + 1] ?? '';
-            if ($base[$i] === '-d' && str_starts_with($next, 'extension=') && in_array(substr($next, 10), self::MISSING_ON_LIVE, true)) {
+            if ($base[$i] === '-d' && str_starts_with($next, 'extension=') && in_array(substr($next, 10), $removable, true)) {
                 $i++;
                 continue;
             }
@@ -52,7 +60,35 @@ class ClaudeSdkWithoutExtensionsTest extends TestCase
         $this->assertTrue($run->successful(), $run->errorOutput() . $run->output());
         $out = json_decode($run->output(), true);
         $this->assertIsArray($out, $run->output());
-        $this->assertSame([], $out['loaded'], 'The second PHP still has one of the extensions live lacks');
+        $this->assertSame($builtIn, $out['loaded'], 'The second PHP still has an extension that could have been left out');
         $this->assertSame(['{"ok":true}', 'end_turn', 5], [$out['text'], $out['stop'], $out['out']]);
+    }
+
+    public function test_the_sdk_never_calls_those_extensions(): void
+    {
+        $uses = '/\b(?:sodium_\w+|gmp_\w+|exif_\w+|finfo_\w+|mime_content_type|grapheme_\w+|idn_to_\w+|intl\w*_\w+|numfmt_\w+|datefmt_\w+|collator_\w+|normalizer_\w+|transliterator_\w+)\s*\('
+            . '|\bnew\s+\\\\?(?:finfo|Normalizer|NumberFormatter|IntlDateFormatter|Collator|Transliterator|IntlTimeZone|IntlCalendar|ResourceBundle|MessageFormatter|Locale|GMP)\b'
+            . '|\b(?:Normalizer|NumberFormatter|IntlDateFormatter|Collator|Transliterator|Locale|IntlChar)::/';
+
+        $files = 0;
+        $found = [];
+        foreach (self::SDK_PACKAGES as $package) {
+            $dir = base_path('vendor/' . $package);
+            $this->assertDirectoryExists($dir, "{$package} is not installed");
+            foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)) as $file) {
+                if ($file->getExtension() !== 'php' || preg_match('~[\\\\/](tests?|examples|fixtures)[\\\\/]~i', $file->getPathname())) {
+                    continue;
+                }
+                $files++;
+                // Comments may name anything; code may not
+                $code = preg_replace('~/\*.*?\*/|//[^\n]*|#[^\[\n][^\n]*~s', '', (string) file_get_contents($file->getPathname()));
+                if (preg_match_all($uses, $code, $m)) {
+                    $found[] = str_replace(base_path('vendor') . DIRECTORY_SEPARATOR, '', $file->getPathname()) . ': ' . implode(', ', array_unique($m[0]));
+                }
+            }
+        }
+
+        $this->assertGreaterThan(100, $files, 'The SDK sources were not found');
+        $this->assertSame([], $found, 'The SDK or one of its dependencies calls an extension the live web PHP lacks');
     }
 }
