@@ -175,6 +175,7 @@ class ScrumMaster extends Component
                     'title' => Str::limit(trim($milestone['milestone_title'] ?? '') ?: 'Milestone', 140),
                     'goal' => trim($milestone['goal'] ?? '') ?: null,
                     'weight_percentage' => $weight,
+                    'amount' => round((float) $this->project->total_budget * $weight / 100, 2),
                     'status' => 'Pending',
                     'start_date' => $start->format('Y-m-d'),
                     'due_date' => $due->format('Y-m-d'),

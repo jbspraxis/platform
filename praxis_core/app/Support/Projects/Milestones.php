@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
  */
 final class Milestones
 {
-    public const FIELDS = ['phase_number', 'title', 'description', 'weight_percentage', 'status', 'start_date', 'due_date', 'accepted_at', 'accepted_by_name', 'goal', 'notes'];
+    public const FIELDS = ['phase_number', 'title', 'description', 'weight_percentage', 'amount', 'status', 'start_date', 'due_date', 'accepted_at', 'accepted_by_name', 'goal', 'notes'];
 
     public static function find(string $projectId, ?string $phaseId): ?object
     {
@@ -25,10 +25,33 @@ final class Milestones
         return (int) DB::table('project_phases')->where('project_id', $projectId)->whereNull('deleted_at')->max('phase_number') + 1;
     }
 
+    /**
+     * A milestone's agreed amount (project_phases.amount): what its invoice is pre-filled with. Set from the weight
+     * when the weight is set or changed; a change report keeps every amount as it is and only rescales the weights,
+     * so amounts never drift with rounding. An older row without one falls back to weight × contract total.
+     */
+    public static function amount(object $phase, ?float $total = null): float
+    {
+        if ($phase->amount !== null) {
+            return (float) $phase->amount;
+        }
+        $total ??= (float) DB::table('projects')->where('id', $phase->project_id)->value('total_budget');
+
+        return round($total * (float) $phase->weight_percentage / 100, 2);
+    }
+
+    private static function amountFor(string $projectId, $weight): string
+    {
+        $total = (float) DB::table('projects')->where('id', $projectId)->value('total_budget');
+
+        return number_format(round($total * (float) $weight / 100, 2), 2, '.', '');
+    }
+
     public static function create(string $projectId, array $data): string
     {
         $id = (string) Str::uuid();
         $row = self::withAcceptance(array_intersect_key($data, array_flip(self::FIELDS)));
+        $row['amount'] ??= self::amountFor($projectId, $row['weight_percentage'] ?? 0);
         DB::table('project_phases')->insert($row + [
             'id' => $id, 'project_id' => $projectId,
             'created_by' => Auth::id(), 'updated_by' => Auth::id(), 'created_at' => now(), 'updated_at' => now(),
@@ -43,6 +66,11 @@ final class Milestones
         [$before, $after] = ProjectRules::diff((array) $phase, self::withAcceptance(array_intersect_key($data, array_flip(self::FIELDS))));
         if (! $after) {
             return;
+        }
+        // A new weight sets a new agreed amount; anything else leaves the amount alone
+        if (array_key_exists('weight_percentage', $after) && ! array_key_exists('amount', $after)) {
+            $before['amount'] = $phase->amount;
+            $after['amount'] = self::amountFor($phase->project_id, $after['weight_percentage']);
         }
         DB::table('project_phases')->where('id', $phase->id)->update($after + ['updated_by' => Auth::id(), 'updated_at' => now()]);
         ProjectRules::log($action, "Changed M{$phase->phase_number} “{$phase->title}”: " . implode(', ', array_keys($after)) . '.', 'project_phases', $phase->id, $before, $after);

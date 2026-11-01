@@ -72,6 +72,7 @@ final class Tasks
         DB::table('tasks')->where('id', $task->id)->update($after + ['updated_by' => Auth::id(), 'updated_at' => now()]);
         ProjectRules::log('TASK_UPDATED', "Changed “{$task->title}”: " . implode(', ', array_keys($before)) . '.', 'tasks', $task->id, $before, $after);
         if (! empty($after['assigned_to'])) {
+            self::leadOnly($task->id, $after['assigned_to']);
             self::tellLead($projectId, $task->id, $after['title'] ?? $task->title, $after['assigned_to']);
         }
     }
@@ -83,10 +84,17 @@ final class Tasks
             ->when(! $anyone, fn ($q) => $q->whereNull('assigned_to'))
             ->update(['assigned_to' => Auth::id(), 'updated_by' => Auth::id(), 'updated_at' => now()]);
         if ($updated) {
+            self::leadOnly($task->id, Auth::id());
             ProjectRules::log('TASK_CHECKOUT', "Took the lead on “{$task->title}”.", 'tasks', $task->id, ['assigned_to' => $task->assigned_to], ['assigned_to' => Auth::id()]);
         }
 
         return $updated > 0;
+    }
+
+    /** The lead is never also sharing or watching the same task: their task_people row goes */
+    public static function leadOnly(string $taskId, string $leadId): void
+    {
+        DB::table('task_people')->where('task_id', $taskId)->where('user_id', $leadId)->delete();
     }
 
     /**
@@ -103,7 +111,7 @@ final class Tasks
             // The 5-hour client QA window (Rule 6)
             if ($newStatus === 'QA_Review') {
                 $updateData['qa_sla_expires_at'] = now()->addHours(5);
-                self::notifyQaApprovers("‘{$task->title}’ is waiting for the client’s review. If the client doesn’t respond within 5 hours, it’s approved automatically.");
+                self::notifyQaApprovers($task);
             }
 
             // Cleared when pulled out of client review
@@ -161,10 +169,44 @@ final class Tasks
 
         ProjectRules::log('TASK_MOVED', "Moved “{$task->title}” from {$task->status} to {$newStatus}.", 'tasks', $task->id, ['status' => $task->status], ['status' => $newStatus]);
         if (in_array($newStatus, ['QA_Review', 'Done'], true)) {
-            self::tell($projectId, $task, __('projects.bell.moved_title'), __('projects.bell.moved', [
-                'task' => $task->title, 'status' => __('projects.task_statuses.' . $newStatus),
-            ]));
+            self::tell($projectId, $task, fn (string $l) => [__('projects.bell.moved_title', [], $l), __('projects.bell.moved', [
+                'task' => $task->title, 'status' => __('projects.task_statuses.' . $newStatus, [], $l),
+            ], $l)]);
         }
+    }
+
+    /**
+     * The 45-minute presence check went unanswered (App\Livewire\Hq\TimerPresence): every open timer of this person
+     * stops and books its hours, and its task goes back to To do. Moved unchanged from SprintBoard::forcePauseTimers.
+     * Returns how many timers stopped.
+     */
+    public static function pauseOpenTimers(string $userId): int
+    {
+        $openLogs = DB::table('task_time_logs')->where('user_id', $userId)->whereNull('end_time')->get();
+        if ($openLogs->isEmpty()) {
+            return 0;
+        }
+
+        $rate = DB::table('compensation_history')->where('user_id', $userId)->orderBy('effective_from', 'desc')->value('hourly_rate') ?? 50.00;
+
+        foreach ($openLogs as $log) {
+            $endTime = now();
+            $durationMinutes = Carbon::parse($log->start_time)->diffInMinutes($endTime);
+
+            DB::table('task_time_logs')->where('id', $log->id)->update([
+                'end_time' => $endTime,
+                'duration_minutes' => $durationMinutes,
+                'cost_calculated' => ($durationMinutes / 60) * $rate,
+            ]);
+
+            DB::table('tasks')->where('id', $log->task_id)->update([
+                'status' => 'To-Do', // out of In progress
+                'actual_hours_logged' => DB::raw('actual_hours_logged + ' . round($durationMinutes / 60, 2)),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return $openLogs->count();
     }
 
     /** The people sharing a task and its watchers, as a manager sets them (the lead is never one of them) */
@@ -254,6 +296,7 @@ final class Tasks
         DB::table('task_comments')->insert([
             'task_id' => $task->id,
             'user_id' => Auth::id(),
+            'author_type' => 'staff', // the portal shows the client's own comments only
             'comment_text' => $text,
             'attachment_path' => $attachmentPath,
             'created_by' => Auth::id(),
@@ -261,9 +304,10 @@ final class Tasks
             'updated_at' => now(),
         ]);
         ProjectRules::log('TASK_COMMENTED', "Commented on “{$task->title}”.", 'tasks', $task->id);
-        self::tell($projectId, $task, __('projects.bell.comment_title'), __('projects.bell.comment', [
-            'name' => trim(Auth::user()->first_name . ' ' . Auth::user()->last_name), 'task' => $task->title, 'text' => Str::limit($text, 140),
-        ]));
+        $name = trim(Auth::user()->first_name . ' ' . Auth::user()->last_name);
+        self::tell($projectId, $task, fn (string $l) => [__('projects.bell.comment_title', [], $l), __('projects.bell.comment', [
+            'name' => $name, 'task' => $task->title, 'text' => Str::limit($text, 140),
+        ], $l)]);
     }
 
     /** A team member proposes a due date; the project lead sees it in the drawer (and the bell) and accepts it or not */
@@ -274,9 +318,10 @@ final class Tasks
 
         $lead = DB::table('projects')->where('id', $projectId)->value('lead_user_id');
         if ($lead && $lead !== Auth::id()) {
-            self::bell([$lead], $projectId, $task->id, __('projects.bell.proposal_title'), __('projects.bell.proposal', [
-                'name' => trim(Auth::user()->first_name . ' ' . Auth::user()->last_name), 'task' => $task->title, 'date' => ProjectPlan::day($date),
-            ]));
+            $name = trim(Auth::user()->first_name . ' ' . Auth::user()->last_name);
+            self::bell([$lead], $projectId, $task->id, fn (string $l) => [__('projects.bell.proposal_title', [], $l), __('projects.bell.proposal', [
+                'name' => $name, 'task' => $task->title, 'date' => ProjectPlan::day($date, 'date', $l),
+            ], $l)]);
         }
     }
 
@@ -292,47 +337,53 @@ final class Tasks
     }
 
     /** The bell for the task's lead, the people sharing it and its watchers, except whoever made the change */
-    private static function tell(string $projectId, object $task, string $title, string $message): void
+    private static function tell(string $projectId, object $task, \Closure $text): void
     {
         $fresh = DB::table('tasks')->where('id', $task->id)->value('assigned_to');
         $people = DB::table('task_people')->where('task_id', $task->id)->pluck('user_id')->push($fresh);
-        self::bell($people->filter()->unique()->reject(fn ($id) => $id === Auth::id())->values()->all(), $projectId, $task->id, $title, $message);
+        self::bell($people->filter()->unique()->reject(fn ($id) => $id === Auth::id())->values()->all(), $projectId, $task->id, $text);
     }
 
     private static function tellLead(string $projectId, string $taskId, string $title, string $leadId): void
     {
         if ($leadId !== Auth::id()) {
-            self::bell([$leadId], $projectId, $taskId, __('projects.bell.lead_title'), __('projects.bell.lead', ['task' => $title]));
+            self::bell([$leadId], $projectId, $taskId, fn (string $l) => [__('projects.bell.lead_title', [], $l), __('projects.bell.lead', ['task' => $title], $l)]);
         }
     }
 
-    /** Bell rows (and so a phone push) for active staff, opening the task on the project page */
-    private static function bell(array $userIds, string $projectId, string $taskId, string $title, string $message): void
+    /**
+     * The language a staff member's bell is written in: HQ keeps no language per person yet, so HQ's own language
+     * (config app.hq_locale), never the language of the screen the person who acted happened to be on (App::setLocale
+     * rewrites app.locale to that one).
+     */
+    public static function localeFor(string $userId): string
+    {
+        return config('app.hq_locale') === 'fr' ? 'fr' : 'en';
+    }
+
+    /**
+     * Bell rows (and so a phone push) for active staff, opening the task on the project page; $text(locale) gives
+     * [title, message] in each recipient's language.
+     */
+    private static function bell(array $userIds, string $projectId, ?string $taskId, \Closure $text, ?string $link = null): void
     {
         $active = DB::table('users')->whereIn('id', $userIds)->where('status', 'Active')->whereNull('deleted_at')->pluck('id');
-        $link = route('hq.ops.project', ['project' => $projectId, 'tab' => 'backlog', 'task' => $taskId]);
-        $rows = $active->map(fn ($id) => [
-            'id' => (string) Str::uuid(), 'user_id' => $id, 'title' => Str::limit($title, 150, '…'), 'message' => $message,
-            'link_url' => $link, 'type' => 'Project', 'is_read' => 0, 'created_at' => now(),
-        ])->all();
+        $link ??= route('hq.ops.project', ['project' => $projectId, 'tab' => 'backlog', 'task' => $taskId]);
+        $rows = $active->map(function ($id) use ($text, $link) {
+            [$title, $message] = $text(self::localeFor($id));
+
+            return ['id' => (string) Str::uuid(), 'user_id' => $id, 'title' => Str::limit($title, 150, '…'), 'message' => $message,
+                'link_url' => $link, 'type' => 'Project', 'is_read' => 0, 'created_at' => now()];
+        })->all();
         if ($rows) {
             DB::table('notifications')->insert($rows);
         }
     }
 
-    /** QA approvers follow what lands in client review (from SprintBoard) */
-    private static function notifyQaApprovers(string $message): void
+    /** QA approvers follow what lands in client review (from SprintBoard); the link opens Quality and issues */
+    private static function notifyQaApprovers(object $task): void
     {
-        $inserts = [];
-        foreach (Access::staffWith('qa.approve') as $adminId) {
-            $inserts[] = [
-                'id' => (string) Str::uuid(), 'user_id' => $adminId,
-                'title' => 'Task ready for client review', 'message' => $message,
-                'type' => 'Project', 'created_at' => now(),
-            ];
-        }
-        if (! empty($inserts)) {
-            DB::table('notifications')->insert($inserts);
-        }
+        self::bell(Access::staffWith('qa.approve'), '', null, fn (string $l) => [__('projects.bell.review_title', [], $l), __('projects.bell.review', ['task' => $task->title], $l)],
+            route('hq.ops.qa'));
     }
 }

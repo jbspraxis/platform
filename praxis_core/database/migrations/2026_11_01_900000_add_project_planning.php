@@ -28,6 +28,8 @@ return new class extends Migration
             $table->string('accepted_by_name', 150)->nullable()->after('accepted_at')->comment('Who accepted, e.g. "Oyebode, CTO"');
             $table->text('goal')->nullable()->after('accepted_by_name');
             $table->text('notes')->nullable()->after('goal');
+            $table->decimal('amount', 15, 2)->nullable()->after('weight_percentage')
+                ->comment('Its agreed amount in the project currency: invoices use it; the weight is its share of the contract total');
         });
 
         Schema::table('tasks', function (Blueprint $table) {
@@ -122,7 +124,18 @@ return new class extends Migration
         });
 
         $this->backfillMilestoneDates();
+        $this->backfillMilestoneAmounts();
         $this->backfillProjectLeads();
+    }
+
+    /** Each milestone's agreed amount from its weight and the contract total, for the empty ones (MyCity: M1 12% = ₦444,000) */
+    private function backfillMilestoneAmounts(): void
+    {
+        foreach (DB::table('project_phases')->join('projects', 'projects.id', '=', 'project_phases.project_id')->whereNull('project_phases.amount')
+            ->get(['project_phases.id', 'project_phases.weight_percentage', 'projects.total_budget']) as $phase) {
+            DB::table('project_phases')->where('id', $phase->id)->whereNull('amount')
+                ->update(['amount' => round((float) $phase->total_budget * (float) $phase->weight_percentage / 100, 2)]);
+        }
     }
 
     /**
@@ -178,6 +191,6 @@ return new class extends Migration
             $table->dropColumn('lead_user_id');
         });
         Schema::table('tasks', fn (Blueprint $table) => $table->dropColumn(['due_date', 'proposed_due_date', 'proposed_due_by']));
-        Schema::table('project_phases', fn (Blueprint $table) => $table->dropColumn(['start_date', 'due_date', 'accepted_at', 'accepted_by_name', 'goal', 'notes']));
+        Schema::table('project_phases', fn (Blueprint $table) => $table->dropColumn(['start_date', 'due_date', 'accepted_at', 'accepted_by_name', 'goal', 'notes', 'amount']));
     }
 };

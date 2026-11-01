@@ -195,6 +195,7 @@ class ImportEngagement extends Command
                 'title' => $phase['title'],
                 'description' => $phase['description'] ?? null,
                 'weight_percentage' => $phase['weight'] ?? 0,
+                'amount' => round((float) ($p['total_budget'] ?? 0) * (float) ($phase['weight'] ?? 0) / 100, 2),
                 'status' => $phase['status'] ?? 'Pending',
                 'start_date' => $phase['start'] ?? $this->sprintSpan($b, $phase['key'])['start'] ?? null,
                 'due_date' => $phase['due'] ?? $this->sprintSpan($b, $phase['key'])['end'] ?? null,

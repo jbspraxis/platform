@@ -121,15 +121,19 @@ final class ChangeReports
         $plan = json_decode((string) $report->plan, true) ?: [];
         $milestone = $plan['milestone'] ?? [];
 
-        // Every milestone keeps its amount: its share shrinks by old total / new total
-        $phases = DB::table('project_phases')->where('project_id', $project->id)->whereNull('deleted_at')->get(['id', 'weight_percentage']);
+        // Every milestone keeps its agreed amount (project_phases.amount, to the unit); its weight, its share of the
+        // contract, becomes that amount over the new total. Weights come from the amounts each time, so they never drift.
+        $phases = DB::table('project_phases')->where('project_id', $project->id)->whereNull('deleted_at')->get(['id', 'project_id', 'weight_percentage', 'amount']);
         $before = round((float) $phases->sum('weight_percentage'), 2);
         $after = 0.0;
         if ((float) $project->total_budget > 0) {
             foreach ($phases as $phase) {
-                $weight = round((float) $phase->weight_percentage * $preview['factor'], 2);
+                $amount = Milestones::amount($phase, (float) $project->total_budget);
+                $weight = round($amount / $preview['total'] * 100, 2);
                 $after += $weight;
-                DB::table('project_phases')->where('id', $phase->id)->update(['weight_percentage' => $weight, 'updated_by' => Auth::id(), 'updated_at' => now()]);
+                DB::table('project_phases')->where('id', $phase->id)->update([
+                    'weight_percentage' => $weight, 'amount' => $amount, 'updated_by' => Auth::id(), 'updated_at' => now(),
+                ]);
             }
         }
         // A plan that added up to 100% still does: the rounding goes to the new milestone
@@ -140,6 +144,7 @@ final class ChangeReports
             'title' => trim($milestone['title'] ?? '') ?: $report->title,
             'description' => trim($milestone['description'] ?? '') ?: ($report->description ?: null),
             'weight_percentage' => max(0, $weight),
+            'amount' => number_format((float) $report->price, 2, '.', ''),
             'status' => 'Pending',
             'due_date' => ($milestone['due_date'] ?? null) ?: null,
             'notes' => self::label($report) . ', approved ' . now(ProjectPlan::TIME_ZONE)->toDateString() . '.',

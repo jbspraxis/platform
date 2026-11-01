@@ -429,6 +429,19 @@ return [
         'no_milestones' => "Ce projet n’a pas encore de jalon. Ajoutez-en un dans l’onglet Jalons\u{202F}; ses tâches apparaissent ici.",
         'capacity' => "Heures ouvertes attribuées sur ce jalon",
         'empty_column' => "Aucune tâche. Faites-en glisser une ici.",
+        'review_passed' => "Délai de revue client dépassé",
+        'review_due' => "Revue client attendue :when",
+        'open_issue' => "Ouvrir le problème",
+        'issue_reported' => "Problème signalé",
+        'no_description' => "Pas encore de description.",
+        'issue_hint' => "Sélectionnez-le pour l’ouvrir dans Qualité et problèmes.",
+    ],
+
+    'presence' => [
+        'title' => "Travaillez-vous toujours sur cette tâche\u{202F}?",
+        'text' => "Votre minuteur tourne depuis 45\u{00A0}minutes. Confirmez dans les 5\u{00A0}minutes, sinon nous le mettrons en pause et la tâche repassera en À faire.",
+        'keep' => "Laisser le minuteur tourner",
+        'paused' => "Nous avons mis vos minuteurs en pause, faute de réponse à la vérification des 45\u{00A0}minutes. Vos tâches en cours sont revenues en À faire\u{202F}; passez-en une en En cours pour reprendre.",
     ],
 
     'all' => [
@@ -446,6 +459,8 @@ return [
         'proposal' => ":name propose le :date comme échéance de « :task ».",
         'lead_title' => "Vous êtes responsable d’une tâche",
         'lead' => "Vous êtes maintenant responsable de « :task ».",
+        'review_title' => "Tâche prête pour la revue client",
+        'review' => "« :task » attend la revue du client. Sans réponse du client sous 5\u{00A0}heures, elle est approuvée automatiquement.",
     ],
 
     'errors' => [

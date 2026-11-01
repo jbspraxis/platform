@@ -428,6 +428,20 @@ return [
         'no_milestones' => 'This project has no milestones yet. Add one on the Milestones tab; its tasks appear here.',
         'capacity' => 'Open hours assigned on this milestone',
         'empty_column' => 'No tasks. Drag a task here.',
+        'review_passed' => 'Client review window passed',
+        'review_due' => 'Client review due :when',
+        'open_issue' => 'Open issue',
+        'issue_reported' => 'Issue reported',
+        'no_description' => 'No description yet.',
+        'issue_hint' => 'Select to open it in Quality and issues.',
+    ],
+
+    // The 45-minute check while a task timer runs, on every HQ page (App\Livewire\Hq\TimerPresence)
+    'presence' => [
+        'title' => 'Are you still working on this?',
+        'text' => 'Your timer has run for 45 minutes. Confirm within 5 minutes, or we’ll pause your timer and move the task back to To do.',
+        'keep' => 'Keep timer running',
+        'paused' => 'We paused your timers because the 45-minute check wasn’t answered. Your tasks in progress are back in To do; move one into In progress to start again.',
     ],
 
     'all' => [
@@ -446,6 +460,8 @@ return [
         'proposal' => ':name proposes :date as the due date of “:task”.',
         'lead_title' => 'You lead a task',
         'lead' => 'You now lead “:task”.',
+        'review_title' => 'Task ready for client review',
+        'review' => '“:task” is waiting for the client’s review. If the client doesn’t respond within 5 hours, it’s approved automatically.',
     ],
 
     'errors' => [

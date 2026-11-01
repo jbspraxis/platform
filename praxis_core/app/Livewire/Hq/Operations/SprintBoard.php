@@ -221,17 +221,11 @@ class SprintBoard extends Component
         $this->authoriseBoard();
 
         // Only a task on this board
-        if (! $this->boardTask($taskId)) return;
+        $task = $this->boardTask($taskId);
+        if (! $task) return;
 
-        // Only an unassigned task, unless the user may move anyone’s task
-        $updated = DB::table('tasks')->where('id', $taskId)
-            ->when(! Auth::user()->can('projects.approve'), fn ($q) => $q->whereNull('assigned_to'))
-            ->update([
-                'assigned_to' => Auth::id(),
-                'updated_at' => now()
-            ]);
-
-        if ($updated) $this->logAudit('TASK_CHECKOUT', "Staff member assigned task {$taskId} to themselves");
+        // Only an unassigned task, unless the user may move anyone’s task; the new lead stops sharing or watching it
+        \App\Support\Projects\Tasks::assignToMe($task, Auth::user()->can('projects.approve'));
         $this->loadBoardData();
     }
 
@@ -254,56 +248,14 @@ class SprintBoard extends Component
         // The client review window, the timers and the notices (moved to App\Support\Projects\Tasks::move, which the
         // project page's task drawer uses too)
         \App\Support\Projects\Tasks::move($this->projectId, $task, $newStatus);
+        $this->dispatch('timers-changed'); // the page-wide 45-minute check follows (App\Livewire\Hq\TimerPresence)
 
         $this->loadBoardData();
         $this->dispatch('project-changed')->to(\App\Livewire\Hq\Projects\ProjectPage::class); // the page's header and counts
     }
 
-    private function logAudit($action, $description)
-    {
-        DB::table('system_audit_logs')->insert([
-            // Removed UUID insertion to allow DB Auto-Increment
-            'user_id' => Auth::id(),
-            'action' => $action, 
-            'description' => $description,
-            'ip_address' => request()->ip(), 
-            'created_at' => now()
-        ]);
-    }
-    
-    // --- PRESENCE MONITOR KILLSWITCH ---
-    public function forcePauseTimers()
-    {
-        $openLogs = DB::table('task_time_logs')
-            ->where('user_id', Auth::id())
-            ->whereNull('end_time')
-            ->get();
-
-        if ($openLogs->isEmpty()) return;
-
-        $rate = DB::table('compensation_history')->where('user_id', Auth::id())->orderBy('effective_from', 'desc')->value('hourly_rate') ?? 50.00;
-
-        foreach ($openLogs as $log) {
-            $endTime = now();
-            $durationMinutes = \Carbon\Carbon::parse($log->start_time)->diffInMinutes($endTime);
-            $costCalculated = ($durationMinutes / 60) * $rate;
-
-            DB::table('task_time_logs')->where('id', $log->id)->update([
-                'end_time' => $endTime,
-                'duration_minutes' => $durationMinutes,
-                'cost_calculated' => $costCalculated
-            ]);
-
-            DB::table('tasks')->where('id', $log->task_id)->update([
-                'status' => 'To-Do', // Kick it out of In-Progress
-                'actual_hours_logged' => DB::raw("actual_hours_logged + " . round($durationMinutes / 60, 2)),
-                'updated_at' => now()
-            ]);
-        }
-
-        $this->loadBoardData();
-        session()->flash('error', 'We paused your timers because the 45-minute check wasn’t answered. Your tasks in progress are back in To do; move one into In progress to start again.');
-    }
+    // The 45-minute presence check runs on every HQ page now (App\Livewire\Hq\TimerPresence, in the HQ layout), so a
+    // timer started from the task drawer or any other tab is checked too; its pause is Tasks::pauseOpenTimers().
 
     public function render()
     {

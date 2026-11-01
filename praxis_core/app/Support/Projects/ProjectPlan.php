@@ -193,14 +193,15 @@ final class ProjectPlan
      * A date in the reader's language, e.g. 13 November 2026 / 13 novembre 2026. A plain date (a due date) is a Lagos
      * day as it stands; a timestamp (stored in UTC, like created_at) is shown in Lagos time.
      */
-    public static function day($date, string $format = 'date'): string
+    public static function day($date, string $format = 'date', ?string $locale = null): string
     {
         if (! $date) {
             return '';
         }
+        $locale ??= app()->getLocale();
         $at = strlen((string) $date) === 10 ? Carbon::parse($date, self::TIME_ZONE) : Carbon::parse($date, 'UTC')->setTimezone(self::TIME_ZONE);
 
-        return $at->locale(app()->getLocale())->translatedFormat(__('projects.formats.' . $format));
+        return $at->locale($locale)->translatedFormat(__('projects.formats.' . $format, [], $locale));
     }
 
     /** ₦ 3,700,000 / 3 700 000 NGN, as the opportunity pages write money */

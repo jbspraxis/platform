@@ -58,9 +58,9 @@ class InvoiceLedger extends Component
             $this->updatedNewProjectId($project->id);
             $phase = collect($this->projectPhases)->firstWhere('id', (string) request()->query('phase'));
             if ($phase) {
-                $total = (float) DB::table('projects')->where('id', $project->id)->value('total_budget');
+                // The milestone's agreed amount, to the unit (project_phases.amount; weight × total for an older row)
                 $this->new_phase_id = $phase->id;
-                $this->new_amount_due = round($total * (float) $phase->weight_percentage / 100, 2);
+                $this->new_amount_due = \App\Support\Projects\Milestones::amount($phase);
                 $this->new_description = Str::limit(__('projects.invoice_line', ['milestone' => $phase->title]), 250);
             }
         }

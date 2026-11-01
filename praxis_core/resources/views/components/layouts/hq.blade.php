@@ -326,6 +326,10 @@
         </main>
     </div>
 </div>
+{{-- The 45-minute check while a task timer runs, on every HQ page (docs/PROJECTS.md) --}}
+@auth
+    <livewire:hq.timer-presence />
+@endauth
 @livewireScripts
 </body>
 </html>

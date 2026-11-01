@@ -242,16 +242,18 @@ class TaskDrawer extends Component
         abort_unless(ProjectRules::canManage($this->projectId), 403);
         $task = $this->taskId ? $this->task() : null;
         $this->title = trim($this->title);
+        // The team (active staff), plus whoever is on the task already: someone who has left doesn't block a save
         $team = ProjectRules::team($this->projectId)->pluck('id')->all();
+        $already = $task ? Tasks::people($task->id) : ['sharing' => [], 'watcher' => []];
         $this->validate([
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:10000'],
             'phaseId' => ['required', Rule::exists('project_phases', 'id')->where('project_id', $this->projectId)->whereNull('deleted_at')],
-            'leadId' => ['nullable', Rule::in($team)],
+            'leadId' => ['nullable', Rule::in(array_filter([...$team, $task?->assigned_to]))],
             'sharing' => ['array', 'max:25'],
-            'sharing.*' => [Rule::in($team)],
+            'sharing.*' => [Rule::in([...$team, ...$already['sharing'], ...$already['watcher']])],
             'watchers' => ['array', 'max:25'],
-            'watchers.*' => [Rule::in($team)],
+            'watchers.*' => [Rule::in([...$team, ...$already['sharing'], ...$already['watcher']])],
             'dueDate' => ['nullable', 'date_format:Y-m-d'],
             'hours' => ['nullable', 'numeric', 'min:0', 'max:9999'],
         ], [
@@ -317,6 +319,7 @@ class TaskDrawer extends Component
             return;
         }
         Tasks::move($this->projectId, $task, $value);
+        $this->dispatch('timers-changed'); // the page-wide 45-minute check follows (App\Livewire\Hq\TimerPresence)
         $this->changed(__('projects.task.moved', ['status' => __('projects.task_statuses.' . $value)]));
     }
 

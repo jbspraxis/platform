@@ -153,6 +153,9 @@ class MilestoneDrawer extends Component
         $invoiced = in_array($current, ['invoiced', 'paid'], true);
         $this->title = trim($this->title);
         $this->acceptedBy = trim($this->acceptedBy);
+        // Who accepted it and when are asked for when it moves to Accepted; one accepted before they were kept (live
+        // MyCity's M1) can still be edited without them
+        $accepting = ! $invoiced && $this->column === 'accepted' && $current !== 'accepted';
         $this->validate([
             'number' => ['required', 'integer', 'min:0', 'max:999'],
             'title' => ['required', 'string', 'max:140'], // room for an imported title's "M4 · " (the column holds 150)
@@ -161,8 +164,8 @@ class MilestoneDrawer extends Component
             'column' => $invoiced ? ['nullable'] : ['required', Rule::in(array_keys(ProjectPlan::STATUS_FOR))],
             'startDate' => ['nullable', 'date_format:Y-m-d'],
             'dueDate' => ['nullable', 'date_format:Y-m-d', $this->startDate ? 'after_or_equal:startDate' : 'nullable'],
-            'acceptedAt' => [Rule::requiredIf(! $invoiced && $this->column === 'accepted'), 'nullable', 'date_format:Y-m-d'],
-            'acceptedBy' => [Rule::requiredIf(! $invoiced && $this->column === 'accepted'), 'nullable', 'string', 'max:150'],
+            'acceptedAt' => [Rule::requiredIf($accepting), 'nullable', 'date_format:Y-m-d'],
+            'acceptedBy' => [Rule::requiredIf($accepting), 'nullable', 'string', 'max:150'],
             'goal' => ['nullable', 'string', 'max:5000'],
             'notes' => ['nullable', 'string', 'max:10000'],
         ], [
@@ -195,7 +198,7 @@ class MilestoneDrawer extends Component
         ];
         if (! $invoiced) {
             $data['status'] = ProjectPlan::STATUS_FOR[$this->column];
-            $data += $this->column === 'accepted' ? ['accepted_at' => $this->acceptedAt, 'accepted_by_name' => $this->acceptedBy] : [];
+            $data += $this->column === 'accepted' ? ['accepted_at' => $this->acceptedAt ?: null, 'accepted_by_name' => $this->acceptedBy ?: null] : [];
         }
 
         if ($phase) {

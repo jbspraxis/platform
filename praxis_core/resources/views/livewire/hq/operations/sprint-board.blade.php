@@ -51,24 +51,8 @@
         </div>
     @endif
 
-    @php
-        // Detect if the logged-in user has an active task to trigger the Alpine monitor
-        $hasActiveTasks = collect($tasks['In-Progress'])->where('assigned_to', auth()->id())->count() > 0;
-    @endphp
-
-    <div class="flex items-stretch gap-4 overflow-x-auto pb-4" x-data="sprintBoard({{ $hasActiveTasks ? 'true' : 'false' }})">
-
-        <!-- Presence check -->
-        <div class="modal-backdrop" x-show="showPresenceModal" style="display: none;" x-transition.opacity>
-            <div class="modal text-center" role="dialog" aria-modal="true" aria-labelledby="presence-title">
-                <i data-lucide="clock" class="mx-auto mb-3 h-8 w-8 text-deep-teal"></i>
-                <h2 id="presence-title" class="modal-title">Are you still working on this?</h2>
-                <p class="text-small text-slate">Your timer has run for 45 minutes. Confirm within 5 minutes, or we’ll pause your timer and move the task back to To do.</p>
-                <div class="modal-actions justify-center">
-                    <button type="button" @click="confirmPresence()" class="btn btn-primary">Keep timer running</button>
-                </div>
-            </div>
-        </div>
+    {{-- The 45-minute presence check is on every HQ page now (livewire:hq.timer-presence in the HQ layout) --}}
+    <div class="flex items-stretch gap-4 overflow-x-auto pb-4" x-data="sprintBoard()">
 
         @foreach(['To-Do', 'In-Progress', 'QA_Review', 'Failed', 'Done'] as $column)
             <div class="flex w-[280px] min-w-[280px] flex-col rounded-lg border border-line bg-paper"
@@ -80,7 +64,7 @@
 
                 <div class="flex items-center justify-between border-b border-line px-4 py-3">
                     <span class="text-ui font-semibold text-ink">{{ $columnLabels[$column] }}</span>
-                    <span class="rounded-full bg-mist px-2.5 text-caption font-semibold text-slate num" aria-label="{{ count($tasks[$column]) }} tasks">{{ count($tasks[$column]) }}</span>
+                    <span class="rounded-full bg-mist px-2.5 text-caption font-semibold text-slate num" aria-label="{{ trans_choice('projects.backlog.count', count($tasks[$column]), ['count' => count($tasks[$column])]) }}">{{ count($tasks[$column]) }}</span>
                 </div>
 
                 <div class="flex min-h-[300px] flex-1 flex-col gap-3 p-3">
@@ -118,7 +102,7 @@
                                     $isExpired = $expires->isPast();
                                 @endphp
                                 <span class="pill {{ $isExpired ? 'pill-danger' : 'pill-warning' }} mb-3">
-                                    {{ $isExpired ? 'Client review window passed' : 'Client review due ' . $expires->diffForHumans() }}
+                                    {{ $isExpired ? __('projects.board.review_passed') : __('projects.board.review_due', ['when' => $expires->locale(app()->getLocale())->diffForHumans()]) }}
                                 </span>
                             @endif
 
@@ -144,13 +128,13 @@
                             @if($task['has_active_qa'] ?? false)
                                 <div class="group relative mt-3">
                                     <a href="{{ route('hq.ops.qa', ['ticket' => $task['qa_ticket_id']]) }}" class="btn btn-sm w-full border-danger bg-danger-tint text-danger no-underline" wire:navigate>
-                                        <i data-lucide="circle-alert"></i> Open issue
+                                        <i data-lucide="circle-alert"></i> {{ __('projects.board.open_issue') }}
                                     </a>
 
                                     <div class="pointer-events-none invisible absolute bottom-full left-1/2 z-10 mb-2 w-[240px] -translate-x-1/2 rounded-lg border border-line bg-paper p-3 text-left opacity-0 transition-opacity group-hover:visible group-hover:opacity-100" style="box-shadow: var(--shadow-float);">
-                                        <div class="text-caption font-semibold text-danger">{{ isset($task['qa_ticket_title']) ? preg_replace('/^\[(DIRECT COMM|BUG REPORT)\]\s*/', '', $task['qa_ticket_title']) : 'Issue reported' }}</div>
-                                        <div class="mt-1 text-caption text-slate">{{ $task['qa_ticket_description'] ?? 'No description yet.' }}</div>
-                                        <div class="mt-2 text-caption text-muted">Select to open it in Quality and issues.</div>
+                                        <div class="text-caption font-semibold text-danger">{{ isset($task['qa_ticket_title']) ? preg_replace('/^\[(DIRECT COMM|BUG REPORT)\]\s*/', '', $task['qa_ticket_title']) : __('projects.board.issue_reported') }}</div>
+                                        <div class="mt-1 text-caption text-slate">{{ $task['qa_ticket_description'] ?? __('projects.board.no_description') }}</div>
+                                        <div class="mt-2 text-caption text-muted">{{ __('projects.board.issue_hint') }}</div>
                                     </div>
                                 </div>
                             @endif
@@ -168,45 +152,12 @@
     </div>
 
     <script>
-        function sprintBoard(hasActiveTasks) {
+        function sprintBoard() {
             return {
                 dragover: false,
                 dragStatus: null,
                 draggedTaskId: null,
                 sourceColumn: null,
-
-                // Presence check
-                showPresenceModal: false,
-                presenceTimeout: null,
-                warningTimeout: null,
-
-                init() {
-                    if (hasActiveTasks) {
-                        this.startPresenceMonitor();
-                    }
-                },
-
-                startPresenceMonitor() {
-                    clearTimeout(this.presenceTimeout);
-                    clearTimeout(this.warningTimeout);
-                    this.showPresenceModal = false;
-
-                    // 45 minutes = 2700000 ms
-                    this.presenceTimeout = setTimeout(() => {
-                        this.showPresenceModal = true;
-
-                        // 5 minutes to answer = 300000 ms
-                        this.warningTimeout = setTimeout(() => {
-                            this.showPresenceModal = false;
-                            @this.call('forcePauseTimers'); // pauses this person’s open timers
-                        }, 300000);
-
-                    }, 2700000);
-                },
-
-                confirmPresence() {
-                    this.startPresenceMonitor(); // Resets the clocks
-                },
 
                 dragStart(event, taskId, sourceColumn) {
                     this.draggedTaskId = taskId;

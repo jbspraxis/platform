@@ -264,7 +264,7 @@ class ChangeReportDrawer extends Component
             'canSeeMoney' => $this->open && ProjectRules::canSeeMoney($this->projectId),
             'project' => $project,
             'preview' => $report && ChangeReports::isOpen($report) ? ChangeReports::preview($report) : null,
-            'phase' => $report && $report->phase_id ? DB::table('project_phases')->where('id', $report->phase_id)->first(['id', 'phase_number', 'title', 'weight_percentage']) : null,
+            'phase' => $report && $report->phase_id ? DB::table('project_phases')->where('id', $report->phase_id)->whereNull('deleted_at')->first(['id', 'phase_number', 'title', 'weight_percentage']) : null,
             'history' => $report ? ProjectHistory::for('change_reports', $report->id) : collect(),
         ]);
     }

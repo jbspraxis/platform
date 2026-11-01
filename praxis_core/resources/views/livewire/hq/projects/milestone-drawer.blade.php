@@ -171,7 +171,7 @@
                             <p class="help" style="margin: 0">
                                 {{ __('projects.milestone.no_invoice') }}
                                 @if ($canSeeMoney && $project && (float) $project->total_budget > 0)
-                                    {{ __('projects.milestone.invoice_amount', ['amount' => ProjectPlan::money((float) $project->total_budget * (float) $milestone->weight_percentage / 100, $project->currency)]) }}
+                                    {{ __('projects.milestone.invoice_amount', ['amount' => ProjectPlan::money(\App\Support\Projects\Milestones::amount($milestone, (float) $project->total_budget), $project->currency)]) }}
                                 @endif
                             </p>
                         @endif
