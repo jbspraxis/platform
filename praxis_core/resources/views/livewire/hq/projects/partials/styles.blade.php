@@ -28,7 +28,7 @@
     /* Milestones: the strip (Overview) and the kanban */
     .pj-strip { position: relative; display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x proximity; }
     .pj-strip > * { flex: 0 0 200px; scroll-snap-align: start; }
-    .pj-mini { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--color-line); border-radius: var(--radius-card); background: var(--color-paper); text-align: left; cursor: pointer; font: inherit; color: inherit; }
+    .pj-mini { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--color-line); border-radius: var(--radius-card); background: var(--color-paper); text-align: left; cursor: pointer; font: inherit; color: inherit; text-decoration: none; }
     .pj-mini:hover { border-color: var(--color-deep-teal); }
     .pj-mini-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.8125rem; color: var(--color-muted); }
     .pj-mini-title { font-size: 0.875rem; line-height: 1.25rem; font-weight: 600; color: var(--color-ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -55,11 +55,11 @@
     .pj-group-head h3 { margin: 0; font-size: 1rem; line-height: 1.5rem; }
     /* A row of columns when the list is wide, the title over its details when it is narrow (the list's width, not the screen's) */
     .pj-rows { list-style: none; margin: 0; padding: 0; container-type: inline-size; }
-    .pj-row { display: grid; grid-template-columns: minmax(0, 1fr) 150px 150px 170px 140px; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--color-line); font-size: 0.875rem; }
+    .pj-row { display: grid; grid-template-columns: minmax(0, 1fr) 150px 170px 140px; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--color-line); font-size: 0.875rem; }
     .pj-row-cell { min-width: 0; color: var(--color-slate); overflow-wrap: anywhere; }
     .pj-row-label { display: none; }
-    @container (max-width: 880px) {
-        .pj-row { grid-template-columns: 130px 140px minmax(0, 1fr) 140px; gap: 6px 16px; }
+    @container (max-width: 760px) {
+        .pj-row { grid-template-columns: 140px minmax(0, 1fr) 140px; gap: 6px 16px; }
         .pj-row > :first-child { grid-column: 1 / -1; }
         .pj-row-label { display: block; font-size: 0.75rem; line-height: 1rem; color: var(--color-muted); }
     }

@@ -27,16 +27,13 @@ class TaskDrawerTest extends TestCase
 
     private string $phaseId;
 
-    private string $sprintId;
-
     private User $manager;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->projectId = $this->project();
-        $this->phaseId = $this->phase($this->projectId, 4, 100, ['status' => 'Active']);
-        $this->sprintId = $this->sprint($this->projectId, 'M4 · Recruitment', '2026-11-02', '2026-11-13', 'Active');
+        $this->phaseId = $this->phase($this->projectId, 4, 100, ['status' => 'Active', 'start_date' => '2026-11-02', 'due_date' => '2026-11-13']);
         $this->manager = $this->staff('delivery', ['delivery']);
     }
 
@@ -50,13 +47,17 @@ class TaskDrawerTest extends TestCase
         [$lead, $sharer, $watcher] = [$this->staff('lead', ['engineer']), $this->staff('sharer', ['engineer']), $this->staff('watcher', ['engineer'])];
         $this->actingAs($this->manager);
 
-        $drawer = Livewire::test(TaskDrawer::class, ['projectId' => $this->projectId])->dispatch('new-task', phase: $this->phaseId, sprint: $this->sprintId)
-            ->assertSet('phaseId', $this->phaseId)->assertSet('sprintId', $this->sprintId)
-            ->set('title', 'Blind panel scoring')->set('leadId', $lead->id)->set('sharing', [$sharer->id])->set('watchers', [$watcher->id])
+        // The three pickers (x-hq.picker): type part of a name, choose
+        $drawer = Livewire::test(TaskDrawer::class, ['projectId' => $this->projectId])->dispatch('new-task', phase: $this->phaseId)
+            ->assertSet('phaseId', $this->phaseId)
+            ->set('title', 'Blind panel scoring')
+            ->set('leadSearch', 'Lead')->assertSee($lead->first_name . ' ' . $lead->last_name)->call('chooseLead', $lead->id)
+            ->call('addSharing', $sharer->id)->call('addWatcher', $watcher->id)
+            ->call('addWatcher', $sharer->id) // already sharing: not a watcher too
             ->set('dueDate', '2026-11-12')->set('hours', '6')->call('save')->assertHasNoErrors();
 
         $task = DB::table('tasks')->where('title', 'Blind panel scoring')->first();
-        $this->assertSame([$lead->id, '2026-11-12', '6.00', $this->sprintId], [$task->assigned_to, $task->due_date, $task->estimated_hours, $task->sprint_id]);
+        $this->assertSame([$lead->id, '2026-11-12', '6.00', $this->phaseId, null], [$task->assigned_to, $task->due_date, $task->estimated_hours, $task->phase_id, $task->sprint_id]);
         $this->assertSame($sharer->id, DB::table('task_people')->where('task_id', $task->id)->where('role', 'sharing')->value('user_id'));
         $this->assertSame($watcher->id, DB::table('task_people')->where('task_id', $task->id)->where('role', 'watcher')->value('user_id'));
         $this->assertContains(__('projects.bell.lead_title'), $this->bells($lead));
@@ -65,6 +66,7 @@ class TaskDrawerTest extends TestCase
 
         // The lead is picked from the team: someone without project rights or a place on the project is refused
         $stranger = $this->staff('hr', ['hr']);
+        $drawer->call('chooseLead', $stranger->id)->assertSet('leadId', $lead->id);
         $drawer->set('leadId', $stranger->id)->call('save')->assertHasErrors('leadId');
         $this->assertSame($lead->id, DB::table('tasks')->where('id', $task->id)->value('assigned_to'));
     }
@@ -73,7 +75,7 @@ class TaskDrawerTest extends TestCase
     {
         Mail::fake();
         [$lead, $sharer, $watcher] = [$this->staff('lead', ['engineer']), $this->staff('sharer', ['engineer']), $this->staff('watcher', ['engineer'])];
-        $task = $this->task($this->phaseId, ['assigned_to' => $lead->id, 'sprint_id' => $this->sprintId, 'title' => 'Offer letter']);
+        $task = $this->task($this->phaseId, ['assigned_to' => $lead->id, 'title' => 'Offer letter']);
         DB::table('task_people')->insert([
             ['task_id' => $task, 'user_id' => $sharer->id, 'role' => 'sharing', 'created_at' => now(), 'updated_at' => now()],
             ['task_id' => $task, 'user_id' => $watcher->id, 'role' => 'watcher', 'created_at' => now(), 'updated_at' => now()],
@@ -99,7 +101,7 @@ class TaskDrawerTest extends TestCase
         $link = DB::table('notifications')->where('user_id', $watcher->id)->value('link_url');
         $this->assertSame(route('hq.ops.project', ['project' => $this->projectId, 'tab' => 'backlog', 'task' => $task]), $link);
 
-        // The sprint board's rules hold: the client review window opened and closed, the timer ran
+        // The board's rules hold: the client review window opened and closed, the timer ran
         $this->assertNotNull(DB::table('tasks')->where('id', $task)->value('qa_sla_expires_at'));
         $this->assertSame(1, DB::table('task_time_logs')->where('task_id', $task)->whereNotNull('end_time')->count());
         Mail::assertNothingSent();
@@ -183,7 +185,7 @@ class TaskDrawerTest extends TestCase
     public function test_the_board_card_opens_the_drawer_and_shows_due_dates_not_story_points(): void
     {
         $lead = $this->staff('lead', ['engineer']);
-        $task = $this->task($this->phaseId, ['assigned_to' => $lead->id, 'sprint_id' => $this->sprintId, 'title' => 'CV parsing', 'due_date' => '2026-10-20', 'story_points' => 8]);
+        $task = $this->task($this->phaseId, ['assigned_to' => $lead->id, 'title' => 'CV parsing', 'due_date' => '2026-10-20', 'story_points' => 8]);
         $this->actingAs($lead);
 
         Livewire::test(SprintBoard::class, ['id' => $this->projectId])

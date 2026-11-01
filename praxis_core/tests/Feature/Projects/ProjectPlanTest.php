@@ -10,6 +10,7 @@ use App\Support\Projects\Dependencies;
 use App\Support\Projects\ProjectPlan;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 use Tests\Feature\UsesThrowawayDatabase;
@@ -35,9 +36,8 @@ class ProjectPlanTest extends TestCase
             $this->task($m1, ['status' => $status]);
         }
         $this->task($m0, ['status' => 'Done']);
-        $sprint = $this->sprint($project, 'Sprint 1', '2026-11-02', '2026-11-13', 'Active');
-        $this->task($m1, ['status' => 'To-Do', 'sprint_id' => $sprint]);
-        $this->task($m0, ['status' => 'To-Do', 'sprint_id' => $sprint]);
+        $this->task($m1, ['status' => 'To-Do']);
+        $this->task($m0, ['status' => 'To-Do']);
 
         $milestones = ProjectPlan::milestones($project)->keyBy('phase_number');
         $this->assertSame(60.0, $milestones[1]->progress); // 3 of 5
@@ -46,11 +46,25 @@ class ProjectPlanTest extends TestCase
         // 40% × 60% + 60% × 100% + 0% × 50%
         $this->assertSame(84.0, ProjectPlan::progress($milestones->values()));
         $this->assertSame(100.0, ProjectPlan::weightTotal($milestones->values()));
+    }
 
-        // A sprint shows the weight of the milestones it delivers
-        $s = ProjectPlan::sprints($project, $milestones->values())->first();
-        $this->assertSame(40.0, $s->weight);
-        $this->assertSame(['M0', 'M1'], $s->milestones->pluck('code')->all());
+    public function test_the_board_opens_on_the_milestone_running_now(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-11-05 09:00', 'UTC'));
+        $project = $this->project();
+        $m0 = $this->phase($project, 0, 0, ['status' => 'Active', 'start_date' => '2026-10-09', 'due_date' => '2026-10-19']);
+        $m3 = $this->phase($project, 3, 5, ['status' => 'QA', 'start_date' => '2026-10-26', 'due_date' => '2026-10-30']);
+        $m4 = $this->phase($project, 4, 13, ['status' => 'Pending', 'start_date' => '2026-11-02', 'due_date' => '2026-11-13']);
+        $m10 = $this->phase($project, 10, 10, ['status' => 'Active', 'start_date' => '2026-12-14', 'due_date' => '2026-12-18']);
+        $milestones = ProjectPlan::milestones($project);
+
+        // Running today by its dates, even before anyone moved it to In progress
+        $this->assertSame($m4, ProjectPlan::boardDefault($milestones)->id);
+        $this->assertSame([$m0, $m3, $m4, $m10], ProjectPlan::current($milestones)->pluck('id')->all());
+        // Without dates running today: the one in progress due soonest and not past due
+        DB::table('project_phases')->where('id', $m4)->update(['start_date' => null]);
+        $this->assertSame($m10, ProjectPlan::boardDefault(ProjectPlan::milestones($project))->id);
+        Carbon::setTestNow();
     }
 
     public function test_the_kanban_column_follows_the_invoice_then_the_status(): void
@@ -201,17 +215,26 @@ class ProjectPlanTest extends TestCase
         DB::table('projects')->where('id', $own)->update(['lead_user_id' => $lead->id]);
         $empty = $this->phase($project, 4, 13);
         $set = $this->phase($project, 5, 11, ['start_date' => '2026-11-16', 'due_date' => '2026-11-21']);
+        $mixed = [$this->phase($project, 6, 11), $this->phase($project, 7, 10)];
         $s4 = $this->sprint($project, 'M4', '2026-11-02', '2026-11-13');
         $s5 = $this->sprint($project, 'M5', '2026-11-16', '2026-11-20');
+        $s67 = $this->sprint($project, 'M6 and M7', '2026-11-23', '2026-12-04');
         $this->task($empty, ['sprint_id' => $s4]);
         $this->task($set, ['sprint_id' => $s5]);
+        $this->task($mixed[0], ['sprint_id' => $s67]);
+        $this->task($mixed[1], ['sprint_id' => $s67]);
+        Log::spy();
 
         $migration = require base_path('database/migrations/2026_11_01_900000_add_project_planning.php');
         (fn () => $this->backfillMilestoneDates())->call($migration);
         (fn () => $this->backfillProjectLeads())->call($migration);
 
+        // Sprints fold into milestones: a sprint holding one milestone's tasks gives it its dates, empty ones only
         $this->assertSame(['2026-11-02', '2026-11-13'], array_values((array) DB::table('project_phases')->where('id', $empty)->first(['start_date', 'due_date'])));
         $this->assertSame(['2026-11-16', '2026-11-21'], array_values((array) DB::table('project_phases')->where('id', $set)->first(['start_date', 'due_date'])));
+        // A sprint mixing milestones is left alone, with a line in the log
+        $this->assertSame(0, DB::table('project_phases')->whereIn('id', $mixed)->whereNotNull('due_date')->count());
+        Log::shouldHaveReceived('warning')->once()->withArgs(fn ($message) => str_contains($message, 'M6 and M7'));
         $this->assertSame($lead->id, DB::table('projects')->where('id', $project)->value('lead_user_id')); // the opportunity's lead
         $this->assertSame($lead->id, DB::table('projects')->where('id', $own)->value('lead_user_id')); // already set: kept
         $this->assertSame($creator->id, DB::table('projects')->where('id', $orphan)->value('lead_user_id')); // no opportunity: its creator

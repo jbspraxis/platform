@@ -95,6 +95,10 @@ class ImportEngagementTest extends TestCase
         $this->assertSame(['Northwind ERP', 'Active', 'NGN'], [$project->title, $project->status, $project->currency]);
 
         $this->assertSame(2, DB::table('project_phases')->where('project_id', $project->id)->count());
+        // Sprints are folded into milestones: each milestone takes its sprint's dates, and the lead leads the project
+        $this->assertSame(['2026-11-02', '2026-11-06'], array_values((array) DB::table('project_phases')->where('project_id', $project->id)
+            ->where('phase_number', 2)->first(['start_date', 'due_date'])));
+        $this->assertSame($lead->id, $project->lead_user_id);
         $this->assertSame(2, DB::table('sprints')->where('project_id', $project->id)->count());
         $tasks = DB::table('tasks')->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')->where('project_phases.project_id', $project->id)
             ->whereNotNull('tasks.sprint_id')->pluck('tasks.status', 'tasks.title')->all();

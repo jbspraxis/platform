@@ -3,15 +3,19 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Projects, one page each (docs/PROJECTS.md section 4): dates and acceptance on milestones (project_phases), a goal
- * and notes on sprints, due dates on tasks, the project lead, the people on a task, its steps, "waits on" links
- * between tasks and between milestones, and change reports (SOW clause 7.1).
+ * Projects, one page each (docs/PROJECTS.md section 4). Sprints are folded into milestones (owner, 1 Nov 2026): a
+ * milestone (project_phases) now carries its start and due dates, goal, notes and acceptance, and its tasks are its
+ * board. Also: due dates on tasks, the project lead, the people on a task, its steps, "waits on" links between tasks
+ * and between milestones, and change reports (SOW clause 7.1). The sprints table and tasks.sprint_id stay, unused,
+ * for history.
  *
- * Live data is real (MyCity App ERP), so the backfills only fill empty columns: a milestone's start and due dates
- * from the sprints holding its tasks, a project's lead from its opportunity's lead, else whoever created it.
+ * Live data is real (MyCity App ERP), so the backfills only fill empty columns: a milestone's dates from the sprint
+ * that holds its tasks and no other milestone's (all of MyCity's), a project's lead from its opportunity's lead,
+ * else whoever created it.
  */
 return new class extends Migration
 {
@@ -19,14 +23,10 @@ return new class extends Migration
     {
         Schema::table('project_phases', function (Blueprint $table) {
             $table->date('start_date')->nullable()->after('status');
-            $table->date('due_date')->nullable()->after('start_date');
+            $table->date('due_date')->nullable()->after('start_date')->comment('Its end: Overdue once past and not accepted');
             $table->date('accepted_at')->nullable()->after('due_date')->comment('The client\'s written acceptance');
             $table->string('accepted_by_name', 150)->nullable()->after('accepted_at')->comment('Who accepted, e.g. "Oyebode, CTO"');
-            $table->text('notes')->nullable()->after('accepted_by_name');
-        });
-
-        Schema::table('sprints', function (Blueprint $table) {
-            $table->text('goal')->nullable()->after('status');
+            $table->text('goal')->nullable()->after('accepted_by_name');
             $table->text('notes')->nullable()->after('goal');
         });
 
@@ -125,19 +125,29 @@ return new class extends Migration
         $this->backfillProjectLeads();
     }
 
-    /** One sprint per milestone (MyCity): its start and end are the milestone's. Only empty dates are filled. */
+    /**
+     * A sprint whose tasks all belong to one milestone gives that milestone its start and end (MyCity: one sprint per
+     * milestone). A sprint mixing milestones is left alone, with a line in the log. Only empty dates are filled.
+     * (Sprints never had a goal or notes, so there is nothing else to carry over.)
+     */
     private function backfillMilestoneDates(): void
     {
-        $spans = DB::table('tasks')
-            ->join('sprints', 'sprints.id', '=', 'tasks.sprint_id')
-            ->whereNull('tasks.deleted_at')->whereNull('sprints.deleted_at')
-            ->groupBy('tasks.phase_id')
-            ->selectRaw('tasks.phase_id, MIN(sprints.start_date) AS first_day, MAX(sprints.end_date) AS last_day')
-            ->get();
+        $spans = [];
+        foreach (DB::table('sprints')->whereNull('deleted_at')->get(['id', 'title', 'start_date', 'end_date']) as $sprint) {
+            $phases = DB::table('tasks')->where('sprint_id', $sprint->id)->whereNull('deleted_at')->distinct()->pluck('phase_id');
+            if ($phases->count() > 1) {
+                Log::warning("Projects migration: sprint {$sprint->id} ({$sprint->title}) holds tasks of {$phases->count()} milestones; its dates were not copied to any of them.");
+                continue;
+            }
+            if ($phase = $phases->first()) {
+                $spans[$phase]['start'] = min($spans[$phase]['start'] ?? $sprint->start_date, $sprint->start_date);
+                $spans[$phase]['end'] = max($spans[$phase]['end'] ?? $sprint->end_date, $sprint->end_date);
+            }
+        }
 
-        foreach ($spans as $span) {
-            DB::table('project_phases')->where('id', $span->phase_id)->whereNull('start_date')->update(['start_date' => $span->first_day]);
-            DB::table('project_phases')->where('id', $span->phase_id)->whereNull('due_date')->update(['due_date' => $span->last_day]);
+        foreach ($spans as $phaseId => $span) {
+            DB::table('project_phases')->where('id', $phaseId)->whereNull('start_date')->update(['start_date' => $span['start']]);
+            DB::table('project_phases')->where('id', $phaseId)->whereNull('due_date')->update(['due_date' => $span['end']]);
         }
     }
 
@@ -168,7 +178,6 @@ return new class extends Migration
             $table->dropColumn('lead_user_id');
         });
         Schema::table('tasks', fn (Blueprint $table) => $table->dropColumn(['due_date', 'proposed_due_date', 'proposed_due_by']));
-        Schema::table('sprints', fn (Blueprint $table) => $table->dropColumn(['goal', 'notes']));
-        Schema::table('project_phases', fn (Blueprint $table) => $table->dropColumn(['start_date', 'due_date', 'accepted_at', 'accepted_by_name', 'notes']));
+        Schema::table('project_phases', fn (Blueprint $table) => $table->dropColumn(['start_date', 'due_date', 'accepted_at', 'accepted_by_name', 'goal', 'notes']));
     }
 };

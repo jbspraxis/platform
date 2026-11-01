@@ -3,7 +3,7 @@
         // Stored project statuses (database values) and what people read
         $statusLabels = ['Active' => 'Active', 'Scoping' => 'Scoping', 'Locked' => 'On hold', 'Completed' => 'Completed', 'Cancelled' => 'Cancelled'];
         $statusPills = ['Active' => 'pill-success', 'Scoping' => 'pill-neutral', 'Locked' => 'pill-warning', 'Completed' => 'pill-success', 'Cancelled' => 'pill-neutral'];
-        // The sprint board opens for managers and auditors, and for people with a task on the project (SprintBoard::maySeeBoard)
+        // The project page and its milestone board open for managers and auditors, and for people on the project (App\Support\ProjectAccess)
         $canOpenAnyBoard = auth()->user()->can('projects.approve') || auth()->user()->can('projects.export') || ! $canSeeAll;
     @endphp
 
@@ -161,7 +161,7 @@
                         </div>
 
                         <div class="mt-auto flex flex-col gap-2 pt-4">
-                            {{-- The project page (docs/PROJECTS.md) follows the sprint board's rule --}}
+                            {{-- The project page (docs/PROJECTS.md) follows the same rule --}}
                             @if($canOpenAnyBoard)
                                 <a href="{{ route('hq.ops.project', $p['id']) }}" class="btn btn-primary w-full" wire:navigate>
                                     <i data-lucide="folder-kanban"></i> {{ __('projects.open_page') }}
@@ -170,13 +170,13 @@
 
                             @if($canCreate)
                                 <a href="{{ route('hq.ops.scrum', $p['id']) }}" class="btn btn-secondary w-full">
-                                    <i data-lucide="list-checks"></i> Plan sprints
+                                    <i data-lucide="list-checks"></i> {{ __('projects.all.plan') }}
                                 </a>
                             @endif
 
                             @if($canOpenAnyBoard)
-                                <a href="{{ route('hq.ops.project', ['project' => $p['id'], 'tab' => 'sprints']) }}" class="btn btn-secondary w-full" wire:navigate>
-                                    <i data-lucide="layout-dashboard"></i> Open sprint board
+                                <a href="{{ route('hq.ops.project', ['project' => $p['id'], 'tab' => 'board']) }}" class="btn btn-secondary w-full" wire:navigate>
+                                    <i data-lucide="layout-dashboard"></i> {{ __('projects.open_board') }}
                                 </a>
                             @endif
 
@@ -247,7 +247,7 @@
                                 <td>
                                     <div class="flex flex-wrap justify-end gap-2">
                                         @if($canCreate)
-                                            <a href="{{ route('hq.ops.scrum', $p['id']) }}" class="btn btn-secondary btn-sm">Plan sprints</a>
+                                            <a href="{{ route('hq.ops.scrum', $p['id']) }}" class="btn btn-secondary btn-sm">{{ __('projects.all.plan') }}</a>
                                         @endif
                                         @if($canOpenAnyBoard)
                                             <a href="{{ route('hq.ops.project', $p['id']) }}" class="btn btn-secondary btn-sm" wire:navigate>{{ __('projects.open_page') }}</a>
@@ -288,7 +288,7 @@
         <div class="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
             <div>
                 <h2 id="create-project-title" class="text-section font-semibold text-ink">Create project</h2>
-                <p class="help mt-1">Set up the project. You can plan its sprints next.</p>
+                <p class="help mt-1">Set up the project. You can plan its milestones next.</p>
             </div>
             <button type="button" @click="openCreateDrawer = false" class="btn btn-ghost btn-sm" aria-label="Close"><i data-lucide="x"></i></button>
         </div>

@@ -10,16 +10,16 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Changes to tasks from the project page and the sprint board (docs/PROJECTS.md section 3). Callers check
+ * Changes to tasks from the project page and the milestone board (docs/PROJECTS.md section 3). Callers check
  * ProjectRules first. Every change is logged against the task (its history); the lead, the people sharing it and its
  * watchers get the bell when it moves to Client review or Done, or gets a comment, never the person who did it.
- * Nothing here emails anyone: the only client-facing effect is the sprint board's existing portal notice when a
+ * Nothing here emails anyone: the only client-facing effect is the board's existing portal notice when a
  * task enters Client review.
  */
 final class Tasks
 {
     /** The fields a manager edits in the task drawer */
-    public const FIELDS = ['title', 'description', 'phase_id', 'sprint_id', 'assigned_to', 'due_date', 'estimated_hours', 'is_client_visible'];
+    public const FIELDS = ['title', 'description', 'phase_id', 'assigned_to', 'due_date', 'estimated_hours', 'is_client_visible'];
 
     public const MAX_STEPS = 25;
 
@@ -76,7 +76,7 @@ final class Tasks
         }
     }
 
-    /** "Assign to me": an unassigned task, or anyone's for a manager (the sprint board's checkout rule) */
+    /** "Assign to me": an unassigned task, or anyone's for a manager (the board's checkout rule) */
     public static function assignToMe(object $task, bool $anyone): bool
     {
         $updated = DB::table('tasks')->where('id', $task->id)
@@ -90,7 +90,7 @@ final class Tasks
     }
 
     /**
-     * Move a task to another status, with the sprint board's rules unchanged (moved here from SprintBoard): entering
+     * Move a task to another status, with the board's rules unchanged (moved here from SprintBoard): entering
      * Client review starts the 5-hour client window and tells the QA approvers and the client's portal; leaving it
      * clears the window; entering In progress starts the mover's timer and leaving it stops the timer and books the hours.
      */

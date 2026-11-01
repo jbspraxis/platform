@@ -10,12 +10,13 @@
         $leadName = $person($project->lead_first_name, $project->lead_last_name) ?: __('projects.no_lead');
         $columnTone = ['not_started' => 'pill-neutral', 'in_progress' => 'pill-info', 'client_review' => 'pill-warning', 'accepted' => 'pill-success', 'invoiced' => 'pill-info', 'paid' => 'pill-success'];
         $taskTone = ['To-Do' => 'pill-neutral', 'In-Progress' => 'pill-info', 'QA_Review' => 'pill-warning', 'Failed' => 'pill-danger', 'Done' => 'pill-success'];
-        $sprintTone = ['Planned' => 'pill-neutral', 'Active' => 'pill-info', 'Completed' => 'pill-success'];
         $tabUrl = fn ($key, $extra = []) => route('hq.ops.project', ['project' => $projectId] + ($key === 'overview' ? [] : ['tab' => $key]) + $extra);
+        // Opening a milestone shows its task board (sprints were folded into milestones, docs/PROJECTS.md)
+        $boardUrl = fn ($m) => $tabUrl('board', ['board' => $m->id]);
         $tabs = [
             'overview' => __('projects.tabs.overview'),
             'milestones' => __('projects.tabs.milestones'),
-            'sprints' => __('projects.tabs.sprints'),
+            'board' => __('projects.tabs.board'),
             'backlog' => __('projects.tabs.backlog'),
             'qa' => __('projects.tabs.qa') . ($openQa ? ' (' . $openQa . ')' : ''),
             'money' => __('projects.tabs.money'),
@@ -84,7 +85,7 @@
         </div>
     </section>
 
-    {{-- Each tab is its own address (links, not buttons), so the sprint board's own script runs when its tab opens --}}
+    {{-- Each tab is its own address (links, not buttons), so the milestone board's own script runs when its tab opens --}}
     <nav class="tabs" aria-label="{{ __('projects.tabs.label') }}">
         @foreach ($tabs as $key => $label)
             <a href="{{ $tabUrl($key) }}" @class(['tab', 'is-active' => $tab === $key]) @if ($tab === $key) aria-current="page" @endif wire:navigate wire:key="tab-{{ $key }}">{{ $label }}</a>
@@ -103,7 +104,7 @@
                 @else
                     <div class="pj-strip">
                         @foreach ($milestones as $m)
-                            <button type="button" class="pj-mini" wire:key="strip-{{ $m->id }}" wire:click="$dispatch('open-milestone', { id: '{{ $m->id }}' })">
+                            <a href="{{ $boardUrl($m) }}" class="pj-mini" wire:key="strip-{{ $m->id }}" wire:navigate aria-label="{{ __('projects.milestones.open_board', ['code' => $m->code, 'name' => $m->name]) }}">
                                 <span class="pj-mini-top"><span class="tag">{{ $m->code }}</span> <span class="num">{{ $pct($m->weight_percentage) }}</span></span>
                                 <span class="pj-mini-title">{{ $m->name }}</span>
                                 <span class="pj-pills">
@@ -112,31 +113,31 @@
                                 </span>
                                 <span class="pj-bar {{ $m->progress >= 100 ? 'is-done' : '' }}" role="img" aria-label="{{ __('projects.milestones.progress', ['done' => $m->tasks_done, 'total' => $m->tasks_total]) }}"><span style="width: {{ $m->progress }}%"></span></span>
                                 <span class="pj-mini-top"><span>{{ $m->due_date ? __('projects.due', ['date' => $day($m->due_date, 'short')]) : __('projects.no_due') }}</span><span class="num">{{ $pct($m->progress) }}</span></span>
-                            </button>
+                            </a>
                         @endforeach
                     </div>
                 @endif
             </section>
 
             <div class="pj-grid">
-                <section class="card" aria-labelledby="pj-week-title">
-                    <h2 class="card-title" id="pj-week-title" style="margin-bottom: 12px">{{ __('projects.overview.this_week') }}</h2>
-                    @if ($currentSprint)
-                        <p style="margin: 0 0 8px">
-                            <button type="button" class="pj-link" wire:click="$dispatch('open-sprint', { id: '{{ $currentSprint->id }}' })">{{ $currentSprint->title }}</button>
-                            <span class="pill {{ $sprintTone[$currentSprint->status] ?? 'pill-neutral' }} ml-1">{{ __('projects.sprint_statuses.' . $currentSprint->status) }}</span>
-                        </p>
-                        <dl class="pj-dl">
-                            <dt>{{ __('projects.sprint.dates') }}</dt><dd>{{ __('projects.dates', ['start' => $day($currentSprint->start_date), 'end' => $day($currentSprint->end_date)]) }}</dd>
-                            <dt>{{ __('projects.sprint.delivers') }}</dt><dd>{{ $currentSprint->milestones->map(fn ($m) => $m->code)->implode(', ') ?: '—' }} · {{ __('projects.weight_value', ['value' => $pct($currentSprint->weight)]) }}</dd>
-                            <dt>{{ __('projects.sprint.tasks') }}</dt><dd>{{ __('projects.sprint.tasks_done', ['done' => $currentSprint->tasks_done, 'total' => $currentSprint->tasks_total]) }}</dd>
-                            @if ($currentSprint->goal)
-                                <dt>{{ __('projects.sprint.goal') }}</dt><dd>{{ $currentSprint->goal }}</dd>
-                            @endif
-                        </dl>
-                        <a href="{{ $tabUrl('sprints') }}" class="btn btn-secondary btn-sm mt-4" wire:navigate><i data-lucide="kanban"></i> {{ __('projects.overview.open_board') }}</a>
+                <section class="card" aria-labelledby="pj-now-title">
+                    <h2 class="card-title" id="pj-now-title" style="margin-bottom: 12px">{{ __('projects.overview.now') }}</h2>
+                    @if ($current->isNotEmpty())
+                        <ul class="pj-list">
+                            @foreach ($current as $m)
+                                <li wire:key="now-{{ $m->id }}">
+                                    <a href="{{ $boardUrl($m) }}" class="pj-link" wire:navigate>{{ $m->code }} · {{ $m->name }}</a>
+                                    <span class="pill {{ $columnTone[$m->column] }} ml-1">{{ __('projects.columns.' . $m->column) }}</span>
+                                    @if ($m->overdue) <span class="pill pill-danger">{{ __('projects.overdue') }}</span> @endif
+                                    <span class="pj-sub">
+                                        {{ ($m->start_date || $m->due_date) ? __('projects.dates', ['start' => $day($m->start_date) ?: '…', 'end' => $day($m->due_date) ?: '…']) . ' · ' : '' }}{{ __('projects.milestones.progress', ['done' => $m->tasks_done, 'total' => $m->tasks_total]) }}
+                                    </span>
+                                    @if ($m->goal) <span class="pj-sub">{{ __('projects.overview.goal', ['goal' => \Illuminate\Support\Str::limit($m->goal, 140)]) }}</span> @endif
+                                </li>
+                            @endforeach
+                        </ul>
                     @else
-                        <p class="help" style="margin: 0">{{ __('projects.overview.no_sprint') }}</p>
+                        <p class="help" style="margin: 0">{{ __('projects.overview.nothing_now') }}</p>
                     @endif
                 </section>
 
@@ -236,9 +237,14 @@
                                 <article class="pj-card" wire:key="card-{{ $m->id }}" @if ($canManage) draggable="true" x-on:dragstart="dragId = '{{ $m->id }}'" x-on:dragend="dragId = null; over = null" @endif>
                                     <div class="pj-card-top">
                                         <span class="tag">{{ $m->code }}</span>
-                                        <span class="text-caption num" style="color: var(--color-slate)" title="{{ __('projects.milestone.weight') }}">{{ $pct($m->weight_percentage) }}</span>
+                                        <span class="pj-pills" style="align-items: center">
+                                            <span class="text-caption num" style="color: var(--color-slate)" title="{{ __('projects.milestone.weight') }}">{{ $pct($m->weight_percentage) }}</span>
+                                            <button type="button" class="pj-icon-btn is-small" wire:click="$dispatch('open-milestone', { id: '{{ $m->id }}' })"
+                                                    aria-label="{{ __('projects.milestones.details', ['code' => $m->code]) }}" title="{{ __('projects.milestones.details', ['code' => $m->code]) }}"><i data-lucide="pencil"></i></button>
+                                        </span>
                                     </div>
-                                    <button type="button" class="pj-link" wire:click="$dispatch('open-milestone', { id: '{{ $m->id }}' })">{{ $m->name }}</button>
+                                    {{-- Opening a milestone shows its task board --}}
+                                    <a href="{{ $boardUrl($m) }}" class="pj-link" wire:navigate>{{ $m->name }}</a>
                                     <div class="pj-pills">
                                         @if ($m->due_date)
                                             <span class="pill {{ $m->overdue ? 'pill-danger' : 'pill-neutral' }}">{{ $m->overdue ? __('projects.overdue') . ' · ' : '' }}{{ __('projects.due', ['date' => $day($m->due_date, 'short')]) }}</span>
@@ -274,39 +280,13 @@
                 @endforeach
             </div>
 
-        @elseif ($tab === 'sprints')
-            <div class="pj-toolbar">
-                <h2 class="section-title" style="margin: 0">{{ __('projects.sprints.title') }}</h2>
-                @if ($canManage)
-                    <button type="button" class="btn btn-secondary" wire:click="$dispatch('new-sprint')"><i data-lucide="plus"></i> {{ __('projects.sprints.new') }}</button>
-                @endif
-            </div>
-            @if ($sprints->isNotEmpty())
-                <div class="pj-strip mb-6">
-                    @foreach ($sprints as $s)
-                        <button type="button" class="pj-mini" wire:key="sprint-{{ $s->id }}" wire:click="$dispatch('open-sprint', { id: '{{ $s->id }}' })">
-                            <span class="pj-mini-top"><span>{{ $day($s->start_date, 'short') }} – {{ $day($s->end_date, 'short') }}</span><span class="num">{{ $pct($s->weight) }}</span></span>
-                            <span class="pj-mini-title">{{ $s->title }}</span>
-                            <span class="pj-pills"><span class="pill {{ $sprintTone[$s->status] ?? 'pill-neutral' }}">{{ __('projects.sprint_statuses.' . $s->status) }}</span></span>
-                            <span class="pj-mini-top"><span>{{ $s->milestones->map(fn ($m) => $m->code)->implode(', ') ?: __('projects.sprints.no_milestone') }}</span><span class="num">{{ $s->tasks_done }}/{{ $s->tasks_total }}</span></span>
-                        </button>
-                    @endforeach
-                </div>
-            @endif
-            <livewire:hq.operations.sprint-board :id="$projectId" :embedded="true" :key="'board-' . $projectId" />
+        @elseif ($tab === 'board')
+            {{-- One milestone's tasks by status (the sprint board, now taking a milestone) --}}
+            <livewire:hq.operations.sprint-board :id="$projectId" :milestone="$boardMilestoneId" :key="'board-' . $projectId . '-' . ($boardMilestoneId ?? 'now')" />
 
         @elseif ($tab === 'backlog')
+            {{-- Every task of the project, under its milestone (every task has one; ideas go into a 0% milestone such as "Later") --}}
             <div class="pj-filters">
-                <div class="field">
-                    <label for="f-sprint" class="label">{{ __('projects.backlog.sprint') }}</label>
-                    <select id="f-sprint" class="select" wire:model.live="filterSprint">
-                        <option value="">{{ __('projects.backlog.all_sprints') }}</option>
-                        <option value="none">{{ __('projects.backlog.no_sprint') }}</option>
-                        @foreach ($sprints as $s)
-                            <option value="{{ $s->id }}" wire:key="fs-{{ $s->id }}">{{ $s->title }}</option>
-                        @endforeach
-                    </select>
-                </div>
                 <div class="field">
                     <label for="f-lead" class="label">{{ __('projects.backlog.lead') }}</label>
                     <select id="f-lead" class="select" wire:model.live="filterLead">
@@ -350,9 +330,9 @@
                 @if ($group->isNotEmpty() || (! $filtered && $canManage))
                     <section class="pj-group" wire:key="group-{{ $m->id }}" aria-labelledby="group-{{ $m->id }}-title">
                         <div class="pj-group-head">
-                            <h3 id="group-{{ $m->id }}-title"><span class="tag mr-1">{{ $m->code }}</span> {{ $m->name }}</h3>
+                            <h3 id="group-{{ $m->id }}-title"><span class="tag mr-1">{{ $m->code }}</span> <a href="{{ $boardUrl($m) }}" wire:navigate style="color: inherit">{{ $m->name }}</a></h3>
                             <div class="pj-pills" style="align-items: center">
-                                <span class="help">{{ $pct($m->weight_percentage) }} · {{ __('projects.milestones.progress', ['done' => $m->tasks_done, 'total' => $m->tasks_total]) }}</span>
+                                <span class="help">{{ $pct($m->weight_percentage) }} · {{ $m->due_date ? __('projects.due', ['date' => $day($m->due_date, 'short')]) . ' · ' : '' }}{{ __('projects.milestones.progress', ['done' => $m->tasks_done, 'total' => $m->tasks_total]) }}</span>
                                 @if ($canManage)
                                     <button type="button" class="btn btn-ghost btn-sm" wire:click="$dispatch('new-task', { phase: '{{ $m->id }}' })"><i data-lucide="plus"></i> {{ __('projects.backlog.new_task') }}</button>
                                 @endif
@@ -373,7 +353,6 @@
                                         </div>
                                         <div class="pj-row-cell"><span class="pj-row-label">{{ __('projects.backlog.status') }}</span><span class="pill {{ $taskTone[$t->status] ?? 'pill-neutral' }}">{{ __('projects.task_statuses.' . $t->status) }}</span></div>
                                         <div class="pj-row-cell"><span class="pj-row-label">{{ __('projects.backlog.lead') }}</span>{{ $person($t->first_name, $t->last_name) ?: __('projects.no_lead') }}@if (($sharing[$t->id] ?? 0) > 0) <span class="tag ml-1">+{{ $sharing[$t->id] }}</span>@endif</div>
-                                        <div class="pj-row-cell"><span class="pj-row-label">{{ __('projects.backlog.sprint') }}</span>{{ $t->sprint_id ? ($sprintNames[$t->sprint_id] ?? '—') : __('projects.backlog.no_sprint') }}</div>
                                         <div class="pj-row-cell"><span class="pj-row-label">{{ __('projects.task.due_date') }}</span>
                                             @if ($t->due_date)
                                                 <span @class(['pill', 'pill-danger' => $late, 'pill-neutral' => ! $late])>{{ $late ? __('projects.overdue') . ' · ' : '' }}{{ $day($t->due_date, 'short') }}</span>
@@ -431,12 +410,12 @@
                     <h2 class="card-title" id="pj-meetings-title" style="margin-bottom: 12px">{{ __('projects.money.meetings') }}</h2>
                     @if ($opportunity)
                         <p class="help" style="margin: 0 0 12px">{{ __('projects.money.meetings_text', ['title' => $opportunity->title]) }}</p>
-                        @can('opportunities.view')
+                        @if ($canOpenOpportunity)
                             <div class="pj-actions">
                                 <a href="{{ route('hq.crm.opportunity', ['opportunity' => $opportunity->id, 'tab' => 'meetings']) }}" class="btn btn-secondary btn-sm" wire:navigate><i data-lucide="calendar"></i> {{ __('projects.money.open_meetings') }}</a>
                                 <a href="{{ route('hq.crm.opportunity', ['opportunity' => $opportunity->id, 'tab' => 'sow']) }}" class="btn btn-secondary btn-sm" wire:navigate><i data-lucide="file-signature"></i> {{ __('projects.money.open_sow') }}</a>
                             </div>
-                        @endcan
+                        @endif
                         @if ($sow)
                             <p class="help" style="margin: 12px 0 0">{{ __('projects.money.sow', ['ref' => $sow->reference ?: __('projects.money.sow_no_ref'), 'version' => $sow->version, 'date' => $sow->signed_at ? $day($sow->signed_at) : '—']) }}</p>
                         @endif
@@ -506,6 +485,5 @@
 
     <livewire:hq.projects.task-drawer :project-id="$projectId" :key="'task-drawer-' . $projectId" />
     <livewire:hq.projects.milestone-drawer :project-id="$projectId" :key="'milestone-drawer-' . $projectId" />
-    <livewire:hq.projects.sprint-drawer :project-id="$projectId" :key="'sprint-drawer-' . $projectId" />
     <livewire:hq.projects.change-report-drawer :project-id="$projectId" :key="'report-drawer-' . $projectId" />
 </div>

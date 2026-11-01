@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Hq\Projects;
 
+use App\Models\User;
 use App\Support\Projects\Dependencies;
 use App\Support\Projects\Milestones;
 use App\Support\Projects\ProjectHistory;
@@ -19,11 +20,11 @@ use Livewire\Component;
 use Livewire\WithFileUploads;
 
 /**
- * The task drawer (docs/PROJECTS.md section 3, after MyCity's task panel): details, the lead (a select, with
- * "Assign to me" beside it), the people sharing it and its watchers, status, due date (Overdue), steps, "waits on"
- * (a warning only), comments with a file, and history. The project's lead and managers edit everything; the lead
- * and the people sharing it move it, tick steps, comment and propose a due date; anyone who sees it may watch it.
- * Opened by the open-task / new-task events, or by ?task=<id> in the address (the bell links there).
+ * The task drawer (docs/PROJECTS.md section 3, after MyCity's task panel): details, its milestone (every task has
+ * one), the lead (a picker, x-hq.picker, with "Me" beside it), the people sharing it and its watchers, status, due
+ * date (Overdue), steps, "waits on" (a warning only), comments with a file, and history. The project's lead and
+ * managers edit everything; the lead and the people sharing it move it, tick steps, comment and propose a due date;
+ * anyone who sees it may watch it. Opened by the open-task / new-task events, or by ?task=<id> (the bell links there).
  */
 class TaskDrawer extends Component
 {
@@ -46,10 +47,14 @@ class TaskDrawer extends Component
     public string $title = '';
     public string $description = '';
     public string $phaseId = '';
-    public string $sprintId = '';
     public string $leadId = '';
     public array $sharing = [];
     public array $watchers = [];
+
+    // What is typed in the three pickers (the lists narrow to the project's team)
+    public string $leadSearch = '';
+    public string $sharingSearch = '';
+    public string $watcherSearch = '';
     public string $dueDate = '';
     public string $hours = '';
     public bool $clientVisible = true;
@@ -90,7 +95,7 @@ class TaskDrawer extends Component
     }
 
     #[On('new-task')]
-    public function newTask(?string $phase = null, ?string $sprint = null): void
+    public function newTask(?string $phase = null): void
     {
         abort_unless(ProjectRules::canManage($this->projectId), 403);
         $this->resetForm();
@@ -98,7 +103,88 @@ class TaskDrawer extends Component
         $this->link = '';
         $this->open = true;
         $this->phaseId = Milestones::find($this->projectId, $phase)?->id ?? '';
-        $this->sprintId = Milestones::findSprint($this->projectId, $sprint)?->id ?? '';
+    }
+
+    // The pickers (managers): the lead is never also sharing or watching
+    public function chooseLead(string $userId): void
+    {
+        $this->authorizePicking();
+        if ($this->onTeam($userId)) {
+            $this->leadId = $userId;
+            $this->sharing = array_values(array_diff($this->sharing, [$userId]));
+            $this->watchers = array_values(array_diff($this->watchers, [$userId]));
+        }
+        $this->leadSearch = '';
+    }
+
+    public function clearLead(): void
+    {
+        $this->authorizePicking();
+        $this->leadId = '';
+        $this->leadSearch = '';
+    }
+
+    public function addSharing(string $userId): void
+    {
+        $this->authorizePicking();
+        if ($userId !== $this->leadId && $this->onTeam($userId) && ! in_array($userId, $this->sharing, true)) {
+            $this->sharing[] = $userId;
+            $this->watchers = array_values(array_diff($this->watchers, [$userId]));
+        }
+        $this->sharingSearch = '';
+    }
+
+    public function removeSharing(string $userId): void
+    {
+        $this->authorizePicking();
+        $this->sharing = array_values(array_diff($this->sharing, [$userId]));
+    }
+
+    public function addWatcher(string $userId): void
+    {
+        $this->authorizePicking();
+        if ($userId !== $this->leadId && $this->onTeam($userId) && ! in_array($userId, [...$this->sharing, ...$this->watchers], true)) {
+            $this->watchers[] = $userId;
+        }
+        $this->watcherSearch = '';
+    }
+
+    public function removeWatcher(string $userId): void
+    {
+        $this->authorizePicking();
+        $this->watchers = array_values(array_diff($this->watchers, [$userId]));
+    }
+
+    private function authorizePicking(): void
+    {
+        abort_unless($this->open && ProjectRules::canManage($this->projectId), 403);
+    }
+
+    private function onTeam(string $userId): bool
+    {
+        return ProjectRules::team($this->projectId)->contains('id', $userId);
+    }
+
+    /** Options and choices for the three pickers: the project's team, narrowed by what is typed */
+    private function pickers(): array
+    {
+        $team = ProjectRules::team($this->projectId)->pluck('id')->all();
+        $people = User::whereIn('id', $team)->get(['id', 'first_name', 'last_name', 'avatar_path', 'job_title'])->keyBy('id');
+        $item = fn (User $u) => ['id' => $u->id, 'label' => trim($u->first_name . ' ' . $u->last_name), 'meta' => $u->job_title, 'user' => $u];
+        $match = fn (string $term, array $exclude) => $people->reject(fn ($u) => in_array($u->id, $exclude, true))
+            ->filter(fn ($u) => trim($term) === '' || Str::contains(Str::lower($u->first_name . ' ' . $u->last_name), Str::lower(trim($term))))
+            ->sortBy(fn ($u) => Str::lower($u->first_name . ' ' . $u->last_name))->take(30)->map($item)->values();
+        $chosen = fn (array $ids) => collect($ids)->map(fn ($id) => $people->get($id))->filter()->map($item)->values();
+        $taken = array_filter([$this->leadId, ...$this->sharing, ...$this->watchers]);
+
+        return [
+            'leadOptions' => $match($this->leadSearch, []),
+            'leadSelected' => $this->leadId !== '' ? $chosen([$this->leadId])->first() : null,
+            'sharingOptions' => $match($this->sharingSearch, $taken),
+            'sharingSelected' => $chosen($this->sharing),
+            'watcherOptions' => $match($this->watcherSearch, $taken),
+            'watcherSelected' => $chosen($this->watchers),
+        ];
     }
 
     public function close(): void
@@ -111,7 +197,7 @@ class TaskDrawer extends Component
 
     private function resetForm(): void
     {
-        $this->reset('title', 'description', 'phaseId', 'sprintId', 'leadId', 'sharing', 'watchers', 'dueDate', 'hours', 'clientVisible',
+        $this->reset('title', 'description', 'phaseId', 'leadId', 'sharing', 'watchers', 'leadSearch', 'sharingSearch', 'watcherSearch', 'dueDate', 'hours', 'clientVisible',
             'status', 'newStep', 'waitOn', 'comment', 'attachment', 'proposedDate', 'notice', 'noticeTone');
         $this->resetErrorBag();
     }
@@ -123,7 +209,6 @@ class TaskDrawer extends Component
             'title' => $task->title,
             'description' => (string) $task->description,
             'phaseId' => $task->phase_id,
-            'sprintId' => (string) $task->sprint_id,
             'leadId' => (string) $task->assigned_to,
             'sharing' => $people['sharing'],
             'watchers' => $people['watcher'],
@@ -162,7 +247,6 @@ class TaskDrawer extends Component
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:10000'],
             'phaseId' => ['required', Rule::exists('project_phases', 'id')->where('project_id', $this->projectId)->whereNull('deleted_at')],
-            'sprintId' => ['nullable', Rule::exists('sprints', 'id')->where('project_id', $this->projectId)->whereNull('deleted_at')],
             'leadId' => ['nullable', Rule::in($team)],
             'sharing' => ['array', 'max:25'],
             'sharing.*' => [Rule::in($team)],
@@ -174,7 +258,6 @@ class TaskDrawer extends Component
             'title.required' => __('projects.task.errors.title'),
             'title.max' => __('projects.task.errors.title_long'),
             'phaseId.*' => __('projects.task.errors.milestone'),
-            'sprintId.*' => __('projects.task.errors.sprint'),
             'leadId.*' => __('projects.task.errors.lead'),
             'sharing.*' => __('projects.task.errors.people'),
             'watchers.*' => __('projects.task.errors.people'),
@@ -187,7 +270,6 @@ class TaskDrawer extends Component
             'title' => $this->title,
             'description' => trim($this->description) ?: null,
             'phase_id' => $this->phaseId,
-            'sprint_id' => $this->sprintId ?: null,
             'assigned_to' => $this->leadId ?: null,
             'due_date' => $this->dueDate ?: null,
             'estimated_hours' => $this->hours === '' ? null : number_format((float) $this->hours, 2, '.', ''),
@@ -218,7 +300,7 @@ class TaskDrawer extends Component
         }
     }
 
-    /** The status menu: the same move as dragging the card on the sprint board (timers, client review window) */
+    /** The status menu: the same move as dragging the card on the milestone board (timers, client review window) */
     public function updatedStatus(string $value): void
     {
         $task = $this->task();
@@ -368,10 +450,8 @@ class TaskDrawer extends Component
             'task' => $task,
             'canManage' => $canManage,
             'milestones' => $milestones,
-            'sprints' => DB::table('sprints')->where('project_id', $this->projectId)->whereNull('deleted_at')->orderBy('start_date')->get(['id', 'title', 'start_date', 'end_date']),
-            'team' => $canManage ? ProjectRules::team($this->projectId) : collect(),
             'names' => $names,
-        ];
+        ] + ($canManage ? $this->pickers() : []);
         if (! $task) {
             return view('livewire.hq.projects.task-drawer', $data);
         }

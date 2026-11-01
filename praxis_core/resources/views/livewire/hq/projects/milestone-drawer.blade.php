@@ -42,6 +42,9 @@
                         <h3 id="ms-progress-title">{{ __('projects.milestone.progress_title') }}</h3>
                         <div class="pj-bar {{ $milestone->progress >= 100 ? 'is-done' : '' }}" role="img" aria-label="{{ $pct($milestone->progress) }}"><span style="width: {{ $milestone->progress }}%"></span></div>
                         <p class="help" style="margin: 6px 0 0">{{ __('projects.milestone.progress_text', ['value' => $pct($milestone->progress), 'done' => $milestone->tasks_done, 'total' => $milestone->tasks_total]) }}</p>
+                        <a href="{{ route('hq.ops.project', ['project' => $projectId, 'tab' => 'board', 'board' => $milestone->id]) }}" class="btn btn-secondary btn-sm mt-3" wire:navigate>
+                            <i data-lucide="kanban"></i> {{ __('projects.milestone.open_board') }}
+                        </a>
                     </section>
                 @endif
 
@@ -118,6 +121,11 @@
                                 </div>
                             @endif
                             <div class="field">
+                                <label for="ms-goal" class="label">{{ __('projects.milestone.goal') }}</label>
+                                <textarea id="ms-goal" class="textarea" rows="2" wire:model="goal"></textarea>
+                                @error('goal') <span class="field-error">{{ $message }}</span> @enderror
+                            </div>
+                            <div class="field">
                                 <label for="ms-notes" class="label">{{ __('projects.milestone.notes') }}</label>
                                 <textarea id="ms-notes" class="textarea" rows="3" wire:model="notes"></textarea>
                                 @error('notes') <span class="field-error">{{ $message }}</span> @enderror
@@ -137,6 +145,9 @@
                             <dt>{{ __('projects.milestone.due') }}</dt><dd>{{ $milestone->due_date ? $day($milestone->due_date) : '—' }}</dd>
                             @if ($milestone->accepted_at)
                                 <dt>{{ __('projects.milestone.accepted') }}</dt><dd>{{ __('projects.milestone.accepted_text', ['date' => $day($milestone->accepted_at), 'name' => $milestone->accepted_by_name ?: '—']) }}</dd>
+                            @endif
+                            @if ($milestone->goal)
+                                <dt>{{ __('projects.milestone.goal') }}</dt><dd>{{ $milestone->goal }}</dd>
                             @endif
                             @if ($milestone->notes)
                                 <dt>{{ __('projects.milestone.notes') }}</dt><dd>{{ $milestone->notes }}</dd>

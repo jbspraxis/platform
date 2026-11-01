@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * What a project page reads (docs/PROJECTS.md, decisions 2, 3 and 6): milestones with their kanban column, progress
- * and invoice, sprints with the weight of what they deliver, overdue work.
+ * and invoice, and overdue work. A milestone is also the unit of work with its own task board (sprints were folded
+ * into milestones on 1 Nov 2026; the sprints table is history only).
  *
  * One weight: a milestone's weight_percentage is its share of the contract. A milestone's progress is its done tasks
  * over its tasks (one with no tasks counts as done once accepted); the project's is the sum of weight × progress.
@@ -128,35 +129,29 @@ final class ProjectPlan
         return round((float) $milestones->sum(fn ($m) => (float) $m->weight_percentage), 2);
     }
 
-    /** Sprints in date order, each with the milestones its tasks belong to, their weight, and its task counts */
-    public static function sprints(string $projectId, Collection $milestones): Collection
-    {
-        $sprints = DB::table('sprints')->where('project_id', $projectId)->whereNull('deleted_at')->orderBy('start_date')->orderBy('created_at')->get();
-        $links = DB::table('tasks')->whereIn('sprint_id', $sprints->pluck('id'))->whereNull('deleted_at')
-            ->groupBy('sprint_id', 'phase_id')
-            ->selectRaw("sprint_id, phase_id, COUNT(*) AS total, SUM(CASE WHEN status = 'Done' THEN 1 ELSE 0 END) AS done")
-            ->get()->groupBy('sprint_id');
-        $byId = $milestones->keyBy('id');
-
-        return $sprints->map(function ($sprint) use ($links, $byId) {
-            $rows = collect($links->get($sprint->id, []));
-            $sprint->milestones = $rows->map(fn ($r) => $byId->get($r->phase_id))->filter()->sortBy('phase_number')->values();
-            $sprint->weight = round((float) $sprint->milestones->sum(fn ($m) => (float) $m->weight_percentage), 2);
-            $sprint->tasks_total = (int) $rows->sum('total');
-            $sprint->tasks_done = (int) $rows->sum('done');
-
-            return $sprint;
-        });
-    }
-
-    /** This week's sprint: the one running today, else the Active one, else the next to start */
-    public static function currentSprint(Collection $sprints): ?object
+    /** The milestones being worked on now: in progress or in client review, or running today by their dates */
+    public static function current(Collection $milestones): Collection
     {
         $today = self::today();
 
-        return $sprints->first(fn ($s) => $s->start_date <= $today && $s->end_date >= $today)
-            ?? $sprints->firstWhere('status', 'Active')
-            ?? $sprints->filter(fn ($s) => $s->start_date > $today)->sortBy('start_date')->first();
+        return $milestones->filter(fn ($m) => in_array($m->column, ['in_progress', 'client_review'], true)
+            || ($m->column === 'not_started' && $m->start_date && $m->start_date <= $today && (! $m->due_date || $m->due_date >= $today)))->values();
+    }
+
+    /**
+     * The milestone a board opens on: one running today, else the in-progress one due soonest that isn't past due,
+     * else any in progress, else the first not yet delivered, else the first.
+     */
+    public static function boardDefault(Collection $milestones): ?object
+    {
+        $today = self::today();
+        $open = $milestones->reject(fn ($m) => in_array($m->column, self::DELIVERED, true));
+
+        return $open->first(fn ($m) => $m->start_date && $m->due_date && $m->start_date <= $today && $m->due_date >= $today)
+            ?? $open->where('column', 'in_progress')->filter(fn ($m) => $m->due_date && $m->due_date >= $today)->sortBy('due_date')->first()
+            ?? $open->firstWhere('column', 'in_progress')
+            ?? $open->first()
+            ?? $milestones->first();
     }
 
     /** The next milestone due: not yet accepted, with the earliest due date */

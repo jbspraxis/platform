@@ -16,7 +16,7 @@ use Livewire\Component;
 
 /**
  * The milestone drawer (docs/PROJECTS.md section 3): code and title, description, weight (with the project's total and
- * a warning when it isn't 100%), status, dates, acceptance, notes, "waits on" other milestones, its tasks and its
+ * a warning when it isn't 100%), status, start and end (its due date), goal, acceptance, notes, "waits on" other milestones, its tasks and its
  * invoice. Everyone who sees the project reads it; the project's lead and managers edit, add and delete
  * (only a milestone with no tasks and no invoice). Dropping a card on Accepted opens it to record who accepted it.
  */
@@ -43,6 +43,7 @@ class MilestoneDrawer extends Component
     public string $dueDate = '';
     public string $acceptedAt = '';
     public string $acceptedBy = '';
+    public string $goal = '';
     public string $notes = '';
     public string $waitOn = '';
 
@@ -104,7 +105,7 @@ class MilestoneDrawer extends Component
 
     private function resetForm(): void
     {
-        $this->reset('number', 'title', 'description', 'weight', 'column', 'startDate', 'dueDate', 'acceptedAt', 'acceptedBy', 'notes', 'waitOn',
+        $this->reset('number', 'title', 'description', 'weight', 'column', 'startDate', 'dueDate', 'acceptedAt', 'acceptedBy', 'goal', 'notes', 'waitOn',
             'confirmingDelete', 'notice', 'noticeTone');
         $this->resetErrorBag();
     }
@@ -122,6 +123,7 @@ class MilestoneDrawer extends Component
             'dueDate' => (string) $phase->due_date,
             'acceptedAt' => (string) $phase->accepted_at,
             'acceptedBy' => (string) $phase->accepted_by_name,
+            'goal' => (string) $phase->goal,
             'notes' => (string) $phase->notes,
         ]);
     }
@@ -161,6 +163,7 @@ class MilestoneDrawer extends Component
             'dueDate' => ['nullable', 'date_format:Y-m-d', $this->startDate ? 'after_or_equal:startDate' : 'nullable'],
             'acceptedAt' => [Rule::requiredIf(! $invoiced && $this->column === 'accepted'), 'nullable', 'date_format:Y-m-d'],
             'acceptedBy' => [Rule::requiredIf(! $invoiced && $this->column === 'accepted'), 'nullable', 'string', 'max:150'],
+            'goal' => ['nullable', 'string', 'max:5000'],
             'notes' => ['nullable', 'string', 'max:10000'],
         ], [
             'number.*' => __('projects.milestone.errors.number'),
@@ -174,6 +177,7 @@ class MilestoneDrawer extends Component
             'acceptedAt.*' => __('projects.milestone.errors.accepted_at'),
             'acceptedBy.*' => __('projects.milestone.errors.accepted_by'),
             'description.max' => __('projects.errors.long'),
+            'goal.max' => __('projects.errors.long'),
             'notes.max' => __('projects.errors.long'),
         ]);
 
@@ -186,6 +190,7 @@ class MilestoneDrawer extends Component
             'weight_percentage' => number_format((float) $this->weight, 2, '.', ''),
             'start_date' => $this->startDate ?: null,
             'due_date' => $this->dueDate ?: null,
+            'goal' => trim($this->goal) ?: null,
             'notes' => trim($this->notes) ?: null,
         ];
         if (! $invoiced) {

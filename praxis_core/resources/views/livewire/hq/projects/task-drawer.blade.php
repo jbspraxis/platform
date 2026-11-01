@@ -99,66 +99,37 @@
                                 <textarea id="task-description" class="textarea" rows="3" wire:model="description"></textarea>
                                 @error('description') <span class="field-error">{{ $message }}</span> @enderror
                             </div>
-                            <div class="pj-two">
-                                <div class="field">
-                                    <label for="task-phase" class="label">{{ __('projects.task.milestone') }}</label>
-                                    <select id="task-phase" class="select" wire:model="phaseId" @error('phaseId') aria-invalid="true" aria-describedby="task-phase-error" @enderror>
-                                        <option value="">{{ __('projects.task.choose_milestone') }}</option>
-                                        @foreach ($milestones as $m)
-                                            <option value="{{ $m->id }}" wire:key="tp-{{ $m->id }}">{{ $m->code }} · {{ $m->name }}</option>
-                                        @endforeach
-                                    </select>
-                                    @error('phaseId') <span class="field-error" id="task-phase-error">{{ $message }}</span> @enderror
-                                </div>
-                                <div class="field">
-                                    <label for="task-sprint" class="label">{{ __('projects.task.sprint') }}</label>
-                                    <select id="task-sprint" class="select" wire:model="sprintId">
-                                        <option value="">{{ __('projects.backlog.no_sprint') }}</option>
-                                        @foreach ($sprints as $s)
-                                            <option value="{{ $s->id }}" wire:key="ts-{{ $s->id }}">{{ $s->title }}</option>
-                                        @endforeach
-                                    </select>
-                                    @error('sprintId') <span class="field-error">{{ $message }}</span> @enderror
-                                </div>
-                            </div>
                             <div class="field">
-                                <label for="task-lead" class="label">{{ __('projects.task.lead') }}</label>
-                                <div class="pj-inline">
-                                    <select id="task-lead" class="select" wire:model="leadId" @error('leadId') aria-invalid="true" @enderror>
-                                        <option value="">{{ __('projects.no_lead') }}</option>
-                                        @foreach ($team as $p)
-                                            <option value="{{ $p->id }}" wire:key="tl-{{ $p->id }}">{{ trim($p->first_name . ' ' . $p->last_name) }}</option>
-                                        @endforeach
-                                    </select>
-                                    <button type="button" class="btn btn-secondary" x-on:click="$wire.set('leadId', @js(auth()->id()))">{{ __('projects.task.me') }}</button>
-                                </div>
-                                <span class="help">{{ __('projects.task.lead_help') }}</span>
-                                @error('leadId') <span class="field-error">{{ $message }}</span> @enderror
+                                <label for="task-phase" class="label">{{ __('projects.task.milestone') }}</label>
+                                <select id="task-phase" class="select" wire:model="phaseId" @error('phaseId') aria-invalid="true" aria-describedby="task-phase-error" @else aria-describedby="task-phase-help" @enderror>
+                                    <option value="">{{ __('projects.task.choose_milestone') }}</option>
+                                    @foreach ($milestones as $m)
+                                        <option value="{{ $m->id }}" wire:key="tp-{{ $m->id }}">{{ $m->code }} · {{ $m->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('phaseId')
+                                    <span class="field-error" id="task-phase-error">{{ $message }}</span>
+                                @else
+                                    <span class="help" id="task-phase-help">{{ __('projects.task.milestone_help') }}</span>
+                                @enderror
                             </div>
-                            <div class="pj-two">
-                                <fieldset class="field" style="border: 0; padding: 0; margin: 0">
-                                    <legend class="label" style="margin-bottom: 6px">{{ __('projects.task.sharing') }}</legend>
-                                    <div class="pj-people">
-                                        {{-- The lead is never also sharing or watching (the saved lead; a lead changed in this form is dropped on save) --}}
-                                        @foreach ($team as $p)
-                                            @continue($task && $p->id === $task->assigned_to)
-                                            <label wire:key="sh-{{ $p->id }}"><input type="checkbox" value="{{ $p->id }}" wire:model="sharing"> {{ trim($p->first_name . ' ' . $p->last_name) }}</label>
-                                        @endforeach
-                                    </div>
-                                    @error('sharing') <span class="field-error">{{ $message }}</span> @enderror
-                                    @error('sharing.*') <span class="field-error">{{ $message }}</span> @enderror
-                                </fieldset>
-                                <fieldset class="field" style="border: 0; padding: 0; margin: 0">
-                                    <legend class="label" style="margin-bottom: 6px">{{ __('projects.task.watchers') }}</legend>
-                                    <div class="pj-people">
-                                        @foreach ($team as $p)
-                                            @continue($task && $p->id === $task->assigned_to)
-                                            <label wire:key="wa-{{ $p->id }}"><input type="checkbox" value="{{ $p->id }}" wire:model="watchers"> {{ trim($p->first_name . ' ' . $p->last_name) }}</label>
-                                        @endforeach
-                                    </div>
-                                    <span class="help">{{ __('projects.task.watchers_help') }}</span>
-                                </fieldset>
+                            {{-- People: PR #14's picker over the project's team (type part of a name, Enter or click to choose) --}}
+                            <div>
+                                <x-hq.picker id="task-lead" :label="__('projects.task.lead')" model="leadSearch" :options="$leadOptions" :selected="$leadSelected"
+                                             choose="chooseLead" remove="clearLead" :placeholder="__('projects.task.find_person')" :help="__('projects.task.lead_help')"
+                                             :error="$errors->first('leadId')" :empty="__('projects.task.no_person')" :term="$leadSearch" :change="__('projects.task.change')" />
+                                @if ($leadId !== auth()->id())
+                                    <button type="button" class="btn btn-ghost btn-sm mt-1" wire:click="chooseLead('{{ auth()->id() }}')"><i data-lucide="user-plus"></i> {{ __('projects.task.me') }}</button>
+                                @endif
                             </div>
+                            <x-hq.picker id="task-sharing" :label="__('projects.task.sharing')" model="sharingSearch" :options="$sharingOptions" :selected="$sharingSelected" :multiple="true"
+                                         choose="addSharing" remove="removeSharing" :placeholder="__('projects.task.find_person')" :help="__('projects.task.sharing_help')"
+                                         :error="$errors->first('sharing') ?: $errors->first('sharing.*')" :empty="__('projects.task.no_person')" :term="$sharingSearch"
+                                         :removeLabel="__('projects.task.remove_person')" />
+                            <x-hq.picker id="task-watchers" :label="__('projects.task.watchers')" model="watcherSearch" :options="$watcherOptions" :selected="$watcherSelected" :multiple="true"
+                                         choose="addWatcher" remove="removeWatcher" :placeholder="__('projects.task.find_person')" :help="__('projects.task.watchers_help')"
+                                         :error="$errors->first('watchers') ?: $errors->first('watchers.*')" :empty="__('projects.task.no_person')" :term="$watcherSearch"
+                                         :removeLabel="__('projects.task.remove_person')" />
                             <div class="pj-two">
                                 <div class="field">
                                     <label for="task-due" class="label">{{ __('projects.task.due_date') }}</label>
@@ -183,7 +154,6 @@
                                 <dt>{{ __('projects.task.description') }}</dt><dd>{{ $task->description }}</dd>
                             @endif
                             <dt>{{ __('projects.task.milestone') }}</dt><dd>{{ $milestone ? $milestone->code . ' · ' . $milestone->name : '—' }}</dd>
-                            <dt>{{ __('projects.task.sprint') }}</dt><dd>{{ $task->sprint_id ? ($sprints->firstWhere('id', $task->sprint_id)?->title ?? '—') : __('projects.backlog.no_sprint') }}</dd>
                             <dt>{{ __('projects.task.lead') }}</dt><dd>{{ $name($task->assigned_to) }}</dd>
                             <dt>{{ __('projects.task.sharing') }}</dt><dd>{{ collect($people['sharing'])->map(fn ($id) => $name($id))->implode(', ') ?: '—' }}</dd>
                             <dt>{{ __('projects.task.watchers') }}</dt><dd>{{ collect($people['watcher'])->map(fn ($id) => $name($id))->implode(', ') ?: '—' }}</dd>

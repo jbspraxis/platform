@@ -67,8 +67,9 @@ trait ProjectFixtures
     }
 
     /**
-     * MyCity App ERP's shape (docs/PROJECTS.md section 6): M0 Foundation at 0% and M1–M11 by the SOW's weights, one
-     * sprint per milestone, 148 tasks, invoice 001 (deposit) and 002 (M1) paid. Returns [project, phases by number, sprints by number].
+     * MyCity App ERP's shape after PR 7's migration (docs/PROJECTS.md section 6): M0 Foundation at 0% and M1–M11 by the
+     * SOW's weights, each with the dates of its old sprint (kept as history, tasks still point at it), 148 tasks,
+     * invoice 001 (deposit) and 002 (M1) paid. Returns [project, phases by number, sprints by number].
      */
     protected function myCityShape(array $project = []): array
     {
@@ -80,7 +81,8 @@ trait ProjectFixtures
         $projectId = $this->project($project + ['title' => 'MyCity App ERP', 'total_budget' => 3700000]);
         $phases = $sprints = [];
         foreach ($weights as $n => $w) {
-            $phases[$n] = $this->phase($projectId, $n, $w, ['status' => $status[$n] ?? 'Pending', 'title' => "M{$n} · Workstream {$n}"]);
+            $phases[$n] = $this->phase($projectId, $n, $w, ['status' => $status[$n] ?? 'Pending', 'title' => "M{$n} · Workstream {$n}",
+                'start_date' => $dates[$n][0], 'due_date' => $dates[$n][1]]);
             $sprints[$n] = $this->sprint($projectId, "M{$n} · Workstream {$n}", $dates[$n][0], $dates[$n][1], $n === 4 ? 'Active' : ($n < 4 || $n === 9 ? 'Completed' : 'Planned'));
         }
         // 148 tasks: 12 or 13 a milestone, the delivered milestones done

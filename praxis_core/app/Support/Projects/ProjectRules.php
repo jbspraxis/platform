@@ -11,10 +11,10 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Who may do what on a project page (docs/PROJECTS.md, decision 8 and section 5). Seeing the page and its drawers
- * needs projects.view and the sprint-board rule (App\Support\ProjectAccess: managers and auditors see every project,
+ * needs projects.view and the board rule (App\Support\ProjectAccess: managers and auditors see every project,
  * everyone else the projects they lead or have work on). The project's lead and holders of projects.create edit
  * everything; a team member with projects.edit works on the tasks they lead or share (status, steps, comments,
- * due-date proposals). projects.approve still moves anyone's card, as it did on the sprint board.
+ * due-date proposals). projects.approve still moves anyone's card, as it did on the board before.
  * Every change is written to system_audit_logs through log(), which feeds the drawers' history.
  */
 final class ProjectRules
@@ -31,7 +31,7 @@ final class ProjectRules
         return Auth::check() && DB::table('projects')->where('id', $projectId)->where('lead_user_id', Auth::id())->exists();
     }
 
-    /** Milestones, sprints, any task, change reports */
+    /** Milestones, any task, change reports */
     public static function canManage(?string $projectId): bool
     {
         return self::canView($projectId) && (Auth::user()->can('projects.create') || self::isLead($projectId));
@@ -57,7 +57,7 @@ final class ProjectRules
         return self::canWorkOn($task, $projectId) || (self::canView($projectId) && Auth::user()->can('projects.approve'));
     }
 
-    /** canMove for many cards at once (the sprint board), with the lookups done once */
+    /** canMove for many cards at once (the milestone board), with the lookups done once */
     public static function mover(string $projectId): Closure
     {
         $user = Auth::user();

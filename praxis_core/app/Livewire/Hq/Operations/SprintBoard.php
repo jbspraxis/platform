@@ -12,6 +12,11 @@ use Illuminate\Support\Str;
 use App\Support\Access;
 use App\Support\ProjectAccess;
 
+/**
+ * The milestone board (docs/PROJECTS.md): one milestone's tasks by status, on the project page's Milestone board tab.
+ * Sprints were folded into milestones (owner, 1 Nov 2026), so the board takes a milestone and reads its tasks through
+ * tasks.phase_id; the class keeps its old name. Timers, the 45-minute check and the client review window are unchanged.
+ */
 #[Layout('components.layouts.hq')]
 class SprintBoard extends Component
 {
@@ -30,13 +35,9 @@ class SprintBoard extends Component
     #[Locked]
     public bool $canMoveAny = false; // projects.approve: move anyone’s task
 
-    // On the project page's Sprints tab (docs/PROJECTS.md): the page has the header and the task drawer
-    #[Locked]
-    public bool $embedded = false;
-
-    // Board State
-    public $activeSprintId = null;
-    public $sprints = [];
+    // Board State: the milestone shown (the Milestone menu) and the project's milestones
+    public $activeMilestoneId = null;
+    public $milestones = [];
     public $tasks = [
         'To-Do' => [],
         'In-Progress' => [],
@@ -48,31 +49,36 @@ class SprintBoard extends Component
     // Telemetry State
     public $teamCapacity = []; // Tracks burnout risk
 
-    public function mount($id, bool $embedded = false)
+    /** $milestone: the one to open on (a kanban card's link); else the one running now (ProjectPlan::boardDefault) */
+    public function mount($id, ?string $milestone = null)
     {
-        $this->embedded = $embedded;
         $this->canMoveOwn = Auth::user()->can('projects.edit');
         $this->canMoveAny = Auth::user()->can('projects.approve');
         $project = DB::table('projects')->where('id', $id)->first();
         if (!$project) abort(404);
 
-        // Same rule as the sprint boards list: managers and auditors see every board,
-        // everyone else only the boards of projects where they have an assigned task
-        abort_unless(self::maySeeBoard($id), 403, 'You don’t have permission to open this sprint board. Ask a project lead to assign you a task on this project, or an administrator to change your role.');
+        // Same rule as the milestone boards list: managers and auditors see every board,
+        // everyone else only the boards of projects they lead or have a task on
+        abort_unless(self::maySeeBoard($id), 403, __('projects.errors.no_access'));
 
         $this->projectId = $id;
         $this->project = $project;
 
-        $this->sprints = DB::table('sprints')->where('project_id', $this->projectId)->orderBy('start_date', 'asc')->get()->toArray();
-        
-        // Auto-select the currently active sprint, or default to the first one
-        $activeSprint = collect($this->sprints)->where('status', 'Active')->first() ?? collect($this->sprints)->first();
-        $this->activeSprintId = $activeSprint ? $activeSprint->id : null;
-
-        $this->loadBoardData();
+        $this->loadMilestones();
+        $this->activeMilestoneId = $milestone;
+        $this->updatedActiveMilestoneId($milestone);
     }
 
-    /** The sprint boards list (SprintBoardDirectory) and the QA hub use the same rule (App\Support\ProjectAccess) */
+    /** The project's milestones for the menu, in order, with their dates */
+    private function loadMilestones(): void
+    {
+        $this->milestones = \App\Support\Projects\ProjectPlan::milestones($this->projectId)
+            ->map(fn ($m) => (object) ['id' => $m->id, 'code' => $m->code, 'name' => $m->name, 'column' => $m->column,
+                'start_date' => $m->start_date, 'due_date' => $m->due_date])
+            ->all();
+    }
+
+    /** The milestone boards list (SprintBoardDirectory) and the QA hub use the same rule (App\Support\ProjectAccess) */
     public static function maySeeBoard($projectId): bool
     {
         return ProjectAccess::maySee($projectId);
@@ -81,7 +87,7 @@ class SprintBoard extends Component
     /** Checked again on every change: access can end while the board is open (a task reassigned, a role changed) */
     private function authoriseBoard(): void
     {
-        abort_unless(self::maySeeBoard($this->projectId), 403, 'You no longer have access to this sprint board. Ask a project lead to assign you a task on this project, or an administrator to change your role.');
+        abort_unless(self::maySeeBoard($this->projectId), 403, __('projects.errors.no_access'));
     }
 
     /** A task on this board’s project, or null (task ids come from the browser) */
@@ -95,47 +101,46 @@ class SprintBoard extends Component
             ->first();
     }
 
-    /** A drawer on the project page changed a sprint or a task: the menu and the cards follow */
+    /** A drawer on the project page changed a milestone or a task: the menu and the cards follow */
     #[\Livewire\Attributes\On('project-changed')]
     public function refreshFromProject(): void
     {
         $this->authoriseBoard();
-        $this->sprints = DB::table('sprints')->where('project_id', $this->projectId)->whereNull('deleted_at')->orderBy('start_date', 'asc')->get()->toArray();
-        $this->updatedActiveSprintId($this->activeSprintId);
+        $this->loadMilestones();
+        $this->updatedActiveMilestoneId($this->activeMilestoneId);
     }
 
-    public function switchSprint($sprintId)
+    public function switchMilestone($milestoneId)
     {
-        $this->activeSprintId = $sprintId;
-        $this->updatedActiveSprintId($sprintId);
+        $this->activeMilestoneId = $milestoneId;
+        $this->updatedActiveMilestoneId($milestoneId);
     }
 
     /**
-     * The Sprint menu (wire:model.live="activeSprintId"): the board follows at once. Only this project's sprints;
-     * anything else falls back to the active one. Without this the menu changed but the tasks stayed on the
-     * sprint chosen when the page opened.
+     * The Milestone menu (wire:model.live="activeMilestoneId"): the board follows at once. Only this project's
+     * milestones; anything else falls back to the one running now.
      */
-    public function updatedActiveSprintId($sprintId): void
+    public function updatedActiveMilestoneId($milestoneId): void
     {
-        $sprints = collect($this->sprints);
-        if (! $sprints->contains(fn ($s) => data_get($s, 'id') === $sprintId)) {
-            $fallback = $sprints->first(fn ($s) => data_get($s, 'status') === 'Active') ?? $sprints->first();
-            $this->activeSprintId = data_get($fallback, 'id');
+        $milestones = collect($this->milestones);
+        if (! $milestones->contains(fn ($m) => data_get($m, 'id') === $milestoneId)) {
+            $this->activeMilestoneId = data_get(\App\Support\Projects\ProjectPlan::boardDefault($milestones), 'id');
         }
         $this->loadBoardData();
     }
 
-    // Runs when the page opens, when the sprint changes and after every move, so access is checked again here too
+    // Runs when the page opens, when the milestone changes and after every move, so access is checked again here too
     public function loadBoardData()
     {
         $this->authoriseBoard();
-        if (!$this->activeSprintId) return;
+        if (!$this->activeMilestoneId) return;
 
         $rawTasks = DB::table('tasks')
             ->leftJoin('users', 'tasks.assigned_to', '=', 'users.id')
             ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
-            ->where('project_phases.project_id', $this->projectId) 
-            ->where('tasks.sprint_id', $this->activeSprintId)
+            ->where('project_phases.project_id', $this->projectId)
+            ->where('tasks.phase_id', $this->activeMilestoneId)
+            ->whereNull('tasks.deleted_at')
             ->select(
                 'tasks.*', 
                 'users.first_name', 'users.last_name', 

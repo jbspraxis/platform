@@ -19,7 +19,7 @@
             
             <div style="background: rgba(10, 17, 40, 0.85); border: 1px solid var(--erp-border-dark); border-radius: 4px; padding: 25px;">
                 <div style="font-family: 'Roboto Mono', monospace; font-size: 0.85rem; color: var(--erp-teal); margin-bottom: 20px; border-bottom: 1px solid var(--erp-border-dark); padding-bottom: 10px;">
-                    > MY ASSIGNED SPRINT BACKLOG
+                    > MY ASSIGNED TASKS
                 </div>
 
                 @if(count($activeTasks) > 0)

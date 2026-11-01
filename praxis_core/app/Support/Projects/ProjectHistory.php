@@ -20,15 +20,14 @@ final class ProjectHistory
             ->map(fn ($row) => self::present($row));
     }
 
-    /** The project's latest lines across its milestones, sprints, tasks and change reports, each naming its record */
-    public static function activity(string $projectId, Collection $milestones, Collection $sprints, int $limit = 10): Collection
+    /** The project's latest lines across its milestones, tasks and change reports, each naming its record */
+    public static function activity(string $projectId, Collection $milestones, int $limit = 10): Collection
     {
         $tasks = DB::table('tasks')->whereIn('phase_id', $milestones->pluck('id'))->pluck('title', 'id');
         $reports = DB::table('change_reports')->where('project_id', $projectId)->get(['id', 'number'])->mapWithKeys(fn ($r) => [$r->id => ChangeReports::label($r)]);
         $names = [
             'projects' => collect([$projectId => null]),
             'project_phases' => $milestones->mapWithKeys(fn ($m) => [$m->id => $m->code . ' ' . $m->name]),
-            'sprints' => $sprints->pluck('title', 'id'),
             'tasks' => $tasks,
             'change_reports' => $reports,
         ];
@@ -61,7 +60,6 @@ final class ProjectHistory
         $statusLabel = match ($row->target_table) {
             'tasks' => $status ? __('projects.task_statuses.' . $status) : '',
             'project_phases' => $status && ($column = array_search($status, ProjectPlan::STATUS_FOR, true)) ? __('projects.columns.' . $column) : '',
-            'sprints' => $status ? __('projects.sprint_statuses.' . $status) : '',
             'change_reports' => $status ? __('projects.cr_statuses.' . $status) : '',
             default => '',
         };

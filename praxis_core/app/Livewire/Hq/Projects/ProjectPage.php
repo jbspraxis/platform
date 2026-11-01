@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Hq\Projects;
 
+use App\Models\Opportunity;
 use App\Support\Access;
+use App\Support\Opportunities\OpportunityAccess;
 use App\Support\Projects\Milestones;
 use App\Support\Projects\ProjectHistory;
 use App\Support\Projects\ProjectPlan;
@@ -17,15 +19,16 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * One project (docs/PROJECTS.md section 2): Overview, Milestones (a kanban, decision 2), Sprints (the sprint board),
- * Backlog, QA, and Meetings and money. Milestones, sprints, tasks and change reports open in their drawers
- * (MilestoneDrawer, SprintDrawer, TaskDrawer, ChangeReportDrawer), which dispatch project-changed after each change.
- * projects.view and the sprint-board rule open it; the project's lead and managers edit (App\Support\Projects\ProjectRules).
+ * One project (docs/PROJECTS.md section 2): Overview, Milestones (the kanban of decision 2), Milestone board (one
+ * milestone's tasks by status: the sprint board, now taking a milestone), Backlog, QA, and Meetings and money.
+ * Milestones, tasks and change reports open in their drawers (MilestoneDrawer, TaskDrawer, ChangeReportDrawer), which
+ * dispatch project-changed after each change. projects.view and the board rule open it; the project's lead and
+ * managers edit (App\Support\Projects\ProjectRules).
  */
 #[Layout('components.layouts.hq')]
 class ProjectPage extends Component
 {
-    public const TABS = ['overview', 'milestones', 'sprints', 'backlog', 'qa', 'money'];
+    public const TABS = ['overview', 'milestones', 'board', 'backlog', 'qa', 'money'];
 
     #[Locked]
     public string $projectId;
@@ -33,10 +36,11 @@ class ProjectPage extends Component
     #[Url(except: 'overview')]
     public string $tab = 'overview';
 
-    // Backlog filters: sprint '' (all), 'none' (no sprint) or an id; lead '' (anyone), 'none' or an id
-    #[Url(as: 'sprint', except: '')]
-    public string $filterSprint = '';
+    // The milestone the board opens on (?board=<id>, from a kanban card); the board's own menu changes it after that
+    #[Url(as: 'board', except: '')]
+    public string $boardMilestone = '';
 
+    // Backlog filters: lead '' (anyone), 'none' or an id
     #[Url(as: 'lead', except: '')]
     public string $filterLead = '';
 
@@ -88,7 +92,7 @@ class ProjectPage extends Component
 
     public function clearFilters(): void
     {
-        $this->reset('filterSprint', 'filterLead', 'filterStatus', 'filterOverdue');
+        $this->reset('filterLead', 'filterStatus', 'filterOverdue');
     }
 
     /**
@@ -140,12 +144,13 @@ class ProjectPage extends Component
         abort_unless($project, 404);
         $milestones = ProjectPlan::milestones($this->projectId);
         $canManage = ProjectRules::canManage($this->projectId);
-        $sprints = ProjectPlan::sprints($this->projectId, $milestones);
+        $opportunity = Opportunity::query()
+            ->where(fn ($q) => $q->where('project_id', $this->projectId)->when($project->opportunity_id, fn ($q) => $q->orWhere('id', $project->opportunity_id)))
+            ->orderByDesc('updated_at')->first();
 
         $data = [
             'project' => $project,
             'milestones' => $milestones,
-            'sprints' => $sprints,
             'progress' => ProjectPlan::progress($milestones),
             'weightTotal' => ProjectPlan::weightTotal($milestones),
             'nextDue' => ProjectPlan::nextDue($milestones),
@@ -153,19 +158,21 @@ class ProjectPage extends Component
             'openQa' => ProjectPlan::openQaCount($this->projectId),
             'canManage' => $canManage,
             'canSeeMoney' => ProjectRules::canSeeMoney($this->projectId),
-            'opportunity' => DB::table('opportunities')->whereNull('deleted_at')
-                ->where(fn ($q) => $q->where('project_id', $this->projectId)->when($project->opportunity_id, fn ($q) => $q->orWhere('id', $project->opportunity_id)))
-                ->orderByDesc('updated_at')->first(['id', 'title']),
+            'opportunity' => $opportunity,
+            // The opportunity's team opens it too (OpportunityAccess, PR #14)
+            'canOpenOpportunity' => $opportunity && OpportunityAccess::canView(Auth::user(), $opportunity),
         ];
 
         $data += match ($this->tab) {
             'overview' => [
-                'currentSprint' => ProjectPlan::currentSprint($sprints),
-                'activity' => ProjectHistory::activity($this->projectId, $milestones, $sprints),
+                'current' => ProjectPlan::current($milestones),
+                'activity' => ProjectHistory::activity($this->projectId, $milestones),
                 'canSetLead' => Auth::user()->can('projects.create'),
                 'team' => Auth::user()->can('projects.create') ? ProjectRules::team($this->projectId) : collect(),
             ],
-            'backlog' => $this->backlog($milestones, $sprints),
+            // A kanban card's link, else the milestone running now (the board decides)
+            'board' => ['boardMilestoneId' => $milestones->firstWhere('id', $this->boardMilestone)?->id],
+            'backlog' => $this->backlog(),
             'qa' => ['tickets' => DB::table('qa_tickets')->leftJoin('tasks', 'tasks.id', '=', 'qa_tickets.task_id')
                 ->where('qa_tickets.project_id', $this->projectId)->whereNull('qa_tickets.deleted_at')
                 ->orderByRaw("FIELD(qa_tickets.status, 'Open', 'Investigating', 'Resolved', 'Closed')")
@@ -185,20 +192,18 @@ class ProjectPage extends Component
         return view('livewire.hq.projects.page', $data)->title($project->title . ' · ' . __('projects.title'));
     }
 
-    /** Every task, filtered, grouped by milestone; each with its sprint, lead, sharing count and open "waits on" */
-    private function backlog($milestones, $sprints): array
+    /** Every task, filtered, grouped by milestone (every task has one); each with its lead, sharing count and open "waits on" */
+    private function backlog(): array
     {
         $tasks = DB::table('tasks')->join('project_phases', 'project_phases.id', '=', 'tasks.phase_id')
             ->leftJoin('users', 'users.id', '=', 'tasks.assigned_to')
             ->where('project_phases.project_id', $this->projectId)->whereNull('project_phases.deleted_at')->whereNull('tasks.deleted_at')
-            ->when($this->filterSprint === 'none', fn ($q) => $q->whereNull('tasks.sprint_id'))
-            ->when($this->filterSprint !== '' && $this->filterSprint !== 'none', fn ($q) => $q->where('tasks.sprint_id', $this->filterSprint))
             ->when($this->filterLead === 'none', fn ($q) => $q->whereNull('tasks.assigned_to'))
             ->when($this->filterLead !== '' && $this->filterLead !== 'none', fn ($q) => $q->where('tasks.assigned_to', $this->filterLead))
             ->when(in_array($this->filterStatus, ProjectPlan::TASK_STATUSES, true), fn ($q) => $q->where('tasks.status', $this->filterStatus))
             ->when($this->filterOverdue, fn ($q) => $q->whereNotNull('tasks.due_date')->where('tasks.due_date', '<', ProjectPlan::today())->where('tasks.status', '!=', 'Done'))
             ->orderByRaw("FIELD(tasks.status, 'In-Progress', 'Failed', 'QA_Review', 'To-Do', 'Done')")->orderBy('tasks.due_date')->orderBy('tasks.created_at')
-            ->get(['tasks.id', 'tasks.phase_id', 'tasks.sprint_id', 'tasks.title', 'tasks.status', 'tasks.due_date', 'tasks.assigned_to', 'users.first_name', 'users.last_name']);
+            ->get(['tasks.id', 'tasks.phase_id', 'tasks.title', 'tasks.status', 'tasks.due_date', 'tasks.assigned_to', 'users.first_name', 'users.last_name']);
 
         $ids = $tasks->pluck('id')->all();
         $sharing = $ids ? DB::table('task_people')->whereIn('task_id', $ids)->where('role', 'sharing')->groupBy('task_id')->selectRaw('task_id, COUNT(*) AS n')->pluck('n', 'task_id') : collect();
@@ -208,11 +213,10 @@ class ProjectPage extends Component
             'taskCount' => $tasks->count(),
             'waits' => ProjectPlan::openWaits($ids),
             'sharing' => $sharing,
-            'sprintNames' => $sprints->pluck('title', 'id'),
             'leads' => DB::table('users')->whereIn('id', DB::table('tasks')->join('project_phases', 'project_phases.id', '=', 'tasks.phase_id')
                 ->where('project_phases.project_id', $this->projectId)->whereNotNull('tasks.assigned_to')->select('tasks.assigned_to'))
                 ->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
-            'filtered' => $this->filterSprint !== '' || $this->filterLead !== '' || $this->filterStatus !== '' || $this->filterOverdue,
+            'filtered' => $this->filterLead !== '' || $this->filterStatus !== '' || $this->filterOverdue,
         ];
     }
 }

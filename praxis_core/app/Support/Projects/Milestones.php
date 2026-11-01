@@ -7,25 +7,17 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Changes to milestones (project_phases) and sprints from the project page (docs/PROJECTS.md sections 2 and 3).
+ * Changes to milestones (project_phases) from the project page (docs/PROJECTS.md sections 2 and 3). A milestone is
+ * also the unit of work: its dates, goal and tasks are its board (sprints were folded into milestones on 1 Nov 2026).
  * Only the project's lead and managers call these (ProjectRules::canManage). Every change is logged against its record.
  */
 final class Milestones
 {
-    public const FIELDS = ['phase_number', 'title', 'description', 'weight_percentage', 'status', 'start_date', 'due_date', 'accepted_at', 'accepted_by_name', 'notes'];
-
-    public const SPRINT_FIELDS = ['title', 'start_date', 'end_date', 'status', 'goal', 'notes'];
-
-    public const SPRINT_STATUSES = ['Planned', 'Active', 'Completed'];
+    public const FIELDS = ['phase_number', 'title', 'description', 'weight_percentage', 'status', 'start_date', 'due_date', 'accepted_at', 'accepted_by_name', 'goal', 'notes'];
 
     public static function find(string $projectId, ?string $phaseId): ?object
     {
         return $phaseId ? DB::table('project_phases')->where('project_id', $projectId)->where('id', $phaseId)->whereNull('deleted_at')->first() : null;
-    }
-
-    public static function findSprint(string $projectId, ?string $sprintId): ?object
-    {
-        return $sprintId ? DB::table('sprints')->where('project_id', $projectId)->where('id', $sprintId)->whereNull('deleted_at')->first() : null;
     }
 
     public static function nextNumber(string $projectId): int
@@ -85,29 +77,6 @@ final class Milestones
         ProjectRules::log('MILESTONE_DELETED', "Deleted the milestone M{$phase->phase_number} “{$phase->title}”.", 'project_phases', $phase->id);
 
         return true;
-    }
-
-    public static function createSprint(string $projectId, array $data): string
-    {
-        $id = (string) Str::uuid();
-        $row = array_intersect_key($data, array_flip(self::SPRINT_FIELDS));
-        DB::table('sprints')->insert($row + [
-            'id' => $id, 'project_id' => $projectId,
-            'created_by' => Auth::id(), 'updated_by' => Auth::id(), 'created_at' => now(), 'updated_at' => now(),
-        ]);
-        ProjectRules::log('SPRINT_CREATED', "Added the sprint “{$row['title']}” ({$row['start_date']} to {$row['end_date']}).", 'sprints', $id, [], $row);
-
-        return $id;
-    }
-
-    public static function updateSprint(object $sprint, array $data): void
-    {
-        [$before, $after] = ProjectRules::diff((array) $sprint, array_intersect_key($data, array_flip(self::SPRINT_FIELDS)));
-        if (! $after) {
-            return;
-        }
-        DB::table('sprints')->where('id', $sprint->id)->update($after + ['updated_by' => Auth::id(), 'updated_at' => now()]);
-        ProjectRules::log('SPRINT_UPDATED', "Changed the sprint “{$sprint->title}”: " . implode(', ', array_keys($after)) . '.', 'sprints', $sprint->id, $before, $after);
     }
 
     /** Accepted on and by belong to an accepted milestone only: leaving Accepted clears them */

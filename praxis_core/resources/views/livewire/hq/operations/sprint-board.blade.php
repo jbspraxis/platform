@@ -4,38 +4,35 @@
         $columnLabels = collect(['To-Do', 'In-Progress', 'QA_Review', 'Failed', 'Done'])->mapWithKeys(fn ($s) => [$s => __('projects.task_statuses.' . $s)])->all();
     @endphp
 
-    <div class="page-header" @if($embedded) style="margin-bottom: 16px" @endif>
-        <div>
-            @unless($embedded)
-                <h1 class="page-title">{{ __('projects.board.title', ['project' => $project->title]) }}</h1>
-            @endunless
-            <p class="page-subtitle">{{ __('projects.board.subtitle') }}</p>
+    {{-- On the project page's Milestone board tab (docs/PROJECTS.md); the page holds the header and the drawers --}}
+    <div class="page-header" style="margin-bottom: 16px">
+        <div style="min-width: 0">
+            <p class="page-subtitle" style="margin-top: 0">{{ __('projects.board.subtitle') }}</p>
         </div>
 
         <div class="flex flex-wrap items-end gap-3">
-            @if(!empty($sprints))
-                <div class="field">
-                    <label for="sprint-select" class="label">{{ __('projects.board.sprint') }}</label>
-                    <select id="sprint-select" wire:model.live="activeSprintId" class="select min-w-[240px]">
-                        @foreach($sprints as $sprint)
-                            <option value="{{ $sprint->id }}">{{ $sprint->title }} ({{ \Carbon\Carbon::parse($sprint->start_date)->format('j M') }} to {{ \Carbon\Carbon::parse($sprint->end_date)->format('j M') }})</option>
+            @if(!empty($milestones))
+                <div class="field" style="min-width: 0; max-width: 100%">
+                    <label for="milestone-select" class="label">{{ __('projects.board.milestone') }}</label>
+                    <select id="milestone-select" wire:model.live="activeMilestoneId" class="select" style="min-width: min(280px, 100%); max-width: 100%">
+                        @foreach($milestones as $m)
+                            <option value="{{ $m->id }}">{{ $m->code }} · {{ $m->name }}@if($m->start_date || $m->due_date) ({{ \App\Support\Projects\ProjectPlan::day($m->start_date, 'short') ?: '…' }} – {{ \App\Support\Projects\ProjectPlan::day($m->due_date, 'short') ?: '…' }})@endif</option>
                         @endforeach
                     </select>
                 </div>
+                @if($activeMilestoneId)
+                    <button type="button" class="btn btn-secondary" wire:click="$dispatch('open-milestone', { id: '{{ $activeMilestoneId }}' })">
+                        <i data-lucide="pencil"></i> {{ __('projects.board.details') }}
+                    </button>
+                @endif
             @endif
-
-            @unless($embedded)
-                <a href="{{ route('hq.ops.project', ['project' => $projectId, 'tab' => 'sprints']) }}" class="btn btn-secondary" wire:navigate>
-                    <i data-lucide="folder-kanban"></i> {{ __('projects.open_page') }}
-                </a>
-            @endunless
         </div>
     </div>
 
     <x-flash class="mb-4" />
 
-    @if(empty($sprints))
-        <div class="alert alert-info mb-4"><i data-lucide="info"></i> <span>No sprints planned for this project yet. Once sprints are planned, their tasks appear here.</span></div>
+    @if(empty($milestones))
+        <div class="alert alert-info mb-4"><i data-lucide="info"></i> <span>{{ __('projects.board.no_milestones') }}</span></div>
     @endif
 
     @if(!empty($teamCapacity))
@@ -98,9 +95,8 @@
                              @dragstart="dragStart($event, '{{ $task['id'] }}', '{{ $column }}')"
                              style="{{ $isDraggable === 'false' && $task['assigned_to'] ? 'opacity: 0.6; cursor: not-allowed;' : '' }}">
 
-                            <div class="text-caption text-muted">{{ $task['phase_title'] }}</div>
-                            {{-- Opens the task drawer (docs/PROJECTS.md section 3) --}}
-                            <button type="button" class="mt-1 mb-3 block w-full cursor-pointer border-0 bg-transparent p-0 text-left text-small font-semibold text-ink hover:text-deep-teal"
+                            {{-- Opens the task drawer (docs/PROJECTS.md section 3); every card is on the milestone in the menu --}}
+                            <button type="button" class="mb-3 block w-full cursor-pointer border-0 bg-transparent p-0 text-left text-small font-semibold text-ink hover:text-deep-teal"
                                     wire:click="$dispatch('open-task', { id: '{{ $task['id'] }}' })">{{ $task['title'] }}</button>
 
                             @if(!empty($task['due_date']) || !empty($task['waits_on']))
@@ -170,11 +166,6 @@
             </div>
         @endforeach
     </div>
-
-    {{-- On its own page the board brings the task drawer; on the project page the page has it --}}
-    @unless($embedded)
-        <livewire:hq.projects.task-drawer :project-id="$projectId" :key="'board-task-drawer-' . $projectId" />
-    @endunless
 
     <script>
         function sprintBoard(hasActiveTasks) {

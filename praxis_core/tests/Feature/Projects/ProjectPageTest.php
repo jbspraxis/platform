@@ -8,7 +8,6 @@ use App\Livewire\Hq\Operations\SprintBoard;
 use App\Livewire\Hq\Projects\ChangeReportDrawer;
 use App\Livewire\Hq\Projects\MilestoneDrawer;
 use App\Livewire\Hq\Projects\ProjectPage;
-use App\Livewire\Hq\Projects\SprintDrawer;
 use App\Livewire\Hq\Projects\TaskDrawer;
 use App\Models\User;
 use Illuminate\Support\Arr;
@@ -21,7 +20,7 @@ use Tests\TestCase;
 /**
  * The project page (docs/PROJECTS.md): who opens and edits it (lead, manager, team member, outsider), its tabs on
  * MyCity's shape in English and French, the milestone kanban (status columns, Accepted, Invoiced via Finance) and the
- * links in from All projects, the sprint boards, the QA hub and Finance. Runs on a throwaway MySQL database.
+ * links in from All projects, the milestone boards, the QA hub and Finance. Runs on a throwaway MySQL database.
  */
 class ProjectPageTest extends TestCase
 {
@@ -32,18 +31,16 @@ class ProjectPageTest extends TestCase
 
     private array $phases;
 
-    private array $sprints;
-
     protected function setUp(): void
     {
         parent::setUp();
-        [$this->projectId, $this->phases, $this->sprints] = $this->myCityShape();
+        [$this->projectId, $this->phases] = $this->myCityShape();
     }
 
     private function engineerOnTask(): array
     {
         $member = $this->staff('member', ['engineer']);
-        $task = $this->task($this->phases[4], ['assigned_to' => $member->id, 'sprint_id' => $this->sprints[4], 'title' => 'Vacancy form']);
+        $task = $this->task($this->phases[4], ['assigned_to' => $member->id, 'title' => 'Vacancy form']);
 
         return [$member, $task];
     }
@@ -61,15 +58,33 @@ class ProjectPageTest extends TestCase
         $this->assertSame('paid', $page->viewData('milestones')->firstWhere('phase_number', 1)->column);
         $this->assertSame('client_review', $page->viewData('milestones')->firstWhere('phase_number', 2)->column);
 
-        foreach (['milestones' => 'Client review', 'sprints' => 'Workstream 4', 'backlog' => 'M4 task', 'qa' => 'No QA tickets', 'money' => 'Change reports'] as $tab => $text) {
+        foreach (['milestones' => 'Client review', 'backlog' => 'M4 task', 'qa' => 'No QA tickets', 'money' => 'Change reports'] as $tab => $text) {
             $page->call('show', $tab)->assertOk()->assertSee($text);
         }
+        // A kanban card opens its milestone's board
+        $page->call('show', 'milestones')->assertSee(route('hq.ops.project', ['project' => $this->projectId, 'tab' => 'board', 'board' => $this->phases[4]]));
         $page->call('show', 'backlog');
         $this->assertSame(148, $page->viewData('taskCount'));
-        $page->set('filterSprint', $this->sprints[4]);
-        $this->assertSame(12, $page->viewData('taskCount'));
-        $page->set('filterSprint', '')->set('filterStatus', 'In-Progress');
+        $page->set('filterStatus', 'In-Progress');
         $this->assertSame(4, $page->viewData('taskCount'));
+
+        // The Milestone board tab holds the board, opened on the milestone the link names
+        Livewire::withQueryParams(['tab' => 'board', 'board' => $this->phases[4]])->test(ProjectPage::class, ['project' => $this->projectId])
+            ->assertOk()->assertSet('boardMilestone', $this->phases[4])->assertSeeLivewire(SprintBoard::class);
+        $board = Livewire::test(SprintBoard::class, ['id' => $this->projectId, 'milestone' => $this->phases[4]])->assertSet('activeMilestoneId', $this->phases[4]);
+        $this->assertCount(12, collect($board->get('tasks'))->flatten(1));
+    }
+
+    public function test_hq_no_longer_says_sprint(): void
+    {
+        $this->actingAs($this->staff('owner', ['owner']));
+        foreach (ProjectPage::TABS as $tab) {
+            Livewire::withQueryParams(['tab' => $tab])->test(ProjectPage::class, ['project' => $this->projectId])->assertDontSeeText('Sprint')->assertDontSeeText('sprint ');
+        }
+        Livewire::test(SprintBoard::class, ['id' => $this->projectId])->assertDontSeeText('Sprint')->assertSee('M4 · Workstream 4');
+        $this->get(route('hq.ops.boards.directory'))->assertOk()->assertDontSeeText('Sprint')->assertSeeText('Milestone boards');
+        $this->get(route('hq.ops.deployments'))->assertOk()->assertDontSeeText('Sprint');
+        $this->get(route('hq.ops.scrum', $this->projectId))->assertOk()->assertDontSeeText('Sprint')->assertSeeText('Plan milestones');
     }
 
     public function test_the_page_and_its_drawers_read_in_french(): void
@@ -80,7 +95,7 @@ class ProjectPageTest extends TestCase
             ->call('show', 'milestones')->assertSee('Revue client')->assertSee('Payé');
         Livewire::test(TaskDrawer::class, ['projectId' => $this->projectId])->dispatch('new-task', phase: $this->phases[4])->assertSee('Ajouter une tâche');
         Livewire::test(MilestoneDrawer::class, ['projectId' => $this->projectId])->dispatch('open-milestone', id: $this->phases[1])->assertSee('Facture');
-        Livewire::test(SprintDrawer::class, ['projectId' => $this->projectId])->dispatch('open-sprint', id: $this->sprints[4])->assertSee('Livre');
+        Livewire::test(SprintBoard::class, ['id' => $this->projectId, 'milestone' => $this->phases[4]])->assertSee('Jalon')->assertSee('Détails du jalon');
         Livewire::test(ChangeReportDrawer::class, ['projectId' => $this->projectId])->dispatch('new-report')->assertSee('Rédiger un rapport de modification');
     }
 
@@ -139,11 +154,11 @@ class ProjectPageTest extends TestCase
     public function test_sharing_a_task_lets_a_member_move_it_on_the_board_too(): void
     {
         [$member] = $this->engineerOnTask();
-        $shared = $this->task($this->phases[4], ['sprint_id' => $this->sprints[4], 'assigned_to' => $this->staff('owner2', ['engineer'])->id]);
+        $shared = $this->task($this->phases[4], ['assigned_to' => $this->staff('owner2', ['engineer'])->id]);
         DB::table('task_people')->insert(['task_id' => $shared, 'user_id' => $member->id, 'role' => 'sharing', 'created_at' => now(), 'updated_at' => now()]);
         $this->actingAs($member);
 
-        $board = Livewire::test(SprintBoard::class, ['id' => $this->projectId, 'embedded' => true])->assertSet('activeSprintId', $this->sprints[4]);
+        $board = Livewire::test(SprintBoard::class, ['id' => $this->projectId, 'milestone' => $this->phases[4]])->assertSet('activeMilestoneId', $this->phases[4]);
         $card = collect($board->get('tasks'))->flatten(1)->firstWhere('id', $shared);
         $this->assertTrue($card['can_move']);
         $board->call('updateTaskStatus', $shared, 'In-Progress');
@@ -171,9 +186,10 @@ class ProjectPageTest extends TestCase
             ->set('title', 'Payroll rules')->set('dueDate', '2026-11-27')->call('save')->assertHasNoErrors();
         $this->assertSame('Payroll rules', DB::table('tasks')->where('id', $task)->value('title'));
 
-        Livewire::test(SprintDrawer::class, ['projectId' => $this->projectId])->dispatch('open-sprint', id: $this->sprints[5])
-            ->set('goal', 'Offers out')->call('save')->assertHasNoErrors();
-        $this->assertSame('Offers out', DB::table('sprints')->where('id', $this->sprints[5])->value('goal'));
+        // A milestone carries its own dates and goal (sprints are folded into milestones)
+        Livewire::test(MilestoneDrawer::class, ['projectId' => $this->projectId])->dispatch('open-milestone', id: $this->phases[5])
+            ->set('goal', 'Offers out')->set('dueDate', '2026-11-24')->call('save')->assertHasNoErrors();
+        $this->assertSame(['Offers out', '2026-11-24'], array_values((array) DB::table('project_phases')->where('id', $this->phases[5])->first(['goal', 'due_date'])));
     }
 
     public function test_a_manager_sets_the_lead_and_an_auditor_only_reads(): void
@@ -242,8 +258,10 @@ class ProjectPageTest extends TestCase
         $this->actingAs($this->staff('delivery', ['delivery']));
         $url = route('hq.ops.project', ['project' => $this->projectId]);
         $this->get(route('hq.ops.deployments'))->assertOk()->assertSee($url, false);
-        $this->get(route('hq.ops.boards.directory'))->assertOk()->assertSee(route('hq.ops.project', ['project' => $this->projectId, 'tab' => 'sprints']), false);
-        $this->get(route('hq.ops.board', $this->projectId))->assertOk()->assertSee(route('hq.ops.project', ['project' => $this->projectId, 'tab' => 'sprints']), false);
+        $this->get(route('hq.ops.boards.directory'))->assertOk()->assertSee(route('hq.ops.project', ['project' => $this->projectId, 'tab' => 'board']), false);
+        // The old sprint board addresses (bells, bookmarks) lead to the new pages
+        $this->get(route('hq.ops.board', $this->projectId))->assertRedirect(route('hq.ops.project', ['project' => $this->projectId, 'tab' => 'board']));
+        $this->get(str_replace('/milestone-boards', '/sprint-boards', route('hq.ops.boards.directory')))->assertRedirect();
 
         // The QA hub filtered to the project, from its QA tab
         $ticket = (string) Str::uuid();
