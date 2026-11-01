@@ -228,11 +228,20 @@ return [
         'QUESTIONNAIRE_QUESTION_REMOVED' => "Question retirée du questionnaire.",
         'QUESTIONNAIRE_COMPLETED' => "Questionnaire marqué comme terminé.",
         'QUESTIONNAIRE_RESTARTED' => "Questionnaire mis de côté pour être rédigé à nouveau.",
+        // Propositions (PR 4)
+        'PROPOSAL_STARTED' => "Proposition commencée.",
+        'PROPOSAL_DRAFT_REQUESTED' => "Rédaction de la proposition demandée à l’IA.",
+        'PROPOSAL_VERSION_STARTED' => "Nouvelle version de la proposition commencée.",
+        'PROPOSAL_VERSION_DISCARDED' => "Version brouillon de la proposition abandonnée.",
+        'PROPOSAL_APPROVED' => "Proposition approuvée pour l’envoi.",
+        'PROPOSAL_REOPENED' => "Proposition remise en brouillon.",
+        'PROPOSAL_SENT' => "Proposition envoyée au client.",
+        'PROPOSAL_APPROVED_BY_CLIENT' => "Le client a approuvé la proposition.",
+        'PROPOSAL_CHANGES_REQUESTED' => "Le client a demandé des modifications à la proposition.",
     ],
 
     'stubs' => [
         'meetings' => "La planification des réunions depuis cette page, avec un lien Google Meet, les invitations et la récupération automatique des transcriptions, arrive prochainement. Les réunions des audits offerts précédents figurent ci-dessous.",
-        'proposals' => "La rédaction de la proposition à partir de cette opportunité arrive prochainement. En attendant, les propositions créées dans Propositions figurent ici.",
         'sow' => "L’énoncé des travaux est rédigé à partir de la proposition approuvée, puis signé par le client. Cette fonction arrive prochainement.",
         'project' => "Le projet est préparé ici une fois l’énoncé des travaux signé.",
     ],

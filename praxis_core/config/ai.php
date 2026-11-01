@@ -138,22 +138,31 @@ return [
             'schema' => $question,
         ],
 
+        // PR 4: one version of the proposal, from the opportunity with its full transcripts (read once, here: cost rule
+        // 4). MATERIAL holds the financial dictionary (codes, no prices) and, for a later version, the one the client
+        // has with their comments. App\Support\Opportunities\Proposals keeps sections with a title and text, and the
+        // suggested codes found in the dictionary, priced from it (quantity from here, else the dictionary's).
         'proposal' => [
             'provider' => 'claude', 'model' => 'claude-sonnet-5-5', 'effort' => 'high', 'max_tokens' => 32000,
             'stream' => true, 'sync' => false, 'expected_chars' => 18000,
-            'task' => 'Draft the proposal for this opportunity from the meetings, the notes and the lead\'s answers. Open with a one-page executive summary (the situation, what we recommend, what it changes, what it takes), then the approach following the Praxis Method, scope and exclusions, the team and governance, and the timeline. Suggest line items by their financial dictionary code only: prices come from the dictionary.',
+            'task' => 'Draft the proposal for this opportunity from the meetings, their notes and transcripts, and the lead’s answers to the questionnaire. Write it for the client’s decision-makers. Sections in this order, with these keys where they fit: executive_summary (one page: the situation, what we recommend, what it changes, what it takes), approach (how we will do the work, phase by phase), scope (what is in and what is out), team (the roles on each side and how decisions are made; never a staff member’s name), timeline (phases and milestones in weeks, never calendar dates that weren’t agreed). Add another section only when the meetings call for it. Each title is an action title: a short sentence that states the takeaway. Never write a price, rate or total in the text: the fees come from the line items. Suggest line items by their code in the financial dictionary in MATERIAL, with a quantity and why the work needs it. For a later version, keep what the client didn’t question and the section keys of the version they have, and answer each of their comments.',
             'schema' => ['type' => 'object', 'properties' => [
-                'title' => ['type' => 'string'], 'sections' => $sections,
+                'title' => ['type' => 'string', 'description' => '4 to 8 words, sentence case, naming the outcome'],
+                'sections' => $sections,
                 'suggested_line_items' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
-                    'code' => ['type' => 'string'], 'reason' => ['type' => 'string'],
-                ], 'required' => ['code', 'reason'], 'additionalProperties' => false]],
+                    'code' => ['type' => 'string', 'description' => 'A code from the financial dictionary, exactly as written'],
+                    'quantity' => ['type' => 'number', 'description' => 'How many units of the dictionary’s default quantity'],
+                    'reason' => ['type' => 'string', 'description' => 'One sentence, for our team'],
+                ], 'required' => ['code', 'quantity', 'reason'], 'additionalProperties' => false]],
             ], 'required' => ['title', 'sections', 'suggested_line_items'], 'additionalProperties' => false],
         ],
 
+        // PR 4: "what changed" between the version the client has and the next one, for the client (in the email,
+        // the portal and the PDF). Queued like the rest; the lead edits it before approving.
         'proposal_changes' => [
             'provider' => 'claude', 'model' => 'claude-haiku-5-5', 'effort' => 'low', 'max_tokens' => 4000,
-            'stream' => false, 'sync' => true, 'expected_chars' => 1500,
-            'task' => 'Compare the two versions below and say what changed, section by section, in a few plain words each, for the client.',
+            'stream' => false, 'sync' => false, 'expected_chars' => 1500,
+            'task' => 'Compare the two versions of the proposal in MATERIAL and tell the client what changed: a one- or two-sentence summary, then one change per section that changed (section_key is the key in square brackets; line_items for the line items), in a few plain words each. Leave out sections that didn’t change and anything only reworded.',
             'schema' => ['type' => 'object', 'properties' => [
                 'summary' => ['type' => 'string'],
                 'changes' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [

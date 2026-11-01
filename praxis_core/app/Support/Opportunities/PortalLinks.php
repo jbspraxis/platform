@@ -3,6 +3,7 @@
 namespace App\Support\Opportunities;
 
 use App\Models\Opportunity;
+use App\Models\Proposal;
 use Illuminate\Support\Facades\URL;
 
 /**
@@ -23,6 +24,29 @@ final class PortalLinks
         $parameters = array_filter(['opportunity' => $opportunity->id, 'c' => $clientUserId]);
         $relative = URL::temporarySignedRoute('portal.meetings', now()->addDays(self::DAYS), $parameters, absolute: false);
         $origin = preg_replace('~^(https?://[^/]+).*$~', '$1', route('portal.meetings', ['opportunity' => $opportunity->id]));
+
+        return $origin . $relative;
+    }
+
+    /**
+     * One version of the proposal in the portal: read it, comment by section, approve it or ask for changes, book a
+     * follow-up. $clientUserId fills in who is reviewing.
+     */
+    public static function proposal(Proposal $proposal, ?string $clientUserId = null): string
+    {
+        return self::signed('portal.proposals.review', array_filter(['proposal' => $proposal->id, 'c' => $clientUserId]));
+    }
+
+    /** The PDF of that version, from the portal page */
+    public static function proposalPdf(Proposal $proposal): string
+    {
+        return self::signed('portal.proposals.pdf', ['proposal' => $proposal->id]);
+    }
+
+    private static function signed(string $route, array $parameters): string
+    {
+        $relative = URL::temporarySignedRoute($route, now()->addDays(self::DAYS), $parameters, absolute: false);
+        $origin = preg_replace('~^(https?://[^/]+).*$~', '$1', route($route, ['proposal' => $parameters['proposal']]));
 
         return $origin . $relative;
     }
