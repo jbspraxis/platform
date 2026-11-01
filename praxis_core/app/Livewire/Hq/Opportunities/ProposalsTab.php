@@ -18,11 +18,12 @@ use LogicException;
 
 /**
  * The opportunity page's Proposals tab (docs/OPPORTUNITIES.md section 4, row 4). The AI drafts a version in the
- * background from the opportunity; whoever manages opportunities edits it (saved as they go: each field when they
- * leave it, each line or section added or removed); the owner or the lead approves it; then it is sent to the
- * client's people with the PDF and the portal link. Client comments show under their sections; changes lead to
- * the next version, which says what changed. Legacy proposals are listed below with a link to the old builder.
- * Every action checks its permission on the server (Proposals::canEdit, canDraftWithAi, canApprove).
+ * background from the opportunity; whoever manages it (the permission, or the opportunity's team) edits it (saved
+ * as they go: each field when they leave it, each line or section added or removed); the owner or the lead approves
+ * it; then it is sent to the client's people with the PDF and the portal link. Client comments show under their
+ * sections; changes lead to the next version, which says what changed. Legacy proposals are listed below with a link
+ * to the old builder. Every request checks canView for this opportunity, and every action its own permission on the
+ * server (Proposals::canEdit, canDraftWithAi, canApprove), always with the opportunity.
  */
 class ProposalsTab extends Component
 {
@@ -75,8 +76,15 @@ class ProposalsTab extends Component
 
     public function mount(string $opportunityId): void
     {
-        abort_unless(OpportunityAccess::canView(Auth::user()), 403);
-        $this->opportunityId = Opportunity::findOrFail($opportunityId)->id;
+        $opportunity = Opportunity::findOrFail($opportunityId);
+        abort_unless(OpportunityAccess::canView(Auth::user(), $opportunity), 403);
+        $this->opportunityId = $opportunity->id;
+    }
+
+    /** Every later request (each action, and the poll while the AI works): still allowed to open this opportunity */
+    public function hydrate(): void
+    {
+        abort_unless(OpportunityAccess::canView(Auth::user(), $this->opportunity()), 403);
     }
 
     private function opportunity(): Opportunity

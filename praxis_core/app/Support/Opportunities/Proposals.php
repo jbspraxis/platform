@@ -68,7 +68,7 @@ final class Proposals
     /** The sections a blank proposal starts with, in this order (titles from lang proposals.sections) */
     public const BLANK_SECTIONS = ['executive_summary', 'approach', 'scope', 'team', 'timeline'];
 
-    /** Change the proposal: the right to manage opportunities, while the opportunity is open */
+    /** Change the proposal: the right to manage opportunities, or being on this one's team, while it is open */
     public static function canEdit(?User $user, Opportunity $opportunity): bool
     {
         return OpportunityAccess::canManage($user, $opportunity) && ! $opportunity->isClosed();

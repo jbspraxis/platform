@@ -212,6 +212,36 @@ class ProposalsTest extends TestCase
         Livewire::test(ProposalsTab::class, ['opportunityId' => $o->id])->call('send')->assertForbidden();
     }
 
+    public function test_the_opportunitys_team_works_on_the_proposal_and_nobody_else_opens_it(): void
+    {
+        $lead = $this->staff('lead', ['sales']);
+        $o = $this->opportunity($lead);
+        $p = Proposals::start($o, 'USD', $lead);
+        // An engineer has no opportunity permission: on the team they work on it, off it they see nothing
+        $member = $this->staff('engineer', ['engineer']);
+        $outsider = $this->staff('designer', ['engineer']);
+        DB::table('opportunity_members')->insert(['id' => (string) \Illuminate\Support\Str::uuid(), 'opportunity_id' => $o->id, 'user_id' => $member->id, 'created_at' => now()]);
+
+        $this->actingAs($outsider);
+        Livewire::test(ProposalsTab::class, ['opportunityId' => $o->id])->assertForbidden();
+        $this->get(route('hq.crm.proposal-pdf', ['opportunity' => $o->id, 'proposal' => $p->id]))->assertForbidden();
+
+        $this->actingAs($member);
+        Livewire::test(ProposalsTab::class, ['opportunityId' => $o->id])->assertSee('Edit the draft')
+            ->set('sections.0.body', 'We recommend it.')
+            ->assertDontSee('Approve this version')->call('approve')->assertForbidden();
+        $this->assertSame('We recommend it.', $p->fresh()->sections[0]['body']);
+        $this->get(route('hq.crm.proposal-pdf', ['opportunity' => $o->id, 'proposal' => $p->id]))->assertOk();
+        // The lead approves; the member sends
+        $this->assertNull(Proposals::approve($p->fresh(), $lead));
+        Livewire::test(ProposalsTab::class, ['opportunityId' => $o->id])->call('send')->assertSee('Sent.');
+
+        // Taken off the team: the next request on a tab left open (an action or the poll) is refused
+        $tab = Livewire::test(ProposalsTab::class, ['opportunityId' => $o->id])->assertOk();
+        DB::table('opportunity_members')->where('user_id', $member->id)->delete();
+        $tab->call('check')->assertForbidden();
+    }
+
     public function test_the_draft_is_saved_as_people_go_and_the_totals_follow(): void
     {
         $lead = $this->staff('sales', ['sales']);
