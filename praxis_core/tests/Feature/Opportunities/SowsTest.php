@@ -463,8 +463,9 @@ class SowsTest extends TestCase
         $sow = $this->signedSow($o, $owner);
 
         $master = Livewire::test(\App\Livewire\Hq\Operations\ScrumMaster::class, ['id' => $sow->project_id]);
-        $this->assertStringContainsString('STATEMENT OF WORK', $master->get('sowContext'));
-        $this->assertStringContainsString('1. Diagnostic (2 weeks, 40% of the contract)', $master->get('sowContext'));
+        $this->assertStringContainsString('STATEMENT OF WORK', $master->get('scope'));
+        $this->assertStringContainsString('1. Diagnostic (2 weeks, 40% of the contract)', $master->get('scope'));
+        $this->assertContains('signed statement of work ' . $sow->reference, $master->get('sources'));
     }
 
     public function test_the_pdf_names_the_parties_and_the_email_samples_render_in_both_languages(): void
@@ -783,16 +784,16 @@ class SowsTest extends TestCase
 
         // The plan waits in the project draft: link to it, draft nothing
         Livewire::test(\App\Livewire\Hq\Operations\ScrumMaster::class, ['id' => $sow->project_id])
-            ->assertSet('blocked', 'draft_pending')->assertSee('Open the project draft')->assertDontSee('Draft the plan')
-            ->call('generateScrumBacklog')->assertSet('generatedBacklog', []);
+            ->assertSee('Open the project draft')->assertDontSee('Draft the plan')->assertDontSee('Suggest tasks for this milestone')
+            ->call('draftPlan')->assertHasErrors('plan');
+        $this->assertSame(0, \App\Models\MilestonePlan::count());
 
-        // Created: the project has milestones, so the assistant won't append a second plan
+        // Created: the project has milestones, so it is planned a milestone at a time, never with a second whole plan
         $this->assertNull(ProjectDrafts::create(ProjectDraft::where('sow_id', $sow->id)->sole(), $owner));
         $phases = DB::table('project_phases')->where('project_id', $sow->project_id)->count();
         Livewire::test(\App\Livewire\Hq\Operations\ScrumMaster::class, ['id' => $sow->project_id])
-            ->assertSet('blocked', 'has_plan')->assertSee('Planning inside a milestone is coming')
-            ->set('generatedBacklog', [['milestone_title' => 'Copy', 'goal' => '', 'tasks' => [['title' => 'x', 'description' => '']]]])
-            ->call('commitBacklogToDatabase');
+            ->assertSee('Suggest tasks for this milestone')->assertDontSee('Draft the plan')
+            ->call('draftPlan')->assertHasErrors('plan');
         $this->assertSame($phases, DB::table('project_phases')->where('project_id', $sow->project_id)->count());
     }
 

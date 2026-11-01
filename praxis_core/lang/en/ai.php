@@ -28,6 +28,8 @@ return [
         'proposal_changes' => 'What changed',
         'sow' => 'Statement of work',
         'project_draft' => 'Project draft',
+        'plan_milestone' => 'Milestone plan',
+        'plan_project' => 'Project plan',
         'connection_test' => 'Key test',
     ],
 ];
