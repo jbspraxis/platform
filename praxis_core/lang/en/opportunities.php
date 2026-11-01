@@ -212,6 +212,7 @@ return [
         'MEETING_CONFIRMED' => 'Scheduled the meeting the client asked for.',
         'MEETING_RESCHEDULED' => 'Changed a meeting.',
         'MEETING_CANCELLED' => 'Cancelled a meeting.',
+        'MEETING_MILESTONE' => 'Linked an internal meeting to a milestone, or unlinked it.',
         'MEETING_DECLINED' => 'Declined the client’s meeting request.',
         'TRANSCRIPT_COLLECTED' => 'Collected a meeting transcript from Google.',
         'TRANSCRIPT_ADDED' => 'Added a meeting transcript.',

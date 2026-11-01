@@ -71,8 +71,10 @@ final class Handovers
 
     /**
      * One milestone's handover as a screen shows it, for this person: the milestone, its latest client handover meeting
-     * (not cancelled) and when, the points to review and the issues (open), and the links to schedule or open it.
-     * opportunityId is null when no opportunity holds the project, milestone null when the milestone isn't on it.
+     * (not cancelled) and when, the points to review and the issues (open), and the links to schedule or open it; and
+     * the team's own meetings about it (internal meetings linked to it, the latest three, for those who can open them)
+     * with the link to schedule another. opportunityId is null when no opportunity holds the project, milestone null
+     * when the milestone isn't on it.
      */
     public static function forMilestone(string $projectId, string $phaseId, ?User $user): array
     {
@@ -82,7 +84,10 @@ final class Handovers
             ->where('status', '!=', 'cancelled')->orderByDesc('starts_at')->first() : null;
         $counts = $meeting ? MeetingPoint::where('meeting_id', $meeting->id)->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status') : collect();
         $canSchedule = $opportunity !== null && $milestone !== null && OpportunityAccess::canManage($user, $opportunity) && ProjectAccess::maySee($projectId);
+        $canView = $opportunity !== null && OpportunityAccess::canView($user, $opportunity);
         $link = fn (array $query) => route('hq.crm.opportunity', ['opportunity' => $opportunity->id, 'tab' => 'meetings'] + $query);
+        $team = $canView && $milestone ? Meeting::where('opportunity_id', $opportunity->id)->where('phase_id', $milestone->id)->where('kind', 'internal')
+            ->whereIn('status', ['scheduled', 'held'])->orderByDesc('starts_at')->limit(3)->get() : collect();
 
         return [
             'opportunityId' => $opportunity?->id,
@@ -96,7 +101,9 @@ final class Handovers
                 ->whereIn('qa_tickets.status', ['Open', 'Investigating'])->count() : 0,
             'canSchedule' => $canSchedule,
             'scheduleUrl' => $canSchedule && (! $meeting || $meeting->status === 'held') ? $link(['handover' => $milestone->id]) : null,
-            'meetingUrl' => $meeting && OpportunityAccess::canView($user, $opportunity) ? $link(['meeting' => $meeting->id]) : null,
+            'meetingUrl' => $meeting && $canView ? $link(['meeting' => $meeting->id]) : null,
+            'teamMeetings' => $team->map(fn (Meeting $m) => ['meeting' => $m, 'when' => self::when($m, app()->getLocale()), 'url' => $link(['meeting' => $m->id])])->all(),
+            'teamUrl' => $canSchedule ? $link(['team' => $milestone->id]) : null,
         ];
     }
 

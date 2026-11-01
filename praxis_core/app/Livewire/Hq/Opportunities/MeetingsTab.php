@@ -53,6 +53,10 @@ class MeetingsTab extends Component
     #[Url(as: 'handover', except: '')]
     public string $handover = '';
 
+    /** From the milestone board: open the form for an internal meeting about that milestone, then forget it */
+    #[Url(as: 'team', except: '')]
+    public string $team = '';
+
     /** The meeting whose details are open (from a notification link: ?meeting=…) */
     #[Url(as: 'meeting', except: '')]
     public string $open = '';
@@ -69,6 +73,9 @@ class MeetingsTab extends Component
     /** A new meeting that hands over this milestone (checked again on save) */
     #[Locked]
     public string $milestoneId = '';
+
+    /** A new internal meeting's milestone (optional; checked on save): the team's meeting about it */
+    public string $teamMilestoneId = '';
 
     public string $kind = 'client';
 
@@ -143,6 +150,10 @@ class MeetingsTab extends Component
             $this->canManage ? $this->openHandover($this->handover) : $this->say(__('handover.errors.cannot_schedule'), 'warning');
             $this->handover = '';
         }
+        if ($this->team !== '') {
+            $this->canManage ? $this->openTeamMeeting($this->team) : $this->say(__('meetings.milestone.cannot_schedule'), 'warning');
+            $this->team = '';
+        }
     }
 
     private function opportunity(): Opportunity
@@ -215,6 +226,26 @@ class MeetingsTab extends Component
         $this->fill(['milestoneId' => $milestone->id, 'title' => Handovers::defaultTitle($o, $milestone), 'agenda' => Handovers::defaultAgenda($o, $milestone)]);
     }
 
+    /** The form for the team's meeting about a milestone: internal, the milestone chosen (it can still be changed) */
+    public function openTeamMeeting(string $milestoneId): void
+    {
+        $this->authorizeManage();
+        $o = $this->opportunity();
+        $milestone = Handovers::milestoneFor($o, $milestoneId);
+        if (! $milestone) {
+            $this->say(__('handover.errors.milestone'), 'warning');
+
+            return;
+        }
+        if (! Handovers::canSeeProject($o)) {
+            $this->say(__('handover.errors.project_access'), 'warning');
+
+            return;
+        }
+        $this->openSchedule('internal');
+        $this->fill(['teamMilestoneId' => $milestone->id, 'title' => __('meetings.milestone.default_title', ['milestone' => $milestone->title])]);
+    }
+
     public function updatedKind(string $kind): void
     {
         if ($this->milestoneId !== '') {
@@ -283,6 +314,12 @@ class MeetingsTab extends Component
         $milestone = null;
         if (! $editing && $this->milestoneId !== '' && ! ($milestone = Handovers::milestoneFor($o, $this->milestoneId))) {
             $this->addError('milestone', __('handover.errors.milestone'));
+
+            return;
+        }
+        // The team's meeting about a milestone: a new internal one (an existing one is linked from its details)
+        if (! $editing && $kind === 'internal' && $this->teamMilestoneId !== '' && ! ($milestone = Handovers::milestoneFor($o, $this->teamMilestoneId))) {
+            $this->addError('teamMilestoneId', __('handover.errors.milestone'));
 
             return;
         }
@@ -366,6 +403,38 @@ class MeetingsTab extends Component
         $this->open = $change->meeting->id;
         $this->reported($change, $editing ? ($wasRequested ? 'confirmed' : 'changed') : 'scheduled');
         $this->dispatch('meetings-changed');
+    }
+
+    /**
+     * Link an internal meeting to a milestone of the project, or unlink it ('' = none), from its details, before or
+     * after it is held: nothing goes to Google or the attendees. The milestone list is the project's, so seeing the
+     * project is needed too (Handovers::canSeeProject), as for a handover.
+     */
+    public function linkMilestone(string $meetingId, string $milestoneId = ''): void
+    {
+        $this->authorizeManage();
+        $o = $this->opportunity();
+        $m = $this->meeting($meetingId);
+        if ($m->kind !== 'internal' || $m->status === 'cancelled') {
+            $this->say(__('meetings.milestone.internal_only'), 'warning');
+
+            return;
+        }
+        if (! Handovers::canSeeProject($o)) {
+            $this->say(__('handover.errors.project_access'), 'warning');
+
+            return;
+        }
+        $milestone = $milestoneId !== '' ? Handovers::milestoneFor($o, $milestoneId) : null;
+        if ($milestoneId !== '' && ! $milestone) {
+            $this->say(__('handover.errors.milestone'), 'warning');
+
+            return;
+        }
+        if (Meetings::setMilestone($m, $milestone?->id)) {
+            $this->say($milestone ? __('meetings.milestone.linked', ['milestone' => $milestone->title]) : __('meetings.milestone.unlinked'));
+            $this->dispatch('meetings-changed');
+        }
     }
 
     // ---- Cancel ------------------------------------------------------------------------------------------------
@@ -790,7 +859,7 @@ class MeetingsTab extends Component
 
     private function resetForm(): void
     {
-        $this->reset(['formOpen', 'editingId', 'milestoneId', 'kind', 'title', 'date', 'time', 'duration', 'staff', 'contacts', 'guests', 'agenda']);
+        $this->reset(['formOpen', 'editingId', 'milestoneId', 'teamMilestoneId', 'kind', 'title', 'date', 'time', 'duration', 'staff', 'contacts', 'guests', 'agenda']);
         $this->resetErrorBag();
     }
 
@@ -910,10 +979,12 @@ class MeetingsTab extends Component
         }
         $pending = collect($runs)->flatten()->contains(fn ($r) => ! $r->isFinished());
 
-        // Milestone handovers: which milestone, how many points each, and the open one's points with their tickets
+        // Milestone handovers: which milestone, how many points each, and the open one's points with their tickets.
+        // Internal meetings can be about a milestone too (the team's meeting): their tag names it.
         $handovers = $meetings->filter->isHandover();
-        $milestones = $handovers->isEmpty() ? collect() : DB::table('project_phases')->whereIn('id', $handovers->pluck('phase_id')->unique()->all())
-            ->get(['id', 'title'])->keyBy('id');
+        $linked = $meetings->pluck('phase_id')->filter()->unique()->values();
+        $milestones = $linked->isEmpty() ? collect() : DB::table('project_phases')->whereIn('id', $linked->all())->get(['id', 'title'])->keyBy('id');
+        $canLinkMilestone = $this->canManage && $o->project_id && Handovers::canSeeProject($o);
         $pointCounts = $handovers->isEmpty() ? collect() : MeetingPoint::whereIn('meeting_id', $handovers->pluck('id')->all())
             ->selectRaw('meeting_id, status, count(*) as total')->groupBy('meeting_id', 'status')->get()->groupBy('meeting_id')
             ->map(fn ($rows) => $rows->pluck('total', 'status')->map(fn ($n) => (int) $n));
@@ -962,6 +1033,11 @@ class MeetingsTab extends Component
             'canQa' => (bool) Auth::user()?->can('qa.view'),
             // Task titles are the project's: shown to those who see its milestone board (ProjectAccess)
             'canSeeProject' => $handovers->isNotEmpty() && Handovers::canSeeProject($o),
+            // An internal meeting's milestone (the form for a new one; its details for one already made)
+            'canLinkMilestone' => $canLinkMilestone,
+            'projectMilestones' => $canLinkMilestone && ($this->formOpen || $this->open !== '')
+                ? DB::table('project_phases')->where('project_id', $o->project_id)->whereNull('deleted_at')->orderBy('phase_number')->orderBy('title')->get(['id', 'phase_number', 'title'])
+                : collect(),
         ]);
     }
 }

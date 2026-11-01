@@ -632,6 +632,101 @@ class MilestoneHandoverTest extends TestCase
         $this->assertSame('5 November 2026, 10:00 GMT', Handovers::forMilestone($s['project'], $s['milestone'], auth()->user())['when']);
     }
 
+    public function test_the_team_schedules_its_own_meeting_about_a_milestone_from_the_board(): void
+    {
+        $owner = $this->staff('owner', ['owner']);
+        $s = $this->handover(lead: $owner);
+        $this->actingAs($owner);
+
+        // The board offers the team's meeting next to the handover
+        $link = route('hq.crm.opportunity', ['opportunity' => $s['o']->id, 'tab' => 'meetings', 'team' => $s['milestone']]);
+        $this->board($s)->assertSee('Team meetings')->assertSee('No team meeting for this milestone yet.')->assertSee('Schedule a team meeting')->assertSeeHtml(e($link));
+
+        // The link opens an internal meeting's form with the milestone chosen; the milestone can still be changed
+        $form = Livewire::withQueryParams(['team' => $s['milestone']])->test(MeetingsTab::class, ['opportunityId' => $s['o']->id])
+            ->assertSet('formOpen', true)->assertSet('kind', 'internal')->assertSet('teamMilestoneId', $s['milestone'])->assertSet('team', '')
+            ->assertSet('title', 'Team meeting: M3 Reports')->assertSeeHtml('id="mtg-milestone"');
+        $form->set('date', '2026-11-09')->set('time', '10:00')->set('guests', 'elisha@example.test')->call('save')->assertHasNoErrors();
+
+        $m = Meeting::sole();
+        $this->assertSame([$s['milestone'], 'internal', false], [$m->phase_id, $m->kind, $m->isHandover()]);
+        $this->google->assertMeetingCreated(fn (MeetingRequest $r) => $r->title === 'Team meeting: M3 Reports');
+        Mail::assertNotSent(MeetingInvitationMail::class);
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->assertSee('Milestone: M3 Reports')->assertDontSee('Milestone handover: M3 Reports');
+
+        // On the board, under the milestone's team meetings; the handover is still to schedule
+        $this->board($s)->assertSee('Team meeting: M3 Reports')->assertSee('9 November 2026, 10:00 WAT')
+            ->assertSeeHtml(e(route('hq.crm.opportunity', ['opportunity' => $s['o']->id, 'tab' => 'meetings', 'meeting' => $m->id])))
+            ->assertSee('No handover meeting for this milestone yet.')->assertSee('Schedule handover');
+
+        // A milestone of another project is refused
+        Livewire::withQueryParams(['team' => $s['milestone']])->test(MeetingsTab::class, ['opportunityId' => $s['o']->id])
+            ->set('teamMilestoneId', DB::table('tasks')->where('id', $this->otherProjectTask())->value('phase_id'))
+            ->set('date', '2026-11-10')->set('time', '10:00')->call('save')->assertHasErrors('teamMilestoneId');
+        $this->assertSame(1, Meeting::count());
+
+        // Its transcript gets notes like any internal meeting, never handover points
+        $starts = CarbonImmutable::parse('2026-11-05 09:00:00', 'UTC');
+        $held = Meetings::schedule($s['o'], ['kind' => 'internal', 'title' => 'M3 review', 'starts_at' => $starts, 'ends_at' => $starts->addHour(),
+            'staff' => [$owner->id], 'phase_id' => $s['milestone']])->meeting;
+        Transcripts::fromText($held, 'Elisha (09:05): M3 part one is done.', 'paste');
+        $this->assertSame(0, $held->points()->count());
+        $this->assertSame(0, AiRun::where('purpose', 'handover_points')->count());
+    }
+
+    public function test_an_internal_meeting_is_linked_to_a_milestone_from_its_details_without_telling_anyone(): void
+    {
+        $s = $this->handover();
+        $starts = CarbonImmutable::parse('2026-11-09 21:00:00', 'UTC');
+        $m = Meetings::schedule($s['o'], ['kind' => 'internal', 'title' => 'Internal: M3 review', 'starts_at' => $starts, 'ends_at' => $starts->addMinutes(45),
+            'staff' => [$s['lead']->id], 'guests' => [['email' => 'victor@example.test']]])->meeting;
+        $this->google->created = [];
+        $this->actingAs($s['lead']);
+
+        $tab = Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('toggle', $m->id)->assertSeeHtml('id="m-milestone-' . $m->id . '"');
+        $tab->call('linkMilestone', $m->id, $s['milestone'])->assertSee('Linked to M3 Reports')->assertSee('Milestone: M3 Reports');
+        $this->assertSame($s['milestone'], $m->fresh()->phase_id);
+        $this->assertSame([[], []], [$this->google->created, $this->google->updated]);
+        Mail::assertNothingOutgoing();
+        $this->assertSame(1, DB::table('system_audit_logs')->where('action', 'MEETING_MILESTONE')->count());
+
+        // Only to a milestone of this opportunity's project
+        $tab->call('linkMilestone', $m->id, DB::table('tasks')->where('id', $this->otherProjectTask())->value('phase_id'));
+        $this->assertSame($s['milestone'], $m->fresh()->phase_id);
+
+        // A client meeting's milestone is its handover's: not changed here
+        $handover = $this->heldHandover($s);
+        $tab->call('linkMilestone', $handover->id, '')->assertSee('Only an internal meeting that isn’t cancelled is linked to a milestone here.');
+        $this->assertSame($s['milestone'], $handover->fresh()->phase_id);
+
+        // Unlinked again
+        $tab->call('linkMilestone', $m->id, '')->assertSee('No longer linked to a milestone.');
+        $this->assertNull($m->fresh()->phase_id);
+
+        // Without the project (the lead's only task goes to someone else) there is no milestone list, and no link
+        DB::table('tasks')->where('assigned_to', $s['lead']->id)->update(['assigned_to' => null]);
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('toggle', $m->id)->assertDontSeeHtml('id="m-milestone-' . $m->id . '"')
+            ->call('linkMilestone', $m->id, $s['milestone'])->assertSee('You can’t see this project’s tasks');
+        $this->assertNull($m->fresh()->phase_id);
+    }
+
+    public function test_the_teams_meetings_dont_hold_a_milestone_back_from_deletion(): void
+    {
+        $owner = $this->staff('owner', ['owner']);
+        $s = $this->handover(lead: $owner);
+        $this->actingAs($owner);
+        $m5 = $this->milestone($s['project'], 5, 'M5 Training');
+        $starts = CarbonImmutable::parse('2026-11-09 09:00:00', 'UTC');
+        $m = Meetings::schedule($s['o'], ['kind' => 'internal', 'title' => 'M5 planning', 'starts_at' => $starts, 'ends_at' => $starts->addHour(),
+            'staff' => [$owner->id], 'phase_id' => $m5])->meeting;
+        $phase = fn () => DB::table('project_phases')->where('id', $m5)->first();
+
+        $this->assertTrue(Milestones::canDelete($phase()));
+        $this->assertTrue(Milestones::delete($phase()));
+        $this->assertNotNull($phase()->deleted_at);
+        $this->assertSame(['scheduled', null], [$m->fresh()->status, $m->fresh()->phase_id]);
+    }
+
     // ---- Fixtures --------------------------------------------------------------------------------------------------
 
     /**

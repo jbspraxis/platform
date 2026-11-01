@@ -213,6 +213,7 @@ return [
         'MEETING_CONFIRMED' => "Réunion demandée par le client planifiée.",
         'MEETING_RESCHEDULED' => "Réunion modifiée.",
         'MEETING_CANCELLED' => "Réunion annulée.",
+        'MEETING_MILESTONE' => "Réunion interne liée à un jalon, ou déliée.",
         'MEETING_DECLINED' => "Demande de réunion du client refusée.",
         'TRANSCRIPT_COLLECTED' => "Transcription d’une réunion récupérée auprès de Google.",
         'TRANSCRIPT_ADDED' => "Transcription d’une réunion ajoutée.",

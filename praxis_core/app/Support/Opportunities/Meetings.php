@@ -34,8 +34,9 @@ use Throwable;
  *
  * $data: kind (client|internal), title, agenda, starts_at, ends_at (any time zone; stored in UTC), staff (user
  * ids), contacts (the organisation's client_users ids; client meetings only), guests ([['email' => …, 'name' => …]]),
- * appointment_id (the website booking it comes from), phase_id (a client meeting that hands over that milestone of the
- * opportunity's project: App\Support\Opportunities\Handovers checks it before scheduling).
+ * appointment_id (the website booking it comes from), phase_id (a milestone of the opportunity's project: a client
+ * meeting with one hands that milestone over, an internal one is the team's meeting about it;
+ * App\Support\Opportunities\Handovers::milestoneFor checks it before scheduling).
  */
 final class Meetings
 {
@@ -65,7 +66,7 @@ final class Meetings
             $meeting = DB::transaction(function () use ($opportunity, $data, $kind, $starts, $ends, $attendees, $event) {
                 $meeting = Meeting::create([
                     'opportunity_id' => $opportunity->id,
-                    'phase_id' => $kind === 'client' ? ($data['phase_id'] ?? null) : null,
+                    'phase_id' => $data['phase_id'] ?? null,
                     'organization_id' => $opportunity->organization_id,
                     'kind' => $kind,
                     'title' => self::title($data),
@@ -227,6 +228,29 @@ final class Meetings
         $meeting->load('attendees', 'opportunity.organization');
 
         return new MeetingChange($meeting, $wasScheduled && $meeting->kind === 'client' ? self::emailClients($meeting, 'cancelled') : []);
+    }
+
+    /**
+     * Link an internal meeting to a milestone of the opportunity's project, or unlink it ($phaseId null), before or
+     * after it is held. Nothing goes to Google or the attendees. A client meeting's milestone is its handover's and
+     * doesn't change. The caller checks the milestone (Handovers::milestoneFor). False when nothing changed.
+     */
+    public static function setMilestone(Meeting $meeting, ?string $phaseId): bool
+    {
+        if ($meeting->kind !== 'internal' || $meeting->status === 'cancelled') {
+            throw new LogicException('Only an internal meeting that is not cancelled is linked to a milestone this way');
+        }
+        if ($meeting->phase_id === $phaseId) {
+            return false;
+        }
+        $old = $meeting->phase_id;
+        $meeting->forceFill(['phase_id' => $phaseId, 'updated_by' => Auth::guard('web')->id()])->save();
+        OpportunityAccess::log('MEETING_MILESTONE', $phaseId
+            ? sprintf('Linked the internal meeting “%s” to the milestone “%s”.', $meeting->title, (string) DB::table('project_phases')->where('id', $phaseId)->value('title'))
+            : sprintf('Unlinked the internal meeting “%s” from its milestone.', $meeting->title),
+            'opportunities', $meeting->opportunity_id, ['phase_id' => $old], ['meeting_id' => $meeting->id, 'phase_id' => $phaseId]);
+
+        return true;
     }
 
     /** A requested meeting, or a scheduled one that hasn't started */
