@@ -86,7 +86,7 @@
                                     <span class="tag">{{ __('opportunities.meetings.kinds.' . $m->kind) }}</span>
                                     @if ($m->isHandover())
                                         @php $counts = $pointCounts[$m->id] ?? collect(); @endphp
-                                        <span class="pill pill-info mtg-handover-tag">{{ __('handover.tag', ['sprint' => $sprints[$m->sprint_id]->title ?? '…']) }}</span>
+                                        <span class="pill pill-info mtg-handover-tag">{{ __('handover.tag', ['milestone' => $milestones[$m->phase_id]->title ?? '…']) }}</span>
                                         @if ($counts->get('draft'))<span class="pill pill-warning">{{ trans_choice('handover.counts.draft', $counts->get('draft'), ['count' => $counts->get('draft')]) }}</span>@endif
                                         @if ($counts->get('confirmed'))<span>{{ trans_choice('handover.counts.confirmed', $counts->get('confirmed'), ['count' => $counts->get('confirmed')]) }}</span>@endif
                                     @endif
@@ -189,23 +189,23 @@
         <div class="modal-backdrop" wire:key="mtg-form" x-data x-on:keydown.escape.window="$wire.closeForm()">
             <div class="modal mtg-modal" role="dialog" aria-modal="true" aria-labelledby="mtg-form-title">
                 <h2 class="modal-title" id="mtg-form-title">
-                    {{ $editing ? ($editing->status === 'requested' ? __('meetings.form.confirm_title') : __('meetings.form.change_title')) : ($formSprint ? __('handover.form.title') : __('meetings.form.title')) }}
+                    {{ $editing ? ($editing->status === 'requested' ? __('meetings.form.confirm_title') : __('meetings.form.change_title')) : ($formMilestone ? __('handover.form.title') : __('meetings.form.title')) }}
                 </h2>
                 <p class="help" style="margin: 0 0 16px">{{ $editing ? __('meetings.form.change_intro') : __('meetings.form.intro') }}</p>
                 @error('google')
                     <div class="alert alert-danger" role="alert" style="margin-bottom: 16px"><i data-lucide="circle-alert"></i><span>{{ $message }}</span></div>
                 @enderror
-                @error('sprint')
+                @error('milestone')
                     <div class="alert alert-danger" role="alert" style="margin-bottom: 16px"><i data-lucide="circle-alert"></i><span>{{ $message }}</span></div>
                 @enderror
-                @if ($formSprint)
+                @if ($formMilestone)
                     <div class="callout" role="note" style="display: flex; gap: 10px; align-items: flex-start; margin-bottom: 16px">
                         <i data-lucide="target" style="width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px"></i>
-                        <span>{{ __('handover.form.callout', ['sprint' => $formSprint->title]) }}</span>
+                        <span>{{ __('handover.form.callout', ['milestone' => $formMilestone->title]) }}</span>
                     </div>
                 @endif
                 <form wire:submit="save" class="mtg-form" novalidate>
-                    @unless ($editing || $formSprint)
+                    @unless ($editing || $formMilestone)
                         <fieldset class="field mtg-fieldset">
                             <legend class="label">{{ __('meetings.form.kind') }}</legend>
                             <div class="mtg-radios">

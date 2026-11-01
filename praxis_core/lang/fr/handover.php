@@ -1,25 +1,25 @@
 <?php
 
-// Réunions de livraison de sprint (docs/OPPORTUNITIES.md section 12, PR 6). defaults, ticket et signoff sont lus par
-// le client, dans la langue de l’opportunité.
+// Livraisons de jalon (docs/OPPORTUNITIES.md section 12, PR 6). defaults, ticket et signoff sont lus par le client,
+// dans la langue de l’opportunité.
 return [
 
     'severity' => ['Low' => "Faible", 'Medium' => "Moyenne", 'Critical' => "Critique"],
 
     'defaults' => [
-        'title' => "Livraison\u{00A0}: :sprint",
-        'agenda' => "Livraison de :sprint (du :start au :end).",
-        'delivered' => "Ce que ce sprint a livré\u{00A0}:",
+        'title' => "Livraison du jalon\u{00A0}: :milestone",
+        'agenda' => "Livraison du jalon :milestone.",
+        'delivered' => "Ce que ce jalon a livré\u{00A0}:",
         'more' => "… et :count autre tâche|… et :count autres tâches",
         'points' => "Vos questions et les points à corriger\u{00A0}: nous consignons chacun d’eux et vous indiquons comment il a été traité.",
     ],
 
     'form' => [
-        'title' => "Planifier la livraison",
-        'callout' => "Cette réunion livre :sprint. Une fois sa transcription reçue, l’IA liste les points soulevés pour que vous les confirmiez comme incidents.",
+        'title' => "Planifier la livraison du jalon",
+        'callout' => "Cette réunion livre le jalon :milestone. Une fois sa transcription reçue, l’IA liste les points soulevés pour que vous les confirmiez comme incidents.",
     ],
 
-    'tag' => "Livraison\u{00A0}: :sprint",
+    'tag' => "Livraison du jalon\u{00A0}: :milestone",
     'counts' => [
         'draft' => "{1} 1 point à examiner|[2,*] :count points à examiner",
         'confirmed' => "{1} 1 incident|[2,*] :count incidents",
@@ -57,7 +57,7 @@ return [
         'detail' => "Ce qui a été demandé",
         'raised_by' => "Soulevé par",
         'severity' => "Gravité",
-        'task' => "Tâche du sprint",
+        'task' => "Tâche du jalon",
         'no_task' => "Aucune tâche",
     ],
 
@@ -81,8 +81,8 @@ return [
     ],
 
     'errors' => [
-        'sprint' => "Ce sprint n’appartient pas au projet de cette opportunité. Ouvrez le tableau de sprint du projet et réessayez.",
-        'cannot_schedule' => "Vous ne pouvez pas planifier de réunion pour cette opportunité. Demandez à une personne qui gère les opportunités de planifier la livraison.",
+        'milestone' => "Ce jalon n’appartient pas au projet de cette opportunité. Ouvrez le tableau de sprint du projet et réessayez.",
+        'cannot_schedule' => "Vous ne pouvez pas planifier de réunion pour cette opportunité. Demandez à un membre de son équipe, ou à une personne qui gère les opportunités, de planifier la livraison du jalon.",
         'decided' => "Ce point a déjà été confirmé ou écarté. La liste est maintenant à jour.",
         'no_project' => "Cette opportunité n’a pas de projet\u{00A0}: aucun incident ne peut être créé.",
         'title' => "Donnez un titre au point.",
@@ -96,8 +96,8 @@ return [
     ],
 
     'ticket' => [
-        'raised_by' => "Soulevé par :name lors de la réunion de livraison «\u{202F}:meeting\u{202F}» du :date.",
-        'raised' => "Soulevé lors de la réunion de livraison «\u{202F}:meeting\u{202F}» du :date.",
+        'raised_by' => "Soulevé par :name lors de la livraison du jalon «\u{202F}:meeting\u{202F}» du :date.",
+        'raised' => "Soulevé lors de la livraison du jalon «\u{202F}:meeting\u{202F}» du :date.",
     ],
 
     'signoff' => [
@@ -110,17 +110,18 @@ return [
     ],
 
     'notify' => [
-        'title' => "Point de livraison sur votre tâche",
-        'message' => "«\u{202F}:title\u{202F}», soulevé lors d’une réunion de livraison, concerne une tâche qui vous est attribuée. Consultez-le dans Qualité et incidents.",
+        'title' => "Point de livraison de jalon sur votre tâche",
+        'message' => "«\u{202F}:title\u{202F}», soulevé lors d’une livraison de jalon, concerne une tâche qui vous est attribuée. Consultez-le dans Qualité et incidents.",
     ],
 
     'board' => [
-        'title' => "Livraison du sprint",
-        'none' => "Aucune réunion de livraison pour ce sprint.",
+        'title' => "Livraison du jalon|Livraison des jalons",
+        'none' => "Aucune réunion de livraison pour ce jalon.",
+        'no_milestones' => "Ce sprint ne contient encore aucune tâche de jalon\u{00A0}: rien à livrer pour l’instant.",
         'schedule' => "Planifier la livraison",
         'schedule_another' => "En planifier une autre",
-        'no_opportunity' => "Ce projet n’a pas d’opportunité\u{00A0}: sa réunion de livraison ne peut pas être planifiée ici, car les réunions appartiennent à une opportunité.",
-        'no_permission' => "Une personne qui gère les opportunités planifie la réunion de livraison.",
+        'no_opportunity' => "Ce projet n’a pas d’opportunité\u{00A0}: la livraison de ses jalons ne peut pas être planifiée ici, car les réunions appartiennent à une opportunité.",
+        'no_permission' => "Un membre de l’équipe de l’opportunité, ou une personne qui gère les opportunités, la planifie.",
         'when' => ":date, :time (WAT)",
         'open' => "Ouvrir la réunion",
         'review' => "{0} Aucun point à examiner|{1} 1 point à examiner|[2,*] :count points à examiner",

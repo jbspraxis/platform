@@ -17,7 +17,7 @@ class Meeting extends Model
     use HasUuids, SoftDeletes;
 
     protected $fillable = [
-        'opportunity_id', 'sprint_id', 'organization_id', 'kind', 'title', 'agenda', 'starts_at', 'ends_at', 'time_zone', 'status',
+        'opportunity_id', 'phase_id', 'organization_id', 'kind', 'title', 'agenda', 'starts_at', 'ends_at', 'time_zone', 'status',
         'appointment_id', 'google_event_id', 'meet_link', 'meet_code', 'transcript_status', 'transcript_next_try_at', 'transcript_tries',
         'created_by', 'updated_by', 'deleted_by',
     ];
@@ -44,14 +44,15 @@ class Meeting extends Model
         return $this->hasMany(MeetingTranscript::class)->orderBy('collected_at');
     }
 
-    /** A sprint's handover meeting: the points raised in it, in order (PR 6) */
+    /** A milestone's handover meeting: the points raised in it, in order (PR 6) */
     public function points(): HasMany
     {
         return $this->hasMany(MeetingPoint::class)->orderBy('position')->orderBy('created_at');
     }
 
+    /** A client meeting that hands over a milestone (phase_id: project_phases are the milestones) */
     public function isHandover(): bool
     {
-        return $this->sprint_id !== null && $this->kind === 'client';
+        return $this->phase_id !== null && $this->kind === 'client';
     }
 }

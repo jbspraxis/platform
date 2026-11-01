@@ -1,26 +1,26 @@
 <?php
 
-// Sprint handovers (docs/OPPORTUNITIES.md section 12, PR 6): the handover meeting scheduled from the sprint board, the
-// points raised in it, confirmed as QA tickets. defaults, ticket and signoff are in the opportunity's language (the
-// client reads them); the rest is HQ's.
+// Milestone handovers (docs/OPPORTUNITIES.md section 12, PR 6): the handover meeting of a milestone, scheduled from the
+// sprint board, and the points raised in it, confirmed as QA tickets. defaults, ticket and signoff are in the
+// opportunity's language (the client reads them); the rest is HQ's.
 return [
 
     'severity' => ['Low' => 'Low', 'Medium' => 'Medium', 'Critical' => 'Critical'],
 
     'defaults' => [
-        'title' => 'Handover: :sprint',
-        'agenda' => 'Handing over :sprint (:start to :end).',
-        'delivered' => 'What this sprint delivered:',
+        'title' => 'Milestone handover: :milestone',
+        'agenda' => 'Handing over the milestone :milestone.',
+        'delivered' => 'What this milestone delivered:',
         'more' => '…and :count more task|…and :count more tasks',
         'points' => 'Your questions and any points to fix: we record each one and tell you how it was closed.',
     ],
 
     'form' => [
-        'title' => 'Schedule the handover',
-        'callout' => 'This meeting hands over :sprint. Once its transcript is in, the AI lists the points raised for you to confirm as issues.',
+        'title' => 'Schedule the milestone handover',
+        'callout' => 'This meeting hands over the milestone :milestone. Once its transcript is in, the AI lists the points raised for you to confirm as issues.',
     ],
 
-    'tag' => 'Handover: :sprint',
+    'tag' => 'Milestone handover: :milestone',
     'counts' => [
         'draft' => '{1} 1 point to review|[2,*] :count points to review',
         'confirmed' => '{1} 1 issue|[2,*] :count issues',
@@ -58,7 +58,7 @@ return [
         'detail' => 'What was asked',
         'raised_by' => 'Raised by',
         'severity' => 'Severity',
-        'task' => 'Sprint task',
+        'task' => 'Milestone task',
         'no_task' => 'No task',
     ],
 
@@ -82,8 +82,8 @@ return [
     ],
 
     'errors' => [
-        'sprint' => 'That sprint isn’t on this opportunity’s project. Open the project’s sprint board and try again.',
-        'cannot_schedule' => 'You can’t schedule meetings for this opportunity. Ask someone who manages opportunities to schedule the handover.',
+        'milestone' => 'That milestone isn’t on this opportunity’s project. Open the project’s sprint board and try again.',
+        'cannot_schedule' => 'You can’t schedule meetings for this opportunity. Ask someone on its team, or who manages opportunities, to schedule the milestone handover.',
         'decided' => 'This point was already confirmed or left out. The list is up to date now.',
         'no_project' => 'This opportunity has no project, so no issue can be created.',
         'title' => 'Give the point a title.',
@@ -97,8 +97,8 @@ return [
     ],
 
     'ticket' => [
-        'raised_by' => 'Raised by :name in the handover meeting “:meeting” on :date.',
-        'raised' => 'Raised in the handover meeting “:meeting” on :date.',
+        'raised_by' => 'Raised by :name in the milestone handover “:meeting” on :date.',
+        'raised' => 'Raised in the milestone handover “:meeting” on :date.',
     ],
 
     'signoff' => [
@@ -111,17 +111,18 @@ return [
     ],
 
     'notify' => [
-        'title' => 'Handover point on your task',
-        'message' => '“:title”, raised in a handover meeting, concerns a task assigned to you. See it in Quality and issues.',
+        'title' => 'Milestone handover point on your task',
+        'message' => '“:title”, raised in a milestone handover, concerns a task assigned to you. See it in Quality and issues.',
     ],
 
     'board' => [
-        'title' => 'Sprint handover',
-        'none' => 'No handover meeting for this sprint yet.',
-        'schedule' => 'Schedule the handover',
+        'title' => 'Milestone handover|Milestone handovers',
+        'none' => 'No handover meeting for this milestone yet.',
+        'no_milestones' => 'This sprint holds no milestone’s tasks yet, so there’s nothing to hand over.',
+        'schedule' => 'Schedule handover',
         'schedule_another' => 'Schedule another',
-        'no_opportunity' => 'This project has no opportunity, so its handover meeting can’t be scheduled here: meetings belong to an opportunity.',
-        'no_permission' => 'Someone who manages opportunities schedules the handover meeting.',
+        'no_opportunity' => 'This project has no opportunity, so its milestone handovers can’t be scheduled here: meetings belong to an opportunity.',
+        'no_permission' => 'Someone on the opportunity’s team, or who manages opportunities, schedules it.',
         'when' => ':date, :time WAT',
         'open' => 'Open the meeting',
         'review' => '{0} No points to review|{1} 1 point to review|[2,*] :count points to review',

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * A point raised in a sprint's handover meeting (docs/OPPORTUNITIES.md section 12, PR 6): drafted by the AI from the
+ * A point raised in a milestone's handover meeting (docs/OPPORTUNITIES.md section 12, PR 6): drafted by the AI from the
  * transcript (origin ai) or added by the lead, then confirmed (a QA ticket on the project, qa_ticket_id) or left out
  * (dismissed). Only a draft can change.
  */

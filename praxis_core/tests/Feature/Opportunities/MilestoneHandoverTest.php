@@ -30,12 +30,13 @@ use Tests\Support\Google\FakeGoogle;
 use Tests\TestCase;
 
 /**
- * Sprint handovers (docs/OPPORTUNITIES.md section 12, PR 6): the handover meeting scheduled from a sprint through
- * Meetings::schedule, the AI's points from its transcript (handover_points, through FakeAi), the lead's review that
- * turns each confirmed point into a QA ticket (once, under a lock), the ticket's status back on the meeting and in the
- * sign-off text, permissions and limits checked on the server, French.
+ * Milestone handovers (docs/OPPORTUNITIES.md section 12, PR 6): the handover meeting of a milestone scheduled from the
+ * sprint board through Meetings::schedule (meetings.phase_id), the AI's points from its transcript (handover_points,
+ * through FakeAi) linked to the milestone's tasks, the lead's review that turns each confirmed point into a QA ticket
+ * (once, under a lock), the ticket's status back on the meeting and in the sign-off text, permissions (the
+ * opportunity's team included) and limits checked on the server, French.
  */
-class SprintHandoverTest extends TestCase
+class MilestoneHandoverTest extends TestCase
 {
     use OpportunityFixtures, UsesThrowawayDatabase;
 
@@ -65,29 +66,30 @@ class SprintHandoverTest extends TestCase
         $this->ai = FakeAi::install()->respond('meeting_notes', self::NOTES)->respond('client_minutes', self::MINUTES)->respond('handover_points', self::POINTS, 9000, 400);
     }
 
-    public function test_the_lead_schedules_a_sprints_handover_from_the_sprint_board(): void
+    public function test_the_lead_schedules_a_milestones_handover_from_the_sprint_board(): void
     {
         $owner = $this->staff('owner', ['owner']);
         $s = $this->handover(lead: $owner);
         $this->actingAs($owner);
 
-        $link = route('hq.crm.opportunity', ['opportunity' => $s['o']->id, 'tab' => 'meetings', 'handover' => $s['sprint']]);
+        // The sprint holds the M3 milestone's tasks: the board offers M3's handover
+        $link = route('hq.crm.opportunity', ['opportunity' => $s['o']->id, 'tab' => 'meetings', 'handover' => $s['milestone']]);
         Livewire::test(SprintBoard::class, ['id' => $s['project']])
-            ->assertSee('Sprint handover')->assertSee('No handover meeting for this sprint yet.')
-            ->assertSee('Schedule the handover')->assertSeeHtml(e($link));
+            ->assertSee('Milestone handover')->assertSee('M3 Reports')->assertSee('No handover meeting for this milestone yet.')
+            ->assertSee('Schedule handover')->assertSeeHtml(e($link))->assertDontSee('Sprint handover');
 
-        // The link opens the Meetings tab's form for that sprint: a client meeting, titled and set out from the sprint
-        $form = Livewire::withQueryParams(['handover' => $s['sprint']])->test(MeetingsTab::class, ['opportunityId' => $s['o']->id])
-            ->assertSet('formOpen', true)->assertSet('sprintId', $s['sprint'])->assertSet('kind', 'client')->assertSet('handover', '')
-            ->assertSet('title', 'Handover: M3: Reports')->assertSet('contacts', [$s['contact']])
-            ->assertSee('This meeting hands over M3: Reports.')->assertDontSeeHtml('wire:model.live="kind"');
-        $this->assertStringContainsString("Handing over M3: Reports (20 October 2026 to 2 November 2026).\n\nWhat this sprint delivered:\n- Stock report export\n- Sales dashboard\n- Audit trail", $form->get('agenda'));
+        // The link opens the Meetings tab's form for that milestone: a client meeting, titled and set out from it
+        $form = Livewire::withQueryParams(['handover' => $s['milestone']])->test(MeetingsTab::class, ['opportunityId' => $s['o']->id])
+            ->assertSet('formOpen', true)->assertSet('milestoneId', $s['milestone'])->assertSet('kind', 'client')->assertSet('handover', '')
+            ->assertSet('title', 'Milestone handover: M3 Reports')->assertSet('contacts', [$s['contact']])
+            ->assertSee('Schedule the milestone handover')->assertSee('This meeting hands over the milestone M3 Reports.')->assertDontSeeHtml('wire:model.live="kind"');
+        $this->assertStringContainsString("Handing over the milestone M3 Reports.\n\nWhat this milestone delivered:\n- Stock report export\n- Sales dashboard\n- Audit trail", $form->get('agenda'));
 
-        // The kind can't be switched to internal, nor the sprint swapped from the browser
+        // The kind can't be switched to internal, nor the milestone swapped from the browser
         $form->set('kind', 'internal')->assertSet('kind', 'client');
         try {
-            $form->set('sprintId', (string) Str::uuid());
-            $this->fail('sprintId should be locked');
+            $form->set('milestoneId', (string) Str::uuid());
+            $this->fail('milestoneId should be locked');
         } catch (CannotUpdateLockedPropertyException) {
             // expected
         }
@@ -95,19 +97,45 @@ class SprintHandoverTest extends TestCase
         $form->set('date', '2026-11-09')->set('time', '10:00')->call('save')->assertHasNoErrors()->assertSee('Meeting scheduled');
 
         $m = Meeting::sole();
-        $this->assertSame([$s['sprint'], 'client', 'scheduled', $s['o']->id], [$m->sprint_id, $m->kind, $m->status, $m->opportunity_id]);
+        $this->assertSame([$s['milestone'], 'client', 'scheduled', $s['o']->id], [$m->phase_id, $m->kind, $m->status, $m->opportunity_id]);
         $this->assertSame('https://meet.google.com/abc-aaaa-xyz', $m->meet_link);
-        $this->google->assertMeetingCreated(fn (MeetingRequest $r) => $r->title === 'Handover: M3: Reports' && str_contains((string) $r->description, '- Sales dashboard'));
+        $this->google->assertMeetingCreated(fn (MeetingRequest $r) => $r->title === 'Milestone handover: M3 Reports' && str_contains((string) $r->description, '- Sales dashboard'));
         Mail::assertSent(MeetingInvitationMail::class, fn ($mail) => $mail->hasTo('ada@mycity.test') && $mail->variant === 'invite');
 
         // Back on the board: the meeting, a link to it, and no second "Schedule" until it has been held
         Livewire::test(SprintBoard::class, ['id' => $s['project']])
-            ->assertSee('Handover: M3: Reports')->assertSee('9 November 2026, 10:00 WAT')->assertSee('Open the meeting')
+            ->assertSee('Milestone handover: M3 Reports')->assertSee('9 November 2026, 10:00 WAT')->assertSee('Open the meeting')
             ->assertSeeHtml(e(route('hq.crm.opportunity', ['opportunity' => $s['o']->id, 'tab' => 'meetings', 'meeting' => $m->id])))
-            ->assertDontSee('Schedule the handover')->assertDontSee('Schedule another');
+            ->assertDontSee('Schedule handover')->assertDontSee('Schedule another');
     }
 
-    public function test_without_an_opportunity_the_right_sprint_or_the_permission_nothing_is_scheduled(): void
+    public function test_a_sprint_holding_two_milestones_offers_a_handover_for_each_and_the_points_follow_the_milestone(): void
+    {
+        $owner = $this->staff('owner', ['owner']);
+        $s = $this->handover(lead: $owner);
+        $this->actingAs($owner);
+        // M4 starts in the same sprint; M3 also has a task left out of any sprint
+        $m4 = $this->milestone($s['project'], 4, 'M4 Payroll');
+        $this->task($m4, $s['sprint'], 'Payroll run', 0);
+        $late = $this->task($s['milestone'], null, 'Year-end report', 20);
+
+        $board = Livewire::test(SprintBoard::class, ['id' => $s['project']])->assertSee('Milestone handovers')->assertSeeInOrder(['M3 Reports', 'M4 Payroll']);
+        foreach ([$s['milestone'], $m4] as $milestone) {
+            $board->assertSeeHtml(e(route('hq.crm.opportunity', ['opportunity' => $s['o']->id, 'tab' => 'meetings', 'handover' => $milestone])));
+        }
+
+        // M3's handover: the AI numbers M3's tasks (all of them, whichever sprint), never M4's
+        $m = $this->heldHandover($s);
+        Transcripts::fromText($m, 'Ada Obi (10:02): The stock export stops at 5,000 rows.', 'paste');
+        $this->ai->assertRan('handover_points', fn (AiRequest $r) => str_contains($r->prompt, "Milestone: M3 Reports\n")
+            && str_contains($r->prompt, "Milestone tasks:\n1. Stock report export\n2. Sales dashboard\n3. Audit trail\n4. Year-end report\n") && ! str_contains($r->prompt, 'Payroll run'));
+
+        // The task picker offers the milestone's tasks
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('toggle', $m->id)
+            ->assertSeeHtml('value="' . $late . '"')->assertSee('Milestone task')->assertDontSee('Payroll run');
+    }
+
+    public function test_without_an_opportunity_the_right_milestone_or_the_permission_nothing_is_scheduled(): void
     {
         $owner = $this->staff('owner', ['owner']);
         $s = $this->handover(lead: $owner);
@@ -115,31 +143,37 @@ class SprintHandoverTest extends TestCase
 
         // A project no opportunity holds says why
         $orphan = $this->project($this->organisation(), 'Orphan project');
-        $this->sprint($orphan, 'Sprint 1');
+        $orphanSprint = $this->sprint($orphan, 'Sprint 1');
+        $elsewhere = $this->milestone($orphan, 1, 'M1 Elsewhere');
+        $this->task($elsewhere, $orphanSprint, 'Their task', 0);
         Livewire::test(SprintBoard::class, ['id' => $orphan])
-            ->assertSee('This project has no opportunity, so its handover meeting can’t be scheduled here')->assertDontSee('Schedule the handover');
+            ->assertSee('This project has no opportunity, so its milestone handovers can’t be scheduled here')->assertDontSee('Schedule handover');
 
-        // Another project's sprint
-        $elsewhere = $this->sprint($orphan, 'Sprint 2');
+        // A sprint that holds no task yet has nothing to hand over
+        $empty = $this->sprint($s['project'], 'Sprint 9', 'Planned');
+        Livewire::test(SprintBoard::class, ['id' => $s['project']])->set('activeSprintId', $empty)
+            ->assertSee('This sprint holds no milestone’s tasks yet')->assertDontSee('Schedule handover');
+
+        // Another project's milestone
         Livewire::withQueryParams(['handover' => $elsewhere])->test(MeetingsTab::class, ['opportunityId' => $s['o']->id])
-            ->assertSet('formOpen', false)->assertSee('That sprint isn’t on this opportunity’s project.');
+            ->assertSet('formOpen', false)->assertSee('That milestone isn’t on this opportunity’s project.');
 
-        // The sprint goes between opening the form and saving it: nothing reaches Google
-        $form = Livewire::withQueryParams(['handover' => $s['sprint']])->test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->assertSet('formOpen', true);
-        DB::table('sprints')->where('id', $s['sprint'])->update(['deleted_at' => now()]);
-        $form->set('time', '10:00')->call('save')->assertHasErrors('sprint');
+        // The milestone goes between opening the form and saving it: nothing reaches Google
+        $form = Livewire::withQueryParams(['handover' => $s['milestone']])->test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->assertSet('formOpen', true);
+        DB::table('project_phases')->where('id', $s['milestone'])->update(['deleted_at' => now()]);
+        $form->set('time', '10:00')->call('save')->assertHasErrors('milestone');
         $this->assertSame(0, Meeting::count());
         $this->assertSame([], $this->google->created);
-        DB::table('sprints')->where('id', $s['sprint'])->update(['deleted_at' => null]);
+        DB::table('project_phases')->where('id', $s['milestone'])->update(['deleted_at' => null]);
 
-        // A delivery lead sees the board and the opportunity but doesn't manage opportunities
+        // A delivery lead sees the board and the opportunity but isn't on its team and doesn't manage opportunities
         $delivery = $this->staff('delivery', ['delivery']);
         $this->actingAs($delivery);
         Livewire::test(SprintBoard::class, ['id' => $s['project']])
-            ->assertSee('Someone who manages opportunities schedules the handover meeting.')->assertDontSee('Schedule the handover');
-        Livewire::withQueryParams(['handover' => $s['sprint']])->test(MeetingsTab::class, ['opportunityId' => $s['o']->id])
+            ->assertSee('Someone on the opportunity’s team, or who manages opportunities, schedules it.')->assertDontSee('Schedule handover');
+        Livewire::withQueryParams(['handover' => $s['milestone']])->test(MeetingsTab::class, ['opportunityId' => $s['o']->id])
             ->assertSet('formOpen', false)->assertSee('You can’t schedule meetings for this opportunity.');
-        Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('openHandover', $s['sprint'])->assertForbidden();
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('openHandover', $s['milestone'])->assertForbidden();
     }
 
     public function test_once_the_transcript_is_filed_the_ai_lists_the_points_with_their_tasks_and_nothing_is_created(): void
@@ -152,10 +186,10 @@ class SprintHandoverTest extends TestCase
         Transcripts::fromText($m, "Ada Obi (10:02): The stock export stops at 5,000 rows.\nMusa Bello (10:05): Totals should be in naira.", 'paste');
         Transcripts::fromText($plain, 'Ada Obi (09:00): All good this week.', 'paste');
 
-        // One Haiku run, for the handover only: the sprint's tasks numbered, then the transcript
+        // One Haiku run, for the handover only: the milestone's tasks numbered, then the transcript
         $this->assertCount(1, $this->ai->requestsFor('handover_points'));
         $this->ai->assertRan('handover_points', fn (AiRequest $r) => $r->model === 'claude-haiku-5-5'
-            && str_contains($r->prompt, "Sprint tasks:\n1. Stock report export (M3 Reports)\n2. Sales dashboard (M3 Reports)\n3. Audit trail (M3 Reports)")
+            && str_contains($r->prompt, "Milestone tasks:\n1. Stock report export\n2. Sales dashboard\n3. Audit trail")
             && str_contains($r->prompt, 'Ada Obi (10:02): The stock export stops at 5,000 rows.') && ! str_contains($r->prompt, 'INSTRUCTIONS FROM THE LEAD'));
 
         $points = $m->points()->get();
@@ -209,8 +243,8 @@ class SprintHandoverTest extends TestCase
         $this->assertSame('confirmed', $export->status);
         $this->assertSame([$s['project'], $s['tasks'][0], 'Stock export stops at 5,000 rows', 'Medium', 'Open', $s['lead']->id, 'staff'],
             [$ticket->project_id, $ticket->task_id, $ticket->title, $ticket->severity, $ticket->status, $ticket->submitted_by, $ticket->submitted_by_type]);
-        $this->assertSame("Exporting the stock report to Excel stops after about 5,000 rows; the client needs every row.\n\nRaised by Ada Obi in the handover meeting “Handover: M3: Reports” on 5 November 2026.", $ticket->description);
-        $this->assertDatabaseHas('notifications', ['user_id' => $engineer->id, 'title' => 'Handover point on your task', 'link_url' => route('hq.ops.qa', ['ticket' => $ticket->id])]);
+        $this->assertSame("Exporting the stock report to Excel stops after about 5,000 rows; the client needs every row.\n\nRaised by Ada Obi in the milestone handover “Milestone handover: M3 Reports” on 5 November 2026.", $ticket->description);
+        $this->assertDatabaseHas('notifications', ['user_id' => $engineer->id, 'title' => 'Milestone handover point on your task', 'link_url' => route('hq.ops.qa', ['ticket' => $ticket->id])]);
         $this->assertDatabaseHas('system_audit_logs', ['action' => 'HANDOVER_POINT_CONFIRMED', 'target_id' => $s['o']->id, 'user_id' => $s['lead']->id]);
 
         // A second click, or a second person, creates nothing more
@@ -245,7 +279,7 @@ class SprintHandoverTest extends TestCase
             ->assertSee('Resolved on 6 November 2026')->assertSee('Issue: Open')->assertSee('Last reply: The export now pages through every row.')
             ->assertDontSee('Internal: check the memory limit.')->assertSee('Copy for the sign-off');
         $this->assertSame(implode("\n", [
-            'Points raised in “Handover: M3: Reports” (5 November 2026)',
+            'Points raised in “Milestone handover: M3 Reports” (5 November 2026)',
             '1. Stock export stops at 5,000 rows (Medium): Resolved on 6 November 2026. Last reply: “The export now pages through every row.”',
             '2. Dashboard totals in naira (Medium): Open.',
         ]), Handovers::signoffText($m->fresh()));
@@ -320,16 +354,16 @@ class SprintHandoverTest extends TestCase
 
         // A member schedules the handover from the board
         $this->actingAs($member);
-        Livewire::test(SprintBoard::class, ['id' => $s['project']])->assertSee('Schedule the handover');
-        Livewire::withQueryParams(['handover' => $s['sprint']])->test(MeetingsTab::class, ['opportunityId' => $s['o']->id])
+        Livewire::test(SprintBoard::class, ['id' => $s['project']])->assertSee('Schedule handover');
+        Livewire::withQueryParams(['handover' => $s['milestone']])->test(MeetingsTab::class, ['opportunityId' => $s['o']->id])
             ->assertSet('formOpen', true)->set('date', '2026-11-09')->set('time', '10:00')->call('save')->assertHasNoErrors();
-        $this->assertSame($s['sprint'], Meeting::sole()->sprint_id);
+        $this->assertSame($s['milestone'], Meeting::sole()->phase_id);
 
         // Someone off the team, without the permission, sees the board's handover but can't open or schedule it
         $this->actingAs($outsider);
-        Livewire::test(SprintBoard::class, ['id' => $s['project']])->assertSee('Handover: M3: Reports')
-            ->assertDontSee('Open the meeting')->assertDontSee('Schedule another')->assertDontSee('Schedule the handover');
-        $this->get(route('hq.crm.opportunity', ['opportunity' => $s['o']->id, 'tab' => 'meetings', 'handover' => $s['sprint']]))->assertForbidden();
+        Livewire::test(SprintBoard::class, ['id' => $s['project']])->assertSee('Milestone handover: M3 Reports')
+            ->assertDontSee('Open the meeting')->assertDontSee('Schedule another')->assertDontSee('Schedule handover');
+        $this->get(route('hq.crm.opportunity', ['opportunity' => $s['o']->id, 'tab' => 'meetings', 'handover' => $s['milestone']]))->assertForbidden();
 
         // Points: the member reads them but neither lists them again (no transcript right) nor confirms them (not the lead)
         $m = $this->heldHandover($s);
@@ -409,23 +443,24 @@ class SprintHandoverTest extends TestCase
         $s = $this->handover(lead: $owner, language: 'fr');
         $this->actingAs($owner);
 
-        $form = Livewire::withQueryParams(['handover' => $s['sprint']])->test(MeetingsTab::class, ['opportunityId' => $s['o']->id])
-            ->assertSet('title', "Livraison\u{00A0}: M3: Reports");
-        $this->assertStringStartsWith("Livraison de M3: Reports (du 20 octobre 2026 au 2 novembre 2026).\n\nCe que ce sprint a livré\u{00A0}:", $form->get('agenda'));
+        $form = Livewire::withQueryParams(['handover' => $s['milestone']])->test(MeetingsTab::class, ['opportunityId' => $s['o']->id])
+            ->assertSet('title', "Livraison du jalon\u{00A0}: M3 Reports");
+        $this->assertStringStartsWith("Livraison du jalon M3 Reports.\n\nCe que ce jalon a livré\u{00A0}:", $form->get('agenda'));
 
         $m = $this->heldHandover($s);
         Transcripts::fromText($m, 'Ada Obi (10:02): L’export s’arrête à 5 000 lignes.', 'paste');
         $this->ai->assertRan('handover_points', fn (AiRequest $r) => str_contains($r->prompt, 'Write in French'));
         $point = $m->points()->first();
         Handovers::confirm($point);
-        $this->assertStringEndsWith("Soulevé par Ada Obi lors de la réunion de livraison «\u{202F}Handover: M3: Reports\u{202F}» du 5 novembre 2026.",
+        $this->assertStringEndsWith("Soulevé par Ada Obi lors de la livraison du jalon «\u{202F}Milestone handover: M3 Reports\u{202F}» du 5 novembre 2026.",
             DB::table('qa_tickets')->where('id', $point->fresh()->qa_ticket_id)->value('description'));
-        $this->assertSame("Points soulevés lors de «\u{202F}Handover: M3: Reports\u{202F}» (5 novembre 2026)\n1. Stock report export stops at 5,000 rows (Critique)\u{00A0}: Ouverte.",
+        $this->assertSame("Points soulevés lors de «\u{202F}Milestone handover: M3 Reports\u{202F}» (5 novembre 2026)\n1. Stock report export stops at 5,000 rows (Critique)\u{00A0}: Ouverte.",
             Handovers::signoffText($m->fresh()));
 
         $this->app->setLocale('fr');
         Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('toggle', $m->id)
-            ->assertSee('Points soulevés')->assertSee("Incident\u{00A0}: Ouverte")->assertSee('Copier pour la recette');
+            ->assertSee('Points soulevés')->assertSee("Incident\u{00A0}: Ouverte")->assertSee('Copier pour la recette')->assertSee('Tâche du jalon');
+        Livewire::test(SprintBoard::class, ['id' => $s['project']])->assertSee('Livraison du jalon')->assertSee('En planifier une autre');
 
         $en = array_keys(Arr::dot(require lang_path('en/handover.php')));
         $fr = array_keys(Arr::dot(require lang_path('fr/handover.php')));
@@ -435,7 +470,10 @@ class SprintHandoverTest extends TestCase
 
     // ---- Fixtures --------------------------------------------------------------------------------------------------
 
-    /** An opportunity holding a project with sprint "M3: Reports" (three tasks, in order), its lead and a client contact */
+    /**
+     * An opportunity holding a project whose milestone "M3 Reports" has three tasks (in order), all in the sprint
+     * "Sprint 3" (MyCity's shape: one milestone per sprint), its lead and a client contact
+     */
     private function handover(?User $lead = null, string $language = 'en'): array
     {
         $lead ??= $this->staff('lead', ['sales']);
@@ -446,24 +484,22 @@ class SprintHandoverTest extends TestCase
         }
         $project = $this->project($org, 'MyCity App ERP');
         $o = $this->opportunityFor($org, ['lead_user_id' => $lead->id, 'language' => $language, 'stage' => 'won', 'project_id' => $project]);
-        $phase = (string) Str::uuid();
-        $this->insertRow('project_phases', ['id' => $phase, 'project_id' => $project, 'phase_number' => 3, 'title' => 'M3 Reports', 'weight_percentage' => 20]);
-        $sprint = $this->sprint($project, 'M3: Reports');
+        $milestone = $this->milestone($project, 3, 'M3 Reports');
+        $sprint = $this->sprint($project, 'Sprint 3');
         $tasks = [];
         foreach (['Stock report export', 'Sales dashboard', 'Audit trail'] as $i => $title) {
-            $tasks[] = $id = (string) Str::uuid();
-            $this->insertRow('tasks', ['id' => $id, 'phase_id' => $phase, 'sprint_id' => $sprint, 'title' => $title, 'status' => 'To-Do', 'created_at' => now()->subMinutes(10 - $i)]);
+            $tasks[] = $this->task($milestone, $sprint, $title, 10 + $i);
         }
 
-        return ['lead' => $lead, 'o' => $o, 'project' => $project, 'sprint' => $sprint, 'tasks' => $tasks, 'contact' => $contact];
+        return ['lead' => $lead, 'o' => $o, 'project' => $project, 'milestone' => $milestone, 'sprint' => $sprint, 'tasks' => $tasks, 'contact' => $contact];
     }
 
-    /** The handover meeting of the fixture's sprint, held from 10:00 to 11:00 UTC today */
+    /** The handover meeting of the fixture's milestone, held from 10:00 to 11:00 UTC today */
     private function heldHandover(array $s): Meeting
     {
         $starts = CarbonImmutable::parse('2026-11-05 10:00:00', 'UTC');
-        $m = Meetings::schedule($s['o'], ['kind' => 'client', 'title' => 'Handover: M3: Reports', 'starts_at' => $starts, 'ends_at' => $starts->addHour(),
-            'staff' => [$s['lead']->id], 'contacts' => [$s['contact']], 'sprint_id' => $s['sprint']], brandedEmail: false)->meeting;
+        $m = Meetings::schedule($s['o'], ['kind' => 'client', 'title' => 'Milestone handover: M3 Reports', 'starts_at' => $starts, 'ends_at' => $starts->addHour(),
+            'staff' => [$s['lead']->id], 'contacts' => [$s['contact']], 'phase_id' => $s['milestone']], brandedEmail: false)->meeting;
         $this->google->created = [];
 
         return $m;
@@ -477,10 +513,28 @@ class SprintHandoverTest extends TestCase
         return $id;
     }
 
-    private function sprint(string $projectId, string $title): string
+    /** A milestone (project_phases row) */
+    private function milestone(string $projectId, int $number, string $title): string
     {
         $id = (string) Str::uuid();
-        $this->insertRow('sprints', ['id' => $id, 'project_id' => $projectId, 'title' => $title, 'start_date' => '2026-10-20', 'end_date' => '2026-11-02', 'status' => 'Active']);
+        $this->insertRow('project_phases', ['id' => $id, 'project_id' => $projectId, 'phase_number' => $number, 'title' => $title, 'weight_percentage' => 20]);
+
+        return $id;
+    }
+
+    private function sprint(string $projectId, string $title, string $status = 'Active'): string
+    {
+        $id = (string) Str::uuid();
+        $this->insertRow('sprints', ['id' => $id, 'project_id' => $projectId, 'title' => $title, 'start_date' => '2026-10-20', 'end_date' => '2026-11-02', 'status' => $status]);
+
+        return $id;
+    }
+
+    /** A task of a milestone, in a sprint or none; $order sets which comes first (created_at) */
+    private function task(string $milestoneId, ?string $sprintId, string $title, int $order): string
+    {
+        $id = (string) Str::uuid();
+        $this->insertRow('tasks', ['id' => $id, 'phase_id' => $milestoneId, 'sprint_id' => $sprintId, 'title' => $title, 'status' => 'To-Do', 'created_at' => now()->subHour()->addMinutes($order)]);
 
         return $id;
     }

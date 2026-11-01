@@ -27,7 +27,7 @@ class SprintBoard extends Component
     #[Locked]
     public $project;
 
-    // The project's opportunity, which holds its meetings; without one a sprint's handover can't be scheduled (PR 6)
+    // The project's opportunity, which holds its meetings; without one a milestone's handover can't be scheduled (PR 6)
     #[Locked]
     public ?string $opportunityId = null;
 
@@ -360,42 +360,45 @@ class SprintBoard extends Component
     }
 
     /**
-     * The selected sprint's handover meeting (the latest not cancelled) and its points, and the links to schedule or
-     * open it. Who may schedule or open it is decided by that opportunity (the permission, or being on its team); the
-     * Meetings tab checks again.
+     * The milestones whose tasks the selected sprint holds (MyCity: one per sprint), each with its handover meeting (the
+     * latest client meeting for that milestone, not cancelled), its points, and the links to schedule or open it. Who
+     * may schedule or open one is decided by the opportunity (the permission, or being on its team); the Meetings tab
+     * checks again.
      */
-    private function handover(): array
+    private function handovers(): array
     {
         $user = Auth::user();
         $opportunity = $this->opportunityId ? Opportunity::find($this->opportunityId) : null;
         $canSchedule = $opportunity !== null && OpportunityAccess::canManage($user, $opportunity);
-        $meeting = $this->opportunityId && $this->activeSprintId
-            ? Meeting::where('opportunity_id', $this->opportunityId)->where('sprint_id', $this->activeSprintId)->where('kind', 'client')
-                ->where('status', '!=', 'cancelled')->orderByDesc('starts_at')->first()
-            : null;
-        $counts = $meeting ? MeetingPoint::where('meeting_id', $meeting->id)->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status') : collect();
-        $openIssues = $meeting ? MeetingPoint::where('meeting_points.meeting_id', $meeting->id)->where('meeting_points.status', 'confirmed')
-            ->join('qa_tickets', 'qa_tickets.id', '=', 'meeting_points.qa_ticket_id')->whereNull('qa_tickets.deleted_at')
-            ->whereIn('qa_tickets.status', ['Open', 'Investigating'])->count() : 0;
+        $canOpen = $opportunity !== null && OpportunityAccess::canView($user, $opportunity);
+        $milestones = $opportunity && $this->activeSprintId ? Handovers::milestonesInSprint($this->projectId, $this->activeSprintId) : collect();
         $link = fn (array $query) => route('hq.crm.opportunity', ['opportunity' => $this->opportunityId, 'tab' => 'meetings'] + $query);
+        $at = fn ($meeting, string $format) => $meeting->starts_at->copy()->setTimezone($meeting->time_zone ?: Meetings::TIME_ZONE)->locale(app()->getLocale())->translatedFormat(__($format));
 
-        return [
-            'meeting' => $meeting,
-            'when' => $meeting ? __('handover.board.when', [
-                'date' => $meeting->starts_at->copy()->setTimezone($meeting->time_zone ?: Meetings::TIME_ZONE)->locale(app()->getLocale())->translatedFormat(__('opportunities.formats.date')),
-                'time' => $meeting->starts_at->copy()->setTimezone($meeting->time_zone ?: Meetings::TIME_ZONE)->locale(app()->getLocale())->translatedFormat(__('opportunities.formats.time')),
-            ]) : null,
-            'review' => (int) ($counts['draft'] ?? 0),
-            'issues' => (int) ($counts['confirmed'] ?? 0),
-            'openIssues' => $openIssues,
-            'canSchedule' => $canSchedule,
-            'scheduleUrl' => $canSchedule && $this->activeSprintId && (! $meeting || $meeting->status === 'held') ? $link(['handover' => $this->activeSprintId]) : null,
-            'meetingUrl' => $meeting && $opportunity && OpportunityAccess::canView($user, $opportunity) ? $link(['meeting' => $meeting->id]) : null,
-        ];
+        $items = [];
+        foreach ($milestones as $milestone) {
+            $meeting = Meeting::where('opportunity_id', $opportunity->id)->where('phase_id', $milestone->id)->where('kind', 'client')
+                ->where('status', '!=', 'cancelled')->orderByDesc('starts_at')->first();
+            $counts = $meeting ? MeetingPoint::where('meeting_id', $meeting->id)->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status') : collect();
+            $items[] = [
+                'milestone' => $milestone,
+                'meeting' => $meeting,
+                'when' => $meeting ? __('handover.board.when', ['date' => $at($meeting, 'opportunities.formats.date'), 'time' => $at($meeting, 'opportunities.formats.time')]) : null,
+                'review' => (int) ($counts['draft'] ?? 0),
+                'issues' => (int) ($counts['confirmed'] ?? 0),
+                'openIssues' => $meeting ? MeetingPoint::where('meeting_points.meeting_id', $meeting->id)->where('meeting_points.status', 'confirmed')
+                    ->join('qa_tickets', 'qa_tickets.id', '=', 'meeting_points.qa_ticket_id')->whereNull('qa_tickets.deleted_at')
+                    ->whereIn('qa_tickets.status', ['Open', 'Investigating'])->count() : 0,
+                'scheduleUrl' => $canSchedule && (! $meeting || $meeting->status === 'held') ? $link(['handover' => $milestone->id]) : null,
+                'meetingUrl' => $meeting && $canOpen ? $link(['meeting' => $meeting->id]) : null,
+            ];
+        }
+
+        return ['items' => $items, 'canSchedule' => $canSchedule];
     }
 
     public function render()
     {
-        return view('livewire.hq.operations.sprint-board', ['handover' => $this->handover()]);
+        return view('livewire.hq.operations.sprint-board', ['handovers' => $this->handovers()]);
     }
 }

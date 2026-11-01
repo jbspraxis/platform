@@ -31,7 +31,7 @@ use LogicException;
  * internal meetings through Google (Meetings), add a transcript by hand when Google has none, read the AI's notes,
  * and edit and send the client minutes. "Transcripts" lists every transcript of the opportunity together.
  * opportunities.view reads it; opportunities.manage acts; full transcripts need canReadTranscripts.
- * A sprint's handover meeting (PR 6, Handovers) is scheduled here from the sprint board (?handover=<sprint id>) and
+ * A milestone's handover meeting (PR 6, Handovers) is scheduled here from the sprint board (?handover=<milestone id>) and
  * lists the points raised in it; the lead or the owner (Handovers::canReview) edits and confirms them as QA tickets.
  */
 class MeetingsTab extends Component
@@ -49,7 +49,7 @@ class MeetingsTab extends Component
     #[Locked]
     public bool $canReview = false;
 
-    /** From the sprint board: open the form for that sprint's handover meeting, then forget it */
+    /** From the sprint board: open the form for that milestone's handover meeting, then forget it */
     #[Url(as: 'handover', except: '')]
     public string $handover = '';
 
@@ -66,9 +66,9 @@ class MeetingsTab extends Component
     #[Locked]
     public string $editingId = '';
 
-    /** A new meeting that hands over this sprint (checked again on save) */
+    /** A new meeting that hands over this milestone (checked again on save) */
     #[Locked]
-    public string $sprintId = '';
+    public string $milestoneId = '';
 
     public string $kind = 'client';
 
@@ -188,27 +188,27 @@ class MeetingsTab extends Component
         ]);
     }
 
-    /** The form for a sprint's handover: a client meeting, titled after the sprint, its agenda what the sprint delivered */
-    public function openHandover(string $sprintId): void
+    /** The form for a milestone's handover: a client meeting, titled after the milestone, its agenda what it delivered */
+    public function openHandover(string $milestoneId): void
     {
         $this->authorizeManage();
         $o = $this->opportunity();
-        $sprint = Handovers::sprintFor($o, $sprintId);
-        if (! $sprint) {
-            $this->say(__('handover.errors.sprint'), 'warning');
+        $milestone = Handovers::milestoneFor($o, $milestoneId);
+        if (! $milestone) {
+            $this->say(__('handover.errors.milestone'), 'warning');
 
             return;
         }
         $this->openSchedule('client');
-        $this->fill(['sprintId' => $sprint->id, 'title' => Handovers::defaultTitle($o, $sprint), 'agenda' => Handovers::defaultAgenda($o, $sprint)]);
+        $this->fill(['milestoneId' => $milestone->id, 'title' => Handovers::defaultTitle($o, $milestone), 'agenda' => Handovers::defaultAgenda($o, $milestone)]);
     }
 
     public function updatedKind(string $kind): void
     {
-        if ($this->sprintId !== '') {
+        if ($this->milestoneId !== '') {
             $this->kind = 'client'; // a handover is always with the client
         }
-        if ($this->editingId !== '' || $this->sprintId !== '') {
+        if ($this->editingId !== '' || $this->milestoneId !== '') {
             return;
         }
         $o = $this->opportunity();
@@ -267,10 +267,10 @@ class MeetingsTab extends Component
 
             return;
         }
-        $kind = $editing?->kind ?? ($this->sprintId !== '' ? 'client' : $this->kind);
-        $sprint = null;
-        if (! $editing && $this->sprintId !== '' && ! ($sprint = Handovers::sprintFor($o, $this->sprintId))) {
-            $this->addError('sprint', __('handover.errors.sprint'));
+        $kind = $editing?->kind ?? ($this->milestoneId !== '' ? 'client' : $this->kind);
+        $milestone = null;
+        if (! $editing && $this->milestoneId !== '' && ! ($milestone = Handovers::milestoneFor($o, $this->milestoneId))) {
+            $this->addError('milestone', __('handover.errors.milestone'));
 
             return;
         }
@@ -335,7 +335,7 @@ class MeetingsTab extends Component
             'staff' => $this->staff,
             'contacts' => $contacts,
             'guests' => array_map(fn ($e) => ['email' => $e], $guests),
-            'sprint_id' => $sprint?->id,
+            'phase_id' => $milestone?->id,
         ];
         try {
             $change = $editing ? Meetings::update($editing, $data) : Meetings::schedule($o, $data);
@@ -547,7 +547,7 @@ class MeetingsTab extends Component
         $this->notice = null;
     }
 
-    // ---- A sprint's handover: the points raised, confirmed as QA tickets ------------------------------------------
+    // ---- A milestone's handover: the points raised, confirmed as QA tickets --------------------------------------
 
     /** Ask the AI for the points raised (again): it reads the transcript, so it needs the right to read it */
     public function draftPoints(string $transcriptId): void
@@ -564,7 +564,7 @@ class MeetingsTab extends Component
         } catch (AiUnavailable $e) {
             $this->say($e->getMessage(), 'error');
         } catch (LogicException) {
-            $this->say(__('handover.errors.sprint'), 'warning');
+            $this->say(__('handover.errors.milestone'), 'warning');
         }
     }
 
@@ -742,7 +742,7 @@ class MeetingsTab extends Component
 
     private function resetForm(): void
     {
-        $this->reset(['formOpen', 'editingId', 'sprintId', 'kind', 'title', 'date', 'time', 'duration', 'staff', 'contacts', 'guests', 'agenda']);
+        $this->reset(['formOpen', 'editingId', 'milestoneId', 'kind', 'title', 'date', 'time', 'duration', 'staff', 'contacts', 'guests', 'agenda']);
         $this->resetErrorBag();
     }
 
@@ -862,10 +862,10 @@ class MeetingsTab extends Component
         }
         $pending = collect($runs)->flatten()->contains(fn ($r) => ! $r->isFinished());
 
-        // Sprint handovers: which sprint, how many points each, and the open one's points with their tickets
+        // Milestone handovers: which milestone, how many points each, and the open one's points with their tickets
         $handovers = $meetings->filter->isHandover();
-        $sprints = $handovers->isEmpty() ? collect() : DB::table('sprints')->whereIn('id', $handovers->pluck('sprint_id')->unique()->all())
-            ->get(['id', 'title', 'start_date', 'end_date'])->keyBy('id');
+        $milestones = $handovers->isEmpty() ? collect() : DB::table('project_phases')->whereIn('id', $handovers->pluck('phase_id')->unique()->all())
+            ->get(['id', 'title'])->keyBy('id');
         $pointCounts = $handovers->isEmpty() ? collect() : MeetingPoint::whereIn('meeting_id', $handovers->pluck('id')->all())
             ->selectRaw('meeting_id, status, count(*) as total')->groupBy('meeting_id', 'status')->get()->groupBy('meeting_id')
             ->map(fn ($rows) => $rows->pluck('total', 'status')->map(fn ($n) => (int) $n));
@@ -895,14 +895,14 @@ class MeetingsTab extends Component
             'editing' => $this->editingId !== '' ? $meetings->firstWhere('id', $this->editingId) : null,
             'cancelling' => $this->cancellingId !== '' ? $meetings->firstWhere('id', $this->cancellingId) : null,
             'addingTo' => $this->transcriptFor !== '' ? $meetings->firstWhere('id', $this->transcriptFor) : null,
-            'sprints' => $sprints,
+            'milestones' => $milestones,
             'pointCounts' => $pointCounts,
             'pointRuns' => $pointRuns,
             'pointList' => $pointList,
             'closingNotes' => Handovers::closingNotes($confirmed->pluck('qa_ticket_id')->filter()->values()->all()),
             'signoff' => $shown && $confirmed->isNotEmpty() ? Handovers::signoffText($shown) : null,
-            'taskOptions' => $shown && $this->canReview && $o->project_id ? Handovers::sprintTasks($o->project_id, $shown->sprint_id) : collect(),
-            'formSprint' => $this->formOpen && $this->sprintId !== '' ? Handovers::sprintFor($o, $this->sprintId) : null,
+            'taskOptions' => $shown && $this->canReview && $o->project_id ? Handovers::milestoneTasks($o->project_id, $shown->phase_id) : collect(),
+            'formMilestone' => $this->formOpen && $this->milestoneId !== '' ? Handovers::milestoneFor($o, $this->milestoneId) : null,
             'canQa' => (bool) Auth::user()?->can('qa.view'),
         ]);
     }

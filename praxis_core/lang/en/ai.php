@@ -21,7 +21,7 @@ return [
     'purposes' => [
         'meeting_notes' => 'Meeting notes',
         'client_minutes' => 'Client minutes',
-        'handover_points' => 'Handover points',
+        'handover_points' => 'Milestone handover points',
         'questionnaire' => 'Questionnaire',
         'questionnaire_question' => 'Questionnaire: one question',
         'proposal' => 'Proposal',

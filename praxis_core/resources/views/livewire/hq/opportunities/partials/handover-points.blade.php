@@ -1,4 +1,4 @@
-{{-- The points raised in a sprint's handover meeting (PR 6): the AI's list, the lead's review (edit, create the issue,
+{{-- The points raised in a milestone's handover meeting (PR 6): the AI's list, the lead's review (edit, create the issue,
      leave out), then each issue's status for the sign-off. $m meeting, $pointList (Handovers::points), $pointRuns,
      $canManage, $canReadTranscripts, $canReview, $taskOptions, $closingNotes, $signoff, $canQa, $day. --}}
 @php

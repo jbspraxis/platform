@@ -17,12 +17,13 @@ use Illuminate\Support\Str;
 use LogicException;
 
 /**
- * Sprint handovers (docs/OPPORTUNITIES.md section 12, PR 6). From a sprint of a project that has an opportunity
- * (opportunities.project_id), the lead schedules the client meeting that hands it over, through Meetings::schedule
- * (meetings.sprint_id). Its transcript is collected like any other; once filed, the AI drafts the points raised
- * (handover_points, Haiku) as meeting_points. The lead edits them and confirms each one, which creates a QA ticket on
- * the project, linked to the sprint task when known; nothing is created without that confirmation. The meeting then
- * shows every point with its ticket's status, and signoffText() lists them for the handover sign-off.
+ * Milestone handovers (docs/OPPORTUNITIES.md section 12, PR 6). For a milestone (project_phases) of a project that has
+ * an opportunity (opportunities.project_id), the lead schedules the client meeting that hands it over, through
+ * Meetings::schedule (meetings.phase_id); today's sprint board offers it for the milestones whose tasks the sprint
+ * holds. Its transcript is collected like any other; once filed, the AI drafts the points raised (handover_points,
+ * Haiku) as meeting_points. The lead edits them and confirms each one, which creates a QA ticket on the project, linked
+ * to the milestone's task when known; nothing is created without that confirmation. The meeting then shows every point
+ * with its ticket's status, and signoffText() lists them for the handover sign-off.
  *
  * Who (always for this opportunity: the permission, or being on its team, OpportunityAccess): anyone who can view it
  * sees the points; drafting them reads the transcript (canManage + canReadTranscripts); editing and confirming creates
@@ -41,7 +42,7 @@ final class Handovers
 
     public const MAX_RAISED_BY = 150;
 
-    /** Sprint tasks listed for the AI and the task picker */
+    /** Milestone tasks listed for the AI and the task picker */
     public const MAX_TASKS = 200;
 
     /** The opportunity that holds this project, or null: a project without one can't schedule a handover */
@@ -50,24 +51,32 @@ final class Handovers
         return Opportunity::where('project_id', $projectId)->orderByRaw("stage = 'won' desc")->orderByDesc('updated_at')->first();
     }
 
-    /** The sprint, when it is one of the opportunity's project's sprints */
-    public static function sprintFor(Opportunity $opportunity, ?string $sprintId): ?object
+    /** The milestone (a project_phases row), when it is one of the opportunity's project's milestones */
+    public static function milestoneFor(Opportunity $opportunity, ?string $phaseId): ?object
     {
-        if (! $opportunity->project_id || ! $sprintId) {
+        if (! $opportunity->project_id || ! $phaseId) {
             return null;
         }
 
-        return DB::table('sprints')->where('id', $sprintId)->where('project_id', $opportunity->project_id)->whereNull('deleted_at')
-            ->first(['id', 'project_id', 'title', 'start_date', 'end_date', 'status']);
+        return DB::table('project_phases')->where('id', $phaseId)->where('project_id', $opportunity->project_id)->whereNull('deleted_at')
+            ->first(['id', 'project_id', 'phase_number', 'title', 'description', 'status']);
     }
 
-    /** The sprint's tasks, in the order the AI numbers them (1, 2, …) and the lead picks from */
-    public static function sprintTasks(string $projectId, string $sprintId): Collection
+    /** The milestones whose tasks a sprint holds, in milestone order (MyCity: one per sprint) */
+    public static function milestonesInSprint(string $projectId, string $sprintId): Collection
+    {
+        return DB::table('project_phases')->where('project_phases.project_id', $projectId)->whereNull('project_phases.deleted_at')
+            ->whereExists(fn ($q) => $q->from('tasks')->whereColumn('tasks.phase_id', 'project_phases.id')->where('tasks.sprint_id', $sprintId)->whereNull('tasks.deleted_at'))
+            ->orderBy('phase_number')->orderBy('title')->get(['id', 'phase_number', 'title']);
+    }
+
+    /** The milestone's tasks, in the order the AI numbers them (1, 2, …) and the lead picks from */
+    public static function milestoneTasks(string $projectId, string $phaseId): Collection
     {
         return DB::table('tasks')->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
-            ->where('project_phases.project_id', $projectId)->where('tasks.sprint_id', $sprintId)->whereNull('tasks.deleted_at')
-            ->orderBy('project_phases.phase_number')->orderBy('tasks.created_at')->orderBy('tasks.id')
-            ->limit(self::MAX_TASKS)->get(['tasks.id', 'tasks.title', 'tasks.status', 'project_phases.title as phase_title']);
+            ->where('project_phases.project_id', $projectId)->where('tasks.phase_id', $phaseId)->whereNull('tasks.deleted_at')
+            ->orderBy('tasks.created_at')->orderBy('tasks.id')
+            ->limit(self::MAX_TASKS)->get(['tasks.id', 'tasks.title', 'tasks.status']);
     }
 
     public static function taskOnProject(string $taskId, string $projectId): bool
@@ -82,19 +91,18 @@ final class Handovers
         return OpportunityAccess::canManage($user, $opportunity) && OpportunityAccess::canApprove($user, $opportunity);
     }
 
-    /** "Handover: Sprint 3", in the opportunity's language (the client sees it in the invitation) */
-    public static function defaultTitle(Opportunity $opportunity, object $sprint): string
+    /** "Milestone handover: M3 Reports", in the opportunity's language (the client sees it in the invitation) */
+    public static function defaultTitle(Opportunity $opportunity, object $milestone): string
     {
-        return Str::limit(__('handover.defaults.title', ['sprint' => $sprint->title], $opportunity->language), 200, '');
+        return Str::limit(__('handover.defaults.title', ['milestone' => $milestone->title], $opportunity->language), 200, '');
     }
 
-    /** What the sprint delivered, for the invitation's agenda, in the opportunity's language */
-    public static function defaultAgenda(Opportunity $opportunity, object $sprint): string
+    /** What the milestone delivered, for the invitation's agenda, in the opportunity's language */
+    public static function defaultAgenda(Opportunity $opportunity, object $milestone): string
     {
         $language = $opportunity->language;
-        $date = fn ($d) => Carbon::parse($d)->locale($language)->translatedFormat('j F Y');
-        $tasks = self::sprintTasks($opportunity->project_id, $sprint->id);
-        $lines = [__('handover.defaults.agenda', ['sprint' => $sprint->title, 'start' => $date($sprint->start_date), 'end' => $date($sprint->end_date)], $language)];
+        $tasks = self::milestoneTasks($opportunity->project_id, $milestone->id);
+        $lines = [__('handover.defaults.agenda', ['milestone' => $milestone->title], $language)];
         if ($tasks->isNotEmpty()) {
             $lines[] = '';
             $lines[] = __('handover.defaults.delivered', [], $language);
@@ -119,18 +127,18 @@ final class Handovers
     public static function draftPoints(MeetingTranscript $transcript): AiRun
     {
         $meeting = $transcript->meeting()->with('attendees', 'opportunity.organization')->first();
-        $sprint = $meeting?->isHandover() ? self::sprintFor($meeting->opportunity, $meeting->sprint_id) : null;
-        if (! $sprint) {
-            throw new LogicException('Only a handover meeting of a sprint on the opportunity’s project has points to draft');
+        $milestone = $meeting?->isHandover() ? self::milestoneFor($meeting->opportunity, $meeting->phase_id) : null;
+        if (! $milestone) {
+            throw new LogicException('Only a handover meeting of a milestone on the opportunity’s project has points to draft');
         }
         $o = $meeting->opportunity;
-        $tasks = self::sprintTasks($o->project_id, $sprint->id);
+        $tasks = self::milestoneTasks($o->project_id, $milestone->id);
         $recorded = $meeting->points()->where(fn ($q) => $q->where('status', '!=', 'draft')->orWhere('origin', 'lead'))->pluck('title');
 
         return Ai::queue('handover_points', $transcript, [
-            // Who the client is, cached after the company brief; the sprint, its tasks and the transcript are this job's material
+            // Who the client is, cached after the company brief; the milestone, its tasks and the transcript are this job's material
             'context' => OpportunityContext::for($o, include: ['profile']),
-            'material' => self::material($meeting, $sprint, $tasks, $transcript),
+            'material' => self::material($meeting, $milestone, $tasks, $transcript),
             'instructions' => $recorded->isNotEmpty() ? "Already recorded (do not list them again):\n" . $recorded->map(fn ($t) => "- {$t}")->implode("\n") : null,
             'language' => $o->language,
             // Not sent to the AI: which task each number in MATERIAL stands for, when the answer is filed
@@ -296,7 +304,7 @@ final class Handovers
         }
         [$ticketId, $locked, $meeting, $taskId] = $done;
 
-        OpportunityAccess::log('HANDOVER_POINT_CONFIRMED', sprintf('Confirmed “%s” from the handover meeting “%s” as a %s QA ticket.', $locked->title, $meeting->title, strtolower($locked->severity)),
+        OpportunityAccess::log('HANDOVER_POINT_CONFIRMED', sprintf('Confirmed “%s” from the milestone handover meeting “%s” as a %s QA ticket.', $locked->title, $meeting->title, strtolower($locked->severity)),
             'opportunities', $meeting->opportunity_id, [], ['meeting_id' => $meeting->id, 'point_id' => $locked->id, 'qa_ticket_id' => $ticketId, 'task_id' => $taskId]);
         self::tellAssignee($taskId, $locked, $ticketId, $userId);
 
@@ -315,7 +323,7 @@ final class Handovers
         ]) === 1;
         if ($changed && $dismiss) {
             $meeting = Meeting::find($point->meeting_id);
-            OpportunityAccess::log('HANDOVER_POINT_DISMISSED', sprintf('Left “%s” out of the QA tickets from the handover meeting “%s”.', $point->title, $meeting?->title),
+            OpportunityAccess::log('HANDOVER_POINT_DISMISSED', sprintf('Left “%s” out of the QA tickets from the milestone handover meeting “%s”.', $point->title, $meeting?->title),
                 'opportunities', (string) $meeting?->opportunity_id, [], ['meeting_id' => $point->meeting_id, 'point_id' => $point->id]);
         }
 
@@ -412,21 +420,21 @@ final class Handovers
         ]);
     }
 
-    private static function material(Meeting $meeting, object $sprint, Collection $tasks, MeetingTranscript $transcript): string
+    private static function material(Meeting $meeting, object $milestone, Collection $tasks, MeetingTranscript $transcript): string
     {
         $org = $meeting->opportunity->organization?->name ?: 'the client';
         $who = $meeting->attendees->map(fn ($a) => ($a->name ?: $a->email) . ' (' . match ($a->role) {
             'staff' => 'JBS Praxis', 'client' => $org, default => 'guest',
         } . ')')->implode('; ');
-        $numbered = $tasks->values()->map(fn ($t, $i) => sprintf('%d. %s (%s)', $i + 1, $t->title, $t->phase_title))->implode("\n");
+        $numbered = $tasks->values()->map(fn ($t, $i) => sprintf('%d. %s', $i + 1, $t->title))->implode("\n");
 
         return implode("\n", array_filter([
-            sprintf('Handover meeting: %s, %s WAT', $meeting->title, Meetings::when($meeting)),
-            sprintf('Sprint: %s, %s to %s', $sprint->title, $sprint->start_date, $sprint->end_date),
+            sprintf('Milestone handover meeting: %s, %s WAT', $meeting->title, Meetings::when($meeting)),
+            'Milestone: ' . $milestone->title . (filled($milestone->description) ? ' (' . Str::limit(trim($milestone->description), 500) . ')' : ''),
             $who !== '' ? "Attendees: {$who}" : null,
             filled($meeting->agenda) ? 'Agenda: ' . trim($meeting->agenda) : null,
             '',
-            'Sprint tasks:',
+            'Milestone tasks:',
             $numbered !== '' ? $numbered : '(none listed)',
             '',
             'Transcript:',

@@ -49,7 +49,7 @@
     .mtg-sent { display: flex; flex-direction: column; gap: 8px; font-size: 0.875rem; line-height: 1.375rem; color: var(--color-slate); }
     .mtg-sent ul { margin: 0; padding-left: 18px; list-style: disc; }
     .mtg-sent p { margin: 0; }
-    /* A sprint's handover meeting (PR 6): the points raised and their issues */
+    /* A milestone's handover meeting (PR 6): the points raised and their issues */
     .mtg-handover-tag { white-space: normal; overflow-wrap: anywhere; }
     .mtg-inline-icon { width: 14px; height: 14px; margin-right: 4px; vertical-align: -2px; }
     .mtg-points { border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
