@@ -114,7 +114,8 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
         });
 
         // Opportunities (docs/OPPORTUNITIES.md): one record per piece of work with a client, under Leads and proposals
-        Route::prefix('opportunities')->middleware('can:opportunities.view')->group(function () {
+        // Who may open these is decided in each screen (OpportunityAccess): the permission, or being on the opportunity's team
+        Route::prefix('opportunities')->group(function () {
             Route::get('/', \App\Livewire\Hq\Opportunities\OpportunityBoard::class)->name('hq.crm.opportunities');
             Route::get('/{opportunity}', \App\Livewire\Hq\Opportunities\OpportunityPage::class)->whereUuid('opportunity')->name('hq.crm.opportunity');
         });

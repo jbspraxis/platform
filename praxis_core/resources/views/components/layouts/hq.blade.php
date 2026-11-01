@@ -80,16 +80,17 @@
                 @endif
             @endcanany
 
-            @canany(['crm.view', 'broadcasts.view', 'opportunities.view'])
-                <a href="{{ $user->can('opportunities.view') ? route('hq.crm.opportunities') : ($user->can('crm.view') ? route('hq.crm.leads') : route('hq.crm.broadcast')) }}" class="rail-link {{ $on('hq.crm.*') }}" wire:navigate>
+            @php $opportunities = \App\Support\Opportunities\OpportunityAccess::canOpenBoard($user); @endphp
+            @if ($opportunities || $user->canAny(['crm.view', 'broadcasts.view']))
+                <a href="{{ $opportunities ? route('hq.crm.opportunities') : ($user->can('crm.view') ? route('hq.crm.leads') : route('hq.crm.broadcast')) }}" class="rail-link {{ $on('hq.crm.*') }}" wire:navigate>
                     <i data-lucide="target"></i> Leads and proposals
                 </a>
                 @if (request()->routeIs('hq.crm.*'))
                     <div class="rail-sub">
                         {{-- docs/OPPORTUNITIES.md: one record per piece of work with a client --}}
-                        @can('opportunities.view')
+                        @if ($opportunities)
                             <a href="{{ route('hq.crm.opportunities') }}" class="{{ $on('hq.crm.opportunities', 'hq.crm.opportunity') }}" wire:navigate>{{ __('opportunities.nav') }}</a>
-                        @endcan
+                        @endif
                         @can('crm.view')
                             <a href="{{ route('hq.crm.leads') }}" class="{{ $on('hq.crm.leads') }}" wire:navigate>Leads</a>
                             <a href="{{ route('hq.crm.consult') }}" class="{{ $on('hq.crm.consult') }}" wire:navigate>Free audits</a>
@@ -100,7 +101,7 @@
                         @endcan
                     </div>
                 @endif
-            @endcanany
+            @endif
 
             @canany(['projects.view', 'qa.view', 'timesheets.view', 'signoffs.view'])
                 @php

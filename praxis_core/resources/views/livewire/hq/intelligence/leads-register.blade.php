@@ -6,9 +6,13 @@
             'Qualifying' => 'Qualifying',
             'In Consultation' => 'Free audit',
             'Proposal Sent' => 'Proposal sent',
-            'Won / Lost' => 'Won or lost',
+            'Won' => 'Won',
+            'Lost' => 'Lost',
+            'Won / Lost' => 'Won or lost', // before the stages were split; the migration moved every row
         ];
         $stageLabel = fn ($stage) => $stageLabels[$stage] ?? $stage;
+        // Won and Lost are outcomes: a green or red pill. The other stages are plain text.
+        $stagePill = fn ($stage) => match ($stage) { 'Won' => 'pill pill-success', 'Lost' => 'pill pill-danger', default => null };
         $tierLabel = fn ($tier) => match ((int) $tier) { 1 => 'Tier 1: enterprise', 2 => 'Tier 2: mid-market', default => 'Tier 3: small business' };
         // The tier is a category, not a status: a plain tag (app.css .tag), tinted for tier 1
         $tierStyle = fn ($tier) => (int) $tier === 1 ? 'background: var(--color-teal-tint); color: var(--color-petrol);' : '';
@@ -96,7 +100,13 @@
                                 <div class="text-caption text-muted">{{ $lead->corporate_email }}</div>
                             </td>
                             <td><span class="tag" style="{{ $tierStyle($lead->lead_tier) }}">{{ $tierLabel($lead->lead_tier) }}</span></td>
-                            <td>{{ $stageLabel($lead->pipeline_stage) }}</td>
+                            <td>
+                                @if ($stagePill($lead->pipeline_stage))
+                                    <span class="{{ $stagePill($lead->pipeline_stage) }}">{{ $stageLabel($lead->pipeline_stage) }}</span>
+                                @else
+                                    {{ $stageLabel($lead->pipeline_stage) }}
+                                @endif
+                            </td>
                             <td class="num">
                                 @if($lead->calculated_leakage)
                                     <span class="font-semibold text-ink">{{ $money($lead->copq_currency, $lead->calculated_leakage) }}</span>
@@ -140,7 +150,7 @@
                 <section class="lr-col" aria-label="{{ $stageLabel($stage) }}">
                     <div class="lr-col-head">
                         <span>{{ $stageLabel($stage) }}</span>
-                        <span class="pill pill-neutral num">{{ $inStage->count() }}</span>
+                        <span class="{{ $stagePill($stage) ?? 'pill pill-neutral' }} num">{{ $inStage->count() }}</span>
                     </div>
 
                     <div class="lr-col-cards">
@@ -218,20 +228,40 @@
                     </div>
                 @endif
 
-                <div class="flex flex-wrap items-end gap-3">
-                    <div class="field" style="flex: 1; min-width: 200px;">
+                <div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); align-items: start;">
+                    <div class="field">
                         <label class="label" for="lead-stage">Pipeline stage</label>
                         <select id="lead-stage" wire:model="selectedLead.pipeline_stage" wire:change="updateStage('{{ $selectedLead->org_id }}', $event.target.value)" class="select">
                             @foreach($stages as $stage)
                                 <option value="{{ $stage }}">{{ $stageLabel($stage) }}</option>
                             @endforeach
                         </select>
+                        @if ($stagePill($selectedLead->pipeline_stage))
+                            <span><span class="{{ $stagePill($selectedLead->pipeline_stage) }}">{{ $stageLabel($selectedLead->pipeline_stage) }}</span></span>
+                        @endif
                     </div>
-                    @if(!$selectedLead->owner_id)
-                        <button type="button" wire:click="claimLead('{{ $selectedLead->org_id }}')" wire:loading.attr="disabled" wire:target="claimLead('{{ $selectedLead->org_id }}')" class="btn btn-secondary">
-                            <span wire:loading.remove wire:target="claimLead('{{ $selectedLead->org_id }}')">Assign to me</span>
-                            <span wire:loading wire:target="claimLead('{{ $selectedLead->org_id }}')">Assigning…</span>
-                        </button>
+                    @if ($canAssign)
+                        {{-- Anyone on the staff can own the lead, not only "me": owner or partner hands it to whoever follows it up --}}
+                        <div>
+                            <x-hq.picker id="lead-owner" label="Owner" model="ownerSearch" :options="$ownerOptions" :selected="$ownerSelected"
+                                         choose="assignLead" remove="startReassign" placeholder="Type a name" :empty="'No one matches ‘:term’.'" :term="$ownerSearch"
+                                         :help="$selectedLead->owner_id ? null : 'Who follows this lead up. Choose yourself or a colleague.'" />
+                            @if ($ownerPicking && $selectedLead->owner_id)
+                                <button type="button" class="btn btn-ghost btn-sm" style="margin-top: 4px; padding-left: 0;" wire:click="cancelReassign">Keep {{ $selectedLead->owner_first }}</button>
+                            @endif
+                        </div>
+                    @else
+                        <div class="field">
+                            <span class="label">Owner</span>
+                            <div class="flex items-center gap-2" style="min-height: 40px;">
+                                @if ($selectedLead->owner_id)
+                                    <x-hq.avatar :user="['id' => $selectedLead->owner_id, 'first_name' => $selectedLead->owner_first, 'last_name' => $selectedLead->owner_last, 'avatar_path' => $selectedLead->owner_avatar ?? null]" :size="28" />
+                                    <span class="text-ink">{{ $selectedLead->owner_first }} {{ $selectedLead->owner_last }}</span>
+                                @else
+                                    <span class="text-muted">Not assigned</span>
+                                @endif
+                            </div>
+                        </div>
                     @endif
                 </div>
 

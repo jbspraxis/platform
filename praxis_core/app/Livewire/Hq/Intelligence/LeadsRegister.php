@@ -83,7 +83,12 @@ class LeadsRegister extends Component
     public $dbIndustries = [], $dbArchitectures = [], $dbBottlenecks = [], $dbCurrencies = [];
     // The stages someone can move a lead to by hand; locked so the browser cannot add its own
     #[Locked]
-    public $stages = ['Lead Captured', 'Qualifying', 'In Consultation', 'Proposal Sent', 'Won / Lost'];
+    public $stages = ['Lead Captured', 'Qualifying', 'In Consultation', 'Proposal Sent', 'Won', 'Lost'];
+
+    // Owner picker in the lead details (x-hq.picker): type part of a name, choose anyone on the staff
+    public string $ownerSearch = '';
+
+    public bool $ownerPicking = false;
 
     public function mount()
     {
@@ -144,6 +149,96 @@ class LeadsRegister extends Component
     {
         $this->selectedLead = collect($this->leads)->firstWhere('org_id', $orgId);
         $this->showDrawer = true;
+        $this->ownerPicking = false;
+        $this->ownerSearch = '';
+    }
+
+    /**
+     * Who may hand the open lead to someone: anyone with crm.edit while nobody owns it; afterwards its owner, or
+     * a partner or the owner of the firm (opportunities.approve: the one Leads-and-proposals permission the sales
+     * role does not hold), so a lead can be reassigned without its owner's say.
+     */
+    public function canAssignOpenLead(): bool
+    {
+        $user = Auth::user();
+        if (! $this->selectedLead || ! $user?->can('crm.edit')) {
+            return false;
+        }
+
+        return ! $this->selectedLead->owner_id || $this->selectedLead->owner_id === $user->id || $user->can('opportunities.approve');
+    }
+
+    public function startReassign()
+    {
+        abort_unless($this->canAssignOpenLead(), 403);
+        $this->ownerPicking = true;
+        $this->ownerSearch = '';
+    }
+
+    public function cancelReassign()
+    {
+        $this->ownerPicking = false;
+        $this->ownerSearch = '';
+    }
+
+    /** Give the open lead to $userId (any active staff member), with the audit log and a bell for them */
+    public function assignLead(string $userId)
+    {
+        abort_unless($this->canAssignOpenLead(), 403);
+        $orgId = $this->selectedLead->org_id;
+        $lead = DB::table('organizations')->where('id', $orgId)->whereIn('status', self::REGISTER_STATUSES)->first();
+        $person = \App\Models\User::where('id', $userId)->where('status', 'Active')->whereNull('deleted_at')->first(['id', 'first_name', 'last_name']);
+        if (! $lead || ! $person) {
+            $this->cancelReassign();
+
+            return;
+        }
+
+        if ($lead->assigned_to !== $person->id) {
+            DB::table('organizations')->where('id', $lead->id)->update(['assigned_to' => $person->id, 'updated_at' => now()]);
+            $name = trim($person->first_name . ' ' . $person->last_name);
+            DB::table('system_audit_logs')->insert([
+                'user_id' => Auth::id(),
+                'action' => 'LEAD_ASSIGNED',
+                'description' => $person->id === Auth::id() ? "Took ownership of the lead {$lead->name}." : "Assigned the lead {$lead->name} to {$name}.",
+                'target_table' => 'organizations',
+                'target_id' => $lead->id,
+                'old_values' => json_encode(['assigned_to' => $lead->assigned_to]),
+                'new_values' => json_encode(['assigned_to' => $person->id]),
+                'ip_address' => request()?->ip(),
+                'created_at' => now(),
+            ]);
+            if ($person->id !== Auth::id()) {
+                $by = Auth::user();
+                DB::table('notifications')->insert([
+                    'id' => (string) Str::uuid(),
+                    'user_id' => $person->id,
+                    'type' => 'System',
+                    'title' => 'A lead was assigned to you',
+                    'message' => trim($by->first_name . ' ' . $by->last_name) . " assigned you the lead {$lead->name}.",
+                    'link_url' => route('hq.crm.leads'),
+                    'is_read' => 0,
+                    'created_at' => now(),
+                ]);
+            }
+        }
+        $this->loadLeads();
+        $this->openDrawer($orgId);
+    }
+
+    /** The owner picker's list: active staff matching the typed name, the current owner left out */
+    private function ownerOptions()
+    {
+        $term = trim($this->ownerSearch);
+        $like = '%' . addcslashes($term, '%_\\') . '%';
+
+        return \App\Models\User::query()->where('status', 'Active')->whereNull('deleted_at')
+            ->when($this->selectedLead?->owner_id, fn ($q, $id) => $q->where('id', '!=', $id))
+            ->when($term !== '', fn ($q) => $q->where(fn ($w) => $w->where('first_name', 'like', $like)->orWhere('last_name', 'like', $like)
+                ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", [$like])->orWhere('email', 'like', $like)))
+            ->orderBy('first_name')->orderBy('last_name')->limit(30)
+            ->get(['id', 'first_name', 'last_name', 'avatar_path', 'job_title'])
+            ->map(fn ($u) => ['id' => $u->id, 'label' => trim($u->first_name . ' ' . $u->last_name), 'meta' => $u->job_title, 'user' => $u])->values();
     }
 
     public function closeDrawer()
@@ -499,6 +594,13 @@ class LeadsRegister extends Component
 
     public function render()
     {
-        return view('livewire.hq.intelligence.leads-register');
+        $owner = $this->selectedLead?->owner_id ? ['id' => $this->selectedLead->owner_id, 'label' => trim($this->selectedLead->owner_first . ' ' . $this->selectedLead->owner_last),
+            'user' => ['id' => $this->selectedLead->owner_id, 'first_name' => $this->selectedLead->owner_first, 'last_name' => $this->selectedLead->owner_last, 'avatar_path' => $this->selectedLead->owner_avatar ?? null]] : null;
+
+        return view('livewire.hq.intelligence.leads-register', [
+            'canAssign' => $this->showDrawer && $this->canAssignOpenLead(),
+            'ownerSelected' => $this->ownerPicking ? null : $owner,
+            'ownerOptions' => $this->showDrawer && $this->ownerPicking || ($this->showDrawer && ! $owner) ? $this->ownerOptions() : collect(),
+        ]);
     }
 }

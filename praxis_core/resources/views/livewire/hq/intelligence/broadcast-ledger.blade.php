@@ -1,6 +1,6 @@
 <div>
     @php
-        $stageLabels = ['Lead Captured' => 'New', 'Qualifying' => 'Qualifying', 'In Consultation' => 'Free audit', 'Proposal Sent' => 'Proposal sent', 'Won / Lost' => 'Won or lost'];
+        $stageLabels = ['Lead Captured' => 'New', 'Qualifying' => 'Qualifying', 'In Consultation' => 'Free audit', 'Proposal Sent' => 'Proposal sent', 'Won / Lost' => 'Won or lost', 'Won' => 'Won', 'Lost' => 'Lost'];
         $tabs = ['composer' => 'Write and send', 'queued' => 'Queued', 'sent' => 'Sent', 'failed' => 'Failed'];
     @endphp
 

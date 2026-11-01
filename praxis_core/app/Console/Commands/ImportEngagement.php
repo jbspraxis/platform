@@ -149,7 +149,7 @@ class ImportEngagement extends Command
             'name' => trim($b['organization']['name']),
             'industry' => $b['organization']['industry'] ?? null,
             'status' => 'Active Client',
-            'pipeline_stage' => 'Won / Lost',
+            'pipeline_stage' => 'Won',
             'assigned_to' => $leadId,
             'country' => $b['organization']['country'] ?? 'Nigeria',
             'city' => $b['organization']['city'] ?? null,
