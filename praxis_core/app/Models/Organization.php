@@ -24,6 +24,12 @@ class Organization extends Model
         'governance_status',
         'utm_source',
         'utm_campaign',
-        'ai_friction_matrix'
+        'ai_friction_matrix',
+        'pipeline_stage',
+        'assigned_to',
+        'billing_address',
+        'tax_identification_number',
+        'created_by',
+        'updated_by',
     ];
 }

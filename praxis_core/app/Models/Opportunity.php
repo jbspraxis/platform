@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -39,6 +41,28 @@ class Opportunity extends Model
     public function lead(): BelongsTo
     {
         return $this->belongsTo(User::class, 'lead_user_id');
+    }
+
+    /** Team members chosen on the form (opportunity_members); the lead is not among them */
+    public function members(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'opportunity_members')->withPivot(['added_by', 'created_at']);
+    }
+
+    /** What $user may open: everything with opportunities.view, else only the opportunities they lead or are on */
+    public function scopeVisibleTo(Builder $query, ?User $user): Builder
+    {
+        if (\App\Support\Access::allows($user, 'opportunities.view')) {
+            return $query;
+        }
+
+        return $query->where(fn ($q) => $q->where('lead_user_id', $user?->id)->orWhereHas('members', fn ($m) => $m->where('users.id', $user?->id)));
+    }
+
+    /** Led by $user, or with them on the team */
+    public function scopeInvolving(Builder $query, ?User $user): Builder
+    {
+        return $query->where(fn ($q) => $q->where('lead_user_id', $user?->id)->orWhereHas('members', fn ($m) => $m->where('users.id', $user?->id)));
     }
 
     public function project(): BelongsTo

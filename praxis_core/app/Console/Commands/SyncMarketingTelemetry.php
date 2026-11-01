@@ -67,7 +67,7 @@ class SyncMarketingTelemetry extends Command
             // Selection 10-B: CAC based on "Qualified" Opportunities
             $oppsCount = DB::table('organizations')
                            ->whereIn('id', $orgIds)
-                           ->whereIn('pipeline_stage', ['Qualified', 'Negotiation', 'Won / Lost'])
+                           ->whereIn('pipeline_stage', ['Qualified', 'Negotiation', 'Won / Lost', 'Won', 'Lost'])
                            ->count();
                            
             $wonCount = DB::table('organizations')

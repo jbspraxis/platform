@@ -58,8 +58,8 @@ class QuestionnaireTab extends Component
 
     public function mount(string $opportunityId): void
     {
-        abort_unless(OpportunityAccess::canView(Auth::user()), 403);
         $opportunity = Opportunity::findOrFail($opportunityId);
+        abort_unless(OpportunityAccess::canView(Auth::user(), $opportunity), 403);
         $this->opportunityId = $opportunity->id;
         $this->canAnswer = Questionnaires::canAnswer(Auth::user(), $opportunity);
 

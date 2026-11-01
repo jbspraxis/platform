@@ -2,9 +2,10 @@
 
 namespace App\Livewire\Hq\Opportunities;
 
+use App\Livewire\Hq\Opportunities\Concerns\PicksStaff;
 use App\Models\Opportunity;
-use App\Models\User;
 use App\Support\Opportunities\OpportunityAccess;
+use App\Support\Opportunities\Team;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -18,11 +19,14 @@ use Livewire\Component;
  * One opportunity (docs/OPPORTUNITIES.md section 2): Overview (details, stage, organisation, cost of poor quality,
  * history) and a tab for each later step. Meetings, Questionnaire, Proposals, SOW and Project list what exists
  * today (meetings from free audits, legacy proposals, the project) until PRs 2–5 build them out.
- * opportunities.view opens it; opportunities.manage edits it. Every change is in the audit log.
+ * opportunities.view opens it; opportunities.manage edits it; the opportunity's own team (lead and members) can do
+ * both whatever their roles say. Every change is in the audit log.
  */
 #[Layout('components.layouts.hq')]
 class OpportunityPage extends Component
 {
+    use PicksStaff;
+
     public const TABS = ['overview', 'meetings', 'questionnaire', 'proposals', 'sow', 'project'];
 
     #[Locked]
@@ -39,8 +43,6 @@ class OpportunityPage extends Component
 
     public string $title = '';
 
-    public string $leadUserId = '';
-
     public string $language = 'en';
 
     // Change the stage
@@ -50,7 +52,7 @@ class OpportunityPage extends Component
 
     public function mount(Opportunity $opportunity): void
     {
-        abort_unless(OpportunityAccess::canView(Auth::user()), 403);
+        abort_unless(OpportunityAccess::canView(Auth::user(), $opportunity), 403);
         $this->opportunityId = $opportunity->id;
         $this->canManage = OpportunityAccess::canManage(Auth::user(), $opportunity);
         if (! in_array($this->tab, self::TABS, true)) {
@@ -80,7 +82,13 @@ class OpportunityPage extends Component
     {
         $this->authorizeManage();
         $o = $this->opportunity();
-        $this->fill(['title' => $o->title, 'leadUserId' => (string) $o->lead_user_id, 'language' => $o->language, 'editing' => true]);
+        $this->fill(['title' => $o->title, 'leadUserId' => (string) $o->lead_user_id, 'language' => $o->language, 'editing' => true,
+            'leadSearch' => '', 'teamSearch' => '', 'teamUserIds' => Team::memberIds($o)]);
+    }
+
+    protected function authorizePicking(): void
+    {
+        abort_unless($this->canManage, 403);
     }
 
     public function cancelEdit(): void
@@ -96,12 +104,17 @@ class OpportunityPage extends Component
         $this->validate([
             'title' => ['required', 'string', 'max:200'],
             'leadUserId' => ['required', Rule::exists('users', 'id')->where('status', 'Active')->whereNull('deleted_at')],
+            'teamUserIds' => ['array', 'max:20'],
+            'teamUserIds.*' => ['string', Rule::exists('users', 'id')->where('status', 'Active')->whereNull('deleted_at')],
             'language' => ['required', Rule::in(Opportunity::LANGUAGES)],
         ], [
             'title.required' => __('opportunities.create.errors.title'),
             'title.max' => __('opportunities.create.errors.title_long'),
             'leadUserId.required' => __('opportunities.create.errors.lead'),
             'leadUserId.exists' => __('opportunities.create.errors.lead'),
+            'teamUserIds.max' => __('opportunities.create.errors.team'),
+            'teamUserIds.*.exists' => __('opportunities.create.errors.team'),
+            'teamUserIds.*.string' => __('opportunities.create.errors.team'),
             'language.required' => __('opportunities.create.errors.language'),
             'language.in' => __('opportunities.create.errors.language'),
         ]);
@@ -115,6 +128,9 @@ class OpportunityPage extends Component
             OpportunityAccess::log('OPPORTUNITY_UPDATED', "Changed the details of “{$o->title}”.", 'opportunities', $o->id,
                 array_intersect_key($old, array_diff_assoc($new, $old)), array_diff_assoc($new, $old));
         }
+        Team::sync($o, $this->teamUserIds, Auth::id());
+        // Someone who took themselves off the team may no longer edit
+        $this->canManage = OpportunityAccess::canManage(Auth::user(), $o->fresh());
         $this->editing = false;
         session()->flash('success', __('opportunities.page.saved'));
     }
@@ -184,11 +200,11 @@ class OpportunityPage extends Component
             'copq' => $copq,
             'contact' => $contact,
             'history' => $history,
-            'staff' => $this->editing ? User::where('status', 'Active')->whereNull('deleted_at')->orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name']) : collect(),
+            'team' => Team::of($o),
             'canApprove' => OpportunityAccess::canApprove($user, $o),
             'canReadTranscripts' => OpportunityAccess::canReadTranscripts($user, $o),
             'canOpenProposals' => (bool) $user?->can('crm.view'),
             'canOpenProjects' => (bool) $user?->can('projects.view'),
-        ])->title($o->title . ' · ' . __('opportunities.title'));
+        ] + ($this->editing ? $this->staffPickers() : []))->title($o->title . ' · ' . __('opportunities.title'));
     }
 }

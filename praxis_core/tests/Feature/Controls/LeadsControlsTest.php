@@ -97,12 +97,55 @@ class LeadsControlsTest extends TestCase
 
         Livewire::test(LeadsRegister::class)
             ->call('updateStage', $this->orgId, 'Anything at all')
-            ->call('updateStage', $internal, 'Won / Lost');
+            ->call('updateStage', $internal, 'Won');
         $this->assertSame('Lead Captured', DB::table('organizations')->where('id', $this->orgId)->value('pipeline_stage'));
         $this->assertSame($internalStage, DB::table('organizations')->where('id', $internal)->value('pipeline_stage'));
 
         Livewire::test(LeadsRegister::class)->call('updateStage', $this->orgId, 'Qualifying');
         $this->assertSame('Qualifying', DB::table('organizations')->where('id', $this->orgId)->value('pipeline_stage'));
+
+        // Won and Lost are two stages now, shown as a green and a red pill
+        Livewire::test(LeadsRegister::class)->call('updateStage', $this->orgId, 'Lost')
+            ->assertSeeHtml('pill pill-danger')->assertSee('Lost');
+        $this->assertSame('Lost', DB::table('organizations')->where('id', $this->orgId)->value('pipeline_stage'));
+        Livewire::test(LeadsRegister::class)->call('updateStage', $this->orgId, 'Won')->assertSeeHtml('pill pill-success');
+        $this->assertSame('Won', DB::table('organizations')->where('id', $this->orgId)->value('pipeline_stage'));
+    }
+
+    public function test_a_lead_can_be_assigned_to_anyone_by_its_owner_or_a_partner(): void
+    {
+        $sales = $this->staff('sales', ['sales']);
+        $sales2 = $this->staff('sales2', ['sales']);
+        $delivery = $this->staff('delivery', ['delivery']);
+        $partner = $this->staff('partner', ['partner']);
+        $owner = fn () => DB::table('organizations')->where('id', $this->orgId)->value('assigned_to');
+
+        // Nobody owns it: anyone with crm.edit hands it to anyone, not only to themselves
+        $this->actingAs($sales);
+        Livewire::test(LeadsRegister::class)->call('openDrawer', $this->orgId)->assertSee('Who follows this lead up')
+            ->call('assignLead', $sales2->id)->assertSee('Sales2 Test');
+        $this->assertSame($sales2->id, $owner());
+        $log = DB::table('system_audit_logs')->where('action', 'LEAD_ASSIGNED')->first();
+        $this->assertSame($sales->id, $log->user_id);
+        $this->assertEquals(['assigned_to' => $sales2->id], json_decode($log->new_values, true));
+        $this->assertDatabaseHas('notifications', ['user_id' => $sales2->id, 'title' => 'A lead was assigned to you']);
+
+        // A colleague who neither owns it nor approves can't take it back or move it
+        Livewire::test(LeadsRegister::class)->call('openDrawer', $this->orgId)->assertDontSee('Keep ')
+            ->call('assignLead', $sales->id)->assertForbidden();
+        $this->assertSame($sales2->id, $owner());
+
+        // Its owner can hand it on (to someone without crm.edit too); a partner can reassign it without the owner's say
+        $this->actingAs($sales2);
+        Livewire::test(LeadsRegister::class)->call('openDrawer', $this->orgId)->call('startReassign')->assertSet('ownerPicking', true)
+            ->assertSee('Keep Sales2')->call('assignLead', $delivery->id)->assertSet('ownerPicking', false)->assertSee('Delivery Test');
+        $this->assertSame($delivery->id, $owner());
+        $this->actingAs($delivery);
+        Livewire::test(LeadsRegister::class)->call('openDrawer', $this->orgId)->call('startReassign')->assertForbidden();
+        $this->actingAs($partner);
+        Livewire::test(LeadsRegister::class)->call('openDrawer', $this->orgId)->call('startReassign')->call('assignLead', $sales->id);
+        $this->assertSame($sales->id, $owner());
+        $this->assertSame(3, DB::table('system_audit_logs')->where('action', 'LEAD_ASSIGNED')->count());
     }
 
     public function test_a_lead_someone_owns_cannot_be_taken_over_and_claims_are_logged(): void

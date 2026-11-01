@@ -549,7 +549,7 @@ class LiveConsultation extends Component
 
         DB::table('organizations')->where('id', $this->activeOrgId)->update([
             'status' => 'Lost',
-            'pipeline_stage' => 'Won / Lost',
+            'pipeline_stage' => 'Lost',
             'disqualification_reason' => trim($reason) ?: 'Marked as lost by an approver, no reason given',
             'updated_at' => now()
         ]);

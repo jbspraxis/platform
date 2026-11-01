@@ -13,6 +13,10 @@
         .opp-dl dd { margin: 0; color: var(--color-ink); overflow-wrap: anywhere; }
         .opp-form { display: flex; flex-direction: column; gap: 16px; }
         .opp-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+        .opp-team { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+        .opp-team li { display: flex; align-items: center; gap: 10px; }
+        .opp-team-text { display: flex; flex-direction: column; min-width: 0; }
+        .opp-team-name { font-size: 0.875rem; line-height: 1.25rem; font-weight: 600; color: var(--color-ink); }
         .opp-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
         .opp-history li { font-size: 0.875rem; line-height: 1.375rem; color: var(--color-slate); }
         .opp-history time { display: block; font-size: 0.75rem; color: var(--color-muted); }
@@ -90,16 +94,13 @@
                                    @error('title') aria-invalid="true" aria-describedby="opp-title-error" @enderror>
                             @error('title') <span class="field-error" id="opp-title-error">{{ $message }}</span> @enderror
                         </div>
-                        <div class="field">
-                            <label for="opp-lead" class="label">{{ __('opportunities.fields.lead') }}</label>
-                            <select id="opp-lead" class="select" wire:model="leadUserId" @error('leadUserId') aria-invalid="true" aria-describedby="opp-lead-error" @enderror>
-                                <option value="">{{ __('opportunities.create.choose_lead') }}</option>
-                                @foreach ($staff as $s)
-                                    <option value="{{ $s->id }}" wire:key="staff-{{ $s->id }}">{{ $person($s) }}</option>
-                                @endforeach
-                            </select>
-                            @error('leadUserId') <span class="field-error" id="opp-lead-error">{{ $message }}</span> @enderror
-                        </div>
+                        <x-hq.picker id="opp-lead" :label="__('opportunities.fields.lead')" model="leadSearch" :options="$leadOptions" :selected="$leadSelected"
+                                     choose="chooseLead" remove="clearLead" :placeholder="__('opportunities.create.team_hint')" :help="__('opportunities.create.lead_help')"
+                                     :error="$errors->first('leadUserId')" :empty="__('opportunities.create.no_staff')" :term="$leadSearch" :change="__('opportunities.create.change')" />
+                        <x-hq.picker id="opp-team" :label="__('opportunities.fields.team')" model="teamSearch" :options="$teamOptions" :selected="$teamSelected" :multiple="true"
+                                     choose="addMember" remove="removeMember" :placeholder="__('opportunities.create.team_hint')" :help="__('opportunities.create.team_help')"
+                                     :error="$errors->first('teamUserIds') ?: $errors->first('teamUserIds.*')" :empty="__('opportunities.create.no_staff')" :term="$teamSearch"
+                                     :removeLabel="__('opportunities.create.remove_member')" />
                         <fieldset class="field" style="border: 0; padding: 0; margin: 0">
                             <legend class="label" style="margin-bottom: 6px">{{ __('opportunities.fields.language') }}</legend>
                             <div class="opp-radios">
@@ -171,6 +172,25 @@
                             <dd>{{ trim($contact->first_name . ' ' . $contact->last_name) }}@if ($contact->job_title), {{ $contact->job_title }}@endif<br><a href="mailto:{{ $contact->email }}">{{ $contact->email }}</a></dd>
                         @endif
                     </dl>
+                </section>
+
+                <section class="card" aria-labelledby="opp-team-title">
+                    <h2 class="card-title" id="opp-team-title" style="margin-bottom: 12px">{{ __('opportunities.page.team') }}</h2>
+                    @if ($team->isNotEmpty())
+                        <ul class="opp-team">
+                            @foreach ($team as $member)
+                                <li wire:key="team-{{ $member->id }}">
+                                    <x-hq.avatar :user="$member" :size="32" />
+                                    <span class="opp-team-text">
+                                        <span class="opp-team-name">{{ trim($member->first_name . ' ' . $member->last_name) }}</span>
+                                        <span class="help">{{ $member->id === $o->lead_user_id ? __('opportunities.page.team_lead') : ($member->job_title ?: __('opportunities.page.team_member')) }}</span>
+                                    </span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="help" style="margin: 0">{{ __('opportunities.page.team_none') }}</p>
+                    @endif
                 </section>
 
                 <section class="card" aria-labelledby="opp-copq-title">

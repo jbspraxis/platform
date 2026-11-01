@@ -26,7 +26,7 @@ class TranscriptList extends Component
     public function mount(string $opportunityId): void
     {
         $opportunity = Opportunity::findOrFail($opportunityId);
-        abort_unless(OpportunityAccess::canView(Auth::user()), 403);
+        abort_unless(OpportunityAccess::canView(Auth::user(), $opportunity), 403);
         $this->opportunityId = $opportunity->id;
         $this->canReadTranscripts = OpportunityAccess::canReadTranscripts(Auth::user(), $opportunity);
     }

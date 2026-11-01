@@ -88,7 +88,7 @@ class EscrowGateway extends Component
 
             // 2. Activate Organization
             DB::table('organizations')->where('id', $this->organization->id)->update([
-                'status' => 'Active', 'pipeline_stage' => 'Won / Lost', 'updated_at' => now()
+                'status' => 'Active', 'pipeline_stage' => 'Won', 'updated_at' => now()
             ]);
 
             // 3. Auto-Spawn Project (15-A)
