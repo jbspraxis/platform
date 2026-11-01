@@ -97,9 +97,11 @@
                         @endforeach
                     </select>
                 @endif
-                <a class="btn btn-secondary" href="{{ route('hq.crm.sow-pdf', ['opportunity' => $o->id, 'sow' => $sow->id]) }}" target="_blank" rel="noopener">
-                    <i data-lucide="file-text"></i> {{ $sow->sent_at ? __('sow.bar.pdf') : __('sow.bar.preview') }}
-                </a>
+                @unless ($imported)
+                    <a class="btn btn-secondary" href="{{ route('hq.crm.sow-pdf', ['opportunity' => $o->id, 'sow' => $sow->id]) }}" target="_blank" rel="noopener">
+                        <i data-lucide="file-text"></i> {{ $sow->sent_at ? __('sow.bar.pdf') : __('sow.bar.preview') }}
+                    </a>
+                @endunless
             </div>
         </section>
 
@@ -123,7 +125,15 @@
             </div>
         @endif
 
-        @if ($sow->status === 'signed')
+        @if ($imported)
+            {{-- From opportunities:import (MyCity): signed on paper before the pipeline; no approved proposal, so no fees or PDF here --}}
+            <div class="alert alert-success" role="note"><i data-lucide="badge-check"></i>
+                <span>{{ __('sow.imported.signed', ['date' => $day($sow->signed_at)]) }}
+                    @if (filled($sow->signed_by_name)) {{ __('sow.imported.by', ['name' => $sow->signed_by_name]) }} @endif
+                    {{ __('sow.imported.where') }}
+                </span>
+            </div>
+        @elseif ($sow->status === 'signed')
             <div class="alert alert-success" role="note"><i data-lucide="badge-check"></i>
                 <span>{{ __('sow.client.signed', ['name' => $sow->signed_by_name, 'title' => $sow->signed_by_title, 'email' => $sow->signed_by_email, 'date' => $day($sow->signed_at)]) }}
                     @if ($depositInvoice) {{ __('sow.client.deposit', ['number' => $depositInvoice->invoice_number, 'amount' => $money($depositInvoice->total_amount, $depositInvoice->currency)]) }} @endif
@@ -151,7 +161,7 @@
             </div>
         @endif
 
-        @if ($sow->sent_at)
+        @if ($sow->sent_at && ! $imported)
             <section class="card" aria-labelledby="sw-sent-title">
                 <h2 class="card-title" id="sw-sent-title" style="margin-bottom: 12px">{{ __('proposals.send.sent_title') }}</h2>
                 <dl class="pp-dl">
@@ -400,7 +410,7 @@
         @elseif (! $drafting)
             {{-- As the client reads it --}}
             <section class="card" aria-labelledby="sw-read-title">
-                <h2 class="card-title" id="sw-read-title" style="overflow-wrap: anywhere">{{ $sow->title }}</h2>
+                <h2 class="card-title" id="sw-read-title" style="overflow-wrap: anywhere">{{ $sow->title ?: $sow->reference }}</h2>
                 @if ($sow->version > 1 && filled($sow->changes_summary))
                     <div class="pp-text" style="margin-top: 12px">
                         <strong>{{ __('sow.changes.label', ['n' => $sow->version - 1]) }}</strong>
@@ -416,14 +426,29 @@
                     </li>
                 @endforeach
             </ol>
-            <section class="card" aria-labelledby="sw-ms-read-title">
-                <h2 class="card-title" id="sw-ms-read-title">{{ __('sow.milestones.title') }}</h2>
-                @include('livewire.hq.opportunities.partials.sow-milestones-table', ['list' => $milestoneList])
-                @include('livewire.hq.opportunities.partials.sow-weight-sum', ['milestones' => $milestoneList])
-            </section>
-            @include('livewire.hq.opportunities.partials.sow-fees')
+            @unless ($imported && ! $milestoneList)
+                <section class="card" aria-labelledby="sw-ms-read-title">
+                    <h2 class="card-title" id="sw-ms-read-title">{{ __('sow.milestones.title') }}</h2>
+                    @include('livewire.hq.opportunities.partials.sow-milestones-table', ['list' => $milestoneList])
+                    @include('livewire.hq.opportunities.partials.sow-weight-sum', ['milestones' => $milestoneList])
+                </section>
+            @endunless
+            @unless ($imported)
+                @include('livewire.hq.opportunities.partials.sow-fees')
+            @endunless
 
-            @if ($sow->hq_signed_at || $sow->signed_at)
+            @if ($imported)
+                <section class="card" aria-labelledby="sw-sigs-title">
+                    <h2 class="card-title" id="sw-sigs-title" style="margin-bottom: 12px">{{ __('sow.signatures.title') }}</h2>
+                    <div class="pp-sigs">
+                        @foreach ([[$partyName, $sow->hq_signer_name], [$o->organization?->name, $sow->signed_by_name]] as [$party, $signer])
+                            @if (filled($signer))
+                                <div class="pp-sig"><span class="help">{{ __('sow.signatures.for', ['party' => $party]) }}</span><strong>{{ $signer }}</strong>{{ __('sow.imported.on_paper', ['date' => $day($sow->signed_at)]) }}</div>
+                            @endif
+                        @endforeach
+                    </div>
+                </section>
+            @elseif ($sow->hq_signed_at || $sow->signed_at)
                 <section class="card" aria-labelledby="sw-sigs-title">
                     <h2 class="card-title" id="sw-sigs-title" style="margin-bottom: 12px">{{ __('sow.signatures.title') }}</h2>
                     <div class="pp-sigs">

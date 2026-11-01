@@ -5,7 +5,7 @@
 // Typographie : U+202F avant ; ? ! % et dans « », U+00A0 avant :, apostrophe ’.
 return [
     'title' => 'Brouillon du projet',
-    'from' => "Issu de l’énoncé des travaux :ref, version :n · total du contrat :total",
+    'from' => "Issu de l’énoncé des travaux :ref, version :n · total du contrat :total HT",
     'lead' => "Responsable du projet\u{00A0}: :name (le responsable de l’opportunité)",
     'read_only' => "Vous pouvez lire ce brouillon. Le dirigeant ou le responsable de l’opportunité le modifie et crée le projet.",
     'later' => 'Plus tard',
@@ -96,7 +96,9 @@ return [
             'dates' => "Chaque jalon a besoin d’une date de début et d’une échéance, et doit finir après avoir commencé.",
             'weights' => "Le total des poids des jalons ne fait plus 100\u{202F}%.",
             'project' => "Le projet créé à la signature de l’énoncé des travaux est introuvable. Demandez à un administrateur.",
-            'lead' => "Le responsable de l’opportunité ne fait plus partie du personnel actif. Changez d’abord le responsable de l’opportunité.",
+            'lead' => "L’opportunité n’a pas de responsable, ou son responsable ne fait plus partie du personnel actif. Choisissez le responsable sur l’opportunité (Vue d’ensemble › Modifier les informations)\u{202F}; ce brouillon le reprend aussitôt.",
+            'plan_exists' => "Ce projet a déjà des jalons\u{202F}: un second plan s’y ajouterait. Complétez plutôt le plan depuis la page du projet.",
+            'stale' => "Le brouillon a changé depuis le chargement de cette page\u{202F}: rien n’a été créé. Le voici tel qu’il est maintenant. Vérifiez-le et cliquez de nouveau sur Créer le projet.",
         ],
     ],
 

@@ -95,7 +95,7 @@ return [
         'weeks_count' => ':count semaine|:count semaines',
         'weight' => 'Poids',
         'weight_input' => "Poids (%)",
-        'amount' => 'Montant',
+        'amount' => 'Montant HT',
         'deliverables' => 'Ce qu’il livre et comment il est réceptionné',
         'none' => 'Pas encore de jalons.',
         'add' => 'Ajouter un jalon',
@@ -105,7 +105,7 @@ return [
         'remove_confirm' => "Retirer ce jalon du brouillon\u{202F}?",
         'weight_total' => "Poids\u{00A0}: :total sur 100\u{202F}%",
         'weight_off' => "leur total doit faire 100\u{202F}%",
-        'amount_total' => "Montants\u{00A0}: :amount sur :total",
+        'amount_total' => "Montants\u{00A0}: :amount sur :total HT",
     ],
 
     'fees' => [
@@ -193,6 +193,14 @@ return [
         'clear' => 'Effacer',
     ],
 
+    // Un énoncé importé par opportunities:import (signé sur papier avant le pipeline, par exemple MyCity)
+    'imported' => [
+        'signed' => 'Signé sur papier le :date et importé dans HQ.',
+        'by' => "Pour le client\u{00A0}: :name.",
+        'where' => "Ses honoraires et conditions de paiement figurent dans le document signé et les factures du projet\u{202F}; HQ n’en produit pas de PDF.",
+        'on_paper' => 'Signé sur papier le :date',
+    ],
+
     'signatures' => [
         'title' => 'Signatures',
         'for' => 'Pour :party',
@@ -245,6 +253,8 @@ return [
         'signature_help' => 'Dessinez-la à la souris, au doigt ou au stylet.',
         'send_code' => 'M’envoyer le code',
         'code_intro' => "Nous avons envoyé un code à 6\u{202F}chiffres à :email. Il est valable 10\u{202F}minutes.",
+        'code_intro_reload' => "Nous avons envoyé un code à 6\u{202F}chiffres à l’adresse du signataire. Il est valable 10\u{202F}minutes. Vous signez pour une autre personne\u{202F}? Demandez un nouveau code avec vos propres coordonnées.",
+        'signing_as' => 'Vous signez en tant que :name, :title.',
         'sign_submit' => 'Signer l’énoncé des travaux',
         'new_code' => 'Demander un nouveau code',
         'changes' => 'Demander des modifications',

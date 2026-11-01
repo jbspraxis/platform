@@ -35,7 +35,10 @@ final class DepositInvoice
         $depositTotal = $depositSubtotal + $depositVat;
 
         $invoiceId = (string) Str::uuid();
-        $invNumber = 'INV-' . date('Ym') . '-' . random_int(1000, 9999);
+        // invoice_number is unique: draw again until the number is free (soft-deleted invoices keep theirs)
+        do {
+            $invNumber = 'INV-' . date('Ym') . '-' . random_int(1000, 9999);
+        } while (DB::table('invoices')->where('invoice_number', $invNumber)->exists());
 
         // Auto-FX lock
         $fxRate = 1.000000;

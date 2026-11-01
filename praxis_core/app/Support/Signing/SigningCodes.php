@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\RateLimiter;
  * a 6-digit code, emailed, valid 10 minutes. At most 3 codes every 15 minutes per document and per email address
  * (whichever device asks), and 5 wrong codes per document; the fifth also cancels the code, so it can't be guessed
  * after the wait. $kind names the document ('proposal' for legacy proposals, 'sow'); the email limit is shared,
- * since it protects one mailbox. Callers store the code on their row and turn the reasons into their own words.
+ * since it protects one mailbox. Callers store hash($code) on their row (an HMAC with the app key: never the code
+ * itself, so a database read can't sign) and turn the reasons into their own words.
  */
 final class SigningCodes
 {
@@ -43,6 +44,18 @@ final class SigningCodes
         return (string) random_int(100000, 999999);
     }
 
+    /** What the row keeps instead of the code: an HMAC-SHA256 with the app key */
+    public static function hash(string $code): string
+    {
+        return hash_hmac('sha256', trim($code), (string) config('app.key'));
+    }
+
+    /** The entered code matches the stored HMAC and hasn't expired */
+    public static function matches(?string $stored, $expiresAt, string $entered): bool
+    {
+        return $stored !== null && $stored !== '' && hash_equals($stored, self::hash($entered)) && $expiresAt && now()->lessThanOrEqualTo($expiresAt);
+    }
+
     /**
      * Counts a code about to be sent. Null when it may go; else [reason, minutes to wait], the reason being
      * too_many_codes (this document) or too_many_codes_email (this address).
@@ -65,7 +78,7 @@ final class SigningCodes
     }
 
     /**
-     * Checks an entered code against the one stored. Null when it is right (the wrong-code count is cleared); else
+     * Checks an entered code against the HMAC stored. Null when it is right (the wrong-code count is cleared); else
      * [reason, minutes to wait]: locked (too many wrong codes: wait), cancel (that was the fifth wrong code: the
      * caller clears the stored code) or wrong.
      *
@@ -77,7 +90,7 @@ final class SigningCodes
         if (RateLimiter::tooManyAttempts($key, self::MAX_WRONG_CODES)) {
             return ['locked', self::waitMinutes($key)];
         }
-        if (! $stored || ! hash_equals($stored, $entered) || ! $expiresAt || now()->greaterThan($expiresAt)) {
+        if (! self::matches($stored, $expiresAt, $entered)) {
             RateLimiter::hit($key, self::LOCK_SECONDS);
 
             return RateLimiter::tooManyAttempts($key, self::MAX_WRONG_CODES) ? ['cancel', self::waitMinutes($key)] : ['wrong', 0];

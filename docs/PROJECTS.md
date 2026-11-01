@@ -79,6 +79,16 @@ Nothing yet.
 - 1 Nov 2026: sprints folded into milestones (owner): decision 9; sections 1 to 4 updated to match.
 - 1 Nov 2026: main merged in (PR 6 #15 handovers, PR 4 #16 proposals): the board's handover card is per milestone, PR 6's board tests run on milestones, `config('app.staff_locale')` (PR 4) replaces PR 7's own `hq_locale`, and PR 6's strings say "milestone board".
 - 1 Nov 2026: the lead chat's audit of PR 7 fixed (client visibility, the 45-minute check on every page, bell language, stored milestone amounts, deleted milestones, acceptance, people who left); see "Audit fixes" below.
+- 1 Nov 2026 (owner, with PR 5): **"Less deposit, every milestone"**, below.
+- 1 Nov 2026 (the lead chat's audit of PR 5): *Plan milestones* no longer plans a project that has milestones, or whose plan waits in its project draft, until per-milestone planning (PR 5b).
+
+### Less deposit, every milestone (owner, 1 Nov 2026)
+
+- **The rule**: when a project's signed SOW raised a deposit invoice, each of the SOW's milestones is invoiced at **its amount × (1 − the deposit's share)**, so the deposit and the milestone invoices add up to exactly the contract. `project_phases.amount` stays the milestone's full share of the contract; only what is due changes. `App\Support\Projects\Deposit`.
+- **The deposit's share** = the deposit invoice's amount before VAT ÷ the contract before VAT as signed (the SOW's approved proposal's subtotal; for an imported SOW, the project's total less the change reports approved since). A cancelled deposit invoice counts as none. A milestone a **change report** added isn't reduced (the deposit never covered it). A project without a SOW deposit is unchanged. When the reduced milestones' amounts make the whole contract, the last one takes the rounding, so the total is exact to the cent.
+- **Where it shows**: Finance's *Create invoice*, opened from a milestone dragged to Invoiced, is pre-filled with the amount due and the line "M1 …, on written acceptance, less the 40% deposit"; the milestone drawer says "Its invoice: M1 · ₦444,000 less 13.51% deposit = ₦384,000, before VAT." Amounts are before VAT: Finance adds VAT per invoice. Invoices already issued never change.
+- **Before VAT**: a project made from a PR 5 SOW keeps its contract total (`projects.total_budget`) and its milestones' amounts **before VAT** (the approved proposal's subtotal), because Finance adds VAT to whatever it pre-fills. Legacy projects (made by `ProposalGateway`) still keep the total VAT included, so their pre-fill carries VAT that Finance taxes again: a follow-up for Finance to decide, not changed here.
+- **MyCity App ERP** (imported: deposit INV/…/2026-001 ₦500,000 before VAT on a ₦3,700,000 contract, so 13.51%): M1 was invoiced at ₦384,000 (₦444,000 less 13.51%) before this rule, so live already follows it. The pre-fills of the milestones not yet invoiced become: M2 ₦333,000 → ₦288,000; M3 ₦185,000 → ₦160,000; M4 ₦481,000 → ₦416,000; M5 ₦407,000 → ₦352,000; M6 ₦407,000 → ₦352,000; M7 ₦370,000 → ₦320,000; M8 ₦296,000 → ₦256,000; M9 ₦259,000 → ₦224,000; M10 ₦370,000 → ₦320,000; M11 ₦148,000 → ₦128,000 (M0 is 0%). Deposit ₦500,000 + M1–M11 due ₦3,200,000 = ₦3,700,000.
 
 ### PR 7 (1 Nov 2026): what was built, and what later PRs build on
 

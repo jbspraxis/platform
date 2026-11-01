@@ -477,7 +477,9 @@ class SowTab extends Component
             'polling' => $drafting,
             'legalName' => Sows::legalName(),
             'partyName' => $sow ? Sows::partyName($sow) : (Sows::legalName() ?? Sows::LEGAL_NAME_PLACEHOLDER),
-            'fees' => $sow ? SowPdf::fees($sow) : null,
+            // An imported SOW (opportunities:import, signed on paper) has no approved proposal: no fees or PDF from HQ
+            'imported' => $sow !== null && Sows::isImported($sow),
+            'fees' => $sow && ! Sows::isImported($sow) ? SowPdf::fees($sow) : null,
             'total' => $total,
             'currency' => (string) ($proposal?->currency ?? ''),
             'milestoneList' => $milestones,

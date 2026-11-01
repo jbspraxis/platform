@@ -13,6 +13,7 @@ use App\Support\Access;
 use App\Support\Ai\Ai;
 use App\Support\Finance\DepositInvoice;
 use App\Support\Portal\SignerOnboarding;
+use App\Support\Signing\SigningCodes;
 use App\Support\WebsiteSettings;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -350,7 +351,7 @@ final class Sows
                 'approved_at' => $at,
                 'hq_signer_name' => Str::limit(trim($signerName), 150, ''),
                 'hq_signature_b64' => $signature,
-                'hq_signature_hash' => 'SHA256-' . strtoupper(hash('sha256', $locked->id . self::contractTotal($locked) . trim($signerName) . $at)),
+                'hq_signature_hash' => 'SHA256-' . strtoupper(hash('sha256', $locked->id . self::contentHash($locked) . trim($signerName) . $at)),
                 'hq_ip_address' => $ip,
                 'hq_signed_at' => $at,
                 'provider_legal_name' => $legalName,
@@ -403,8 +404,9 @@ final class Sows
     /**
      * Sends an approved version: the branded email with the PDF and the portal link, in the opportunity's language,
      * to people chosen from Proposals::people(). As Proposals::send: claimed under the locks before any email, every
-     * address on recipients_unsent until its email goes, back to approved and unsent if nobody was reached, earlier
-     * versions with the client superseded. Returns the addresses it could not reach.
+     * address on recipients_unsent until its email goes. The earlier versions with the client are superseded in the
+     * same claim, so from that moment they can't be signed, whatever happens to the emails; if nobody is reached the
+     * version goes back to approved and unsent and they are restored. Returns the addresses it could not reach.
      *
      * @param  list<string>  $emails
      */
@@ -418,41 +420,73 @@ final class Sows
         $pdf = SowPdf::render($sow);
 
         return self::whileMailing($sow, function () use ($sow, $opportunity, $chosen, $pdf, $by) {
-            $claimed = DB::transaction(function () use ($sow, $chosen, $by) {
-                self::lockOpportunity($sow->opportunity_id);
-                $locked = StatementOfWork::whereKey($sow->id)->lockForUpdate()->first();
-                if (! $locked || $locked->status !== StatementOfWork::DRAFT || $locked->approved_at === null || $locked->sent_at !== null || self::signed($locked->opportunity_id)) {
-                    return false;
-                }
-                $locked->forceFill(['status' => StatementOfWork::SENT, 'sent_at' => now(), 'recipients' => $chosen, 'recipients_unsent' => array_column($chosen, 'email'),
-                    'updated_by' => $by->id])->save();
-
-                return true;
-            });
-            if (! $claimed) {
+            $replaced = self::claim($sow, $chosen, $by);
+            if ($replaced === null) {
                 throw new LogicException('Only an approved version that has not been sent can be sent');
             }
             $sow->refresh();
 
             $unsent = self::mail($sow, $chosen, $pdf);
             if (count($unsent) === count($chosen)) {
-                $sow->forceFill(['status' => StatementOfWork::DRAFT, 'sent_at' => null, 'recipients' => null, 'recipients_unsent' => null])->save();
+                DB::transaction(function () use ($sow, $replaced) {
+                    self::lockOpportunity($sow->opportunity_id);
+                    $sow->forceFill(['status' => StatementOfWork::DRAFT, 'sent_at' => null, 'recipients' => null, 'recipients_unsent' => null])->save();
+                    foreach ($replaced as $id => $status) {
+                        StatementOfWork::whereKey($id)->where('status', StatementOfWork::SUPERSEDED)->update(['status' => $status, 'updated_at' => now()]);
+                    }
+                });
 
                 return $unsent;
             }
             $sow->refresh();
-            StatementOfWork::where('opportunity_id', $opportunity->id)->where('version', '<', $sow->version)
-                ->whereIn('status', [StatementOfWork::SENT, StatementOfWork::CHANGES_REQUESTED])->update(['status' => StatementOfWork::SUPERSEDED, 'updated_at' => now()]);
-            $reached = count($chosen) - count($unsent);
-            OpportunityAccess::log('SOW_SENT', sprintf('Sent version %d of the statement of work to %d %s.', $sow->version, $reached, $reached === 1 ? 'person' : 'people'),
-                'opportunities', $opportunity->id, [], ['sow_id' => $sow->id, 'version' => $sow->version]);
-            self::moveStage($opportunity, ['proposal_approved', 'sow'], 'sow_sent');
+            self::afterSend($sow, $opportunity, count($chosen) - count($unsent));
 
             return $unsent;
         });
     }
 
-    /** The addresses a sent version didn't reach, again; under the mail lock */
+    /**
+     * The send's claim, under the locks: an approved, unsent draft becomes Sent with every chosen address on
+     * recipients_unsent, and the earlier versions with the client (sent, or with changes asked for) are superseded at
+     * once. Returns what it superseded ([id => previous status]), or null when the version can't be sent.
+     */
+    private static function claim(StatementOfWork $sow, array $chosen, User $by): ?array
+    {
+        return DB::transaction(function () use ($sow, $chosen, $by) {
+            self::lockOpportunity($sow->opportunity_id);
+            $locked = StatementOfWork::whereKey($sow->id)->lockForUpdate()->first();
+            if (! $locked || $locked->status !== StatementOfWork::DRAFT || $locked->approved_at === null || $locked->sent_at !== null || self::signed($locked->opportunity_id)) {
+                return null;
+            }
+            $replaced = StatementOfWork::where('opportunity_id', $locked->opportunity_id)->where('version', '<', $locked->version)
+                ->whereIn('status', [StatementOfWork::SENT, StatementOfWork::CHANGES_REQUESTED])->pluck('status', 'id')->all();
+            StatementOfWork::whereIn('id', array_keys($replaced))->update(['status' => StatementOfWork::SUPERSEDED, 'auth_otp' => null, 'otp_expires_at' => null, 'updated_at' => now()]);
+            $locked->forceFill(['status' => StatementOfWork::SENT, 'sent_at' => now(), 'recipients' => $chosen, 'recipients_unsent' => array_column($chosen, 'email'),
+                'updated_by' => $by->id])->save();
+
+            return $replaced;
+        });
+    }
+
+    /**
+     * What follows a version reaching the client: earlier versions superseded (already done by the claim; again here
+     * in case), the stage to SOW sent, and the history line once. Idempotent, so resend() finishes a send that was cut
+     * short after its claim (a PHP timeout mid-loop).
+     */
+    private static function afterSend(StatementOfWork $sow, Opportunity $opportunity, int $reached): void
+    {
+        StatementOfWork::where('opportunity_id', $opportunity->id)->where('version', '<', $sow->version)
+            ->whereIn('status', [StatementOfWork::SENT, StatementOfWork::CHANGES_REQUESTED])->update(['status' => StatementOfWork::SUPERSEDED, 'updated_at' => now()]);
+        self::moveStage($opportunity, ['proposal_approved', 'sow'], 'sow_sent');
+        $logged = DB::table('system_audit_logs')->where('target_table', 'opportunities')->where('target_id', $opportunity->id)->where('action', 'SOW_SENT')
+            ->where('new_values', 'like', '%' . $sow->id . '%')->exists();
+        OpportunityAccess::log('SOW_SENT', $logged
+            ? sprintf('Sent version %d of the statement of work again to %d %s it hadn’t reached.', $sow->version, $reached, $reached === 1 ? 'person' : 'people')
+            : sprintf('Sent version %d of the statement of work to %d %s.', $sow->version, $reached, $reached === 1 ? 'person' : 'people'),
+            'opportunities', $opportunity->id, [], ['sow_id' => $sow->id, 'version' => $sow->version]);
+    }
+
+    /** The addresses a sent version didn't reach, again; under the mail lock. It also finishes what a cut-short send skipped. */
     public static function resend(StatementOfWork $sow, User $by): array
     {
         return self::whileMailing($sow, function () use ($sow) {
@@ -465,8 +499,7 @@ final class Sows
             $sow->forceFill(['recipients_unsent' => array_column($recipients, 'email') ?: null])->save();
             $unsent = $recipients ? self::mail($sow, $recipients, SowPdf::render($sow)) : [];
             if (count($unsent) < count($recipients)) {
-                OpportunityAccess::log('SOW_SENT', "Sent version {$sow->version} of the statement of work again to the people it hadn’t reached.", 'opportunities', $sow->opportunity_id,
-                    [], ['sow_id' => $sow->id, 'version' => $sow->version]);
+                self::afterSend($sow->fresh(), $sow->opportunity, count($recipients) - count($unsent));
             }
 
             return $unsent;
@@ -528,7 +561,7 @@ final class Sows
         $done = DB::transaction(function () use ($sow, $person, $message) {
             self::lockOpportunity($sow->opportunity_id);
             $locked = StatementOfWork::whereKey($sow->id)->lockForUpdate()->first();
-            if (! $locked || $locked->status !== StatementOfWork::SENT || $locked->hasExpired() || self::signed($locked->opportunity_id)) {
+            if (! $locked || $locked->status !== StatementOfWork::SENT || $locked->hasExpired() || self::signed($locked->opportunity_id) || self::laterSent($locked)) {
                 return false;
             }
             $locked->forceFill([
@@ -557,22 +590,63 @@ final class Sows
         return true;
     }
 
-    /** The version can be signed now: sent, valid, countersigned by HQ, nothing signed yet, the work not lost */
+    /**
+     * The version can be signed now: sent, valid, countersigned by HQ, no later version sent, nothing of this work
+     * signed (no SOW, no legacy proposal) and the opportunity neither won nor lost
+     */
     public static function awaitsSignature(StatementOfWork $sow): bool
     {
+        $stage = Opportunity::whereKey($sow->opportunity_id)->value('stage');
+
         return $sow->status === StatementOfWork::SENT && ! $sow->hasExpired() && filled($sow->hq_signature_hash)
-            && $sow->opportunity?->stage !== 'lost' && ! self::signed($sow->opportunity_id);
+            && ! in_array($stage, Opportunity::CLOSED, true) && ! self::signed($sow->opportunity_id) && ! self::laterSent($sow)
+            && ! Proposal::where('opportunity_id', $sow->opportunity_id)->whereIn('status', ['Authorized', 'Converted'])->exists();
+    }
+
+    /** A later version of the same opportunity has gone to the client: this one is replaced, whatever its status says */
+    private static function laterSent(StatementOfWork $sow): bool
+    {
+        return StatementOfWork::where('opportunity_id', $sow->opportunity_id)->where('version', '>', $sow->version)->whereNotNull('sent_at')->exists();
+    }
+
+    /** An imported SOW (opportunities:import: signed on paper, no approved proposal in HQ): HQ shows it, never its fees or a PDF */
+    public static function isImported(StatementOfWork $sow): bool
+    {
+        return $sow->proposal_id === null;
     }
 
     /**
-     * The signer's details and drawn signature, kept with a new code (so a reload shows the code form). The caller
-     * has checked that they are an active contact of the organisation and claimed the code's send limits.
+     * A digest of what is signed: title, sections, milestones and the fees' figures. Both fingerprints (HQ's and the
+     * client's) include it, so a change to the text after signing shows.
+     */
+    public static function contentHash(StatementOfWork $sow): string
+    {
+        $proposal = $sow->proposal;
+
+        return hash('sha256', json_encode([
+            'title' => (string) $sow->title,
+            'sections' => array_values((array) $sow->sections),
+            'milestones' => self::cleanMilestones((array) $sow->milestones),
+            'fees' => [(string) $proposal?->currency, (string) $proposal?->subtotal, (string) $proposal?->vat_rate, (string) $proposal?->total_value, (string) $proposal?->payment_schedule_type,
+                (string) ($proposal?->custom_deposit_percent ?? ''), self::lineDigest($proposal)],
+        ], JSON_UNESCAPED_UNICODE));
+    }
+
+    private static function lineDigest(?Proposal $proposal): array
+    {
+        return $proposal ? Proposals::lines($proposal)->map(fn ($l) => [$l->description, $l->quantity, (string) $l->unit_price])->all() : [];
+    }
+
+    /**
+     * The signer's details and drawn signature, kept with a new code (so a reload shows the code form): the code only
+     * as its HMAC (SigningCodes::hash). A later request replaces them, and the code sent earlier then signs nothing.
+     * The caller has checked that they are an active contact of the organisation and claimed the code's send limits.
      */
     public static function holdSignature(StatementOfWork $sow, array $signer, string $signature, string $code): bool
     {
         return (bool) StatementOfWork::whereKey($sow->id)->where('status', StatementOfWork::SENT)->update([
-            'auth_otp' => $code,
-            'otp_expires_at' => now()->addMinutes(\App\Support\Signing\SigningCodes::MINUTES),
+            'auth_otp' => SigningCodes::hash($code),
+            'otp_expires_at' => now()->addMinutes(SigningCodes::MINUTES),
             'signed_by_name' => Str::limit(trim((string) $signer['name']), 150, ''),
             'signed_by_title' => Str::limit(trim((string) $signer['title']), 150, ''),
             'signed_by_email' => mb_strtolower(trim((string) $signer['email'])),
@@ -582,20 +656,24 @@ final class Sows
     }
 
     /**
-     * The client signs (the code was right). In one transaction, claimed under the locks so it happens once: the
-     * version is signed (fingerprint, IP, time) and every other open version superseded; the organisation becomes an
-     * Active Client; the project is created (Scoping, led by the opportunity's lead: it holds the deposit invoice, and
-     * Create project writes its plan later); the deposit invoice is raised from the approved proposal's price and
+     * The client signs with the code. In one transaction, claimed under the locks so it happens once, and only if
+     * $code is the one issued with the signature now held (its HMAC, not expired) and that signer is still an active
+     * contact: the version is signed (a fingerprint over the signed text, the signer, the IP and the time) and every
+     * other open version superseded; the organisation becomes an Active Client; the project is created (Scoping, led
+     * by the opportunity's lead: it holds the deposit invoice, and Create project writes its plan later) with the
+     * approved proposal's lines as its budget; the deposit invoice is raised from the approved proposal's price and
      * schedule; the opportunity is Won. Then the signer gets portal access, HQ is told, SowSigned fires and the
-     * project draft is queued. False when the version can no longer be signed.
+     * project draft is queued. False when the version can no longer be signed or the code doesn't match.
      */
-    public static function sign(StatementOfWork $sow, ?string $ip): bool
+    public static function sign(StatementOfWork $sow, string $code, ?string $ip): bool
     {
         $timestamp = now();
-        $result = DB::transaction(function () use ($sow, $ip, $timestamp) {
+        $result = DB::transaction(function () use ($sow, $code, $ip, $timestamp) {
             self::lockOpportunity($sow->opportunity_id);
             $locked = StatementOfWork::whereKey($sow->id)->lockForUpdate()->first();
-            if (! $locked || ! self::awaitsSignature($locked) || ! $locked->signed_by_email) {
+            if (! $locked || ! self::awaitsSignature($locked) || ! $locked->signed_by_email
+                || ! SigningCodes::matches($locked->auth_otp, $locked->otp_expires_at, $code)
+                || ! Proposals::isActiveContact($locked->opportunity, (string) $locked->signed_by_email)) {
                 return null;
             }
             $opportunity = Opportunity::with('organization')->find($locked->opportunity_id);
@@ -607,7 +685,7 @@ final class Sows
 
             $locked->forceFill([
                 'status' => StatementOfWork::SIGNED,
-                'client_signature_hash' => 'SHA256-CLIENT-' . strtoupper(hash('sha256', $locked->id . $locked->signed_by_name . $ip . $timestamp)),
+                'client_signature_hash' => 'SHA256-CLIENT-' . strtoupper(hash('sha256', $locked->id . self::contentHash($locked) . $locked->signed_by_name . $locked->signed_by_email . $ip . $timestamp)),
                 'client_ip_address' => $ip,
                 'signed_at' => $timestamp,
                 'auth_otp' => null,
@@ -628,17 +706,25 @@ final class Sows
                 'description' => "Created from signed statement of work {$locked->reference}.",
                 'status' => 'Scoping',
                 'currency' => $proposal->currency,
-                'total_budget' => $proposal->total_value,
+                'total_budget' => self::contractTotal($locked), // before VAT: Finance adds VAT per invoice
                 'lead_user_id' => $opportunity->lead_user_id ?: $locked->approved_by,
                 'created_by' => $locked->approved_by,
                 'created_at' => $timestamp,
                 'updated_at' => $timestamp,
             ]);
+            // The approved proposal's lines become the project's budget, as the legacy gateway does (Finance › Project budgets)
+            foreach (Proposals::lines($proposal) as $line) {
+                DB::table('project_budgets')->insert([
+                    'id' => (string) Str::uuid(), 'project_id' => $projectId, 'description' => $line->description, 'quantity' => $line->quantity,
+                    'unit_price' => $line->unit_price, 'total_allocated' => $line->total_price, 'created_at' => $timestamp,
+                ]);
+            }
             $invoice = DepositInvoice::raise($projectId, $organization, [
                 'subtotal' => $proposal->subtotal,
                 'vat_rate' => $proposal->vat_rate,
                 'currency' => $proposal->currency,
                 'payment_schedule_type' => $proposal->payment_schedule_type,
+                'custom_deposit_percent' => $proposal->custom_deposit_percent ?? null,
                 'title' => $locked->title ?: $proposal->title,
                 'reference' => $locked->reference,
             ], $locked->approved_by, $timestamp);
@@ -665,10 +751,14 @@ final class Sows
         return true;
     }
 
-    /** The price of the contract: the approved proposal's total, VAT included (projects.total_budget, as the legacy gateway) */
+    /**
+     * The contract's price before VAT: the approved proposal's subtotal. It is the project's total_budget and what the
+     * milestones' amounts share out, because Finance adds VAT on each invoice it raises from a milestone (a total with
+     * VAT in it would be taxed twice); the deposit invoice adds its own VAT too.
+     */
     public static function contractTotal(StatementOfWork $sow): float
     {
-        return (float) ($sow->proposal?->total_value ?? 0);
+        return (float) ($sow->proposal?->subtotal ?? 0);
     }
 
     /** Each milestone's amount: weight × total, the rounding on the last one with a weight so they add up to the total exactly */

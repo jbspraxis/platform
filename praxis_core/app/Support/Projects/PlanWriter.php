@@ -18,11 +18,12 @@ final class PlanWriter
     /**
      * $milestones: [{title, goal, description, weight_percentage, amount (null: weight × total), start_date, due_date,
      * tasks: [{title, description, assigned_to, estimated_hours, due_date}]}]; optional keys may be left out.
-     * Returns the new milestones' ids, in order.
+     * Returns the new milestones' ids, in order. $notify false: no bell per task (the caller rings each person once,
+     * tellLeads()).
      *
      * @return list<string>
      */
-    public static function write(string $projectId, array $milestones): array
+    public static function write(string $projectId, array $milestones, bool $notify = true): array
     {
         $number = Milestones::nextNumber($projectId);
         $ids = [];
@@ -51,7 +52,7 @@ final class PlanWriter
                     'assigned_to' => $task['assigned_to'] ?? null,
                     'estimated_hours' => isset($task['estimated_hours']) && $task['estimated_hours'] !== '' ? (float) $task['estimated_hours'] : null,
                     'due_date' => $task['due_date'] ?? null,
-                ], fn ($v) => $v !== null));
+                ], fn ($v) => $v !== null), $notify);
             }
         }
 
@@ -71,12 +72,34 @@ final class PlanWriter
             'created_at' => now(),
         ]);
 
+        // In each person's language (Tasks::localeFor), not the screen language of whoever saved the plan
         foreach (Access::staffWith('projects.edit') as $memberId) {
+            $locale = Tasks::localeFor($memberId);
             DB::table('notifications')->insert([
                 'id' => (string) Str::uuid(), 'user_id' => $memberId,
-                'title' => 'Project plan ready',
-                'message' => "The milestones for ‘{$projectTitle}’ are saved. Tasks can now be assigned on their boards.",
+                'title' => __('projects.bell.plan_title', [], $locale),
+                'message' => __('projects.bell.plan', ['project' => $projectTitle], $locale),
                 'link_url' => route('hq.ops.project', ['project' => $projectId, 'tab' => 'milestones']),
+                'type' => 'Project', 'created_at' => now(),
+            ]);
+        }
+    }
+
+    /**
+     * One bell per person for the tasks of a new plan they lead ($leadIds: one entry per task, nulls ignored), opening
+     * the project's backlog filtered to them; never the person who saved the plan
+     */
+    public static function tellLeads(string $projectId, string $projectTitle, array $leadIds): void
+    {
+        $counts = array_count_values(array_filter($leadIds, fn ($id) => is_string($id) && $id !== '' && $id !== Auth::id()));
+        $active = DB::table('users')->whereIn('id', array_keys($counts))->where('status', 'Active')->whereNull('deleted_at')->pluck('id');
+        foreach ($active as $userId) {
+            $locale = Tasks::localeFor($userId);
+            DB::table('notifications')->insert([
+                'id' => (string) Str::uuid(), 'user_id' => $userId,
+                'title' => __('projects.bell.tasks_title', [], $locale),
+                'message' => trans_choice('projects.bell.tasks', $counts[$userId], ['count' => $counts[$userId], 'project' => $projectTitle], $locale),
+                'link_url' => route('hq.ops.project', ['project' => $projectId, 'tab' => 'backlog', 'lead' => $userId]),
                 'type' => 'Project', 'created_at' => now(),
             ]);
         }

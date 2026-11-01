@@ -35,6 +35,18 @@ class ScrumMaster extends Component
     public $generatedBacklog = []; // Holds the AI JSON before commit: [{milestone_title, goal, tasks: [{title, description}]}]
     public $isGenerating = false;
 
+    /**
+     * Why the assistant won't plan this project (the lead's audit of PR 5, until per-milestone planning, PR 5b):
+     * has_plan (it has milestones: a second whole plan would stack on them, client-visible tasks and all), or
+     * draft_pending (its plan is in the project draft from its signed SOW). '' when it may.
+     */
+    #[Locked]
+    public string $blocked = '';
+
+    /** The opportunity holding the pending project draft, for the link */
+    #[Locked]
+    public ?string $draftOpportunityId = null;
+
     public function mount($id)
     {
         // Strict Access Control: this screen only builds plans (milestones and their tasks), so projects.create
@@ -47,7 +59,22 @@ class ScrumMaster extends Component
 
         if (!$this->project) abort(404);
 
+        $this->blocked = $this->whyBlocked();
         $this->extractProposalContext();
+    }
+
+    private function whyBlocked(): string
+    {
+        $draft = DB::table('project_drafts')->join('statements_of_work', 'statements_of_work.id', '=', 'project_drafts.sow_id')
+            ->where('statements_of_work.project_id', $this->projectId)->where('project_drafts.status', '!=', 'created')->whereNull('project_drafts.deleted_at')
+            ->first(['project_drafts.opportunity_id']);
+        $this->draftOpportunityId = $draft?->opportunity_id;
+
+        return match (true) {
+            $draft !== null => 'draft_pending',
+            DB::table('project_phases')->where('project_id', $this->projectId)->whereNull('deleted_at')->exists() => 'has_plan',
+            default => '',
+        };
     }
 
     private function extractProposalContext()
@@ -89,6 +116,10 @@ class ScrumMaster extends Component
     public function generateScrumBacklog()
     {
         abort_unless(Auth::user()->can('projects.create'), 403);
+        // Checked again on each request: a plan may have been created since the page opened
+        if ($this->blocked = $this->whyBlocked()) {
+            return;
+        }
 
         $this->validate([
             'sowContext' => 'required|string|min:50'
@@ -170,6 +201,11 @@ class ScrumMaster extends Component
     public function commitBacklogToDatabase()
     {
         abort_unless(Auth::user()->can('projects.create'), 403);
+        if ($this->blocked = $this->whyBlocked()) {
+            $this->generatedBacklog = [];
+
+            return;
+        }
 
         if (empty($this->generatedBacklog)) {
             session()->flash('error', 'There is no draft to save. Draft the plan first.');

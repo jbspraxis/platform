@@ -19,6 +19,7 @@ return [
     'handover_generic_preheader' => 'Utilisez-le pour valider la livraison de votre projet.',
     'handover_generic_intro' => 'Utilisez ce code pour valider la livraison de votre projet.',
     'handover_next' => 'Saisissez-le sur la page de validation, puis apposez votre signature.',
+    'signer' => "Ce code signe au nom de :signer. Si ce n’est pas vous ou votre fonction, demandez un nouveau code avec vos propres coordonnées.",
     'not_expected' => "Si vous n’avez pas demandé ce code, vous pouvez ignorer cet e-mail\u{00A0}: rien n’est signé sans lui.",
     'reason' => 'Vous recevez ce message parce qu’un code de signature a été demandé pour cette adresse e-mail sur le portail client JBS Praxis.',
 ];

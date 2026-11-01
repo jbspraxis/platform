@@ -21,6 +21,14 @@ return [
     'no' => "Non",
     'history_system' => "HQ",
     'invoice_line' => ":milestone, sur acceptation écrite",
+    'invoice_line_less' => ":milestone, sur acceptation écrite, déduction faite de l’acompte de :percent",
+
+    'planner' => [
+        'has_plan' => "Ce projet a déjà ses jalons\u{202F}: l’assistant ne le planifie pas une seconde fois. La planification à l’intérieur d’un jalon arrive bientôt\u{202F}; en attendant, ajoutez les tâches sur le tableau du jalon.",
+        'draft_pending' => "Le plan de ce projet se trouve dans le brouillon du projet issu de l’énoncé des travaux signé. Relisez-le et cliquez sur Créer le projet.",
+        'open_draft' => "Ouvrir le brouillon du projet",
+        'open_board' => "Ouvrir le tableau du jalon",
+    ],
 
     'formats' => [
         'date' => "j F Y",
@@ -352,6 +360,7 @@ return [
         'invoice_total' => "Total",
         'no_invoice' => "Pas encore facturé.",
         'invoice_amount' => "Sa part du contrat est de :amount.",
+        'invoice_less' => "Sa facture\u{00A0}: :code · :amount moins l’acompte de :percent = :due, hors TVA.",
         'tasks' => "Tâches (:count)",
         'delete_title' => "Supprimer",
         'delete' => "Supprimer :code",
@@ -463,6 +472,10 @@ return [
         'lead' => "Vous êtes maintenant responsable de « :task ».",
         'review_title' => "Tâche prête pour la revue client",
         'review' => "« :task » attend la revue du client. Sans réponse du client sous 5\u{00A0}heures, elle est approuvée automatiquement.",
+        'plan_title' => "Plan du projet prêt",
+        'plan' => "Les jalons de « :project » sont enregistrés. Les tâches peuvent maintenant être attribuées sur leurs tableaux.",
+        'tasks_title' => "Vous êtes responsable de tâches d’un nouveau plan",
+        'tasks' => "Vous êtes responsable de :count tâche sur « :project ».|Vous êtes responsable de :count tâches sur « :project ».",
     ],
 
     'errors' => [

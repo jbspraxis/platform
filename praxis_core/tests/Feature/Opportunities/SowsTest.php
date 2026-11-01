@@ -86,11 +86,14 @@ class SowsTest extends TestCase
         Mail::fake();
     }
 
-    /** An opportunity led by $lead whose client approved version 1 of the proposal (USD 1,000 + 7.5% VAT, 40/30/30) */
-    private function approvedOpportunity(User $lead): Opportunity
+    /**
+     * An opportunity led by $lead whose client approved version 1 of the proposal (USD 1,000 + 7.5% VAT, 40/30/30). A
+     * second one in the same test needs its own contact address ($email).
+     */
+    private function approvedOpportunity(User $lead, string $email = 'ngozi@kilo.test'): Opportunity
     {
         $org = $this->organisation(['name' => 'Kilo Pharma', 'country' => 'Nigeria']);
-        $this->clientContact($org, ['first_name' => 'Ngozi', 'last_name' => 'Eze', 'email' => 'ngozi@kilo.test']);
+        $this->clientContact($org, ['first_name' => 'Ngozi', 'last_name' => 'Eze', 'email' => $email]);
         $o = $this->opportunityFor($org, ['title' => 'Month-end close', 'lead_user_id' => $lead->id, 'stage' => 'proposal']);
         $meeting = Meeting::create(['opportunity_id' => $o->id, 'organization_id' => $org, 'kind' => 'client', 'title' => 'Discovery',
             'starts_at' => '2026-10-05 09:00:00', 'ends_at' => '2026-10-05 10:00:00', 'status' => 'held', 'transcript_status' => 'ready']);
@@ -103,8 +106,8 @@ class SowsTest extends TestCase
         Proposals::save($p, ['title' => 'A faster close', 'sections' => [['key' => 'executive_summary', 'title' => 'Summary', 'body' => 'We recommend it.']],
             'lines' => [['code' => '#1292P', 'description' => 'Diagnostic & Audit', 'quantity' => '1 Phase', 'unit_price' => 1000]]], $lead);
         $this->assertNull(Proposals::approve($p, $lead));
-        Proposals::send($p->fresh(), ['ngozi@kilo.test'], $lead);
-        $this->assertTrue(Proposals::approveForClient($p->fresh(), ['name' => 'Ngozi Eze', 'email' => 'ngozi@kilo.test'], 'CFO'));
+        Proposals::send($p->fresh(), [$email], $lead);
+        $this->assertTrue(Proposals::approveForClient($p->fresh(), ['name' => 'Ngozi Eze', 'email' => $email], 'CFO'));
 
         return $o->fresh();
     }
@@ -121,15 +124,16 @@ class SowsTest extends TestCase
         return $sow->fresh();
     }
 
-    /** Sent to Ngozi, then signed by her in the portal with the code */
+    /** Sent to Ngozi (the organisation's contact), then signed by her in the portal with the code */
     private function signedSow(Opportunity $o, User $lead): StatementOfWork
     {
+        $email = DB::table('client_users')->where('organization_id', $o->organization_id)->where('first_name', 'Ngozi')->value('email');
         $sow = $this->approvedSow($o, $lead);
-        $this->assertSame([], Sows::send($sow, ['ngozi@kilo.test'], $lead));
+        $this->assertSame([], Sows::send($sow, [$email], $lead));
         $page = Livewire::test(SowReview::class, ['sow' => $sow->id])->call('choose', 'sign')
-            ->set('name', 'Ngozi Eze')->set('email', 'ngozi@kilo.test')->set('jobTitle', 'CFO')->set('signature', self::PNG)
+            ->set('name', 'Ngozi Eze')->set('email', $email)->set('jobTitle', 'CFO')->set('signature', self::PNG)
             ->call('requestCode')->assertHasNoErrors()->assertSet('step', 'code');
-        $page->set('code', (string) StatementOfWork::find($sow->id)->auth_otp)->call('verify')->assertHasNoErrors()->assertSet('done', 'signed');
+        $page->set('code', Mail::sent(SigningCode::class)->last()->code)->call('verify')->assertHasNoErrors()->assertSet('done', 'signed');
 
         return $sow->fresh();
     }
@@ -145,7 +149,7 @@ class SowsTest extends TestCase
             ->assertSee('Write the statement of work')->assertSee('which Ngozi Eze approved')
             ->set('instructions', 'Two milestones only.')->call('start', true)
             ->assertDispatched('sow-changed')->assertSet('title', 'A faster month-end close')
-            ->assertSee('Weights: 100% of 100%')->assertSee("Amounts: USD\u{00A0}1,075.00 of USD\u{00A0}1,075.00");
+            ->assertSee('Weights: 100% of 100%')->assertSee("Amounts: USD\u{00A0}1,000.00 of USD\u{00A0}1,000.00, before VAT");
 
         $sow = StatementOfWork::where('opportunity_id', $o->id)->sole();
         $this->assertSame([1, 'draft', 'Client Approved'], [$sow->version, $sow->status, $sow->proposal->status]);
@@ -272,7 +276,7 @@ class SowsTest extends TestCase
             ->set('name', 'Ngozi Eze')->set('email', 'ngozi@kilo.test')->set('jobTitle', 'CFO')->set('signature', self::PNG)
             ->call('requestCode')->assertHasNoErrors()->assertSet('step', 'code');
         Mail::assertSent(SigningCode::class, fn (SigningCode $m) => $m->hasTo('ngozi@kilo.test') && $m->purpose === SigningCode::SOW);
-        $code = (string) StatementOfWork::find($sow->id)->auth_otp;
+        $code = Mail::sent(SigningCode::class)->last()->code;
         $page->set('code', $code === '000000' ? '111111' : '000000')->call('verify')->assertHasErrors('code');
         $page->set('code', $code)->call('verify')->assertHasNoErrors()->assertSet('done', 'signed')->assertSee('the statement of work is signed');
 
@@ -282,7 +286,7 @@ class SowsTest extends TestCase
 
         // The project made to hold the deposit: Scoping, led by the opportunity's lead, no plan yet
         $project = DB::table('projects')->where('id', $sow->project_id)->first();
-        $this->assertSame(['Scoping', $lead->id, $o->id, '1075.00', 'USD'], [$project->status, $project->lead_user_id, $project->opportunity_id, $project->total_budget, $project->currency]);
+        $this->assertSame(['Scoping', $lead->id, $o->id, '1000.00', 'USD'], [$project->status, $project->lead_user_id, $project->opportunity_id, $project->total_budget, $project->currency]);
         $this->assertSame(0, DB::table('project_phases')->where('project_id', $project->id)->count());
         // Deposit: 40% of 1,000 + 7.5% VAT
         $invoice = DB::table('invoices')->where('id', $sow->deposit_invoice_id)->first();
@@ -300,7 +304,7 @@ class SowsTest extends TestCase
         $p = $draft->payload;
         $this->assertSame('ready', $draft->status);
         $this->assertSame('2026-11-06', $p['project']['start_date']);
-        $this->assertSame([['Diagnostic', 40.0, 430.0, '2026-11-06', '2026-11-19', 2], ['Build', 60.0, 645.0, '2026-11-20', '2026-12-10', 1]],
+        $this->assertSame([['Diagnostic', 40.0, 400.0, '2026-11-06', '2026-11-19', 2], ['Build', 60.0, 600.0, '2026-11-20', '2026-12-10', 1]],
             array_map(fn ($m) => [$m['title'], (float) $m['weight'], (float) $m['amount'], $m['start_date'], $m['due_date'], count($m['tasks'])], $p['milestones']));
         $this->assertSame(['analyst', 'consultant'], array_column($p['roles'], 'key'));
         $ai->assertRan('project_draft', fn (AiRequest $r) => str_contains($r->prompt, '1. Diagnostic (2 weeks') && str_contains(implode("\n", $r->system), 'STATEMENT OF WORK'));
@@ -308,7 +312,7 @@ class SowsTest extends TestCase
         $this->assertTrue(DB::table('notifications')->where('user_id', $lead->id)->where('title', 'Statement of work signed: Month-end close')->exists());
 
         // Signed once: the code can't sign again
-        $this->assertFalse(Sows::sign($sow->fresh(), '203.0.113.9'));
+        $this->assertFalse(Sows::sign($sow->fresh(), $code, '203.0.113.9'));
         $this->assertSame(1, DB::table('invoices')->where('po_sow_reference', $sow->reference)->count());
     }
 
@@ -330,7 +334,7 @@ class SowsTest extends TestCase
 
         // Five wrong codes cancel the code
         $page = Livewire::test(SowReview::class, ['sow' => $sow->id])->assertSet('step', 'code');
-        $code = (string) StatementOfWork::find($sow->id)->auth_otp;
+        $code = Mail::sent(SigningCode::class)->last()->code;
         for ($i = 0; $i < SigningCodes::MAX_WRONG_CODES; $i++) {
             $page->set('code', $code === '000000' ? '111111' : '000000')->call('verify');
         }
@@ -388,7 +392,7 @@ class SowsTest extends TestCase
     {
         Event::fake([ProjectCreatedFromOpportunity::class]);
         $lead = $this->staff('lead', ['sales']);
-        $analyst = $this->staff('analyst', ['sales']);
+        $analyst = $this->staff('analyst', ['delivery']); // on the project's team (projects.edit)
         $member = $this->staff('member', ['sales']);
         $this->actingAs($lead);
         $o = $this->approvedOpportunity($lead);
@@ -413,7 +417,7 @@ class SowsTest extends TestCase
             ->call('moveTask', 0, 1, 1)
             ->call('addMilestone');
         $p = ProjectDraft::where('sow_id', $sow->id)->sole()->payload;
-        $this->assertSame([['2026-11-09', '2026-11-22', 40.0, 430.0], ['2026-11-23', '2026-12-13', 60.0, 645.0], ['2026-12-14', '2026-12-27', 0.0, 0.0]],
+        $this->assertSame([['2026-11-09', '2026-11-22', 40.0, 400.0], ['2026-11-23', '2026-12-13', 60.0, 600.0], ['2026-12-14', '2026-12-27', 0.0, 0.0]],
             array_map(fn ($m) => [$m['start_date'], $m['due_date'], (float) $m['weight'], (float) $m['amount']], $p['milestones']));
         $this->assertSame(['Interview the finance team'], array_column($p['milestones'][0]['tasks'], 'title'));
         $this->assertSame(['Configure the ledger', 'Train the team', 'Map the month-end close'], array_column($p['milestones'][1]['tasks'], 'title'));
@@ -427,7 +431,7 @@ class SowsTest extends TestCase
         $project = DB::table('projects')->where('id', $sow->project_id)->first();
         $this->assertSame(['Active', $lead->id, '2026-11-09', '2026-12-27'], [$project->status, $project->lead_user_id, $project->start_date, $project->target_end_date]);
         $phases = DB::table('project_phases')->where('project_id', $project->id)->orderBy('phase_number')->get();
-        $this->assertSame([[1, 'Diagnostic', '40.00', '430.00', '2026-11-09', '2026-11-22', 'An agreed map of the close'], [2, 'Build', '60.00', '645.00', '2026-11-23', '2026-12-13', 'The new close, run once'],
+        $this->assertSame([[1, 'Diagnostic', '40.00', '400.00', '2026-11-09', '2026-11-22', 'An agreed map of the close'], [2, 'Build', '60.00', '600.00', '2026-11-23', '2026-12-13', 'The new close, run once'],
             [3, 'Later', '0.00', '0.00', '2026-12-14', '2026-12-27', null]],
             $phases->map(fn ($m) => [$m->phase_number, $m->title, $m->weight_percentage, $m->amount, $m->start_date, $m->due_date, $m->goal])->all());
         $this->assertSame((float) $project->total_budget, round($phases->sum(fn ($m) => (float) $m->amount), 2), 'Amounts add up to the contract total');
@@ -490,12 +494,313 @@ class SowsTest extends TestCase
 
     public function test_english_and_french_have_the_same_strings(): void
     {
-        foreach (['sow', 'project_draft', 'emails/sow', 'emails/signing'] as $file) {
+        foreach (['sow', 'project_draft', 'emails/sow', 'emails/signing', 'projects'] as $file) {
             $en = array_keys(Arr::dot(require lang_path("en/{$file}.php")));
             $fr = array_keys(Arr::dot(require lang_path("fr/{$file}.php")));
             sort($en);
             sort($fr);
             $this->assertSame($en, $fr, $file);
         }
+    }
+
+    // ---- The lead chat's audit of #19 (1 Nov 2026) ----
+
+    /** Version 2 approved from version 1, which the client asked to change */
+    private function secondVersion(Opportunity $o, User $lead, StatementOfWork $v1): StatementOfWork
+    {
+        StatementOfWork::whereKey($v1->id)->update(['status' => StatementOfWork::CHANGES_REQUESTED]);
+        $v2 = Sows::newVersion($o, $lead);
+        Sows::save($v2, ['title' => 'A faster close', 'sections' => $v1->sections, 'milestones' => $v1->milestones, 'changes_summary' => 'Shorter build.'], $lead);
+        $this->assertNull(Sows::approve($v2, $lead, 'Lead Test', self::PNG, null));
+
+        return $v2->fresh();
+    }
+
+    public function test_once_a_later_version_is_claimed_as_sent_the_earlier_one_signs_nothing_even_if_the_send_is_cut_short(): void
+    {
+        $lead = $this->staff('lead', ['sales']);
+        $this->actingAs($lead);
+        $o = $this->approvedOpportunity($lead);
+        $v1 = $this->approvedSow($o, $lead);
+        Sows::send($v1, ['ngozi@kilo.test'], $lead);
+        // Ngozi has a code for version 1 while HQ prepares version 2
+        Livewire::test(SowReview::class, ['sow' => $v1->id])->call('choose', 'sign')->set('name', 'Ngozi Eze')->set('email', 'ngozi@kilo.test')
+            ->set('jobTitle', 'CFO')->set('signature', self::PNG)->call('requestCode')->assertHasNoErrors();
+        $code = Mail::sent(SigningCode::class)->last()->code;
+        // HQ starts version 2 from the one with the client, and approves it
+        $v2 = Sows::newVersion($o, $lead);
+        Sows::save($v2, ['title' => 'A faster close', 'sections' => $v1->sections, 'milestones' => $v1->milestones, 'changes_summary' => 'Shorter build.'], $lead);
+        $this->assertNull(Sows::approve($v2, $lead, 'Lead Test', self::PNG, null));
+        DB::table('opportunities')->where('id', $o->id)->update(['stage' => 'sow']); // as if the client had asked for changes meanwhile
+
+        // The request dies right after the claim (a PHP timeout before any email)
+        $claim = new \ReflectionMethod(Sows::class, 'claim');
+        $this->assertSame([$v1->id => StatementOfWork::SENT], $claim->invoke(null, $v2->fresh(), [['email' => 'ngozi@kilo.test', 'name' => 'Ngozi Eze', 'client_user_id' => null]], $lead));
+        $this->assertSame([StatementOfWork::SUPERSEDED, null], [$v1->fresh()->status, $v1->fresh()->auth_otp]);
+        $this->assertFalse(Sows::awaitsSignature($v1->fresh()));
+        $this->assertFalse(Sows::sign($v1->fresh(), $code, '203.0.113.9'));
+        $this->assertFalse(Sows::requestChanges($v1->fresh(), ['name' => 'Ngozi Eze', 'email' => 'ngozi@kilo.test'], 'x'));
+        $this->assertSame('sow', $o->fresh()->stage, 'The stage moves only once an email has gone');
+        $this->assertSame(0, DB::table('system_audit_logs')->where('action', 'SOW_SENT')->where('new_values', 'like', '%' . $v2->id . '%')->count());
+
+        // "Send again to them" finishes the send: the email, the stage and the history line
+        $this->assertSame([], Sows::resend($v2->fresh(), $lead));
+        Mail::assertSent(SowMail::class, fn (SowMail $m) => $m->sow->id === $v2->id);
+        $this->assertSame('sow_sent', $o->fresh()->stage);
+        $this->assertSame(1, DB::table('system_audit_logs')->where('action', 'SOW_SENT')->where('new_values', 'like', '%' . $v2->id . '%')->count());
+
+        // A send that reaches nobody gives the earlier version back
+        $o3 = $this->approvedOpportunity($lead, 'ngozi3@kilo.test');
+        $w1 = $this->approvedSow($o3, $lead);
+        Sows::send($w1, ['ngozi3@kilo.test'], $lead);
+        $w2 = $this->secondVersion($o3, $lead, $w1);
+        StatementOfWork::whereKey($w1->id)->update(['status' => StatementOfWork::SENT]);
+        Mail::shouldReceive('to')->andThrow(new \RuntimeException('SMTP down'));
+        $this->assertSame(['ngozi3@kilo.test'], Sows::send($w2, ['ngozi3@kilo.test'], $lead));
+        $this->assertSame([StatementOfWork::SENT, StatementOfWork::DRAFT], [$w1->fresh()->status, $w2->fresh()->status]);
+    }
+
+    public function test_the_code_is_stored_as_an_hmac_and_signs_only_for_the_signer_it_was_issued_for(): void
+    {
+        $lead = $this->staff('lead', ['sales']);
+        $this->actingAs($lead);
+        $o = $this->approvedOpportunity($lead);
+        $this->clientContact($o->organization_id, ['first_name' => 'Tunde', 'last_name' => 'Bello', 'email' => 'tunde@kilo.test', 'is_primary_client' => 0]);
+        $sow = $this->approvedSow($o, $lead);
+        Sows::send($sow, ['ngozi@kilo.test'], $lead);
+        $ask = fn (string $name, string $email) => Livewire::test(SowReview::class, ['sow' => $sow->id])->call('choose', 'sign')
+            ->set('name', $name)->set('email', $email)->set('jobTitle', 'CFO')->set('signature', self::PNG)->call('requestCode');
+
+        $page = $ask('Ngozi Eze', 'ngozi@kilo.test')->assertHasNoErrors()->assertSee('You are signing as Ngozi Eze, CFO.')->assertSee('We emailed a 6-digit code to ngozi@kilo.test');
+        $first = Mail::sent(SigningCode::class)->last();
+        $this->assertStringContainsString('This code signs as Ngozi Eze, CFO.', $first->render());
+        $stored = StatementOfWork::find($sow->id)->auth_otp;
+        $this->assertSame(64, strlen($stored));
+        $this->assertNotSame($first->code, $stored);
+        $this->assertSame(SigningCodes::hash($first->code), $stored);
+        // Someone else opening the link sees who is signing, not their address
+        Livewire::test(SowReview::class, ['sow' => $sow->id])->assertSet('step', 'code')->assertSee('You are signing as Ngozi Eze, CFO.')->assertDontSee('ngozi@kilo.test');
+
+        // Tunde asks for a code too: the row now holds his details, so Ngozi's code signs nothing
+        $ask('Tunde Bello', 'tunde@kilo.test')->assertHasNoErrors();
+        $page->set('code', $first->code)->call('verify')->assertHasErrors('code');
+        $this->assertSame(StatementOfWork::SENT, $sow->fresh()->status);
+        // Nor does his once he is no longer an active contact
+        DB::table('client_users')->where('email', 'tunde@kilo.test')->update(['status' => 'Suspended']);
+        $this->assertFalse(Sows::sign($sow->fresh(), Mail::sent(SigningCode::class)->last()->code, null));
+        DB::table('client_users')->where('email', 'tunde@kilo.test')->update(['status' => 'Active']);
+        $this->assertTrue(Sows::sign($sow->fresh(), Mail::sent(SigningCode::class)->last()->code, null));
+        $this->assertSame(['Tunde Bello', 'tunde@kilo.test'], [$sow->fresh()->signed_by_name, $sow->fresh()->signed_by_email]);
+    }
+
+    public function test_signing_copies_the_budget_lines_honours_a_custom_deposit_and_fingerprints_the_text(): void
+    {
+        $lead = $this->staff('lead', ['sales']);
+        $this->actingAs($lead);
+        $o = $this->approvedOpportunity($lead);
+        Proposal::where('opportunity_id', $o->id)->update(['payment_schedule_type' => 'custom', 'custom_deposit_percent' => 25]);
+        FakeAi::install()->unconfigured();
+        $sow = $this->signedSow($o, $lead);
+        $other = $sow->replicate();
+        $other->sections = [['key' => 'purpose', 'title' => 'Purpose', 'body' => 'Other words.']];
+        $this->assertNotSame(Sows::contentHash($sow), Sows::contentHash($other), 'The text is in the fingerprints');
+
+        $this->assertSame([['Diagnostic & Audit', '1 Phase', '1000.00']], DB::table('project_budgets')->where('project_id', $sow->project_id)->get()
+            ->map(fn ($b) => [$b->description, $b->quantity, $b->total_allocated])->all());
+        $invoice = DB::table('invoices')->where('id', $sow->deposit_invoice_id)->first();
+        $this->assertSame(['250.00', '18.75', '268.75'], [$invoice->amount_due, $invoice->vat_amount, $invoice->total_amount]);
+    }
+
+    public function test_a_legacy_proposal_and_a_sow_never_both_sign(): void
+    {
+        $lead = $this->staff('lead', ['sales']);
+        $this->actingAs($lead);
+        $o = $this->approvedOpportunity($lead);
+        $sow = $this->approvedSow($o, $lead);
+        Sows::send($sow, ['ngozi@kilo.test'], $lead);
+        $legacy = (string) \Illuminate\Support\Str::uuid();
+        $this->insertRow('proposals', ['id' => $legacy, 'organization_id' => $o->organization_id, 'opportunity_id' => $o->id, 'proposal_ref' => 'PRP-OLD', 'title' => 'Old',
+            'status' => 'Authorized', 'signing_mode' => 'legacy', 'subtotal' => 1, 'total_value' => 1, 'payment_schedule_type' => '50_50', 'validity_days' => 30, 'updated_at' => now()]);
+        $this->assertFalse(Sows::awaitsSignature($sow->fresh()), 'A legacy proposal of this work was signed');
+        DB::table('proposals')->where('id', $legacy)->delete();
+        $this->assertTrue(Sows::awaitsSignature($sow->fresh()));
+
+        // The other way round: a SOW signed, the legacy gateway refuses
+        FakeAi::install()->unconfigured();
+        $signed = $this->signedSow($this->approvedOpportunity($lead, 'ngozi2@kilo.test'), $lead);
+        $token = \Illuminate\Support\Str::random(40);
+        $this->insertRow('proposals', ['id' => (string) \Illuminate\Support\Str::uuid(), 'organization_id' => $signed->opportunity->organization_id, 'opportunity_id' => $signed->opportunity_id,
+            'proposal_ref' => 'PRP-OLD2', 'token_hash' => $token, 'title' => 'Old', 'status' => 'Pending Auth', 'hq_signature_hash' => 'SHA256-HQ', 'signing_mode' => 'legacy',
+            'subtotal' => 1, 'total_value' => 1, 'payment_schedule_type' => '50_50', 'validity_days' => 30, 'updated_at' => now()]);
+        Livewire::test(\App\Livewire\Portal\ProposalGateway::class, ['token' => $token])->set('signerName', 'Ngozi Eze')->set('signerTitle', 'CFO')->set('signerEmail', 'ngozi@kilo.test')
+            ->call('requestAuthorizationOtp', self::PNG)->assertHasErrors('signingCode');
+    }
+
+    public function test_an_imported_sow_shows_as_signed_on_paper_without_fees_or_a_pdf(): void
+    {
+        $lead = $this->staff('lead', ['sales']);
+        $this->actingAs($lead);
+        $o = $this->opportunityFor($this->organisation(['name' => 'MyCity (test)']), ['lead_user_id' => $lead->id, 'stage' => 'won']);
+        $sow = StatementOfWork::create(['opportunity_id' => $o->id, 'reference' => 'SOW/JBSP/TEST/2026-01', 'version' => 1, 'status' => 'signed',
+            'sections' => [['key' => 'scope', 'title' => 'Scope', 'body' => 'The ERP.']], 'sent_at' => '2026-10-02 00:00:00', 'signed_at' => '2026-10-02 00:00:00',
+            'signed_by_name' => 'MyCity App Ltd (Chief Executive Officer)', 'hq_signer_name' => 'Tom-Blake Forghab, Managing Partner']);
+
+        Livewire::test(SowTab::class, ['opportunityId' => $o->id])
+            ->assertSee('Signed on paper on 2 October 2026 and imported into HQ.')->assertSee('MyCity App Ltd (Chief Executive Officer)')->assertSee('Tom-Blake Forghab, Managing Partner')
+            ->assertDontSee('From the approved proposal')->assertDontSee('Deposit')->assertDontSee('(, )')->assertDontSee('Sent to')
+            ->assertDontSeeHtml(route('hq.crm.sow-pdf', ['opportunity' => $o->id, 'sow' => $sow->id]));
+        $this->get(route('hq.crm.sow-pdf', ['opportunity' => $o->id, 'sow' => $sow->id]))->assertNotFound();
+    }
+
+    public function test_less_deposit_every_milestone_the_deposit_and_the_milestone_invoices_make_the_contract(): void
+    {
+        $lead = $this->staff('lead', ['sales']);
+        $this->actingAs($lead);
+        $o = $this->approvedOpportunity($lead);
+        FakeAi::install()->unconfigured();
+        $sow = $this->signedSow($o, $lead);
+        $draft = ProjectDraft::where('sow_id', $sow->id)->sole();
+        $this->assertNull(ProjectDrafts::create($draft, $lead));
+        $phases = DB::table('project_phases')->where('project_id', $sow->project_id)->orderBy('phase_number')->get();
+
+        // 40% deposit: M1 400 → 240, M2 600 → 360; 400 + 240 + 360 = 1,000 before VAT
+        $dues = \App\Support\Projects\Deposit::dues($sow->project_id);
+        $this->assertSame([240.0, 360.0], [$dues[$phases[0]->id], $dues[$phases[1]->id]]);
+        $this->assertSame(1000.0, round(400 + array_sum($dues), 2));
+        // Finance's pre-fill and the drawer say so; project_phases.amount keeps the full share
+        $finance = $this->staff('owner', ['owner']);
+        $this->actingAs($finance);
+        Livewire::withQueryParams(['create' => 1, 'project' => $sow->project_id, 'phase' => $phases[0]->id])->test(\App\Livewire\Hq\Finance\InvoiceLedger::class)
+            ->assertSet('new_amount_due', 240.0)->assertSet('new_description', 'Diagnostic, on written acceptance, less the 40% deposit');
+        $this->assertSame('400.00', $phases[0]->amount);
+        Livewire::test(\App\Livewire\Hq\Projects\MilestoneDrawer::class, ['projectId' => $sow->project_id])->call('openMilestone', $phases[0]->id)
+            ->assertSee("Its invoice: M1 · USD\u{00A0}400 less 40% deposit = USD\u{00A0}240, before VAT.");
+
+        // Uneven weights: the last milestone takes the rounding, so the total stays exact
+        DB::table('project_phases')->where('id', $phases[0]->id)->update(['amount' => 333.33]);
+        DB::table('project_phases')->where('id', $phases[1]->id)->update(['amount' => 666.67]);
+        $dues = \App\Support\Projects\Deposit::dues($sow->project_id);
+        $this->assertSame([200.0, 400.0], [$dues[$phases[0]->id], $dues[$phases[1]->id]]);
+        $this->assertSame(1000.0, round(400 + array_sum($dues), 2));
+        // A milestone a change report added isn't reduced; a project without a SOW deposit doesn't change
+        DB::table('change_reports')->insert(['id' => (string) \Illuminate\Support\Str::uuid(), 'project_id' => $sow->project_id, 'number' => 1, 'title' => 'Extra', 'price' => 100,
+            'currency' => 'USD', 'timeline_days' => 0, 'status' => 'approved', 'phase_id' => $phases[1]->id, 'created_at' => now(), 'updated_at' => now()]);
+        $this->assertSame(666.67, \App\Support\Projects\Deposit::forMilestone(DB::table('project_phases')->find($phases[1]->id))['due']);
+        $this->assertNull(\App\Support\Projects\Deposit::forProject((string) \Illuminate\Support\Str::uuid()));
+    }
+
+    public function test_an_imported_deposit_as_mycity_is_reduced_by_its_share_of_the_contract(): void
+    {
+        $owner = $this->staff('owner', ['owner']);
+        $this->actingAs($owner);
+        $org = $this->organisation(['name' => 'MyCity (test)']);
+        $o = $this->opportunityFor($org, ['lead_user_id' => $owner->id, 'stage' => 'won']);
+        $project = (string) \Illuminate\Support\Str::uuid();
+        $this->insertRow('projects', ['id' => $project, 'organization_id' => $org, 'title' => 'ERP', 'total_budget' => 3700000, 'currency' => 'NGN', 'status' => 'Active']);
+        $deposit = (string) \Illuminate\Support\Str::uuid();
+        $this->insertRow('invoices', ['id' => $deposit, 'project_id' => $project, 'invoice_number' => 'INV-TEST-001', 'invoice_type' => 'Tax Invoice - Initial Deposit',
+            'amount_due' => 500000, 'vat_amount' => 0, 'total_amount' => 500000, 'currency' => 'NGN', 'status' => 'Paid', 'due_date' => '2026-10-12']);
+        StatementOfWork::create(['opportunity_id' => $o->id, 'reference' => 'SOW/TEST', 'version' => 1, 'status' => 'signed', 'signed_at' => '2026-10-02', 'deposit_invoice_id' => $deposit]);
+        $m1 = (string) \Illuminate\Support\Str::uuid();
+        $this->insertRow('project_phases', ['id' => $m1, 'project_id' => $project, 'phase_number' => 1, 'title' => 'Core', 'weight_percentage' => 12, 'amount' => 444000, 'status' => 'Completed']);
+
+        $due = \App\Support\Projects\Deposit::forMilestone(DB::table('project_phases')->find($m1));
+        $this->assertSame([444000.0, 384000.0, 13.51], [$due['amount'], $due['due'], $due['deposit']['percent']]);
+    }
+
+    public function test_create_project_takes_the_opportunitys_lead_as_it_is_now_and_never_stacks_a_second_plan(): void
+    {
+        $lead = $this->staff('lead', ['sales']);
+        $newLead = $this->staff('newlead', ['sales']);
+        $this->actingAs($lead);
+        $o = $this->approvedOpportunity($lead);
+        FakeAi::install()->unconfigured();
+        $sow = $this->signedSow($o, $lead);
+        $draft = ProjectDraft::where('sow_id', $sow->id)->sole();
+
+        // No lead: refused, and fixed on the opportunity
+        $o->forceFill(['lead_user_id' => null])->save();
+        $this->actingAs($this->staff('owner', ['owner']));
+        $this->assertSame('lead', ProjectDrafts::create($draft->fresh(), auth()->user()));
+        $o->forceFill(['lead_user_id' => $newLead->id])->save();
+        Livewire::test(ProjectDraftTab::class, ['opportunityId' => $o->id])->assertSee('Project lead: Newlead Test');
+
+        // A page that is behind saves and creates nothing
+        $tab = Livewire::test(ProjectDraftTab::class, ['opportunityId' => $o->id]);
+        $this->assertTrue(ProjectDrafts::save($draft->fresh(), $draft->fresh()->payload, auth()->user(), $draft->fresh()->revision));
+        $tab->set('payload.project.title', 'From a stale page')->assertHasErrors('draft');
+        $this->assertNotSame('From a stale page', ProjectDraft::find($draft->id)->payload['project']['title']);
+        $this->assertSame('stale', ProjectDrafts::create($draft->fresh(), auth()->user(), $draft->fresh()->revision - 1));
+
+        // A role goes only to someone on the project's team
+        $outsider = $this->staff('outsider', ['sales']);
+        $payload = $draft->fresh()->payload;
+        $payload['roles'] = [['key' => 'pm', 'title' => 'PM', 'user_id' => $outsider->id]];
+        ProjectDrafts::save($draft->fresh(), $payload, auth()->user());
+        $this->assertNull($draft->fresh()->payload['roles'][0]['user_id']);
+
+        // A plan already on the project: refused
+        $phase = (string) \Illuminate\Support\Str::uuid();
+        $this->insertRow('project_phases', ['id' => $phase, 'project_id' => $sow->project_id, 'phase_number' => 1, 'title' => 'By hand', 'weight_percentage' => 0, 'status' => 'Pending']);
+        $this->assertSame('plan_exists', ProjectDrafts::create($draft->fresh(), auth()->user()));
+        DB::table('project_phases')->where('id', $phase)->delete();
+
+        $this->assertNull(ProjectDrafts::create($draft->fresh(), auth()->user()));
+        $this->assertSame($newLead->id, DB::table('projects')->where('id', $sow->project_id)->value('lead_user_id'));
+    }
+
+    public function test_create_project_rings_each_person_once_in_their_language_and_the_draft_never_reads_full_transcripts(): void
+    {
+        $lead = $this->staff('lead', ['sales']);
+        $analyst = $this->staff('analyst', ['delivery']);
+        $this->actingAs($lead);
+        $o = $this->approvedOpportunity($lead);
+        $ai = FakeAi::install()->respond('project_draft', self::PLAN);
+        $sow = $this->signedSow($o, $lead);
+        $ai->assertRan('project_draft', fn (AiRequest $r) => ! str_contains(implode("\n", $r->system), 'secret detail') && str_contains(implode("\n", $r->system), 'The close takes 15 days.'));
+
+        $draft = ProjectDraft::where('sow_id', $sow->id)->sole();
+        $payload = $draft->payload;
+        $payload['roles'][0]['user_id'] = $analyst->id; // the analyst leads two tasks
+        ProjectDrafts::save($draft, $payload, $lead);
+        config(['app.staff_locale' => 'fr']);
+        $this->assertNull(ProjectDrafts::create($draft->fresh(), $lead));
+
+        $bells = DB::table('notifications')->where('user_id', $analyst->id)->get(['title', 'message']);
+        $this->assertSame(['Vous êtes responsable de 2 tâches sur « A faster close ».'],
+            $bells->where('title', 'Vous êtes responsable de tâches d’un nouveau plan')->pluck('message')->values()->all(), 'One bell for both tasks, in HQ’s language');
+        $this->assertSame(0, $bells->where('title', 'Vous êtes responsable d’une tâche')->count(), 'No bell per task');
+        $this->assertTrue($bells->contains('title', 'Plan du projet prêt'));
+    }
+
+    public function test_plan_milestones_refuses_to_plan_again_a_project_with_milestones_or_a_pending_draft(): void
+    {
+        $owner = $this->staff('owner', ['owner']);
+        $this->actingAs($owner);
+        $o = $this->approvedOpportunity($owner);
+        FakeAi::install()->unconfigured();
+        $sow = $this->signedSow($o, $owner);
+
+        // The plan waits in the project draft: link to it, draft nothing
+        Livewire::test(\App\Livewire\Hq\Operations\ScrumMaster::class, ['id' => $sow->project_id])
+            ->assertSet('blocked', 'draft_pending')->assertSee('Open the project draft')->assertDontSee('Draft the plan')
+            ->call('generateScrumBacklog')->assertSet('generatedBacklog', []);
+
+        // Created: the project has milestones, so the assistant won't append a second plan
+        $this->assertNull(ProjectDrafts::create(ProjectDraft::where('sow_id', $sow->id)->sole(), $owner));
+        $phases = DB::table('project_phases')->where('project_id', $sow->project_id)->count();
+        Livewire::test(\App\Livewire\Hq\Operations\ScrumMaster::class, ['id' => $sow->project_id])
+            ->assertSet('blocked', 'has_plan')->assertSee('Planning inside a milestone is coming')
+            ->set('generatedBacklog', [['milestone_title' => 'Copy', 'goal' => '', 'tasks' => [['title' => 'x', 'description' => '']]]])
+            ->call('commitBacklogToDatabase');
+        $this->assertSame($phases, DB::table('project_phases')->where('project_id', $sow->project_id)->count());
+    }
+
+    public function test_sow_amounts_take_the_rounding_on_the_last_weighted_milestone(): void
+    {
+        $milestones = [['weight' => 33.33], ['weight' => 33.33], ['weight' => 33.34], ['weight' => 0]];
+        $this->assertSame([333.3, 333.3, 333.4, 0.0], Sows::amounts($milestones, 1000));
+        $amounts = Sows::amounts([['weight' => 33.33], ['weight' => 33.33], ['weight' => 33.34]], 1075.55);
+        $this->assertSame(1075.55, round(array_sum($amounts), 2));
     }
 }

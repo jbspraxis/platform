@@ -65,6 +65,10 @@ class SowReview extends Component
     #[Locked]
     public string $done = '';
 
+    /** The address this page asked a code for: shown on the code step only to whoever asked, never on a reload */
+    #[Locked]
+    public string $codeSentTo = '';
+
     #[Locked]
     public int $linkExpiresAt = 0;
 
@@ -140,7 +144,9 @@ class SowReview extends Component
         }
         try {
             $locale = session()->has('locale') ? MailLocale::forVisitor() : MailLocale::forRecipient($s->opportunity->language);
-            Mail::to($person['email'])->locale($locale)->send(new SigningCode($code, SigningCode::SOW, $s->title ?: $s->reference, explode(' ', trim($this->name))[0] ?: null));
+            // The email says who the code signs for, so a code can't be used for someone else's details unnoticed
+            Mail::to($person['email'])->locale($locale)->send(new SigningCode($code, SigningCode::SOW, $s->title ?: $s->reference, explode(' ', trim($this->name))[0] ?: null,
+                signer: trim($this->name) . ', ' . trim($this->jobTitle)));
         } catch (\Throwable $e) {
             // Never log the code itself; the unsent code is cancelled, so it can't be asked for
             Log::error('SOW signing code email failed', ['sow_id' => $s->id, 'message' => $e->getMessage()]);
@@ -150,6 +156,7 @@ class SowReview extends Component
             return;
         }
         $this->code = '';
+        $this->codeSentTo = $person['email'];
         $this->step = 'code';
     }
 
@@ -171,7 +178,8 @@ class SowReview extends Component
 
             return;
         }
-        if (! Sows::sign($s, request()->ip())) {
+        // Checked again under the lock, with the signature it was issued for (a newer request replaces both)
+        if (! Sows::sign($s, $this->code, request()->ip())) {
             $this->addError('code', __('sow.portal.errors.closed'));
 
             return;

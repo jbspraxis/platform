@@ -30,6 +30,9 @@ class SowPdfController extends Controller
 
     private function pdf(StatementOfWork $sow, string $disposition): Response
     {
+        // An imported SOW was signed on paper: HQ has no fees for it, so no contract-looking PDF is made
+        abort_if(\App\Support\Opportunities\Sows::isImported($sow), 404);
+
         return response(SowPdf::render($sow), 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => $disposition . '; filename="' . SowPdf::filename($sow) . '"',

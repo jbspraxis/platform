@@ -146,7 +146,7 @@ class ProposalGateway extends Component
         
         // PRE-SAVE: Secure the signature immediately so it survives F5 refreshes
         DB::table('proposals')->where('id', $proposal->id)->update([
-            'auth_otp' => $otp,
+            'auth_otp' => SigningCodes::hash($otp), // an HMAC: the code itself is only in the email
             'otp_expires_at' => now()->addMinutes(10),
             'signed_by_name' => $this->signerName . ' (' . $this->signerTitle . ')',
             'client_signature_b64' => $this->signatureBase64,
@@ -214,6 +214,14 @@ class ProposalGateway extends Component
         $clientHash = 'SHA256-CLIENT-' . strtoupper(hash('sha256', $proposal->id . $finalName . $ipAddress . $timestamp));
 
         $signed = DB::transaction(function () use ($proposal, $organization, $ipAddress, $timestamp, $clientHash, $finalName) {
+
+            // The opportunity's row first, as the SOW's signing does: a SOW signed meanwhile stops this one
+            if ($proposal->opportunity_id) {
+                DB::table('opportunities')->where('id', $proposal->opportunity_id)->lockForUpdate()->first();
+                if (\App\Support\Opportunities\Sows::signed($proposal->opportunity_id)) {
+                    return false;
+                }
+            }
 
             // 1. Lock the proposal (code cleared, fingerprint applied), only while it still awaits the
             // client: HQ may have unlocked it since the page was opened
@@ -351,10 +359,15 @@ class ProposalGateway extends Component
         return trans_choice('gateway.proposal.wait_minutes', $minutes, ['count' => $minutes]);
     }
 
-    /** Only a proposal HQ has signed and sent (status Pending Auth) can be signed by the client */
+    /**
+     * Only a proposal HQ has signed and sent (status Pending Auth) can be signed by the client, and never once a
+     * statement of work of its opportunity was signed (PR 5): one piece of work is signed once. A Won opportunity alone
+     * doesn't stop it: the backfill put each organisation's earlier work into one opportunity, Won when any of it was.
+     */
     private function awaitsClientSignature(object $proposal): bool
     {
-        return $proposal->status === 'Pending Auth' && filled($proposal->hq_signature_hash);
+        return $proposal->status === 'Pending Auth' && filled($proposal->hq_signature_hash)
+            && ! ($proposal->opportunity_id && \App\Support\Opportunities\Sows::signed($proposal->opportunity_id));
     }
 
     public function render()

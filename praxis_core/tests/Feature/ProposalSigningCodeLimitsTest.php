@@ -96,7 +96,7 @@ class ProposalSigningCodeLimitsTest extends TestCase
         Mail::fake();
         $proposal = $this->proposal();
         $this->askForCode($proposal['token'])->assertHasNoErrors();
-        $code = DB::table('proposals')->where('id', $proposal['id'])->value('auth_otp');
+        $code = Mail::sent(SigningCode::class)->last()->code; // the row keeps only its HMAC
         $wrong = $code === '000000' ? '111111' : '000000';
         $validFrom = DB::table('proposals')->where('id', $proposal['id'])->value('updated_at');
 
@@ -124,7 +124,7 @@ class ProposalSigningCodeLimitsTest extends TestCase
         Mail::fake();
         $proposal = $this->proposal();
         $this->askForCode($proposal['token'])->assertHasNoErrors();
-        $code = DB::table('proposals')->where('id', $proposal['id'])->value('auth_otp');
+        $code = Mail::sent(SigningCode::class)->last()->code; // the row keeps only its HMAC
 
         Livewire::test(ProposalGateway::class, ['token' => $proposal['token']])->set('otpInput', $code === '000000' ? '111111' : '000000')->call('verifyOtpAndExecuteLaunch');
         Livewire::test(ProposalGateway::class, ['token' => $proposal['token']])->set('otpInput', $code)->call('verifyOtpAndExecuteLaunch')

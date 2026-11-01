@@ -211,7 +211,8 @@
                     </form>
                 @elseif ($mode === 'sign' && $signing && $step === 'code')
                     <form wire:submit="verify" class="card pr-form" style="margin-top: 16px" novalidate>
-                        <p class="help" style="margin: 0">{{ __('sow.portal.code_intro', ['email' => $s->signed_by_email]) }}</p>
+                        <div class="callout" role="note" style="margin: 0"><span>{{ __('sow.portal.signing_as', ['name' => $s->signed_by_name, 'title' => $s->signed_by_title]) }}</span></div>
+                        <p class="help" style="margin: 0">{{ $codeSentTo !== '' ? __('sow.portal.code_intro', ['email' => $codeSentTo]) : __('sow.portal.code_intro_reload') }}</p>
                         <div class="field">
                             <label for="sr-code" class="label">{{ __('gateway.common.code_label') }}</label>
                             <input id="sr-code" type="text" class="input otp-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" wire:model="code"

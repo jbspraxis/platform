@@ -43,7 +43,8 @@ class SowMail extends BrandedMail
             'facts' => [
                 __('emails.sow.reference') => "{$s->reference} · " . __('emails.sow.version', ['n' => $s->version]),
                 __('emails.sow.between') => Sows::partyName($s),
-                __('emails.sow.total') => ProposalPdf::money(Sows::contractTotal($s), (string) ($s->proposal?->currency ?? ''), $language),
+                // VAT included, as the approved proposal states it (the milestones share out the price before VAT)
+                __('emails.sow.total') => ProposalPdf::money((float) ($s->proposal?->total_value ?? 0), (string) ($s->proposal?->currency ?? ''), $language),
                 __('emails.sow.valid_until') => $validUntil->copy()->setTimezone('Africa/Lagos')->locale($language)->translatedFormat(__('emails.sow.date_format')),
             ],
             'portalUrl' => $s->opportunity ? PortalLinks::sow($s, $this->clientUserId) : null,

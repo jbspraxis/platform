@@ -4,7 +4,7 @@
 // then Create project. Same keys as lang/fr/project_draft.php.
 return [
     'title' => 'Project draft',
-    'from' => 'From statement of work :ref, version :n · contract total :total',
+    'from' => 'From statement of work :ref, version :n · contract total :total before VAT',
     'lead' => 'Project lead: :name (the opportunity’s lead)',
     'read_only' => 'You can read this draft. The owner or the opportunity’s lead edits it and creates the project.',
     'later' => 'Later',
@@ -95,7 +95,9 @@ return [
             'dates' => 'Every milestone needs a start and a due date, and must end after it starts.',
             'weights' => 'The milestones’ weights no longer add up to 100%.',
             'project' => 'The project made when the statement of work was signed is missing. Ask an administrator.',
-            'lead' => 'The opportunity’s lead isn’t an active member of staff. Change the lead on the opportunity first.',
+            'lead' => 'The opportunity has no lead, or its lead isn’t an active member of staff. Set the lead on the opportunity (Overview › Edit details); this draft then picks it up.',
+            'plan_exists' => 'This project already has milestones, so a second plan would stack on them. Add to the plan on the project page instead.',
+            'stale' => 'The draft changed since this page loaded it, so nothing was created. Here it is as it stands now: check it and click Create project again.',
         ],
     ],
 

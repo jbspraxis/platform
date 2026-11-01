@@ -11,6 +11,17 @@
 
     <x-flash class="mb-4" />
 
+    @if ($blocked !== '')
+        {{-- Until per-milestone planning (PR 5b): a project with a plan, or a plan waiting in its project draft, isn't planned again --}}
+        <div class="card" role="note">
+            <p style="margin: 0 0 12px">{{ __('projects.planner.' . $blocked) }}</p>
+            @if ($blocked === 'draft_pending' && $draftOpportunityId)
+                <a href="{{ route('hq.crm.opportunity', ['opportunity' => $draftOpportunityId, 'tab' => 'project']) }}" class="btn btn-primary" wire:navigate><i data-lucide="folder-kanban"></i> {{ __('projects.planner.open_draft') }}</a>
+            @else
+                <a href="{{ route('hq.ops.project', ['project' => $projectId, 'tab' => 'board']) }}" class="btn btn-primary" wire:navigate><i data-lucide="kanban"></i> {{ __('projects.planner.open_board') }}</a>
+            @endif
+        </div>
+    @else
     <div class="grid items-start gap-6 lg:grid-cols-[2fr_3fr]">
 
         <div class="card">
@@ -93,4 +104,5 @@
         </div>
 
     </div>
+    @endif
 </div>

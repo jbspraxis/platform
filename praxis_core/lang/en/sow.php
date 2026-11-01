@@ -95,7 +95,7 @@ return [
         'weeks_count' => ':count week|:count weeks',
         'weight' => 'Weight',
         'weight_input' => 'Weight (%)',
-        'amount' => 'Amount',
+        'amount' => 'Amount before VAT',
         'deliverables' => 'What it delivers and how it is accepted',
         'none' => 'No milestones yet.',
         'add' => 'Add a milestone',
@@ -105,7 +105,7 @@ return [
         'remove_confirm' => 'Remove this milestone from the draft?',
         'weight_total' => 'Weights: :total of 100%',
         'weight_off' => 'they must add up to 100%',
-        'amount_total' => 'Amounts: :amount of :total',
+        'amount_total' => 'Amounts: :amount of :total, before VAT',
     ],
 
     'fees' => [
@@ -193,6 +193,14 @@ return [
         'clear' => 'Clear',
     ],
 
+    // A SOW brought in by opportunities:import (signed on paper before the pipeline, e.g. MyCity)
+    'imported' => [
+        'signed' => 'Signed on paper on :date and imported into HQ.',
+        'by' => 'For the client: :name.',
+        'where' => 'Its fees and payment terms are in the signed document and the project’s invoices; HQ makes no PDF of it.',
+        'on_paper' => 'Signed on paper on :date',
+    ],
+
     'signatures' => [
         'title' => 'Signatures',
         'for' => 'For :party',
@@ -246,6 +254,8 @@ return [
         'signature_help' => 'Draw it with your mouse, finger or pen.',
         'send_code' => 'Email me the code',
         'code_intro' => 'We emailed a 6-digit code to :email. It works for 10 minutes.',
+        'code_intro_reload' => 'We emailed a 6-digit code to the signer’s address. It works for 10 minutes. Signing for someone else? Ask for a new code with your own details.',
+        'signing_as' => 'You are signing as :name, :title.',
         'sign_submit' => 'Sign the statement of work',
         'new_code' => 'Ask for a new code',
         'changes' => 'Ask for changes',

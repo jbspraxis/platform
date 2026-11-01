@@ -19,6 +19,7 @@ return [
     'handover_generic_preheader' => 'Use it to sign off your project handover.',
     'handover_generic_intro' => 'Use this code to sign off your project handover.',
     'handover_next' => 'Enter it on the sign-off page, then add your signature.',
+    'signer' => 'This code signs as :signer. If that isn’t you or your title, ask for a new code with your own details.',
     'not_expected' => 'If you didn’t ask for this code, you can ignore this email. Nothing is signed without it.',
     'reason' => 'You are receiving this because a signing code was requested for this email address on the JBS Praxis Client Portal.',
 ];

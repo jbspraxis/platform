@@ -26,9 +26,15 @@ class ProjectDraftTab extends Component
 
     public array $payload = [];
 
-    /** The draft and the moment the editor was filled from it, so a change by the AI or a colleague reloads it */
+    /**
+     * The draft and its revision the editor was filled from: a change by the AI or a colleague reloads it, and a save
+     * or Create project from a page that is behind is refused (ProjectDrafts::save/create)
+     */
     #[Locked]
     public string $loaded = '';
+
+    #[Locked]
+    public ?int $revision = null;
 
     public string $instructions = '';
 
@@ -199,9 +205,14 @@ class ProjectDraftTab extends Component
     public function create(): void
     {
         $draft = $this->authorizeEdit();
-        $this->persist($draft);
-        $why = ProjectDrafts::create($draft->fresh(), Auth::user());
+        if (! $this->persist($draft)) {
+            return;
+        }
+        $why = ProjectDrafts::create($draft->fresh(), Auth::user(), $this->revision);
         if ($why !== null) {
+            if ($why === 'stale') {
+                $this->loaded = '';
+            }
             $this->addError('create', __('project_draft.create.errors.' . $why));
 
             return;
@@ -213,16 +224,20 @@ class ProjectDraftTab extends Component
     /** wire:poll while the AI works */
     public function check(): void {}
 
-    private function persist(ProjectDraft $draft): void
+    /** Saves the editor's payload as of the revision it was loaded at; a draft changed since is reloaded instead */
+    private function persist(ProjectDraft $draft): bool
     {
-        if (! ProjectDrafts::save($draft, $this->payload, Auth::user())) {
+        if (! ProjectDrafts::save($draft, $this->payload, Auth::user(), $this->revision)) {
             $this->loaded = '';
             $this->addError('draft', __('project_draft.errors.not_saved'));
 
-            return;
+            return false;
         }
         $this->payload = (array) $draft->payload;
-        $this->loaded = $draft->id . '@' . $draft->updated_at?->format('Y-m-d H:i:s.u');
+        $this->loaded = $draft->id;
+        $this->revision = $draft->revision;
+
+        return true;
     }
 
     public function render()
@@ -234,15 +249,17 @@ class ProjectDraftTab extends Component
                 $this->loaded = '';
             }
             $draft->load(['aiRun', 'sow']);
-            $stamp = $draft->id . '@' . $draft->updated_at?->format('Y-m-d H:i:s.u');
             if ($draft->status === 'drafting' || ($draft->aiRun && ! $draft->aiRun->isFinished())) {
                 $this->loaded = '';
                 $this->payload = (array) $draft->payload;
-            } elseif ($this->loaded !== $stamp) {
+                $this->revision = $draft->revision;
+            } elseif ($this->loaded !== $draft->id || $this->revision !== $draft->revision) {
                 $this->payload = (array) $draft->payload;
-                $this->loaded = $stamp;
+                $this->loaded = $draft->id;
+                $this->revision = $draft->revision;
             }
         }
+        $leadId = $draft ? ProjectDrafts::leadId($draft) : null;
         $canEdit = $draft && ProjectDrafts::canEdit(Auth::user(), $opportunity) && $draft->status === 'ready';
         $drafting = $draft && ($draft->status === 'drafting' || ($draft->aiRun && ! $draft->aiRun->isFinished()));
 
@@ -253,8 +270,10 @@ class ProjectDraftTab extends Component
             'drafting' => $drafting,
             'draftError' => $draft?->aiRun?->status === 'failed' ? $draft->aiRun->errorMessage() : null,
             'problem' => $draft ? ProjectDrafts::problem($draft) : null,
-            'staff' => $canEdit ? DB::table('users')->where('status', 'Active')->whereNull('deleted_at')->orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name']) : collect(),
-            'lead' => $draft && ($this->payload['lead_user_id'] ?? null) ? DB::table('users')->where('id', $this->payload['lead_user_id'])->first(['first_name', 'last_name', 'status']) : null,
+            // A role goes to someone on the project's team (ProjectRules::team), as the task drawer's pickers
+            'staff' => $canEdit ? ProjectDrafts::team($draft) : collect(),
+            // The opportunity's lead as it is now: Create project makes them the project's lead
+            'lead' => $leadId ? DB::table('users')->where('id', $leadId)->first(['first_name', 'last_name', 'status']) : null,
             'taskCount' => collect($this->payload['milestones'] ?? [])->sum(fn ($m) => count($m['tasks'] ?? [])),
         ]);
     }
