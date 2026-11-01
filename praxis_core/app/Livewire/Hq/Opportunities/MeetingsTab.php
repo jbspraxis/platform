@@ -106,8 +106,14 @@ class MeetingsTab extends Component
     #[Locked]
     public array $minutesSeen = [];
 
-    /** A handover meeting's draft points being edited, by point id: title, detail, raised_by, severity, task_id */
+    /**
+     * A handover meeting's draft points being edited, by point id: title, detail, raised_by, severity, task_id;
+     * $pointsSeen is what HQ held when each was shown, so only the fields this person changed are written back
+     */
     public array $points = [];
+
+    #[Locked]
+    public array $pointsSeen = [];
 
     // Add a point by hand to a handover meeting
     #[Locked]
@@ -199,6 +205,12 @@ class MeetingsTab extends Component
 
             return;
         }
+        // The agenda lists the milestone's tasks: the project's own rule (its sprint board and QA tickets)
+        if (! Handovers::canSeeProject($o)) {
+            $this->say(__('handover.errors.project_access'), 'warning');
+
+            return;
+        }
         $this->openSchedule('client');
         $this->fill(['milestoneId' => $milestone->id, 'title' => Handovers::defaultTitle($o, $milestone), 'agenda' => Handovers::defaultAgenda($o, $milestone)]);
     }
@@ -271,6 +283,11 @@ class MeetingsTab extends Component
         $milestone = null;
         if (! $editing && $this->milestoneId !== '' && ! ($milestone = Handovers::milestoneFor($o, $this->milestoneId))) {
             $this->addError('milestone', __('handover.errors.milestone'));
+
+            return;
+        }
+        if ($milestone && ! Handovers::canSeeProject($o)) {
+            $this->addError('milestone', __('handover.errors.project_access'));
 
             return;
         }
@@ -555,9 +572,14 @@ class MeetingsTab extends Component
         $this->authorizeManage();
         abort_unless(OpportunityAccess::canReadTranscripts(Auth::user(), $this->opportunity()), 403);
         $t = $this->transcript($transcriptId);
-        $running = Handovers::latestRuns([$t->id])[$t->id] ?? null;
-        if (! $t->meeting->isHandover() || ($running && ! $running->isFinished())) {
-            return; // one draft per click: this one is still being written
+        if (! $t->meeting->isHandover()) {
+            return;
+        }
+        // One list at a time for the meeting, whichever transcript: one charge, not two
+        if (Handovers::pendingRun($t->meeting)) {
+            $this->say(__('handover.errors.pending'), 'warning');
+
+            return;
         }
         try {
             Handovers::draftPoints($t);
@@ -572,7 +594,7 @@ class MeetingsTab extends Component
     public function updatedPoints(mixed $value, string $key): void
     {
         [$id, $field] = array_pad(explode('.', $key, 2), 2, '');
-        if (! in_array($field, ['title', 'detail', 'raised_by', 'severity', 'task_id'], true)) {
+        if (! in_array($field, Handovers::FIELDS, true)) {
             return;
         }
         $this->authorizeReview();
@@ -582,8 +604,10 @@ class MeetingsTab extends Component
 
             return;
         }
-        if (! Handovers::updatePoint($point, $field, $value)) {
-            unset($this->points[$id]);
+        if (Handovers::updatePoint($point, $field, $value)) {
+            $this->pointsSeen[$id][$field] = (string) $value;
+        } else {
+            unset($this->points[$id], $this->pointsSeen[$id]);
             $this->say(__('handover.errors.decided'), 'warning');
         }
     }
@@ -603,30 +627,50 @@ class MeetingsTab extends Component
 
             return;
         }
-        unset($this->points[$point->id]);
+        unset($this->points[$point->id], $this->pointsSeen[$point->id]);
         $ticket ? $this->say(__('handover.done.confirmed', ['title' => $point->fresh()->title])) : $this->say(__('handover.errors.decided'), 'warning');
     }
 
-    /** Every draft point of the meeting, as it stands on screen */
-    public function confirmAll(string $meetingId): void
+    /**
+     * The draft points the lead was shown ($pointIds, as rendered), as they stand on screen: never one that arrived
+     * since (a new list, a colleague's point), and not while the AI is still listing (the list is about to change).
+     * The people on the tasks hear once each.
+     */
+    public function confirmAll(string $meetingId, mixed $pointIds = []): void
     {
         $this->authorizeReview();
         $m = $this->meeting($meetingId);
-        $created = 0;
-        foreach ($m->points()->where('status', 'draft')->get() as $point) {
+        $ids = is_array($pointIds) ? array_values(array_unique(array_filter($pointIds, 'is_string'))) : [];
+        if (! $ids || count($ids) > Handovers::MAX_POINTS) {
+            $this->say(__('handover.errors.invalid'), 'warning');
+
+            return;
+        }
+        if (Handovers::pendingRun($m)) {
+            $this->say(__('handover.errors.pending'), 'warning');
+
+            return;
+        }
+        $created = [];
+        foreach ($m->points()->where('status', 'draft')->whereIn('id', $ids)->get() as $point) {
             if (! $this->saveBuffered($point)) {
-                return; // that point's errors show; the ones before it are created
+                break; // that point's errors show; the ones before it are created
             }
             try {
-                $created += Handovers::confirm($point->fresh()) ? 1 : 0;
+                $ticket = Handovers::confirm($point->fresh(), tell: false);
             } catch (LogicException) {
                 $this->say(__('handover.errors.no_project'), 'error');
-
-                return;
+                break;
             }
-            unset($this->points[$point->id]);
+            if ($ticket) {
+                $created[] = ['task_id' => $point->fresh()->task_id, 'title' => $point->fresh()->title, 'ticket_id' => $ticket];
+            }
+            unset($this->points[$point->id], $this->pointsSeen[$point->id]);
         }
-        $this->say(trans_choice('handover.done.confirmed_all', $created, ['count' => $created]));
+        Handovers::tellAssignees($created);
+        if ($this->getErrorBag()->isEmpty() && $this->notice === null) {
+            $this->say(trans_choice('handover.done.confirmed_all', count($created), ['count' => count($created)]));
+        }
     }
 
     public function dismissPoint(string $pointId): void
@@ -634,7 +678,7 @@ class MeetingsTab extends Component
         $this->authorizeReview();
         $point = $this->point($pointId);
         Handovers::dismiss($point) ? $this->say(__('handover.done.dismissed', ['title' => $point->title])) : $this->say(__('handover.errors.decided'), 'warning');
-        unset($this->points[$point->id]);
+        unset($this->points[$point->id], $this->pointsSeen[$point->id]);
     }
 
     public function restorePoint(string $pointId): void
@@ -685,7 +729,7 @@ class MeetingsTab extends Component
 
     private function point(string $id): MeetingPoint
     {
-        return MeetingPoint::whereHas('meeting', fn ($q) => $q->where('opportunity_id', $this->opportunityId))->findOrFail($id);
+        return MeetingPoint::whereHas('meeting', fn ($q) => $q->where('opportunity_id', $this->opportunityId))->with('meeting')->findOrFail($id);
     }
 
     /** What is wrong with a value for a point's field, or null */
@@ -701,23 +745,27 @@ class MeetingsTab extends Component
             'detail' => mb_strlen($value) > Handovers::MAX_DETAIL ? __('handover.errors.detail_long') : null,
             'raised_by' => mb_strlen($value) > Handovers::MAX_RAISED_BY ? __('handover.errors.raised_by_long') : null,
             'severity' => in_array($value, Handovers::SEVERITIES, true) ? null : __('handover.errors.severity'),
-            'task_id' => $value === '' || Handovers::taskOnProject($value, (string) $this->opportunity()->project_id) ? null : __('handover.errors.task'),
+            'task_id' => $value === '' || Handovers::taskOnMilestone($value, $point->meeting?->phase_id) ? null : __('handover.errors.task'),
             default => __('handover.errors.invalid'),
         };
     }
 
-    /** What the lead typed on a draft point and hasn't left yet goes in first; false (with the errors) when it can't */
+    /**
+     * What this person typed on a draft point and hasn't left yet goes in first: only the fields they changed since it
+     * was shown ($pointsSeen), so a colleague's edits to the others stay. False (with the errors) when it can't.
+     */
     private function saveBuffered(MeetingPoint $point): bool
     {
+        $seen = (array) ($this->pointsSeen[$point->id] ?? []);
         foreach ((array) ($this->points[$point->id] ?? []) as $field => $value) {
-            if (! in_array($field, ['title', 'detail', 'raised_by', 'severity', 'task_id'], true)
-                || ((is_string($value) || $value === null) && (string) $value === (string) $point->{$field})) {
+            if (! in_array($field, Handovers::FIELDS, true)
+                || ((is_string($value) || $value === null) && array_key_exists($field, $seen) && (string) $value === (string) $seen[$field])) {
                 continue;
             }
             if ($error = $this->pointError($point, $field, $value)) {
                 $this->addError("points.{$point->id}.{$field}", $error);
-            } else {
-                Handovers::updatePoint($point, $field, $value);
+            } elseif (Handovers::updatePoint($point, $field, $value)) {
+                $this->pointsSeen[$point->id][$field] = (string) $value;
             }
         }
 
@@ -870,12 +918,20 @@ class MeetingsTab extends Component
             ->selectRaw('meeting_id, status, count(*) as total')->groupBy('meeting_id', 'status')->get()->groupBy('meeting_id')
             ->map(fn ($rows) => $rows->pluck('total', 'status')->map(fn ($n) => (int) $n));
         $pointRuns = Handovers::latestRuns($handovers->flatMap->transcripts->pluck('id')->all());
-        $pending = $pending || collect($pointRuns)->contains(fn ($r) => ! $r->isFinished());
+        $pending = $pending || collect($pointRuns)->contains(fn ($r) => Handovers::isPending($r));
         $shown = $this->open !== '' ? $handovers->firstWhere('id', $this->open) : null;
         $pointList = $shown ? Handovers::points($shown) : collect();
         foreach ($pointList->where('status', 'draft') as $p) {
-            // Edit boxes start from what HQ holds; what someone is typing stays
-            $this->points[$p->id] ??= ['title' => $p->title, 'detail' => (string) $p->detail, 'raised_by' => (string) $p->raised_by, 'severity' => $p->severity, 'task_id' => (string) $p->task_id];
+            // Edit boxes start from what HQ holds and follow a colleague's change, unless this person has changed that field
+            foreach (Handovers::FIELDS as $field) {
+                $held = (string) $p->{$field};
+                $mine = $this->points[$p->id][$field] ?? null;
+                $seen = $this->pointsSeen[$p->id][$field] ?? null;
+                if ($mine === null || ($seen !== null && is_string($mine) && $mine === $seen && $held !== $seen)) {
+                    $this->points[$p->id][$field] = $held;
+                    $this->pointsSeen[$p->id][$field] = $held;
+                }
+            }
         }
         $confirmed = $pointList->where('status', 'confirmed');
 
@@ -904,6 +960,8 @@ class MeetingsTab extends Component
             'taskOptions' => $shown && $this->canReview && $o->project_id ? Handovers::milestoneTasks($o->project_id, $shown->phase_id) : collect(),
             'formMilestone' => $this->formOpen && $this->milestoneId !== '' ? Handovers::milestoneFor($o, $this->milestoneId) : null,
             'canQa' => (bool) Auth::user()?->can('qa.view'),
+            // Task titles are the project's: shown to those who see its sprint board (ProjectAccess)
+            'canSeeProject' => $handovers->isNotEmpty() && Handovers::canSeeProject($o),
         ]);
     }
 }

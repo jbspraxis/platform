@@ -256,7 +256,7 @@ class MilestoneHandoverTest extends TestCase
         $tab->call('dismissPoint', $rename->id)->assertSee('left out: no issue created')
             ->call('restorePoint', $rename->id)->call('dismissPoint', $rename->id)
             ->set("points.{$naira->id}.task_id", $s['tasks'][0])
-            ->call('confirmAll', $m->id)->assertSee('1 issue created.')->assertSee('Left out (1)')->assertDontSee('Create the issue');
+            ->call('confirmAll', $m->id, [$naira->id])->assertSee('1 issue created.')->assertSee('Left out (1)')->assertDontSee('Create the issue');
         $this->assertSame(['confirmed', 'dismissed'], [$naira->fresh()->status, $rename->fresh()->status]);
         $this->assertNull($rename->fresh()->qa_ticket_id);
         $this->assertSame(2, DB::table('qa_tickets')->where('task_id', $s['tasks'][0])->count());
@@ -468,6 +468,146 @@ class MilestoneHandoverTest extends TestCase
         $this->assertSame([], array_values(array_diff($fr, $en)), 'Missing in English');
     }
 
+    public function test_create_all_confirms_only_the_points_on_screen_waits_for_a_list_under_way_and_rings_each_person_once(): void
+    {
+        $s = $this->handover();
+        $engineer = $this->staff('engineer', ['engineer']);
+        DB::table('tasks')->whereIn('id', [$s['tasks'][0], $s['tasks'][1]])->update(['assigned_to' => $engineer->id]);
+        $m = $this->heldHandover($s);
+        $t = Transcripts::fromText($m, 'Ada Obi (10:02): The stock export stops at 5,000 rows.', 'paste');
+        [$export, $naira, $rename] = $m->points()->get()->all();
+        $this->actingAs($s['lead']);
+        $tab = Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('toggle', $m->id)
+            ->assertSeeHtml("confirmAll('{$m->id}', [" . e("'{$export->id}', '{$naira->id}', '{$rename->id}'") . '])');
+
+        // A point arrives after the lead's screen was drawn: "Create all" leaves it alone
+        $late = Handovers::addPoint($m, ['title' => 'Arrived after the screen was drawn']);
+        $tab->call('confirmAll', $m->id, [$export->id, $naira->id, $rename->id])->assertSee('3 issues created.');
+        $this->assertSame(['confirmed', 'confirmed', 'confirmed', 'draft'], [$export->fresh()->status, $naira->fresh()->status, $rename->fresh()->status, $late->fresh()->status]);
+        $this->assertSame(3, DB::table('qa_tickets')->count());
+        // Two of the points are on the engineer's tasks: one bell, not two
+        $bells = DB::table('notifications')->where('user_id', $engineer->id)->get();
+        $this->assertCount(1, $bells);
+        $this->assertSame(['Milestone handover points on your tasks', route('hq.ops.qa')], [$bells[0]->title, $bells[0]->link_url]);
+        $this->assertStringStartsWith('2 points raised in a milestone handover', $bells[0]->message);
+
+        // Nothing is created in bulk, or asked for again, while the AI is still listing (filing included)
+        $listing = AiRun::create(['purpose' => 'handover_points', 'provider' => 'claude', 'model' => 'claude-haiku-5-5', 'subject_type' => 'meeting_transcript',
+            'subject_id' => $t->id, 'status' => 'done', 'progress' => 100, 'output' => self::POINTS, 'finished_at' => now()]);
+        $this->assertTrue(Handovers::isPending($listing));   // done, but its points aren't filed yet
+        $tab->call('confirmAll', $m->id, [$late->id])->assertSee('The AI is still listing the points.');
+        $tab->call('draftPoints', $t->id)->assertSee('The AI is still listing the points.');
+        $this->assertSame('draft', $late->fresh()->status);
+        $this->assertCount(1, $this->ai->requestsFor('handover_points'));
+        $this->travel(2)->minutes();
+        $this->assertFalse(Handovers::isPending($listing));   // a run that never files stops counting after a minute
+
+        // Only a list of ids, and no more than a meeting holds
+        $tab->call('confirmAll', $m->id, 'everything')->assertSee('That can’t be saved.');
+        $this->assertSame('draft', $late->fresh()->status);
+    }
+
+    public function test_a_second_transcript_keeps_the_points_under_review_and_a_new_list_replaces_only_unedited_ones_of_its_transcript(): void
+    {
+        $s = $this->handover();
+        $m = $this->heldHandover($s);
+        $this->ai->respond('handover_points', ['points' => [['title' => 'Dashboard loads slowly', 'asked' => 'Over 10 seconds.', 'raised_by' => 'Musa Bello', 'severity' => 'Medium', 'task_number' => 2]]])
+            ->respond('handover_points', ['points' => [['title' => 'Export again', 'asked' => 'Same as before.', 'raised_by' => 'Ada Obi', 'severity' => 'Critical', 'task_number' => 1]]]);
+        $first = Transcripts::fromText($m, 'Ada Obi (10:02): The stock export stops at 5,000 rows.', 'paste');
+        [$export, $naira, $rename] = $m->points()->get()->all();
+        $this->actingAs($s['lead']);
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('toggle', $m->id)->set("points.{$naira->id}.title", 'Dashboard totals in naira, not dollars');
+
+        // A second transcript (added by hand) doesn't touch the review: no automatic list
+        $second = Transcripts::fromText($m, 'Musa Bello (10:40): The dashboard is slow.', 'paste');
+        $this->assertCount(1, $this->ai->requestsFor('handover_points'));
+        $this->assertSame(3, $m->points()->where('status', 'draft')->count());
+
+        // Listing the second transcript adds its points and keeps the first's; they go with it as already recorded
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('toggle', $m->id)->call('draftPoints', $second->id)->assertHasNoErrors();
+        $this->assertStringContainsString("Already recorded (do not list them again):\n- Stock report export stops at 5,000 rows\n- Dashboard totals in naira, not dollars\n- Call the audit trail “History”",
+            $this->ai->requestsFor('handover_points')[1]->prompt);
+        $this->assertSame(['Stock report export stops at 5,000 rows', 'Dashboard totals in naira, not dollars', 'Call the audit trail “History”', 'Dashboard loads slowly'],
+            $m->points()->get()->pluck('title')->all());
+
+        // Listing the first again replaces only its points nobody edited
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('toggle', $m->id)->call('draftPoints', $first->id)->assertHasNoErrors();
+        $this->assertSoftDeleted('meeting_points', ['id' => $export->id]);
+        $this->assertSoftDeleted('meeting_points', ['id' => $rename->id]);
+        $this->assertSame(['Dashboard totals in naira, not dollars', 'Dashboard loads slowly', 'Export again'], $m->points()->get()->pluck('title')->all());
+    }
+
+    public function test_a_reviewer_writes_back_only_the_fields_they_changed(): void
+    {
+        $s = $this->handover();
+        $m = $this->heldHandover($s);
+        Transcripts::fromText($m, 'Ada Obi (10:02): The stock export stops at 5,000 rows.', 'paste');
+        $export = $m->points()->first();
+        $owner = $this->staff('owner', ['owner']);
+
+        $this->actingAs($s['lead']);
+        $lead = Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('toggle', $m->id);
+        // Meanwhile the owner rewords the title and the detail
+        $this->actingAs($owner);
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('toggle', $m->id)
+            ->set("points.{$export->id}.title", 'Stock export fails past 5,000 rows')->set("points.{$export->id}.detail", 'Every row is needed.');
+
+        // The lead's screen follows the owner's change on its next render, and confirming doesn't write back what it showed before
+        $this->actingAs($s['lead']);
+        $lead->set("points.{$export->id}.severity", 'Low')->assertSet("points.{$export->id}.detail", 'Every row is needed.');
+        $this->actingAs($owner);
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('toggle', $m->id)->set("points.{$export->id}.raised_by", 'Ada Obi (MyCity)');
+        $this->actingAs($s['lead']);
+        $lead->call('confirmPoint', $export->id)->assertHasNoErrors();
+        $ticket = DB::table('qa_tickets')->where('id', $export->fresh()->qa_ticket_id)->first();
+        $this->assertSame(['Stock export fails past 5,000 rows', 'Low'], [$ticket->title, $ticket->severity]);
+        $this->assertStringStartsWith("Every row is needed.\n\nRaised by Ada Obi (MyCity) in the milestone handover", $ticket->description);
+    }
+
+    public function test_a_point_links_only_to_a_task_of_its_own_milestone(): void
+    {
+        $s = $this->handover();
+        $m = $this->heldHandover($s);
+        Transcripts::fromText($m, 'Ada Obi (10:02): The stock export stops at 5,000 rows.', 'paste');
+        [$export, $naira] = $m->points()->get()->all();
+        $kickOff = DB::table('tasks')->where('title', 'Kick-off')->where('assigned_to', $s['lead']->id)->value('id');   // same project, milestone M1
+        $this->actingAs($s['lead']);
+
+        $tab = Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('toggle', $m->id)
+            ->assertDontSeeHtml('value="' . $kickOff . '"')
+            ->set("points.{$export->id}.task_id", $kickOff)->assertHasErrors("points.{$export->id}.task_id");
+        $this->assertSame($s['tasks'][0], $export->fresh()->task_id);
+
+        // A task moved to another milestone after the point was drafted: the issue is created without the link
+        DB::table('tasks')->where('id', $s['tasks'][1])->update(['phase_id' => DB::table('tasks')->where('id', $kickOff)->value('phase_id')]);
+        $tab->set("points.{$export->id}.task_id", $s['tasks'][0])->call('confirmPoint', $naira->id)->assertHasNoErrors();
+        $this->assertNull(DB::table('qa_tickets')->where('id', $naira->fresh()->qa_ticket_id)->value('task_id'));
+    }
+
+    public function test_the_lead_also_needs_the_project_and_the_board_shows_the_meetings_own_time_zone(): void
+    {
+        $s = $this->handover();
+        $m = $this->heldHandover($s);
+        Transcripts::fromText($m, 'Ada Obi (10:02): The stock export stops at 5,000 rows.', 'paste');
+        $point = $m->points()->first();
+        // The lead's only task on the project goes to someone else: no sprint board, so no task titles and no tickets
+        DB::table('tasks')->where('assigned_to', $s['lead']->id)->update(['assigned_to' => null]);
+        $this->actingAs($s['lead']);
+
+        $this->assertFalse(Handovers::canReview($s['lead'], $s['o']));
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('toggle', $m->id)
+            ->assertSee('Stock report export stops at 5,000 rows')->assertDontSee('Create the issue')->assertDontSee('Stock report export</option>', false);
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('confirmPoint', $point->id)->assertForbidden();
+        Livewire::withQueryParams(['handover' => $s['milestone']])->test(MeetingsTab::class, ['opportunityId' => $s['o']->id])
+            ->assertSet('formOpen', false)->assertSee('You can’t see this project’s tasks');
+        $this->assertSame(0, DB::table('qa_tickets')->count());
+
+        // The board says when in the meeting's own time zone
+        $m->forceFill(['time_zone' => 'Europe/London'])->save();
+        $this->actingAs($this->staff('owner', ['owner']));
+        $this->assertSame('5 November 2026, 10:00 GMT', Handovers::forMilestone($s['project'], $s['milestone'], auth()->user())['when']);
+    }
+
     // ---- Fixtures --------------------------------------------------------------------------------------------------
 
     /**
@@ -485,6 +625,8 @@ class MilestoneHandoverTest extends TestCase
         $project = $this->project($org, 'MyCity App ERP');
         $o = $this->opportunityFor($org, ['lead_user_id' => $lead->id, 'language' => $language, 'stage' => 'won', 'project_id' => $project]);
         $milestone = $this->milestone($project, 3, 'M3 Reports');
+        // The lead sees the project (ProjectAccess, as its sprint board) through a task of their own, outside any sprint
+        $this->task($this->milestone($project, 1, 'M1 Set-up'), null, 'Kick-off', 0, $lead->id);
         $sprint = $this->sprint($project, 'Sprint 3');
         $tasks = [];
         foreach (['Stock report export', 'Sales dashboard', 'Audit trail'] as $i => $title) {
@@ -531,10 +673,10 @@ class MilestoneHandoverTest extends TestCase
     }
 
     /** A task of a milestone, in a sprint or none; $order sets which comes first (created_at) */
-    private function task(string $milestoneId, ?string $sprintId, string $title, int $order): string
+    private function task(string $milestoneId, ?string $sprintId, string $title, int $order, ?string $assignee = null): string
     {
         $id = (string) Str::uuid();
-        $this->insertRow('tasks', ['id' => $id, 'phase_id' => $milestoneId, 'sprint_id' => $sprintId, 'title' => $title, 'status' => 'To-Do', 'created_at' => now()->subHour()->addMinutes($order)]);
+        $this->insertRow('tasks', ['id' => $id, 'phase_id' => $milestoneId, 'sprint_id' => $sprintId, 'assigned_to' => $assignee, 'title' => $title, 'status' => 'To-Do', 'created_at' => now()->subHour()->addMinutes($order)]);
 
         return $id;
     }

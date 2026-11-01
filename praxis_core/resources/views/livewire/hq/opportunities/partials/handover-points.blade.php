@@ -1,10 +1,13 @@
 {{-- The points raised in a milestone's handover meeting (PR 6): the AI's list, the lead's review (edit, create the issue,
      leave out), then each issue's status for the sign-off. $m meeting, $pointList (Handovers::points), $pointRuns,
-     $canManage, $canReadTranscripts, $canReview, $taskOptions, $closingNotes, $signoff, $canQa, $day. --}}
+     $canManage, $canReadTranscripts, $canReview, $canSeeProject (task titles), $taskOptions, $closingNotes, $signoff,
+     $canQa, $day. --}}
 @php
     $latest = $m->transcripts->last();
-    $run = $latest ? ($pointRuns[$latest->id] ?? null) : null;
-    $busy = $run && ! $run->isFinished();
+    // Under way on any of the meeting's transcripts (filing included): nothing to confirm in bulk, nothing to ask again
+    $pendingRun = $m->transcripts->map(fn ($t) => $pointRuns[$t->id] ?? null)->filter()->first(fn ($r) => \App\Support\Opportunities\Handovers::isPending($r));
+    $run = $pendingRun ?? ($latest ? ($pointRuns[$latest->id] ?? null) : null);
+    $busy = $pendingRun !== null;
     $drafts = $pointList->where('status', 'draft')->values();
     $confirmed = $pointList->where('status', 'confirmed')->values();
     $dismissed = $pointList->where('status', 'dismissed')->values();
@@ -29,8 +32,9 @@
                 <button type="button" class="btn btn-secondary btn-sm" wire:click="openAddPoint('{{ $m->id }}')">
                     <i data-lucide="plus"></i> {{ __('handover.actions.add') }}
                 </button>
-                @if ($drafts->count() > 1)
-                    <button type="button" class="btn btn-primary btn-sm" wire:click="confirmAll('{{ $m->id }}')" wire:confirm="{{ __('handover.actions.confirm_all_ask') }}"
+                @if ($drafts->count() > 1 && ! $busy)
+                    {{-- The points on screen, by id: a point that arrives after this render isn't confirmed with them --}}
+                    <button type="button" class="btn btn-primary btn-sm" wire:click="confirmAll('{{ $m->id }}', [{{ $drafts->map(fn ($p) => "'" . $p->id . "'")->implode(', ') }}])" wire:confirm="{{ __('handover.actions.confirm_all_ask') }}"
                             wire:loading.attr="disabled" wire:target="confirmAll">
                         <i data-lucide="list-checks"></i> {{ trans_choice('handover.actions.confirm_all', $drafts->count(), ['count' => $drafts->count()]) }}
                     </button>
@@ -136,7 +140,7 @@
                             <strong>{{ $p->title }}</strong>
                             <div class="mtg-tags" style="margin-top: 4px">
                                 <span class="pill {{ $severityTone($p->severity) }}">{{ __('handover.severity.' . $p->severity) }}</span>
-                                @if ($p->task_title)<span>{{ $p->task_title }}</span>@endif
+                                @if ($canSeeProject && $p->task_title)<span>{{ $p->task_title }}</span>@endif
                                 @if ($p->raised_by)<span>{{ $p->raised_by }}</span>@endif
                             </div>
                             @if ($p->detail)<p class="mtg-pre" style="margin-top: 6px">{{ $p->detail }}</p>@endif
@@ -167,7 +171,7 @@
                         </span>
                     </div>
                     <div class="mtg-tags">
-                        @if ($p->task_title)<span>{{ __('handover.points.labelled', ['label' => __('handover.fields.task'), 'value' => $p->task_title]) }}</span>@endif
+                        @if ($canSeeProject && $p->task_title)<span>{{ __('handover.points.labelled', ['label' => __('handover.fields.task'), 'value' => $p->task_title]) }}</span>@endif
                         @if ($p->raised_by)<span>{{ __('handover.points.labelled', ['label' => __('handover.fields.raised_by'), 'value' => $p->raised_by]) }}</span>@endif
                         @if ($canQa && ! $gone)
                             <a href="{{ route('hq.ops.qa', ['ticket' => $p->qa_ticket_id]) }}" wire:navigate>{{ __('handover.points.open_issue') }}</a>

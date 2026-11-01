@@ -94,6 +94,8 @@ return [
         'task' => 'Choose a task from this project, or no task.',
         'invalid' => 'That can’t be saved. Refresh the page and try again.',
         'full' => 'This meeting already holds :max points, the most it can.',
+        'pending' => 'The AI is still listing the points. Wait until it has finished, then try again.',
+        'project_access' => 'You can’t see this project’s tasks, so you can’t schedule its milestone handover or create its issues. Ask a project lead for access.',
     ],
 
     'ticket' => [
@@ -113,6 +115,8 @@ return [
     'notify' => [
         'title' => 'Milestone handover point on your task',
         'message' => '“:title”, raised in a milestone handover, concerns a task assigned to you. See it in Quality and issues.',
+        'title_many' => 'Milestone handover points on your tasks',
+        'many' => ':count points raised in a milestone handover concern tasks assigned to you. See them in Quality and issues.',
     ],
 
     'board' => [
@@ -123,7 +127,7 @@ return [
         'schedule_another' => 'Schedule another',
         'no_opportunity' => 'This project has no opportunity, so its milestone handovers can’t be scheduled here: meetings belong to an opportunity.',
         'no_permission' => 'Someone on the opportunity’s team, or who manages opportunities, schedules it.',
-        'when' => ':date, :time WAT',
+        'when' => ':date, :time :zone',
         'open' => 'Open the meeting',
         'review' => '{0} No points to review|{1} 1 point to review|[2,*] :count points to review',
         'issue_count' => '{0} no issues yet|{1} 1 issue (:open open)|[2,*] :count issues (:open open)',

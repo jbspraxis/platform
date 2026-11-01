@@ -93,6 +93,8 @@ return [
         'task' => "Choisissez une tâche de ce projet, ou aucune tâche.",
         'invalid' => "Impossible d’enregistrer cette valeur. Actualisez la page et réessayez.",
         'full' => "Cette réunion compte déjà :max points, le maximum possible.",
+        'pending' => "L’IA liste encore les points. Attendez qu’elle ait terminé, puis réessayez.",
+        'project_access' => "Vous ne voyez pas les tâches de ce projet\u{00A0}: vous ne pouvez donc ni planifier la livraison de ses jalons ni créer ses incidents. Demandez l’accès à un responsable de projet.",
     ],
 
     'ticket' => [
@@ -112,6 +114,8 @@ return [
     'notify' => [
         'title' => "Point de livraison de jalon sur votre tâche",
         'message' => "«\u{202F}:title\u{202F}», soulevé lors d’une livraison de jalon, concerne une tâche qui vous est attribuée. Consultez-le dans Qualité et incidents.",
+        'title_many' => "Points de livraison de jalon sur vos tâches",
+        'many' => ":count points soulevés lors d’une livraison de jalon concernent des tâches qui vous sont attribuées. Consultez-les dans Qualité et incidents.",
     ],
 
     'board' => [
@@ -122,7 +126,7 @@ return [
         'schedule_another' => "En planifier une autre",
         'no_opportunity' => "Ce projet n’a pas d’opportunité\u{00A0}: la livraison de ses jalons ne peut pas être planifiée ici, car les réunions appartiennent à une opportunité.",
         'no_permission' => "Un membre de l’équipe de l’opportunité, ou une personne qui gère les opportunités, la planifie.",
-        'when' => ":date, :time (WAT)",
+        'when' => ":date, :time (:zone)",
         'open' => "Ouvrir la réunion",
         'review' => "{0} Aucun point à examiner|{1} 1 point à examiner|[2,*] :count points à examiner",
         'issue_count' => "{0} aucun incident pour l’instant|{1} 1 incident (ouverts\u{00A0}: :open)|[2,*] :count incidents (ouverts\u{00A0}: :open)",

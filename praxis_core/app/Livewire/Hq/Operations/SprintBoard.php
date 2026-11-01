@@ -9,13 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
-use App\Models\Meeting;
-use App\Models\MeetingPoint;
-use App\Models\Opportunity;
 use App\Support\Access;
 use App\Support\Opportunities\Handovers;
-use App\Support\Opportunities\Meetings;
-use App\Support\Opportunities\OpportunityAccess;
 use App\Support\ProjectAccess;
 
 #[Layout('components.layouts.hq')]
@@ -360,41 +355,18 @@ class SprintBoard extends Component
     }
 
     /**
-     * The milestones whose tasks the selected sprint holds (MyCity: one per sprint), each with its handover meeting (the
-     * latest client meeting for that milestone, not cancelled), its points, and the links to schedule or open it. Who
-     * may schedule or open one is decided by the opportunity (the permission, or being on its team); the Meetings tab
-     * checks again.
+     * The milestone handovers this board shows: one per milestone whose tasks the selected sprint holds (MyCity: one),
+     * each Handovers::forMilestone(), the entry point any milestone screen uses (the row is
+     * partials/milestone-handover.blade.php)
      */
     private function handovers(): array
     {
-        $user = Auth::user();
-        $opportunity = $this->opportunityId ? Opportunity::find($this->opportunityId) : null;
-        $canSchedule = $opportunity !== null && OpportunityAccess::canManage($user, $opportunity);
-        $canOpen = $opportunity !== null && OpportunityAccess::canView($user, $opportunity);
-        $milestones = $opportunity && $this->activeSprintId ? Handovers::milestonesInSprint($this->projectId, $this->activeSprintId) : collect();
-        $link = fn (array $query) => route('hq.crm.opportunity', ['opportunity' => $this->opportunityId, 'tab' => 'meetings'] + $query);
-        $at = fn ($meeting, string $format) => $meeting->starts_at->copy()->setTimezone($meeting->time_zone ?: Meetings::TIME_ZONE)->locale(app()->getLocale())->translatedFormat(__($format));
-
-        $items = [];
-        foreach ($milestones as $milestone) {
-            $meeting = Meeting::where('opportunity_id', $opportunity->id)->where('phase_id', $milestone->id)->where('kind', 'client')
-                ->where('status', '!=', 'cancelled')->orderByDesc('starts_at')->first();
-            $counts = $meeting ? MeetingPoint::where('meeting_id', $meeting->id)->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status') : collect();
-            $items[] = [
-                'milestone' => $milestone,
-                'meeting' => $meeting,
-                'when' => $meeting ? __('handover.board.when', ['date' => $at($meeting, 'opportunities.formats.date'), 'time' => $at($meeting, 'opportunities.formats.time')]) : null,
-                'review' => (int) ($counts['draft'] ?? 0),
-                'issues' => (int) ($counts['confirmed'] ?? 0),
-                'openIssues' => $meeting ? MeetingPoint::where('meeting_points.meeting_id', $meeting->id)->where('meeting_points.status', 'confirmed')
-                    ->join('qa_tickets', 'qa_tickets.id', '=', 'meeting_points.qa_ticket_id')->whereNull('qa_tickets.deleted_at')
-                    ->whereIn('qa_tickets.status', ['Open', 'Investigating'])->count() : 0,
-                'scheduleUrl' => $canSchedule && (! $meeting || $meeting->status === 'held') ? $link(['handover' => $milestone->id]) : null,
-                'meetingUrl' => $meeting && $canOpen ? $link(['meeting' => $meeting->id]) : null,
-            ];
+        if (! $this->opportunityId || ! $this->activeSprintId) {
+            return [];
         }
 
-        return ['items' => $items, 'canSchedule' => $canSchedule];
+        return Handovers::milestonesInSprint($this->projectId, $this->activeSprintId)
+            ->map(fn ($milestone) => Handovers::forMilestone($this->projectId, $milestone->id, Auth::user()))->all();
     }
 
     public function render()

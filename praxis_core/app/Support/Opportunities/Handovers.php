@@ -9,6 +9,7 @@ use App\Models\MeetingTranscript;
 use App\Models\Opportunity;
 use App\Models\User;
 use App\Support\Ai\Ai;
+use App\Support\ProjectAccess;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -19,19 +20,25 @@ use LogicException;
 /**
  * Milestone handovers (docs/OPPORTUNITIES.md section 12, PR 6). For a milestone (project_phases) of a project that has
  * an opportunity (opportunities.project_id), the lead schedules the client meeting that hands it over, through
- * Meetings::schedule (meetings.phase_id); today's sprint board offers it for the milestones whose tasks the sprint
- * holds. Its transcript is collected like any other; once filed, the AI drafts the points raised (handover_points,
- * Haiku) as meeting_points. The lead edits them and confirms each one, which creates a QA ticket on the project, linked
- * to the milestone's task when known; nothing is created without that confirmation. The meeting then shows every point
- * with its ticket's status, and signoffText() lists them for the handover sign-off.
+ * Meetings::schedule (meetings.phase_id); forMilestone() is what a screen shows for one milestone (today's sprint board
+ * shows it for the milestones whose tasks the sprint holds). Its transcript is collected like any other; once filed,
+ * the AI drafts the points raised (handover_points, Haiku) as meeting_points. The lead edits them and confirms each
+ * one, which creates a QA ticket on the project, linked to the milestone's task when known; nothing is created
+ * without that confirmation. The meeting then shows every point with its ticket's status, and signoffText() lists
+ * them for the handover sign-off.
  *
  * Who (always for this opportunity: the permission, or being on its team, OpportunityAccess): anyone who can view it
- * sees the points; drafting them reads the transcript (canManage + canReadTranscripts); editing and confirming creates
- * tickets the client sees, so it is the lead's or the owner's (canReview: canManage + canApprove).
+ * sees the points; drafting them reads the transcript (canManage + canReadTranscripts). The milestone's task titles
+ * (agenda, task picker) and creating QA tickets on the project also need the project, as the sprint board and the QA
+ * hub do (ProjectAccess::maySee); confirming creates tickets the client sees, so it is the lead's or the owner's
+ * (canReview: canManage + canApprove + the project).
  */
 final class Handovers
 {
     public const SEVERITIES = ['Low', 'Medium', 'Critical'];
+
+    /** The fields of a draft point the lead can change */
+    public const FIELDS = ['title', 'detail', 'raised_by', 'severity', 'task_id'];
 
     /** Points one meeting can hold, drafted and added together */
     public const MAX_POINTS = 50;
@@ -62,12 +69,55 @@ final class Handovers
             ->first(['id', 'project_id', 'phase_number', 'title', 'description', 'status']);
     }
 
-    /** The milestones whose tasks a sprint holds, in milestone order (MyCity: one per sprint) */
+    /** The milestones whose tasks a sprint holds, in milestone order (MyCity: one per sprint); today's sprint board only */
     public static function milestonesInSprint(string $projectId, string $sprintId): Collection
     {
         return DB::table('project_phases')->where('project_phases.project_id', $projectId)->whereNull('project_phases.deleted_at')
             ->whereExists(fn ($q) => $q->from('tasks')->whereColumn('tasks.phase_id', 'project_phases.id')->where('tasks.sprint_id', $sprintId)->whereNull('tasks.deleted_at'))
             ->orderBy('phase_number')->orderBy('title')->get(['id', 'phase_number', 'title']);
+    }
+
+    /**
+     * One milestone's handover as a screen shows it, for this person: the milestone, its latest client handover meeting
+     * (not cancelled) and when, the points to review and the issues (open), and the links to schedule or open it.
+     * opportunityId is null when no opportunity holds the project, milestone null when the milestone isn't on it.
+     */
+    public static function forMilestone(string $projectId, string $phaseId, ?User $user): array
+    {
+        $opportunity = self::opportunityForProject($projectId);
+        $milestone = DB::table('project_phases')->where('id', $phaseId)->where('project_id', $projectId)->whereNull('deleted_at')->first(['id', 'phase_number', 'title']);
+        $meeting = $opportunity && $milestone ? Meeting::where('opportunity_id', $opportunity->id)->where('phase_id', $milestone->id)->where('kind', 'client')
+            ->where('status', '!=', 'cancelled')->orderByDesc('starts_at')->first() : null;
+        $counts = $meeting ? MeetingPoint::where('meeting_id', $meeting->id)->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status') : collect();
+        $canSchedule = $opportunity !== null && $milestone !== null && OpportunityAccess::canManage($user, $opportunity) && ProjectAccess::maySee($projectId);
+        $link = fn (array $query) => route('hq.crm.opportunity', ['opportunity' => $opportunity->id, 'tab' => 'meetings'] + $query);
+
+        return [
+            'opportunityId' => $opportunity?->id,
+            'milestone' => $milestone,
+            'meeting' => $meeting,
+            'when' => $meeting ? self::when($meeting, app()->getLocale()) : null,
+            'review' => (int) ($counts['draft'] ?? 0),
+            'issues' => (int) ($counts['confirmed'] ?? 0),
+            'openIssues' => $meeting ? MeetingPoint::where('meeting_points.meeting_id', $meeting->id)->where('meeting_points.status', 'confirmed')
+                ->join('qa_tickets', 'qa_tickets.id', '=', 'meeting_points.qa_ticket_id')->whereNull('qa_tickets.deleted_at')
+                ->whereIn('qa_tickets.status', ['Open', 'Investigating'])->count() : 0,
+            'canSchedule' => $canSchedule,
+            'scheduleUrl' => $canSchedule && (! $meeting || $meeting->status === 'held') ? $link(['handover' => $milestone->id]) : null,
+            'meetingUrl' => $meeting && OpportunityAccess::canView($user, $opportunity) ? $link(['meeting' => $meeting->id]) : null,
+        ];
+    }
+
+    /** "9 November 2026, 10:00 WAT": the meeting's date, time and time zone, in that language */
+    public static function when(Meeting $meeting, string $language): string
+    {
+        $at = $meeting->starts_at->copy()->setTimezone($meeting->time_zone ?: Meetings::TIME_ZONE)->locale($language);
+
+        return __('handover.board.when', [
+            'date' => $at->translatedFormat(__('opportunities.formats.date', [], $language)),
+            'time' => $at->translatedFormat(__('opportunities.formats.time', [], $language)),
+            'zone' => $at->format('T'),
+        ], $language);
     }
 
     /** The milestone's tasks, in the order the AI numbers them (1, 2, …) and the lead picks from */
@@ -79,16 +129,26 @@ final class Handovers
             ->limit(self::MAX_TASKS)->get(['tasks.id', 'tasks.title', 'tasks.status']);
     }
 
-    public static function taskOnProject(string $taskId, string $projectId): bool
+    /** A point links only to a task of the meeting's own milestone */
+    public static function taskOnMilestone(string $taskId, ?string $phaseId): bool
     {
-        return DB::table('tasks')->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
-            ->where('project_phases.project_id', $projectId)->where('tasks.id', $taskId)->whereNull('tasks.deleted_at')->exists();
+        return $phaseId !== null && DB::table('tasks')->where('id', $taskId)->where('phase_id', $phaseId)->whereNull('deleted_at')->exists();
     }
 
-    /** Edit the points and confirm them as QA tickets: managing opportunities, and the opportunity's lead or the owner */
+    /** The signed-in person sees the opportunity's project (its sprint board and QA tickets) */
+    public static function canSeeProject(Opportunity $opportunity): bool
+    {
+        return $opportunity->project_id !== null && ProjectAccess::maySee($opportunity->project_id);
+    }
+
+    /**
+     * Edit the points and confirm them as QA tickets: managing the opportunity, being its lead or the owner, and seeing
+     * its project (ProjectAccess works on the signed-in person, so $user is that person)
+     */
     public static function canReview(?User $user, Opportunity $opportunity): bool
     {
-        return OpportunityAccess::canManage($user, $opportunity) && OpportunityAccess::canApprove($user, $opportunity);
+        return OpportunityAccess::canManage($user, $opportunity) && OpportunityAccess::canApprove($user, $opportunity)
+            && $user !== null && $user->is(Auth::user()) && self::canSeeProject($opportunity);
     }
 
     /** "Milestone handover: M3 Reports", in the opportunity's language (the client sees it in the invitation) */
@@ -121,8 +181,8 @@ final class Handovers
 
     /**
      * The AI drafts the points raised in a handover meeting from one of its transcripts. Throws AiUnavailable (no key,
-     * over budget) before anything is spent. Points already confirmed, left out or added by the lead go with it as
-     * "already recorded", so a new draft doesn't repeat them.
+     * over budget) before anything is spent. Every point it won't replace (confirmed, left out, added or edited by the
+     * lead, or from another transcript) goes with it as "already recorded", so a new list doesn't repeat them.
      */
     public static function draftPoints(MeetingTranscript $transcript): AiRun
     {
@@ -133,7 +193,8 @@ final class Handovers
         }
         $o = $meeting->opportunity;
         $tasks = self::milestoneTasks($o->project_id, $milestone->id);
-        $recorded = $meeting->points()->where(fn ($q) => $q->where('status', '!=', 'draft')->orWhere('origin', 'lead'))->pluck('title');
+        $replaced = self::replaceable($meeting->id, $transcript->id)->pluck('id')->all();
+        $recorded = $meeting->points()->whereNotIn('id', $replaced)->pluck('title');
 
         return Ai::queue('handover_points', $transcript, [
             // Who the client is, cached after the company brief; the milestone, its tasks and the transcript are this job's material
@@ -154,13 +215,39 @@ final class Handovers
         }
 
         return AiRun::where('subject_type', 'meeting_transcript')->whereIn('subject_id', $transcriptIds)->where('purpose', 'handover_points')
-            ->orderBy('created_at')->orderBy('id')->get(['id', 'purpose', 'subject_id', 'status', 'progress', 'error', 'output', 'created_at'])
+            ->orderBy('created_at')->orderBy('id')->get(['id', 'purpose', 'subject_id', 'status', 'progress', 'error', 'output', 'created_at', 'finished_at'])
             ->keyBy('subject_id')->all();
     }
 
     /**
+     * Still under way: queued or running, or done with points that aren't filed yet (Ai::run saves the run as done
+     * before AiRunFinished files them; after a minute it counts as filed, so a meeting that is full can't wait forever)
+     */
+    public static function isPending(AiRun $run): bool
+    {
+        if (! $run->isFinished()) {
+            return true;
+        }
+        if ($run->status !== 'done' || ! self::clean((array) ($run->output['points'] ?? []), [])) {
+            return false;
+        }
+
+        return ($run->finished_at === null || $run->finished_at->greaterThan(now()->subMinute()))
+            && ! MeetingPoint::withTrashed()->where('ai_run_id', $run->id)->exists();
+    }
+
+    /** A handover_points run of any of the meeting's transcripts that is still under way, or null */
+    public static function pendingRun(Meeting $meeting): ?AiRun
+    {
+        $transcripts = $meeting->transcripts()->pluck('id')->all();
+
+        return collect(self::latestRuns($transcripts))->first(fn (AiRun $run) => self::isPending($run));
+    }
+
+    /**
      * AiRunFinished: a finished handover_points run becomes draft points on its meeting, once (meeting row locked). It
-     * replaces the AI's points still waiting; the lead's own, confirmed and left-out points stay.
+     * replaces only the AI's points from the same transcript that are still to review and that nobody has edited; the
+     * lead's own, edited, confirmed and left-out points, and those from other transcripts, stay.
      */
     public static function fileAiOutput(AiRun $run): void
     {
@@ -178,8 +265,7 @@ final class Handovers
             if (! $meeting || MeetingPoint::withTrashed()->where('ai_run_id', $run->id)->exists()) {
                 return;
             }
-            MeetingPoint::where('meeting_id', $meeting->id)->where('status', 'draft')->where('origin', 'ai')
-                ->update(['deleted_at' => now(), 'deleted_by' => $run->requested_by]);
+            self::replaceable($meeting->id, $transcript->id)->update(['deleted_at' => now(), 'deleted_by' => $run->requested_by]);
             $count = MeetingPoint::where('meeting_id', $meeting->id)->count();
             $position = (int) MeetingPoint::where('meeting_id', $meeting->id)->max('position');
             foreach (self::clean((array) ($run->output['points'] ?? []), $taskIds) as $point) {
@@ -263,10 +349,11 @@ final class Handovers
 
     /**
      * The lead confirms a draft point: it becomes a QA ticket on the project (Open, the point's severity, linked to
-     * its task when that task is still on the project). The point is claimed under a lock, so a double click or two
-     * people at once create one ticket. Returns the ticket's id, or null when the point was no longer a draft.
+     * its task when that task is still on the meeting's milestone). The point is claimed under a lock, so a double
+     * click or two people at once create one ticket. Returns the ticket's id, or null when the point was no longer a
+     * draft. $tell: the task's assignee gets a bell now; confirming several at once tells them once (tellAssignees()).
      */
-    public static function confirm(MeetingPoint $point): ?string
+    public static function confirm(MeetingPoint $point, bool $tell = true): ?string
     {
         $userId = Auth::guard('web')->id() ?? throw new LogicException('A point is confirmed by a member of staff');
         $done = DB::transaction(function () use ($point, $userId) {
@@ -279,7 +366,7 @@ final class Handovers
             if (! $projectId || ! $meeting->isHandover()) {
                 throw new LogicException('Only a point of a handover meeting on a project becomes a QA ticket');
             }
-            $taskId = $locked->task_id && self::taskOnProject($locked->task_id, $projectId) ? $locked->task_id : null;
+            $taskId = $locked->task_id && self::taskOnMilestone($locked->task_id, $meeting->phase_id) ? $locked->task_id : null;
             $ticketId = (string) Str::uuid();
             DB::table('qa_tickets')->insert([
                 'id' => $ticketId,
@@ -306,9 +393,41 @@ final class Handovers
 
         OpportunityAccess::log('HANDOVER_POINT_CONFIRMED', sprintf('Confirmed “%s” from the milestone handover meeting “%s” as a %s QA ticket.', $locked->title, $meeting->title, strtolower($locked->severity)),
             'opportunities', $meeting->opportunity_id, [], ['meeting_id' => $meeting->id, 'point_id' => $locked->id, 'qa_ticket_id' => $ticketId, 'task_id' => $taskId]);
-        self::tellAssignee($taskId, $locked, $ticketId, $userId);
+        if ($tell) {
+            self::tellAssignees([['task_id' => $taskId, 'title' => $locked->title, 'ticket_id' => $ticketId]]);
+        }
 
         return $ticketId;
+    }
+
+    /**
+     * The people working on the tasks hear that handover points now concern them: one bell each, however many points
+     * (a bell becomes a phone push). $confirmed: [['task_id', 'title', 'ticket_id'], …]; whoever confirmed isn't told.
+     */
+    public static function tellAssignees(array $confirmed): void
+    {
+        $byTask = collect($confirmed)->filter(fn ($c) => $c['task_id'] ?? null);
+        if ($byTask->isEmpty()) {
+            return;
+        }
+        $assignees = DB::table('tasks')->whereIn('id', $byTask->pluck('task_id')->unique()->all())->whereNotNull('assigned_to')->pluck('assigned_to', 'id');
+        $active = User::whereIn('id', $assignees->unique()->values()->all())->where('status', 'Active')->pluck('id')->all();
+        foreach ($byTask->groupBy(fn ($c) => $assignees[$c['task_id']] ?? null) as $userId => $points) {
+            if ($userId === '' || ! in_array($userId, $active, true) || $userId === Auth::guard('web')->id()) {
+                continue;
+            }
+            $one = $points->count() === 1;
+            DB::table('notifications')->insert([
+                'id' => (string) Str::uuid(),
+                'user_id' => $userId,
+                'type' => 'QA_Update',
+                'title' => Str::limit(__($one ? 'handover.notify.title' : 'handover.notify.title_many'), 150, '…'),
+                'message' => $one ? __('handover.notify.message', ['title' => $points->first()['title']]) : __('handover.notify.many', ['count' => $points->count()]),
+                'link_url' => $one ? route('hq.ops.qa', ['ticket' => $points->first()['ticket_id']]) : route('hq.ops.qa'),
+                'is_read' => 0,
+                'created_at' => now(),
+            ]);
+        }
     }
 
     /** Leave a draft point out (no ticket), or bring a left-out point back as a draft; false when nothing changed */
@@ -389,6 +508,13 @@ final class Handovers
         return implode("\n", $lines);
     }
 
+    /** The AI's points of this transcript still to review that nobody has edited: what a new list of it replaces */
+    private static function replaceable(string $meetingId, string $transcriptId)
+    {
+        return MeetingPoint::where('meeting_id', $meetingId)->where('transcript_id', $transcriptId)
+            ->where('status', 'draft')->where('origin', 'ai')->whereNull('updated_by');
+    }
+
     /** The ticket's text, which the client also reads in the portal: what was asked, then where it was raised */
     private static function ticketDescription(MeetingPoint $point, Meeting $meeting): string
     {
@@ -401,25 +527,6 @@ final class Handovers
         return trim(implode("\n\n", array_filter([trim((string) $point->detail), $where])));
     }
 
-    /** The person working on the task hears that a handover point now concerns it (bell, staff only) */
-    private static function tellAssignee(?string $taskId, MeetingPoint $point, string $ticketId, string $by): void
-    {
-        $assignee = $taskId ? DB::table('tasks')->where('id', $taskId)->value('assigned_to') : null;
-        if (! $assignee || $assignee === $by || ! User::where('id', $assignee)->where('status', 'Active')->exists()) {
-            return;
-        }
-        DB::table('notifications')->insert([
-            'id' => (string) Str::uuid(),
-            'user_id' => $assignee,
-            'type' => 'QA_Update',
-            'title' => Str::limit(__('handover.notify.title'), 150, '…'),
-            'message' => __('handover.notify.message', ['title' => $point->title]),
-            'link_url' => route('hq.ops.qa', ['ticket' => $ticketId]),
-            'is_read' => 0,
-            'created_at' => now(),
-        ]);
-    }
-
     private static function material(Meeting $meeting, object $milestone, Collection $tasks, MeetingTranscript $transcript): string
     {
         $org = $meeting->opportunity->organization?->name ?: 'the client';
@@ -429,7 +536,7 @@ final class Handovers
         $numbered = $tasks->values()->map(fn ($t, $i) => sprintf('%d. %s', $i + 1, $t->title))->implode("\n");
 
         return implode("\n", array_filter([
-            sprintf('Milestone handover meeting: %s, %s WAT', $meeting->title, Meetings::when($meeting)),
+            'Milestone handover meeting: ' . $meeting->title . ', ' . self::when($meeting, 'en'),
             'Milestone: ' . $milestone->title . (filled($milestone->description) ? ' (' . Str::limit(trim($milestone->description), 500) . ')' : ''),
             $who !== '' ? "Attendees: {$who}" : null,
             filled($meeting->agenda) ? 'Agenda: ' . trim($meeting->agenda) : null,
