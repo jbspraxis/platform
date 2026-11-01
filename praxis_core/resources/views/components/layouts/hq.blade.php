@@ -114,7 +114,7 @@
                 @if (request()->routeIs('hq.ops.*'))
                     <div class="rail-sub">
                         @can('projects.view')
-                            <a href="{{ route('hq.ops.deployments') }}" class="{{ $on('hq.ops.deployments') }}" wire:navigate>All projects</a>
+                            <a href="{{ route('hq.ops.deployments') }}" class="{{ $on('hq.ops.deployments', 'hq.ops.project') }}" wire:navigate>All projects</a>
                             <a href="{{ route('hq.ops.boards.directory') }}" class="{{ $on('hq.ops.boards.directory', 'hq.ops.board') }}" wire:navigate>Sprint boards</a>
                         @endcan
                         @can('qa.view')

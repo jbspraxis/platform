@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Storage;
  */
 class SecureFileController extends Controller
 {
-    private const FOLDERS = ['receipts', 'qa_evidence', 'pop_receipts', 'pop_receipts_wht', 'vault'];
+    private const FOLDERS = ['receipts', 'qa_evidence', 'pop_receipts', 'pop_receipts_wht', 'vault', 'task_files'];
 
     public function show(Request $request, string $path)
     {
@@ -28,6 +28,11 @@ class SecureFileController extends Controller
 
         abort_unless($this->canView($request->user(), $folder, $path), 403);
         abort_unless(Storage::disk('local')->exists($path), 404);
+
+        // Files added to task comments can be anything: they always download, never open inside HQ
+        if ($folder === 'task_files') {
+            return Storage::disk('local')->download($path, null, ['Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
+        }
 
         return Storage::disk('local')->response($path, null, [
             'Cache-Control' => 'private, no-store',
@@ -45,6 +50,10 @@ class SecureFileController extends Controller
                 'qa_evidence' => $user->can('qa.view') || $user->can('projects.view'),
                 'pop_receipts', 'pop_receipts_wht' => $user->can('finance.view'),
                 'vault' => $user->can('hr.view'), // candidate CVs
+                // Task comment files (task_files/<task id>/…): whoever may open that task's project page
+                'task_files' => ($projectId = DB::table('tasks')->join('project_phases', 'project_phases.id', '=', 'tasks.phase_id')
+                    ->where('tasks.id', explode('/', $path)[1] ?? '')->value('project_phases.project_id'))
+                    && \App\Support\Projects\ProjectRules::canView($projectId),
                 default => false,
             };
         }

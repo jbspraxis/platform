@@ -40,6 +40,31 @@ class InvoiceLedger extends Component
     {
         $this->loadMasterData();
         $this->loadInvoices();
+        $this->prefillFromProject();
+    }
+
+    /**
+     * ?create=1&project=<id>&phase=<id>: a milestone dragged to Invoiced on its project page (docs/PROJECTS.md)
+     * opens Create invoice with the project, the milestone and its share of the contract filled in.
+     */
+    private function prefillFromProject(): void
+    {
+        if (! request()->boolean('create') || ! Auth::user()->can('finance.create')) {
+            return;
+        }
+        $project = collect($this->activeProjects)->firstWhere('id', (string) request()->query('project'));
+        if ($project) {
+            $this->new_project_id = $project->id;
+            $this->updatedNewProjectId($project->id);
+            $phase = collect($this->projectPhases)->firstWhere('id', (string) request()->query('phase'));
+            if ($phase) {
+                $total = (float) DB::table('projects')->where('id', $project->id)->value('total_budget');
+                $this->new_phase_id = $phase->id;
+                $this->new_amount_due = round($total * (float) $phase->weight_percentage / 100, 2);
+                $this->new_description = Str::limit(__('projects.invoice_line', ['milestone' => $phase->title]), 250);
+            }
+        }
+        $this->showCreateModal = true;
     }
 
     public function setTab($tab)
@@ -64,11 +89,14 @@ class InvoiceLedger extends Component
 
     public function updatedNewProjectId($projectId)
     {
-        // When a project is selected, fetch its pending phases and currency
+        // When a project is selected, fetch the phases (milestones) not invoiced yet and its currency. A milestone is
+        // invoiced on the client's acceptance, so accepted ones are offered too (docs/PROJECTS.md, decision 2)
         if (!empty($projectId)) {
             $this->projectPhases = DB::table('project_phases')
                 ->where('project_id', $projectId)
-                ->where('status', 'Pending')
+                ->whereNull('deleted_at')
+                ->whereNotIn('id', DB::table('invoices')->whereNotNull('phase_id')->whereNull('deleted_at')->where('status', '!=', 'Cancelled')->select('phase_id'))
+                ->orderBy('phase_number')
                 ->get();
 
             $project = collect($this->activeProjects)->firstWhere('id', $projectId);

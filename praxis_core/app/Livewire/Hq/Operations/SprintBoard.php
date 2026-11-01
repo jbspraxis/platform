@@ -30,6 +30,10 @@ class SprintBoard extends Component
     #[Locked]
     public bool $canMoveAny = false; // projects.approve: move anyone’s task
 
+    // On the project page's Sprints tab (docs/PROJECTS.md): the page has the header and the task drawer
+    #[Locked]
+    public bool $embedded = false;
+
     // Board State
     public $activeSprintId = null;
     public $sprints = [];
@@ -44,8 +48,9 @@ class SprintBoard extends Component
     // Telemetry State
     public $teamCapacity = []; // Tracks burnout risk
 
-    public function mount($id)
+    public function mount($id, bool $embedded = false)
     {
+        $this->embedded = $embedded;
         $this->canMoveOwn = Auth::user()->can('projects.edit');
         $this->canMoveAny = Auth::user()->can('projects.approve');
         $project = DB::table('projects')->where('id', $id)->first();
@@ -88,6 +93,15 @@ class SprintBoard extends Component
             ->where('tasks.id', $taskId)
             ->select('tasks.*')
             ->first();
+    }
+
+    /** A drawer on the project page changed a sprint or a task: the menu and the cards follow */
+    #[\Livewire\Attributes\On('project-changed')]
+    public function refreshFromProject(): void
+    {
+        $this->authoriseBoard();
+        $this->sprints = DB::table('sprints')->where('project_id', $this->projectId)->whereNull('deleted_at')->orderBy('start_date', 'asc')->get()->toArray();
+        $this->updatedActiveSprintId($this->activeSprintId);
     }
 
     public function switchSprint($sprintId)
@@ -170,6 +184,29 @@ class SprintBoard extends Component
         }
 
         $this->teamCapacity = $capacityTracker;
+        $this->decorateCards();
+    }
+
+    /**
+     * What a card shows since the project page (docs/PROJECTS.md): due date and Overdue, the open tasks it waits on
+     * (a warning only), how many share it, and whether this person may drag it (lead or sharing it, or a manager).
+     */
+    private function decorateCards(): void
+    {
+        $ids = collect($this->tasks)->flatten(1)->pluck('id')->all();
+        $waits = \App\Support\Projects\ProjectPlan::openWaits($ids);
+        $sharing = $ids ? DB::table('task_people')->whereIn('task_id', $ids)->where('role', 'sharing')->groupBy('task_id')->selectRaw('task_id, COUNT(*) AS n')->pluck('n', 'task_id') : collect();
+        $mayMove = \App\Support\Projects\ProjectRules::mover($this->projectId);
+        foreach ($this->tasks as $column => $cards) {
+            foreach ($cards as $i => $card) {
+                $this->tasks[$column][$i] += [
+                    'is_overdue' => \App\Support\Projects\ProjectPlan::taskOverdue($card),
+                    'waits_on' => collect($waits->get($card['id'], []))->pluck('title')->all(),
+                    'sharing_count' => (int) ($sharing[$card['id']] ?? 0),
+                    'can_move' => $mayMove($card),
+                ];
+            }
+        }
     }
 
     // --- CHECKOUT SYSTEM (Rule 8: C) ---
@@ -202,100 +239,19 @@ class SprintBoard extends Component
         $task = $this->boardTask($taskId);
         if (!$task || $task->status === $newStatus || ! in_array($newStatus, self::COLUMNS, true)) return;
 
-        // Security Gate: own tasks need projects.edit; someone else’s (or unassigned) need projects.approve
-        $isOwn = $task->assigned_to === Auth::id();
-        if (! Auth::user()->can($isOwn ? 'projects.edit' : 'projects.approve')) {
-            session()->flash('error', 'You can only move tasks assigned to you. Ask a project lead to move this one.');
+        // Security gate: the lead or someone sharing the task (projects.edit), the project's lead or a manager, or
+        // projects.approve for anyone's (App\Support\Projects\ProjectRules)
+        if (! \App\Support\Projects\ProjectRules::canMove($task, $this->projectId)) {
+            session()->flash('error', __('projects.task.move_own'));
             return;
         }
 
-        DB::transaction(function () use ($task, $newStatus) {
-            $oldStatus = $task->status;
-            $updateData = ['status' => $newStatus, 'updated_at' => now()];
-
-            // 1. The 5-Hour Client QA SLA (Rule 6)
-            if ($newStatus === 'QA_Review') {
-                $updateData['qa_sla_expires_at'] = now()->addHours(5);
-                $this->notifyAdmins("‘{$task->title}’ is waiting for the client’s review. If the client doesn’t respond within 5 hours, it’s approved automatically.");
-            }
-
-            // 2. Clear SLA if pulled out of QA
-            if ($oldStatus === 'QA_Review' && $newStatus !== 'QA_Review' && $newStatus !== 'Done') {
-                $updateData['qa_sla_expires_at'] = null;
-            }
-
-            DB::table('tasks')->where('id', $task->id)->update($updateData);
-
-            // ==========================================
-            // THE SILENT TIMER ENGINE
-            // ==========================================
-            
-            // TIMER START: Dragged INTO 'In-Progress'
-            if ($newStatus === 'In-Progress' && $oldStatus !== 'In-Progress') {
-                DB::table('task_time_logs')->insert([
-                    'task_id' => $task->id,
-                    'user_id' => Auth::id(),
-                    'start_time' => now(),
-                    'created_at' => now()
-                ]);
-            } 
-            // TIMER STOP: Dragged OUT OF 'In-Progress'
-            elseif ($oldStatus === 'In-Progress' && $newStatus !== 'In-Progress') {
-                
-                // Find the open timer
-                $openLog = DB::table('task_time_logs')
-                    ->where('task_id', $task->id)
-                    ->where('user_id', Auth::id())
-                    ->whereNull('end_time')
-                    ->orderBy('start_time', 'desc')
-                    ->first();
-
-                if ($openLog) {
-                    $endTime = now();
-                    $durationMinutes = Carbon::parse($openLog->start_time)->diffInMinutes($endTime);
-                    
-                    // Fetch Engineer’s Hourly Rate for Live Margin Deduction (Fallback to $50/hr if unset)
-                    $rate = DB::table('compensation_history')
-                                ->where('user_id', Auth::id())
-                                ->orderBy('effective_from', 'desc')
-                                ->value('hourly_rate') ?? 50.00;
-                    
-                    $costCalculated = ($durationMinutes / 60) * $rate;
-
-                    // Close the log and stamp the cost
-                    DB::table('task_time_logs')->where('id', $openLog->id)->update([
-                        'end_time' => $endTime,
-                        'duration_minutes' => $durationMinutes,
-                        'cost_calculated' => $costCalculated
-                    ]);
-
-                    // Add elapsed time to total task actuals
-                    DB::table('tasks')->where('id', $task->id)->update([
-                        'actual_hours_logged' => DB::raw("actual_hours_logged + " . round($durationMinutes / 60, 2))
-                    ]);
-                }
-            }
-        });
-        // Waiting for the client's review: the project's client accounts hear about it (docs/PWA.md)
-        if ($newStatus === 'QA_Review') {
-            \App\Support\Pwa\ClientNotify::task($task->id);
-        }
+        // The client review window, the timers and the notices (moved to App\Support\Projects\Tasks::move, which the
+        // project page's task drawer uses too)
+        \App\Support\Projects\Tasks::move($this->projectId, $task, $newStatus);
 
         $this->loadBoardData();
-    }
-
-    private function notifyAdmins($message)
-    {
-        // QA approvers (they follow what lands in client review)
-        $inserts = [];
-        foreach(Access::staffWith('qa.approve') as $adminId) {
-            $inserts[] = [
-                'id' => (string) Str::uuid(), 'user_id' => $adminId,
-                'title' => 'Task ready for client review', 'message' => $message,
-                'type' => 'Project', 'created_at' => now()
-            ];
-        }
-        if(!empty($inserts)) DB::table('notifications')->insert($inserts);
+        $this->dispatch('project-changed')->to(\App\Livewire\Hq\Projects\ProjectPage::class); // the page's header and counts
     }
 
     private function logAudit($action, $description)

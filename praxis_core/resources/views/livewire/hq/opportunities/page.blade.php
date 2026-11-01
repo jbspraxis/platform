@@ -299,7 +299,10 @@
                         @endif
                     </dl>
                     @if ($canOpenProjects)
-                        <a href="{{ route('hq.ops.board', ['id' => $project->id]) }}" class="btn btn-secondary" wire:navigate><i data-lucide="kanban"></i> {{ __('opportunities.project.open_board') }}</a>
+                        <div class="opp-actions">
+                            <a href="{{ route('hq.ops.project', ['project' => $project->id]) }}" class="btn btn-primary" wire:navigate><i data-lucide="folder-kanban"></i> {{ __('projects.open_page') }}</a>
+                            <a href="{{ route('hq.ops.project', ['project' => $project->id, 'tab' => 'sprints']) }}" class="btn btn-secondary" wire:navigate><i data-lucide="kanban"></i> {{ __('opportunities.project.open_board') }}</a>
+                        </div>
                     @endif
                 </section>
             @else

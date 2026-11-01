@@ -1,19 +1,21 @@
 <div>
     @php
         // Stored task statuses (database values) and what people read; QA_Review is the client’s 5-hour review, as named in the Client Portal
-        $columnLabels = ['To-Do' => 'To do', 'In-Progress' => 'In progress', 'QA_Review' => 'Client review', 'Failed' => 'Changes requested', 'Done' => 'Done'];
+        $columnLabels = collect(['To-Do', 'In-Progress', 'QA_Review', 'Failed', 'Done'])->mapWithKeys(fn ($s) => [$s => __('projects.task_statuses.' . $s)])->all();
     @endphp
 
-    <div class="page-header">
+    <div class="page-header" @if($embedded) style="margin-bottom: 16px" @endif>
         <div>
-            <h1 class="page-title">Sprint board: {{ $project->title }}</h1>
-            <p class="page-subtitle">Drag a task to change its status; moving it into In progress starts your timer.</p>
+            @unless($embedded)
+                <h1 class="page-title">{{ __('projects.board.title', ['project' => $project->title]) }}</h1>
+            @endunless
+            <p class="page-subtitle">{{ __('projects.board.subtitle') }}</p>
         </div>
 
         <div class="flex flex-wrap items-end gap-3">
             @if(!empty($sprints))
                 <div class="field">
-                    <label for="sprint-select" class="label">Sprint</label>
+                    <label for="sprint-select" class="label">{{ __('projects.board.sprint') }}</label>
                     <select id="sprint-select" wire:model.live="activeSprintId" class="select min-w-[240px]">
                         @foreach($sprints as $sprint)
                             <option value="{{ $sprint->id }}">{{ $sprint->title }} ({{ \Carbon\Carbon::parse($sprint->start_date)->format('j M') }} to {{ \Carbon\Carbon::parse($sprint->end_date)->format('j M') }})</option>
@@ -22,9 +24,11 @@
                 </div>
             @endif
 
-            <a href="{{ route('hq.ops.deployments') }}" class="btn btn-secondary" wire:navigate>
-                <i data-lucide="arrow-left"></i> All projects
-            </a>
+            @unless($embedded)
+                <a href="{{ route('hq.ops.project', ['project' => $projectId, 'tab' => 'sprints']) }}" class="btn btn-secondary" wire:navigate>
+                    <i data-lucide="folder-kanban"></i> {{ __('projects.open_page') }}
+                </a>
+            @endunless
         </div>
     </div>
 
@@ -36,7 +40,7 @@
 
     @if(!empty($teamCapacity))
         <div class="card mb-4 flex flex-wrap items-center gap-3 py-4">
-            <span class="stat-label">Open hours assigned in this sprint</span>
+            <span class="stat-label">{{ __('projects.board.capacity') }}</span>
             @foreach($teamCapacity as $userId => $data)
                 @php
                     $capClass = 'pill-success';
@@ -85,16 +89,32 @@
                 <div class="flex min-h-[300px] flex-1 flex-col gap-3 p-3">
                     @foreach($tasks[$column] as $task)
                         @php
-                            $isDraggable = (($task['assigned_to'] === auth()->id() && $canMoveOwn) || $canMoveAny) ? 'true' : 'false';
+                            // The lead or someone sharing it, the project's lead or a manager (App\Support\Projects\ProjectRules)
+                            $isDraggable = ($task['can_move'] ?? false) ? 'true' : 'false';
                         @endphp
 
                         <div class="rounded-lg border border-line bg-paper p-3 transition-colors hover:border-deep-teal {{ $isDraggable === 'true' ? 'cursor-grab' : '' }}"
-                             draggable="{{ $isDraggable }}"
+                             draggable="{{ $isDraggable }}" wire:key="card-{{ $task['id'] }}"
                              @dragstart="dragStart($event, '{{ $task['id'] }}', '{{ $column }}')"
                              style="{{ $isDraggable === 'false' && $task['assigned_to'] ? 'opacity: 0.6; cursor: not-allowed;' : '' }}">
 
                             <div class="text-caption text-muted">{{ $task['phase_title'] }}</div>
-                            <div class="mt-1 mb-3 text-small font-semibold text-ink">{{ $task['title'] }}</div>
+                            {{-- Opens the task drawer (docs/PROJECTS.md section 3) --}}
+                            <button type="button" class="mt-1 mb-3 block w-full cursor-pointer border-0 bg-transparent p-0 text-left text-small font-semibold text-ink hover:text-deep-teal"
+                                    wire:click="$dispatch('open-task', { id: '{{ $task['id'] }}' })">{{ $task['title'] }}</button>
+
+                            @if(!empty($task['due_date']) || !empty($task['waits_on']))
+                                <div class="mb-3 flex flex-wrap gap-1.5">
+                                    @if(!empty($task['due_date']))
+                                        <span class="pill {{ ($task['is_overdue'] ?? false) ? 'pill-danger' : 'pill-neutral' }}">
+                                            {{ ($task['is_overdue'] ?? false) ? __('projects.overdue') . ' · ' : '' }}{{ __('projects.due', ['date' => \App\Support\Projects\ProjectPlan::day($task['due_date'], 'short')]) }}
+                                        </span>
+                                    @endif
+                                    @if(!empty($task['waits_on']))
+                                        <span class="pill pill-warning" title="{{ implode(' · ', $task['waits_on']) }}">{{ trans_choice('projects.waits.card', count($task['waits_on']), ['count' => count($task['waits_on'])]) }}</span>
+                                    @endif
+                                </div>
+                            @endif
 
                             @if($column === 'QA_Review' && $task['qa_sla_expires_at'])
                                 @php
@@ -109,16 +129,19 @@
                             @if(!$task['assigned_to'])
                                 @if($canMoveOwn)
                                     <button type="button" wire:click="assignToMe('{{ $task['id'] }}')" class="btn btn-secondary btn-sm w-full">
-                                        <i data-lucide="user-plus"></i> Assign to me
+                                        <i data-lucide="user-plus"></i> {{ __('projects.task.assign_to_me') }}
                                     </button>
                                 @endif
                             @else
-                                <div class="flex items-center justify-between border-t border-line pt-2">
-                                    <span class="grid h-6 min-w-6 place-items-center rounded-full bg-teal-tint px-1.5 text-caption font-semibold text-petrol num" title="{{ $task['story_points'] }} story points">{{ $task['story_points'] }}</span>
-                                    <span class="inline-flex items-center gap-1 text-caption text-slate">
+                                {{-- Story points stay in the database for the timers but are no longer shown (decision 3) --}}
+                                <div class="flex items-center justify-between gap-2 border-t border-line pt-2">
+                                    <span class="inline-flex min-w-0 items-center gap-1 text-caption text-slate">
                                         <i data-lucide="user" class="h-3.5 w-3.5"></i>
                                         {{ substr($task['first_name'], 0, 1) }}. {{ $task['last_name'] }}
                                     </span>
+                                    @if(($task['sharing_count'] ?? 0) > 0)
+                                        <span class="tag" title="{{ __('projects.task.sharing') }}">+{{ $task['sharing_count'] }}</span>
+                                    @endif
                                 </div>
                             @endif
 
@@ -140,13 +163,18 @@
 
                     @if(count($tasks[$column]) === 0)
                         <div class="rounded-lg border border-dashed border-line p-4 text-center text-caption text-muted">
-                            No tasks. Drag a task here.
+                            {{ __('projects.board.empty_column') }}
                         </div>
                     @endif
                 </div>
             </div>
         @endforeach
     </div>
+
+    {{-- On its own page the board brings the task drawer; on the project page the page has it --}}
+    @unless($embedded)
+        <livewire:hq.projects.task-drawer :project-id="$projectId" :key="'board-task-drawer-' . $projectId" />
+    @endunless
 
     <script>
         function sprintBoard(hasActiveTasks) {

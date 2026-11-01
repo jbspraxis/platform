@@ -87,8 +87,8 @@
                     <div class="stat-value">{{ $kpiActiveDeployments }}</div>
                 </div>
                 <div class="card">
-                    <div class="stat-label">Story points done in the last 7 days</div>
-                    <div class="stat-value">{{ $kpiSprintVelocity }} <span class="text-small font-normal text-muted">points</span></div>
+                    <div class="stat-label">{{ __('projects.all.done_week') }}</div>
+                    <div class="stat-value">{{ $kpiSprintVelocity }}</div>
                 </div>
 
                 @if($canSeeMoney)
@@ -135,7 +135,7 @@
                                 </div>
                             </div>
 
-                            <div class="relative grid h-[60px] w-[60px] shrink-0 place-items-center" role="img" aria-label="{{ $p['progress_percent'] }}% of story points done">
+                            <div class="relative grid h-[60px] w-[60px] shrink-0 place-items-center" role="img" aria-label="{{ __('projects.stats.progress_label', ['value' => $p['progress_percent'] . '%']) }}">
                                 <svg width="60" height="60" class="-rotate-90">
                                     <circle stroke="var(--color-line)" stroke-width="4" fill="transparent" r="24" cx="30" cy="30"/>
                                     <circle stroke="{{ $ringColor }}" stroke-width="4" stroke-linecap="round" fill="transparent" r="24" cx="30" cy="30" style="stroke-dasharray: {{ $circumference }}; stroke-dashoffset: {{ $offset }};"/>
@@ -146,7 +146,7 @@
 
                         <div class="flex flex-wrap justify-between gap-4 rounded-lg bg-mist px-4 py-3">
                             <div>
-                                <div class="stat-label">Story points done</div>
+                                <div class="stat-label">{{ __('projects.all.tasks_done') }}</div>
                                 <div class="text-small font-semibold text-ink num text-left">{{ $p['completed_points'] }} of {{ $p['total_points'] }}</div>
                             </div>
                             @if($canSeeMoney)
@@ -161,6 +161,13 @@
                         </div>
 
                         <div class="mt-auto flex flex-col gap-2 pt-4">
+                            {{-- The project page (docs/PROJECTS.md) follows the sprint board's rule --}}
+                            @if($canOpenAnyBoard)
+                                <a href="{{ route('hq.ops.project', $p['id']) }}" class="btn btn-primary w-full" wire:navigate>
+                                    <i data-lucide="folder-kanban"></i> {{ __('projects.open_page') }}
+                                </a>
+                            @endif
+
                             @if($canCreate)
                                 <a href="{{ route('hq.ops.scrum', $p['id']) }}" class="btn btn-secondary w-full">
                                     <i data-lucide="list-checks"></i> Plan sprints
@@ -168,7 +175,7 @@
                             @endif
 
                             @if($canOpenAnyBoard)
-                                <a href="{{ route('hq.ops.board', $p['id']) }}" class="btn btn-secondary w-full">
+                                <a href="{{ route('hq.ops.project', ['project' => $p['id'], 'tab' => 'sprints']) }}" class="btn btn-secondary w-full" wire:navigate>
                                     <i data-lucide="layout-dashboard"></i> Open sprint board
                                 </a>
                             @endif
@@ -242,7 +249,9 @@
                                         @if($canCreate)
                                             <a href="{{ route('hq.ops.scrum', $p['id']) }}" class="btn btn-secondary btn-sm">Plan sprints</a>
                                         @endif
-                                        <a href="{{ route('hq.ops.boards.directory', ['project' => $p['id']]) }}" class="btn btn-secondary btn-sm">Sprint boards</a>
+                                        @if($canOpenAnyBoard)
+                                            <a href="{{ route('hq.ops.project', $p['id']) }}" class="btn btn-secondary btn-sm" wire:navigate>{{ __('projects.open_page') }}</a>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>

@@ -136,15 +136,9 @@ class ActiveDeployments extends Component
             });
         }
 
-        // Isolation: without $canSeeAll, only projects with tasks assigned to this user
+        // Isolation: without $canSeeAll, only the projects this user leads or has tasks on (App\Support\ProjectAccess)
         if (! $this->canSeeAll) {
-            $assignedProjectIds = DB::table('tasks')
-                ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
-                ->where('tasks.assigned_to', Auth::id())
-                ->pluck('project_phases.project_id')
-                ->unique();
-                
-            $query->whereIn('projects.id', $assignedProjectIds);
+            $query->whereIn('projects.id', \App\Support\ProjectAccess::assignedProjectIds());
         } else {
             if (!empty($this->filterAssignee)) {
                 $filteredProjectIds = DB::table('tasks')
@@ -162,19 +156,15 @@ class ActiveDeployments extends Component
         $bleedingCount = 0;
 
         foreach ($rawProjects as $project) {
-            $taskStats = DB::table('tasks')
+            // Progress is the milestones' weights × their done tasks (docs/PROJECTS.md, decision 3), as on the project page
+            $milestones = \App\Support\Projects\ProjectPlan::milestones($project->id);
+            $totalPoints = $milestones->sum('tasks_total');
+            $completedPoints = $milestones->sum('tasks_done');
+            $progressPercent = (int) round(\App\Support\Projects\ProjectPlan::progress($milestones));
+            $totalHours = DB::table('tasks')
                 ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
                 ->where('project_phases.project_id', $project->id)
-                ->selectRaw('
-                    SUM(tasks.story_points) as total_points,
-                    SUM(CASE WHEN tasks.status = "Done" THEN tasks.story_points ELSE 0 END) as completed_points,
-                    SUM(tasks.actual_hours_logged) as total_hours
-                ')->first();
-
-            $totalPoints = $taskStats->total_points ?? 0;
-            $completedPoints = $taskStats->completed_points ?? 0;
-            $progressPercent = $totalPoints > 0 ? round(($completedPoints / $totalPoints) * 100) : 0;
-            $totalHours = $taskStats->total_hours ?? 0;
+                ->sum('tasks.actual_hours_logged');
 
             $spentAmount = $totalHours * $this->firmHourlyRate;
             $burnPercent = $project->total_budget > 0 ? round(($spentAmount / $project->total_budget) * 100) : 0;
@@ -221,10 +211,11 @@ class ActiveDeployments extends Component
         $this->kpiActiveDeployments = DB::table('projects')->whereIn('status', ['Active', 'Locked'])->count();
         $this->kpiBleedingProjects = $bleedingCount;
 
+        // Tasks done in the last 7 days (story points are no longer shown, docs/PROJECTS.md decision 3)
         $this->kpiSprintVelocity = DB::table('tasks')
             ->where('status', 'Done')
             ->where('updated_at', '>=', now()->subDays(7))
-            ->sum('story_points');
+            ->count();
 
         if ($this->canSeeMoney) {
             $this->kpiCapitalAtRisk = HqMoney::sumByCurrency(DB::table('invoices')
@@ -256,13 +247,7 @@ class ActiveDeployments extends Component
 
         // Still isolate without $canSeeAll
         if (! $this->canSeeAll) {
-            $assignedProjectIds = DB::table('tasks')
-                ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
-                ->where('tasks.assigned_to', Auth::id())
-                ->pluck('project_phases.project_id')
-                ->unique();
-
-            $query->whereIn('projects.id', $assignedProjectIds);
+            $query->whereIn('projects.id', \App\Support\ProjectAccess::assignedProjectIds());
         }
 
         $this->ledgerProjects = json_decode(json_encode($query->get()), true);
@@ -305,6 +290,7 @@ class ActiveDeployments extends Component
             'status' => $this->newStatus,
             'start_date' => $this->newStartDate ?: null,
             'target_end_date' => $this->newEndDate ?: null,
+            'lead_user_id' => Auth::id(), // whoever creates it leads it until the project page says otherwise
             'created_by' => Auth::id(),
             'created_at' => now(),
             'updated_at' => now()

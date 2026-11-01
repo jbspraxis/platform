@@ -134,6 +134,8 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
                 Route::get('/scrum-master/{id}', \App\Livewire\Hq\Operations\ScrumMaster::class)->name('hq.ops.scrum');
                 Route::get('/sprint-boards', \App\Livewire\Hq\Operations\SprintBoardDirectory::class)->name('hq.ops.boards.directory');
                 Route::get('/sprint-board/{id}', \App\Livewire\Hq\Operations\SprintBoard::class)->name('hq.ops.board');
+                // One page per project: milestones, sprints, backlog, QA, meetings and money (docs/PROJECTS.md)
+                Route::get('/projects/{project}', \App\Livewire\Hq\Projects\ProjectPage::class)->whereUuid('project')->name('hq.ops.project');
             });
             Route::get('/qa-hub', \App\Livewire\Hq\Operations\QaHub::class)->middleware('can:qa.view')->name('hq.ops.qa');
             Route::get('/silent-timers', \App\Livewire\Hq\Operations\SilentTimers::class)->middleware('can:timesheets.view')->name('hq.ops.timers');

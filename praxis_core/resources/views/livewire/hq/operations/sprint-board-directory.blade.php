@@ -8,7 +8,8 @@
 
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         @forelse($projects as $p)
-            <a href="{{ route('hq.ops.board', $p->id) }}" class="card flex flex-col gap-3 no-underline transition-colors hover:border-deep-teal" wire:navigate>
+            {{-- The board is the Sprints tab of the project page (docs/PROJECTS.md) --}}
+            <a href="{{ route('hq.ops.project', ['project' => $p->id, 'tab' => 'sprints']) }}" class="card flex flex-col gap-3 no-underline transition-colors hover:border-deep-teal" wire:navigate>
                 <div>
                     <div class="text-caption text-muted">{{ $p->client_name }}</div>
                     <div class="mt-1 font-semibold text-ink">{{ $p->title }}</div>
