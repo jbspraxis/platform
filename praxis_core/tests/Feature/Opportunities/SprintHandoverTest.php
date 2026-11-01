@@ -305,6 +305,52 @@ class SprintHandoverTest extends TestCase
         $this->assertSame(Handovers::MAX_POINTS, $m->points()->count());
     }
 
+    public function test_the_opportunitys_team_works_on_its_handovers_whatever_their_roles(): void
+    {
+        // Engineers have no opportunity permission: the lead and a team member get theirs from this opportunity's team
+        $lead = $this->staff('lead', ['engineer']);
+        $s = $this->handover(lead: $lead);
+        $member = $this->staff('member', ['engineer']);
+        $outsider = $this->staff('outsider', ['engineer']);
+        DB::table('opportunity_members')->insert(['id' => (string) Str::uuid(), 'opportunity_id' => $s['o']->id, 'user_id' => $member->id, 'created_at' => now()]);
+        // Each may see the sprint board through a task of their own
+        foreach ([$lead, $member, $outsider] as $i => $person) {
+            DB::table('tasks')->where('id', $s['tasks'][$i])->update(['assigned_to' => $person->id]);
+        }
+
+        // A member schedules the handover from the board
+        $this->actingAs($member);
+        Livewire::test(SprintBoard::class, ['id' => $s['project']])->assertSee('Schedule the handover');
+        Livewire::withQueryParams(['handover' => $s['sprint']])->test(MeetingsTab::class, ['opportunityId' => $s['o']->id])
+            ->assertSet('formOpen', true)->set('date', '2026-11-09')->set('time', '10:00')->call('save')->assertHasNoErrors();
+        $this->assertSame($s['sprint'], Meeting::sole()->sprint_id);
+
+        // Someone off the team, without the permission, sees the board's handover but can't open or schedule it
+        $this->actingAs($outsider);
+        Livewire::test(SprintBoard::class, ['id' => $s['project']])->assertSee('Handover: M3: Reports')
+            ->assertDontSee('Open the meeting')->assertDontSee('Schedule another')->assertDontSee('Schedule the handover');
+        $this->get(route('hq.crm.opportunity', ['opportunity' => $s['o']->id, 'tab' => 'meetings', 'handover' => $s['sprint']]))->assertForbidden();
+
+        // Points: the member reads them but neither lists them again (no transcript right) nor confirms them (not the lead)
+        $m = $this->heldHandover($s);
+        $t = Transcripts::fromText($m, 'Ada Obi (10:02): The stock export stops at 5,000 rows.', 'paste');
+        $point = $m->points()->first();
+        $this->actingAs($member);
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('toggle', $m->id)
+            ->assertSee('Stock report export stops at 5,000 rows')->assertSee('Waiting for the lead to confirm.')->assertDontSee('List the points again');
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('confirmPoint', $point->id)->assertForbidden();
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('draftPoints', $t->id)->assertForbidden();
+        $this->assertSame(0, DB::table('qa_tickets')->count());
+
+        // The lead does both
+        $this->actingAs($lead);
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('toggle', $m->id)
+            ->call('confirmPoint', $point->id)->assertSee('Issue created')
+            ->call('draftPoints', $t->id)->assertHasNoErrors();
+        $this->assertSame(1, DB::table('qa_tickets')->count());
+        $this->assertCount(2, $this->ai->requestsFor('handover_points'));
+    }
+
     public function test_listing_again_replaces_only_the_points_still_to_review_and_says_what_is_recorded(): void
     {
         $s = $this->handover();

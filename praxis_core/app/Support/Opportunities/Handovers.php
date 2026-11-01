@@ -24,9 +24,9 @@ use LogicException;
  * the project, linked to the sprint task when known; nothing is created without that confirmation. The meeting then
  * shows every point with its ticket's status, and signoffText() lists them for the handover sign-off.
  *
- * Who: anyone who sees the meeting (opportunities.view) sees its points; drafting them reads the transcript
- * (opportunities.manage + canReadTranscripts); editing and confirming creates tickets the client sees, so it is the
- * lead's or the owner's (canReview: opportunities.manage + canApprove).
+ * Who (always for this opportunity: the permission, or being on its team, OpportunityAccess): anyone who can view it
+ * sees the points; drafting them reads the transcript (canManage + canReadTranscripts); editing and confirming creates
+ * tickets the client sees, so it is the lead's or the owner's (canReview: canManage + canApprove).
  */
 final class Handovers
 {

@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Str;
 use App\Models\Meeting;
 use App\Models\MeetingPoint;
+use App\Models\Opportunity;
 use App\Support\Access;
 use App\Support\Opportunities\Handovers;
 use App\Support\Opportunities\Meetings;
@@ -360,12 +361,14 @@ class SprintBoard extends Component
 
     /**
      * The selected sprint's handover meeting (the latest not cancelled) and its points, and the links to schedule or
-     * open it. Scheduling happens on the opportunity's Meetings tab, which checks opportunities.manage again.
+     * open it. Who may schedule or open it is decided by that opportunity (the permission, or being on its team); the
+     * Meetings tab checks again.
      */
     private function handover(): array
     {
         $user = Auth::user();
-        $canSchedule = $this->opportunityId !== null && OpportunityAccess::canManage($user);
+        $opportunity = $this->opportunityId ? Opportunity::find($this->opportunityId) : null;
+        $canSchedule = $opportunity !== null && OpportunityAccess::canManage($user, $opportunity);
         $meeting = $this->opportunityId && $this->activeSprintId
             ? Meeting::where('opportunity_id', $this->opportunityId)->where('sprint_id', $this->activeSprintId)->where('kind', 'client')
                 ->where('status', '!=', 'cancelled')->orderByDesc('starts_at')->first()
@@ -387,7 +390,7 @@ class SprintBoard extends Component
             'openIssues' => $openIssues,
             'canSchedule' => $canSchedule,
             'scheduleUrl' => $canSchedule && $this->activeSprintId && (! $meeting || $meeting->status === 'held') ? $link(['handover' => $this->activeSprintId]) : null,
-            'meetingUrl' => $meeting && OpportunityAccess::canView($user) ? $link(['meeting' => $meeting->id]) : null,
+            'meetingUrl' => $meeting && $opportunity && OpportunityAccess::canView($user, $opportunity) ? $link(['meeting' => $meeting->id]) : null,
         ];
     }
 
