@@ -1,6 +1,10 @@
 <div>
     @php
         $regionNames = ['CM' => 'Cameroon', 'NG' => 'Nigeria', 'KE' => 'Kenya', 'GLOBAL' => 'Head office'];
+        // VAT (App\Support\Finance\Vat): only people who may edit master data change it
+        $canVat = auth()->user()->can('mdm.edit');
+        $vatRate = $region_code ? \App\Support\Finance\Vat::countryRate(strtoupper($region_code)) : null;
+        $locale = app()->getLocale();
     @endphp
 
     @if($showSuccessModal)
@@ -83,6 +87,46 @@
                 </div>
 
                 <hr class="divider" style="margin: 4px 0;">
+                <h3 class="label" style="font-weight: 600; margin: 0;" id="le-vat-heading">{{ __('vat.entity.heading') }}</h3>
+
+                <div class="flex flex-col gap-3" role="group" aria-labelledby="le-vat-heading">
+                    <label for="le-vat" class="flex items-center gap-3" style="min-height: 44px; font-size: 0.875rem; color: var(--color-ink); cursor: {{ $canVat ? 'pointer' : 'default' }};">
+                        <input id="le-vat" type="checkbox" role="switch" wire:model.live="charges_vat" @disabled(! $canVat) aria-describedby="le-vat-help{{ $canVat ? '' : ' le-vat-locked' }}"
+                               @error('charges_vat') aria-invalid="true" @enderror>
+                        <span style="font-weight: 600;">{{ __('vat.entity.charges') }}</span>
+                    </label>
+                    <span id="le-vat-help" class="help" style="margin-top: -8px;">{{ __('vat.entity.help') }}</span>
+                    @error('charges_vat') <span class="field-error" role="alert">{{ $message }}</span> @enderror
+                    @unless ($canVat)
+                        <span id="le-vat-locked" class="help"><i data-lucide="lock" style="width: 14px; height: 14px; vertical-align: -2px;"></i> {{ __('vat.entity.read_only') }}</span>
+                    @endunless
+
+                    @if ($charges_vat)
+                        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                            <div class="field">
+                                <label class="label" for="le-vat-number">{{ __('vat.entity.number') }}</label>
+                                <input id="le-vat-number" type="text" wire:model="vat_number" class="input" maxlength="100" style="font-variant-numeric: tabular-nums;" @disabled(! $canVat)
+                                       @error('vat_number') aria-invalid="true" aria-describedby="le-vat-number-error" @enderror>
+                                @error('vat_number') <span id="le-vat-number-error" class="field-error">{{ $message }}</span> @enderror
+                            </div>
+                            <div class="field">
+                                <label class="label" for="le-vat-starts">{{ __('vat.entity.starts_on') }}</label>
+                                <input id="le-vat-starts" type="date" wire:model="vat_starts_on" class="input" @disabled(! $canVat)
+                                       @error('vat_starts_on') aria-invalid="true" aria-describedby="le-vat-starts-error" @enderror>
+                                @error('vat_starts_on') <span id="le-vat-starts-error" class="field-error">{{ $message }}</span> @enderror
+                            </div>
+                        </div>
+                    @endif
+                    @if ($region_code)
+                        <span class="help">
+                            {{ $vatRate !== null
+                                ? __('vat.entity.rate', ['country' => $this->countryName(strtoupper($region_code)), 'rate' => \App\Support\Finance\Vat::percent($vatRate, $locale)])
+                                : __('vat.entity.no_rate', ['country' => $this->countryName(strtoupper($region_code))]) }}
+                        </span>
+                    @endif
+                </div>
+
+                <hr class="divider" style="margin: 4px 0;">
                 <h3 class="label" style="font-weight: 600; margin: 0;">Legal representative</h3>
 
                 <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
@@ -155,6 +199,17 @@
                                     <div><span class="muted">RC</span> <span class="text-ink">{{ $entity->registration_number }}</span></div>
                                     <div style="margin-top: 2px;"><span class="muted">Tax ID</span> <span class="text-ink">{{ $entity->tax_identification_number }}</span></div>
                                     <div style="margin-top: 2px;"><span class="muted" style="white-space: nowrap;">Employer no.</span> <span class="text-ink">{{ $entity->employer_social_security_code }}</span></div>
+                                    {{-- VAT: on from its start date, with its number; off until the company is registered --}}
+                                    <div style="margin-top: 6px;">
+                                        @if ($entity->charges_vat && $entity->vat_starts_on)
+                                            <span class="pill pill-success">{{ __('vat.entity.status_on', ['date' => \App\Support\Finance\Vat::date(substr((string) $entity->vat_starts_on, 0, 10), $locale)]) }}</span>
+                                            @if ($entity->vat_number)
+                                                <div class="help" style="margin-top: 2px;">{{ __('vat.entity.status_number', ['number' => $entity->vat_number]) }}</div>
+                                            @endif
+                                        @else
+                                            <span class="pill pill-neutral">{{ __('vat.entity.status_off') }}</span>
+                                        @endif
+                                    </div>
                                 </td>
 
                                 <td class="num">

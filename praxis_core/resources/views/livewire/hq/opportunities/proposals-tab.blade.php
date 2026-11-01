@@ -99,7 +99,7 @@
                     @if ($proposal->status === 'Draft' && ! $proposal->approved_at)
                         {{ __('proposals.bar.draft', ['date' => $day($proposal->updated_at)]) }}
                         @if ($editing)
-                            · <span class="pp-saving" wire:loading.remove wire:target="title,sections,lines,vatRate,schedule,validityDays,changesSummary,currency">{{ __('proposals.editor.saved') }}</span><span class="pp-saving" wire:loading wire:target="title,sections,lines,vatRate,schedule,validityDays,changesSummary,currency">{{ __('proposals.editor.saving') }}</span>
+                            · <span class="pp-saving" wire:loading.remove wire:target="title,sections,lines,schedule,validityDays,changesSummary,currency">{{ __('proposals.editor.saved') }}</span><span class="pp-saving" wire:loading wire:target="title,sections,lines,schedule,validityDays,changesSummary,currency">{{ __('proposals.editor.saving') }}</span>
                         @endif
                     @elseif ($proposal->status === 'Draft')
                         {{ __('proposals.bar.approved', ['name' => $person($proposal->approver), 'date' => $day($proposal->approved_at)]) }}
@@ -415,10 +415,6 @@
                             @endforeach
                         </select>
                         <span class="help" id="pp-currency-help">{{ __('proposals.terms.currency_help') }}</span>
-                    </div>
-                    <div class="field">
-                        <label for="pp-terms-vat" class="label">{{ __('proposals.terms.vat') }}</label>
-                        <input id="pp-terms-vat" type="number" inputmode="decimal" min="0" max="100" step="0.01" class="input" wire:model.blur="vatRate">
                     </div>
                     <div class="field">
                         <label for="pp-terms-schedule" class="label">{{ __('proposals.terms.schedule') }}</label>

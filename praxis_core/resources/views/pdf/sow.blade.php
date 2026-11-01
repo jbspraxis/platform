@@ -122,9 +122,18 @@
                 @endforeach
             </tbody>
             <tfoot>
-                <tr><td colspan="3">{{ __('proposals.lines.subtotal') }}</td><td class="num">{{ $money($fees['totals']['subtotal']) }}</td></tr>
-                <tr><td colspan="3">{{ __('proposals.lines.vat', ['rate' => rtrim(rtrim(number_format($fees['vat_rate'], 2, $language === 'fr' ? ',' : '.', ''), '0'), '.,')]) }}</td><td class="num">{{ $money($fees['totals']['vat']) }}</td></tr>
-                <tr class="total"><td colspan="3">{{ __('proposals.lines.total') }}</td><td class="num">{{ $money($fees['totals']['total']) }}</td></tr>
+                @if ($fees['vat']['applies'])
+                    <tr><td colspan="3">{{ __('proposals.lines.subtotal') }}</td><td class="num">{{ $money($fees['totals']['subtotal']) }}</td></tr>
+                    <tr><td colspan="3">{{ __('proposals.lines.vat', ['rate' => \App\Support\Finance\Vat::percent($fees['vat_rate'], $language)]) }}</td><td class="num">{{ $money($fees['totals']['vat']) }}</td></tr>
+                    <tr class="total"><td colspan="3">{{ __('proposals.lines.total') }}</td><td class="num">{{ $money($fees['totals']['total']) }}</td></tr>
+                @else
+                    {{-- No VAT (App\Support\Finance\Vat): no VAT line, and the total is the subtotal --}}
+                    <tr class="total"><td colspan="3">{{ __('vat.total') }}</td><td class="num">{{ $money($fees['totals']['total']) }}</td></tr>
+                @endif
+                @if ($vatNote = \App\Support\Finance\Vat::note($fees['vat']))
+                    {{-- A client abroad: zero-rated export of services (App\Support\Finance\Vat) --}}
+                    <tr><td colspan="4" style="font-size: 8.5pt; padding-top: 6pt">{{ $vatNote }}</td></tr>
+                @endif
             </tfoot>
         </table>
     @endif

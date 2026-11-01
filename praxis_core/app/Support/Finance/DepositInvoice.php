@@ -9,7 +9,8 @@ use Illuminate\Support\Str;
 /**
  * Invoice #001, raised when the client signs (moved out of Portal\ProposalGateway for the SOW, PR 5; owner decision
  * 10: "deposit invoice raised automatically, as today"): the first share of the payment schedule (40_30_30 → 40%,
- * 100 → everything; "custom" reads the custom percentage) of the price before VAT, plus VAT at the agreed rate. Due in
+ * 100 → everything; "custom" reads the custom percentage) of the price before VAT, plus VAT when the issuing company
+ * charges it on the day the invoice is raised (Vat::for; the invoice records it, with the company's region). Due in
  * 10 days, the exchange rate to the US dollar locked, the active remittance account, a SHA-256 fingerprint, one line,
  * and posted to the general ledger. Runs inside the caller's transaction.
  */
@@ -22,7 +23,8 @@ final class DepositInvoice
     }
 
     /**
-     * $terms: subtotal, vat_rate, currency, payment_schedule_type, custom_deposit_percent (optional), title, reference.
+     * $terms: subtotal, billing_entity_id (the issuing company; null: Nigeria's), currency, payment_schedule_type,
+     * custom_deposit_percent (optional), title, reference.
      * Returns the invoice's id, number and total.
      *
      * @return array{id: string, number: string, total: float}
@@ -31,7 +33,8 @@ final class DepositInvoice
     {
         $depositPercentage = self::percent((string) $terms['payment_schedule_type'], $terms['custom_deposit_percent'] ?? null);
         $depositSubtotal = (float) $terms['subtotal'] * ($depositPercentage / 100);
-        $depositVat = $terms['vat_rate'] ? ($depositSubtotal * ((float) $terms['vat_rate'] / 100)) : 0;
+        $vat = Vat::for($organization, $timestamp, $terms['billing_entity_id'] ?? null);
+        $depositVat = $vat['applies'] ? round($depositSubtotal * $vat['rate'] / 100, 2) : 0.0;
         $depositTotal = $depositSubtotal + $depositVat;
 
         $invoiceId = (string) Str::uuid();
@@ -61,6 +64,10 @@ final class DepositInvoice
             'client_tax_id' => $organization->tax_identification_number ?? null,
             'amount_due' => $depositSubtotal,
             'vat_amount' => $depositVat,
+            'vat_rate' => $vat['rate'],
+            'vat_applied' => $vat['applies'],
+            'billing_entity_id' => $vat['entity_id'],
+            'region_code' => $vat['region'] ?? Vat::HOME,
             'wht_amount' => 0.00,
             'total_amount' => $depositTotal,
             'currency' => $terms['currency'],

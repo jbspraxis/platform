@@ -5,6 +5,8 @@ namespace App\Livewire\Hq\Opportunities;
 use App\Livewire\Hq\Opportunities\Concerns\PicksStaff;
 use App\Models\Opportunity;
 use App\Models\User;
+use App\Support\Access;
+use App\Support\Finance\Vat;
 use App\Support\Opportunities\OpportunityAccess;
 use App\Support\Opportunities\Organisations;
 use App\Support\Opportunities\Team;
@@ -84,6 +86,9 @@ class OpportunityBoard extends Component
 
     public string $newOrgTaxId = '';
 
+    /** The company that bills the work (Vat): empty means Nigeria's; only the owner or the chosen lead picks another */
+    public string $billingEntityId = '';
+
     public string $newOrgTimezone = 'Africa/Lagos';
 
     /** An organisation already named like the new one, offered instead of a duplicate */
@@ -118,6 +123,7 @@ class OpportunityBoard extends Component
         $this->resetNewOrg();
         $this->creating = true;
         $this->leadUserId = (string) Auth::id();
+        $this->billingEntityId = '';
         if ($organizationId !== '') {
             $this->chooseOrganisation($organizationId);
         }
@@ -239,7 +245,14 @@ class OpportunityBoard extends Component
             'teamUserIds' => ['array', 'max:20'],
             'teamUserIds.*' => ['string', Rule::exists('users', 'id')->where('status', 'Active')->whereNull('deleted_at')],
             'language' => ['required', Rule::in(Opportunity::LANGUAGES)],
+            'billingEntityId' => ['nullable', 'string', Rule::exists('mdm_legal_entities', 'id')->where('is_active', 1)],
         ];
+    }
+
+    /** Choosing a billing company other than the default: the owner, or the person who will lead the opportunity */
+    private function canChooseBilling(): bool
+    {
+        return Access::allows(Auth::user(), 'opportunities.approve') || $this->leadUserId === (string) Auth::id();
     }
 
     protected function messages(): array
@@ -256,6 +269,7 @@ class OpportunityBoard extends Component
             'teamUserIds.*.string' => __('opportunities.create.errors.team'),
             'language.required' => __('opportunities.create.errors.language'),
             'language.in' => __('opportunities.create.errors.language'),
+            'billingEntityId.exists' => __('vat.billing.invalid'),
         ];
     }
 
@@ -265,12 +279,20 @@ class OpportunityBoard extends Component
         $this->title = trim($this->title);
         $this->newOrg = false;
         $this->validate();
+        // Nigeria's company is the default: stored as null
+        $billing = $this->billingEntityId !== '' && $this->billingEntityId !== Vat::issuer(null)?->id ? $this->billingEntityId : null;
+        if ($billing !== null && ! $this->canChooseBilling()) {
+            $this->addError('billingEntityId', __('vat.billing.only_lead'));
+
+            return;
+        }
 
         $opportunity = Opportunity::create([
             'organization_id' => $this->organizationId,
             'title' => $this->title,
             'stage' => 'discovery',
             'lead_user_id' => $this->leadUserId,
+            'billing_entity_id' => $billing,
             'language' => $this->language,
             'source' => 'manual',
             'created_by' => Auth::id(),
@@ -278,7 +300,7 @@ class OpportunityBoard extends Component
         ]);
         $org = DB::table('organizations')->where('id', $this->organizationId)->value('name');
         OpportunityAccess::log('OPPORTUNITY_OPENED', "Opened the opportunity “{$opportunity->title}” for {$org}.", 'opportunities', $opportunity->id,
-            [], $opportunity->only(['organization_id', 'title', 'stage', 'lead_user_id', 'language', 'source']));
+            [], $opportunity->only(['organization_id', 'title', 'stage', 'lead_user_id', 'billing_entity_id', 'language', 'source']));
         Team::sync($opportunity, $this->teamUserIds, Auth::id());
 
         session()->flash('success', __('opportunities.create.done', ['title' => $opportunity->title]));
@@ -347,6 +369,8 @@ class OpportunityBoard extends Component
             'industries' => $this->newOrg ? Organisations::industries() : [],
             'systems' => $this->newOrg ? Organisations::systems() : [],
             'timeZones' => Organisations::TIME_ZONES,
+            'billingCompanies' => $this->creating ? Vat::companies() : collect(),
+            'canChooseBilling' => $this->creating && $this->canChooseBilling(),
         ] + ($this->creating ? $this->organisationPicker() + $this->staffPickers() : []))->title(__('opportunities.title'));
     }
 }

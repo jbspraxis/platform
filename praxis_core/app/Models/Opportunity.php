@@ -27,7 +27,7 @@ class Opportunity extends Model
     public const LANGUAGES = ['en', 'fr'];
 
     protected $fillable = [
-        'organization_id', 'title', 'stage', 'lead_user_id', 'language', 'source', 'project_id', 'lost_reason', 'closed_at',
+        'organization_id', 'title', 'stage', 'lead_user_id', 'billing_entity_id', 'language', 'source', 'project_id', 'lost_reason', 'closed_at',
         'created_by', 'updated_by', 'deleted_by',
     ];
 

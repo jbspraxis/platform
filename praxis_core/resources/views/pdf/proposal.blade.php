@@ -87,9 +87,18 @@
                 @endforeach
             </tbody>
             <tfoot>
-                <tr><td colspan="3">{{ __('proposals.lines.subtotal') }}</td><td class="num">{{ $money($totals['subtotal']) }}</td></tr>
-                <tr><td colspan="3">{{ __('proposals.lines.vat', ['rate' => rtrim(rtrim(number_format((float) $proposal->vat_rate, 2, $language === 'fr' ? ',' : '.', ''), '0'), '.,')]) }}</td><td class="num">{{ $money($totals['vat']) }}</td></tr>
-                <tr class="total"><td colspan="3">{{ __('proposals.lines.total') }}</td><td class="num">{{ $money($totals['total']) }}</td></tr>
+                @if ($vat['applies'])
+                    <tr><td colspan="3">{{ __('proposals.lines.subtotal') }}</td><td class="num">{{ $money($totals['subtotal']) }}</td></tr>
+                    <tr><td colspan="3">{{ __('proposals.lines.vat', ['rate' => \App\Support\Finance\Vat::percent((float) $vat['rate'], $language)]) }}</td><td class="num">{{ $money($totals['vat']) }}</td></tr>
+                    <tr class="total"><td colspan="3">{{ __('proposals.lines.total') }}</td><td class="num">{{ $money($totals['total']) }}</td></tr>
+                @else
+                    {{-- No VAT (App\Support\Finance\Vat): no VAT line, and the total is the subtotal --}}
+                    <tr class="total"><td colspan="3">{{ __('vat.total') }}</td><td class="num">{{ $money($totals['total']) }}</td></tr>
+                @endif
+                @if ($vatNote = \App\Support\Finance\Vat::note($vat))
+                    {{-- A client abroad: zero-rated export of services (App\Support\Finance\Vat) --}}
+                    <tr><td colspan="4" style="font-size: 8.5pt; padding-top: 6pt">{{ $vatNote }}</td></tr>
+                @endif
             </tfoot>
         </table>
     @else

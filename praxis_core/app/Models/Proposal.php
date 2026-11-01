@@ -41,6 +41,7 @@ class Proposal extends Model
         'recipients_unsent' => 'array',
         'version' => 'integer',
         'validity_days' => 'integer',
+        'vat_applied' => 'boolean',
         'approved_at' => 'datetime',
         'sent_at' => 'datetime',
         'client_approved_at' => 'datetime',

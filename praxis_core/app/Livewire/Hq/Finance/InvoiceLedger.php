@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Support\Access;
+use App\Support\Finance\Vat;
 
 #[Layout('components.layouts.hq')]
 class InvoiceLedger extends Component
@@ -143,25 +144,11 @@ class InvoiceLedger extends Component
         $project = DB::table('projects')->where('id', $this->new_project_id)->first();
         $org = DB::table('organizations')->where('id', $project->organization_id)->first();
         
-        // 1. Tax: match the tax jurisdiction to the client’s country
-        $taxData = DB::table('mdm_tax_compliance')
-            ->where('is_active', 1)
-            ->where(function($query) use ($org) {
-                if ($org && $org->country) {
-                    $query->where('country_code', 'LIKE', '%' . substr($org->country, 0, 2) . '%')
-                          ->orWhere('region_name', 'LIKE', '%' . $org->country . '%');
-                }
-            })
-            ->first();
-            
-        // Fallback to default if no match, but prioritize the match
-        if (!$taxData) {
-            $taxData = DB::table('mdm_tax_compliance')->where('is_active', 1)->first();
-        }
-
-        $vatRate = $taxData ? ((float)$taxData->vat_rate / 100) : 0.075;
-        $vatAmount = $this->new_amount_due * $vatRate;
-        $totalAmount = $this->new_amount_due + $vatAmount;
+        // 1. VAT: only when the company issuing it (the project's opportunity's billing company, else Nigeria's) charges
+        // VAT today, at 0% for a client abroad (App\Support\Finance\Vat); the invoice records what it applied, and who
+        $vat = Vat::for($org, null, Vat::projectEntity($project->id));
+        $vatAmount = $vat['applies'] ? round((float) $this->new_amount_due * $vat['rate'] / 100, 2) : 0.0;
+        $totalAmount = (float) $this->new_amount_due + $vatAmount;
 
         // 2. Due date: handle "Receipt" and "Net X" terms
         if (stripos(strtolower($this->new_payment_terms), 'receipt') !== false) {
@@ -183,7 +170,7 @@ class InvoiceLedger extends Component
         $invNumber = 'INV-' . date('Ym') . '-' . rand(1000, 9999);
         $timestamp = now();
 
-        DB::transaction(function () use ($invoiceId, $invNumber, $project, $org, $vatAmount, $totalAmount, $dueDate, $fxRate, $timestamp) {
+        DB::transaction(function () use ($invoiceId, $invNumber, $project, $org, $vat, $vatAmount, $totalAmount, $dueDate, $fxRate, $timestamp) {
             
             DB::table('invoices')->insert([
                 'id' => $invoiceId,
@@ -193,6 +180,10 @@ class InvoiceLedger extends Component
                 'invoice_number' => $invNumber,
                 'amount_due' => $this->new_amount_due,
                 'vat_amount' => $vatAmount,
+                'vat_rate' => $vat['rate'],
+                'vat_applied' => $vat['applies'],
+                'billing_entity_id' => $vat['entity_id'],
+                'region_code' => $vat['region'] ?? Vat::HOME,
                 'total_amount' => $totalAmount,
                 'wht_amount' => 0.00,
                 'currency' => $this->new_currency,
@@ -373,6 +364,11 @@ class InvoiceLedger extends Component
 
     public function render()
     {
-        return view('livewire.hq.finance.invoice-ledger');
+        // What Create invoice adds for the project chosen: VAT, or a line saying why none (App\Support\Finance\Vat)
+        $project = $this->showCreateModal && $this->new_project_id ? DB::table('projects')->where('id', $this->new_project_id)->first(['id', 'organization_id']) : null;
+
+        return view('livewire.hq.finance.invoice-ledger', [
+            'vat' => $project ? Vat::for((string) $project->organization_id, null, Vat::projectEntity($project->id)) : null,
+        ]);
     }
 }

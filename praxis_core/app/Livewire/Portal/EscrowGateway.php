@@ -128,11 +128,14 @@ class EscrowGateway extends Component
             $invoiceId = (string) Str::uuid();
             $invRef = 'INV-' . date('Ymd') . '-' . rand(100, 999);
             $mobAmount = $this->proposal->total_value * 0.40; // Assuming 40%
-            $taxAmount = $mobAmount * ($this->proposal->tax_rate / 100);
-            
+            // VAT only when the issuing company charges it today (App\Support\Finance\Vat)
+            $vat = \App\Support\Finance\Vat::for($this->organization, null, DB::table('opportunities')->where('id', $this->proposal->opportunity_id ?? null)->value('billing_entity_id'));
+            $taxAmount = $vat['applies'] ? round($mobAmount * $vat['rate'] / 100, 2) : 0.0;
+
             DB::table('invoices')->insert([
                 'id' => $invoiceId, 'project_id' => $projectId, 'invoice_number' => $invRef,
                 'amount_due' => $mobAmount, 'vat_amount' => $taxAmount, 'total_amount' => $mobAmount + $taxAmount,
+                'vat_rate' => $vat['rate'], 'vat_applied' => $vat['applies'], 'billing_entity_id' => $vat['entity_id'], 'region_code' => $vat['region'] ?? \App\Support\Finance\Vat::HOME,
                 'currency' => $this->proposal->currency, 'status' => 'Pending',
                 'due_date' => now()->addDays(7), 'created_at' => now()
             ]);

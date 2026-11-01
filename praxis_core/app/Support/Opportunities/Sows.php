@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Support\Access;
 use App\Support\Ai\Ai;
 use App\Support\Finance\DepositInvoice;
+use App\Support\Finance\Vat;
 use App\Support\Portal\SignerOnboarding;
 use App\Support\Signing\SigningCodes;
 use App\Support\WebsiteSettings;
@@ -93,7 +94,16 @@ final class Sows
     /** The name on a version: as HQ signed it, else today's setting, else the placeholder */
     public static function partyName(StatementOfWork $sow): string
     {
-        return $sow->provider_legal_name ?: (self::legalName() ?? self::LEGAL_NAME_PLACEHOLDER);
+        return $sow->provider_legal_name ?: (self::providerName($sow) ?? self::LEGAL_NAME_PLACEHOLDER);
+    }
+
+    /**
+     * The JBS Praxis party a version names: the legal name of the company issuing it (Master data › Legal entities: the
+     * opportunity's billing company, else Nigeria's; Sows::vat), else Website settings' legal name (legalName())
+     */
+    public static function providerName(StatementOfWork $sow): ?string
+    {
+        return Vat::companyName(self::vat($sow)['entity_id']) ?? self::legalName();
     }
 
     /** The proposal the client approved: what every SOW of this opportunity is drafted from and priced by */
@@ -268,7 +278,7 @@ final class Sows
             $next = $latest->replicate(['ai_run_id', 'approved_by', 'approved_at', 'sent_at', 'recipients', 'recipients_unsent', 'token_hash', 'auth_otp', 'otp_expires_at',
                 'hq_signer_name', 'hq_signature_b64', 'hq_signature_hash', 'hq_ip_address', 'hq_signed_at', 'provider_legal_name', 'signed_by_name', 'signed_by_title',
                 'signed_by_email', 'client_signature_b64', 'client_signature_hash', 'client_ip_address', 'ip_security_flag', 'signed_at', 'deposit_invoice_id', 'project_id',
-                'changes_request', 'changes_requested_by', 'changes_requested_at', 'changes_summary', 'deleted_by']);
+                'changes_request', 'changes_requested_by', 'changes_requested_at', 'changes_summary', 'deleted_by', 'vat_rate', 'vat_applied', 'billing_entity_id']);
             $next->forceFill([
                 'version' => $latest->version + 1,
                 'previous_version_id' => $latest->id,
@@ -338,13 +348,16 @@ final class Sows
             if ($locked->version > 1 && trim((string) $locked->changes_summary) === '') {
                 return 'changes';
             }
-            if (! ($legalName = self::legalName())) {
+            if (! ($legalName = self::providerName($locked))) {
                 return 'legal_name';
             }
             if (! $locked->proposal_id || ! Proposal::whereKey($locked->proposal_id)->where('status', Proposal::CLIENT_APPROVED)->exists()) {
                 return 'proposal';
             }
             $at = now();
+            // The VAT and the issuing company HQ signs with the rest (App\Support\Finance\Vat), as of today; both are in the fingerprint
+            $vat = Vat::for($locked->opportunity?->organization, $at, $locked->opportunity?->billing_entity_id);
+            $locked->forceFill(['vat_rate' => $vat['rate'], 'vat_applied' => $vat['applies'], 'billing_entity_id' => $vat['entity_id']]);
             $locked->forceFill([
                 'milestones' => $milestones,
                 'approved_by' => $by->id,
@@ -374,7 +387,7 @@ final class Sows
     {
         $done = (bool) StatementOfWork::whereKey($sow->id)->where('status', StatementOfWork::DRAFT)->whereNotNull('approved_at')->whereNull('sent_at')->update([
             'approved_by' => null, 'approved_at' => null, 'hq_signer_name' => null, 'hq_signature_b64' => null, 'hq_signature_hash' => null,
-            'hq_ip_address' => null, 'hq_signed_at' => null, 'provider_legal_name' => null, 'updated_by' => $by->id, 'updated_at' => now(),
+            'hq_ip_address' => null, 'hq_signed_at' => null, 'provider_legal_name' => null, 'vat_rate' => null, 'vat_applied' => null, 'billing_entity_id' => null, 'updated_by' => $by->id, 'updated_at' => now(),
         ]);
         if ($done) {
             $sow->refresh();
@@ -417,6 +430,9 @@ final class Sows
         if (! $chosen) {
             throw new LogicException('Choose at least one person HQ knows for this work');
         }
+        if (self::vatChanged($sow)) {
+            throw new LogicException('The VAT changed since HQ signed this version: take it back to draft and approve it again');
+        }
         $pdf = SowPdf::render($sow);
 
         return self::whileMailing($sow, function () use ($sow, $opportunity, $chosen, $pdf, $by) {
@@ -455,7 +471,8 @@ final class Sows
         return DB::transaction(function () use ($sow, $chosen, $by) {
             self::lockOpportunity($sow->opportunity_id);
             $locked = StatementOfWork::whereKey($sow->id)->lockForUpdate()->first();
-            if (! $locked || $locked->status !== StatementOfWork::DRAFT || $locked->approved_at === null || $locked->sent_at !== null || self::signed($locked->opportunity_id)) {
+            if (! $locked || $locked->status !== StatementOfWork::DRAFT || $locked->approved_at === null || $locked->sent_at !== null || self::signed($locked->opportunity_id)
+                || self::vatChanged($locked)) {
                 return null;
             }
             $replaced = StatementOfWork::where('opportunity_id', $locked->opportunity_id)->where('version', '<', $locked->version)
@@ -616,6 +633,36 @@ final class Sows
     }
 
     /**
+     * The VAT on a version's fees (Vat::for's answer): fixed when HQ signs it (vat_rate, vat_applied, billing_entity_id),
+     * and until then today's for the opportunity's billing company, so a draft follows the switch. Anything past draft
+     * (sent, signed, imported, superseded) keeps what it recorded. The approved proposal's own VAT doesn't count: the
+     * SOW is a later document.
+     */
+    public static function vat(StatementOfWork $sow): array
+    {
+        if ($sow->vat_applied === null && $sow->status === StatementOfWork::DRAFT) {
+            return Vat::for($sow->opportunity?->organization, null, $sow->opportunity?->billing_entity_id);
+        }
+
+        return Vat::recorded($sow->vat_applied, $sow->vat_rate, $sow->billing_entity_id, $sow->opportunity?->organization);
+    }
+
+    /**
+     * An approved version whose VAT or issuing company is no longer today's (the switch, or the opportunity's billing
+     * company, changed after HQ signed): it goes back to draft before it is sent
+     */
+    public static function vatChanged(StatementOfWork $sow): bool
+    {
+        if ($sow->vat_applied === null || $sow->sent_at !== null) {
+            return false;
+        }
+        $today = Vat::for($sow->opportunity?->organization, null, $sow->opportunity?->billing_entity_id);
+
+        return (bool) $sow->vat_applied !== $today['applies'] || round((float) $sow->vat_rate, 2) !== round($today['rate'], 2)
+            || $sow->billing_entity_id !== $today['entity_id'];
+    }
+
+    /**
      * A digest of what is signed: title, sections, milestones and the fees' figures. Both fingerprints (HQ's and the
      * client's) include it, so a change to the text after signing shows.
      */
@@ -627,7 +674,7 @@ final class Sows
             'title' => (string) $sow->title,
             'sections' => array_values((array) $sow->sections),
             'milestones' => self::cleanMilestones((array) $sow->milestones),
-            'fees' => [(string) $proposal?->currency, (string) $proposal?->subtotal, (string) $proposal?->vat_rate, (string) $proposal?->total_value, (string) $proposal?->payment_schedule_type,
+            'fees' => [(string) $proposal?->currency, (string) $proposal?->subtotal, ($vat = self::vat($sow))['applies'], (string) $vat['rate'], (string) $vat['entity_id'], (string) $proposal?->payment_schedule_type,
                 (string) ($proposal?->custom_deposit_percent ?? ''), self::lineDigest($proposal)],
         ], JSON_UNESCAPED_UNICODE));
     }
@@ -721,7 +768,7 @@ final class Sows
             }
             $invoice = DepositInvoice::raise($projectId, $organization, [
                 'subtotal' => $proposal->subtotal,
-                'vat_rate' => $proposal->vat_rate,
+                'billing_entity_id' => $locked->billing_entity_id, // the company that signed it bills the deposit
                 'currency' => $proposal->currency,
                 'payment_schedule_type' => $proposal->payment_schedule_type,
                 'custom_deposit_percent' => $proposal->custom_deposit_percent ?? null,
@@ -852,7 +899,7 @@ final class Sows
     {
         $proposal = $sow->proposal;
         $out = [
-            'THE PARTIES: ' . (self::legalName() ?? 'JBS Praxis') . ' (“JBS Praxis”) and ' . ($sow->opportunity?->organization?->name ?? 'the client') . ' (“the client”).',
+            'THE PARTIES: ' . (self::providerName($sow) ?? 'JBS Praxis') . ' (“JBS Praxis”) and ' . ($sow->opportunity?->organization?->name ?? 'the client') . ' (“the client”).',
             'THE PROPOSAL THE CLIENT APPROVED: ' . ($proposal?->proposal_ref ?? '') . ' version ' . ($proposal?->version ?? 1)
                 . ($proposal?->client_approved_name ? ', approved by ' . $proposal->client_approved_name . ' (' . $proposal->client_approved_title . ')' : '') . '.',
             'THE FEES: HQ adds the fees and the payment schedule from that proposal (' . ($proposal?->currency ?? '') . ', payment schedule '

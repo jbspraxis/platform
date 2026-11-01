@@ -7,6 +7,7 @@ use App\Models\Organization;
 use App\Models\Proposal;
 use App\Support\Opportunities\PortalLinks;
 use App\Support\Opportunities\ProposalPdf;
+use App\Support\Opportunities\Proposals;
 use Carbon\CarbonImmutable;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailables\Content;
@@ -40,7 +41,8 @@ class ProposalMail extends BrandedMail
             'changes' => $p->version > 1 && filled($p->changes_summary) ? MeetingMinutesMail::blocks((string) $p->changes_summary) : [],
             'facts' => [
                 __('emails.proposal.reference') => "{$p->proposal_ref} · " . __('emails.proposal.version', ['n' => $p->version]),
-                __('emails.proposal.total') => ProposalPdf::money((float) $p->total_value, (string) $p->currency, $language),
+                // "Total, VAT included", or "Total" when the version carries no VAT (App\Support\Finance\Vat)
+                (Proposals::vat($p)['applies'] ? __('emails.proposal.total') : __('vat.total')) => ProposalPdf::money((float) $p->total_value, (string) $p->currency, $language),
                 __('emails.proposal.valid_until') => $validUntil->copy()->setTimezone('Africa/Lagos')->locale($language)->translatedFormat(__('emails.proposal.date_format')),
             ],
             'portalUrl' => $p->opportunity ? PortalLinks::proposal($p, $this->clientUserId) : null,
@@ -63,7 +65,7 @@ class ProposalMail extends BrandedMail
         $proposal = fn (int $version, ?string $changes) => (new Proposal)->forceFill([
             'id' => $version === 1 ? '5d6e7f80-91a2-4b3c-8d4e-5f6071829304' : '6e7f8091-a2b3-4c4d-9e5f-607182930415',
             'proposal_ref' => 'PRP-20261105-482', 'version' => $version, 'title' => 'A faster month-end close for the Lagos entities',
-            'currency' => 'USD', 'total_value' => 26875.00, 'validity_days' => 30, 'changes_summary' => $changes, 'signing_mode' => 'approve',
+            'currency' => 'USD', 'subtotal' => 25000.00, 'vat_rate' => 7.5, 'vat_applied' => true, 'total_value' => 26875.00, 'validity_days' => 30, 'changes_summary' => $changes, 'signing_mode' => 'approve',
             'sent_at' => CarbonImmutable::parse('2026-11-05 09:00:00', 'UTC'),
         ])->setRelation('opportunity', $opportunity);
 

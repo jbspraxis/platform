@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Str;
+use App\Support\Finance\Vat;
 
 #[Layout('components.layouts.hq')]
 class ProposalBuilder extends Component
@@ -42,8 +43,16 @@ class ProposalBuilder extends Component
     public $title = 'Proposal';
     public $archetype = [];
     public $currency = 'USD';
-    public $vatRate = 7.50;
-    public $paymentSchedule = '40_30_30';
+    // VAT isn't typed here: the issuing company's switch decides it until HQ signs (App\Support\Finance\Vat)
+    #[Locked]
+    public $vatRate = 0.00;
+    #[Locked]
+    public bool $vatApplies = false;
+    #[Locked]
+    public string $vatNote = '';
+    #[Locked]
+    public ?string $vatEntityId = null;
+public $paymentSchedule = '40_30_30';
     public $customDepositPercent = 0.00;
     public $validityDays = 14;
     public $selectedTech = []; // Array of Tech IDs
@@ -145,9 +154,6 @@ class ProposalBuilder extends Component
         // Group Tech Catalog by Category
         $rawTech = DB::table('mdm_tech_catalog')->where('is_active', 1)->get();
         $this->techCatalog = collect($rawTech)->groupBy('category')->toArray();
-
-        $taxRegion = DB::table('mdm_tax_compliance')->where('country_code', 'NG')->where('is_active', 1)->first();
-        $this->vatRate = $taxRegion ? (float) $taxRegion->vat_rate : 7.50;
     }
 
     private function loadLedgerData()
@@ -176,6 +182,7 @@ class ProposalBuilder extends Component
         // Both rows or neither, so a failed insert never leaves a proposal without its narrative
         // (exclusions live on proposals, not on the narrative)
         DB::transaction(function () use ($ref, $token) {
+            $vat = Vat::for((string) $this->selectedLeadId); // no opportunity here: Nigeria's company
             DB::table('proposals')->insert([
                 'id' => $this->proposalId,
                 'organization_id' => $this->selectedLeadId,
@@ -184,6 +191,9 @@ class ProposalBuilder extends Component
                 'proposal_ref' => $ref,
                 'token_hash' => $token,
                 'subtotal' => 0.00,
+                'vat_rate' => $vat['rate'],
+                'vat_applied' => $vat['applies'],
+                'billing_entity_id' => $vat['entity_id'],
                 'total_value' => 0.00,
                 'payment_schedule_type' => '40_30_30',
                 'status' => 'Draft',
@@ -236,7 +246,7 @@ class ProposalBuilder extends Component
 
         $this->archetype = $this->proposal->archetype_id ? explode(' | ', $this->proposal->archetype_id) : [];
         $this->currency = $this->proposal->currency ?? 'USD';
-        $this->vatRate = (float) $this->proposal->vat_rate;
+        $this->followVat();
         $this->paymentSchedule = $this->proposal->payment_schedule_type ?? '40_30_30';
         $this->customDepositPercent = (float) $this->proposal->custom_deposit_percent;
         $this->validityDays = $this->proposal->validity_days ?? 14;
@@ -418,6 +428,26 @@ class ProposalBuilder extends Component
         $this->calculateCommercials();
     }
 
+    /**
+     * A draft takes today's VAT for its client (Vat::for: its opportunity's billing company, else Nigeria's, with its
+     * switch and start date); any other status (signed, rejected, expired…) keeps what it recorded, so opening it never
+     * rewrites its VAT
+     */
+    private function followVat(): void
+    {
+        if ($this->proposal && $this->proposal->status === 'Draft') {
+            $entity = $this->proposal->opportunity_id ? DB::table('opportunities')->where('id', $this->proposal->opportunity_id)->value('billing_entity_id') : null;
+            $vat = Vat::for((string) $this->proposal->organization_id, null, $entity);
+            $this->vatNote = Vat::describe($vat);
+        } else {
+            $vat = Vat::recorded($this->proposal->vat_applied ?? null, $this->proposal->vat_rate ?? 0, $this->proposal->billing_entity_id ?? null);
+            $this->vatNote = '';
+        }
+        $this->vatRate = $vat['rate'];
+        $this->vatApplies = $vat['applies'];
+        $this->vatEntityId = $vat['entity_id'];
+    }
+
     public function calculateCommercials()
     {
         $this->subtotal = array_sum(array_column($this->lineItems, 'total_price'));
@@ -429,6 +459,7 @@ class ProposalBuilder extends Component
     {
         // Also runs on every tab switch, so viewers without crm.edit just don’t save
         if ($this->isLocked || $this->proposalIsLocked() || ! Auth::user()->can('crm.edit')) return;
+        $this->followVat();
         $this->calculateCommercials();
 
         // Structure Phases for JSON
@@ -445,7 +476,9 @@ class ProposalBuilder extends Component
                 'exclusions' => $this->exclusions, 
                 'archetype_id' => implode(' | ', $this->archetype), // Saves as "Tech A | Tech B"
                 'currency' => $this->currency,
-                'vat_rate' => $this->vatRate, 
+                'vat_rate' => $this->vatRate,
+                'vat_applied' => $this->vatApplies,
+                'billing_entity_id' => $this->vatEntityId,
                 'payment_schedule_type' => $this->paymentSchedule,
                 'custom_deposit_percent' => $this->paymentSchedule === 'custom' ? $this->customDepositPercent : null,
                 'validity_days' => $this->validityDays, 
@@ -501,6 +534,14 @@ class ProposalBuilder extends Component
 
         $this->saveBlueprintProgress(); // Ensure latest data is saved
 
+        // The VAT HQ signs it with (App\Support\Finance\Vat), on the saved lines: written here whoever signs, since
+        // saveBlueprintProgress() saves nothing for someone without crm.edit
+        $this->followVat();
+        $subtotal = round((float) DB::table('proposal_line_items')->where('proposal_id', $this->proposalId)->sum('total_price'), 2);
+        $this->subtotal = $subtotal;
+        $this->taxAmount = round($subtotal * $this->vatRate / 100, 2);
+        $this->grandTotal = round($subtotal + $this->taxAmount, 2);
+
         $timestamp = now();
         $ip = Request::ip();
         
@@ -518,8 +559,13 @@ class ProposalBuilder extends Component
 
             // Only while still unlocked: the status may have changed since the check above
             return DB::table('proposals')->where('id', $this->proposalId)->whereNotIn('status', self::LOCKED_STATUSES)->update([
-                'status' => 'Pending Auth', 
+                'status' => 'Pending Auth',
                 'token_hash' => $currentToken,
+                'subtotal' => $this->subtotal,
+                'vat_rate' => $this->vatRate,
+                'vat_applied' => $this->vatApplies,
+                'billing_entity_id' => $this->vatEntityId,
+                'total_value' => $this->grandTotal,
                 'hq_signer_name' => $this->hqSignerName,
                 'hq_signature_b64' => $this->hqSignatureBase64,
                 'hq_signature_hash' => $secureHash,

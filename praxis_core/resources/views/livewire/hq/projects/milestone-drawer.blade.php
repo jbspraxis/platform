@@ -178,6 +178,8 @@
                                         {{ __('projects.milestone.invoice_less', ['code' => 'M' . $milestone->phase_number, 'amount' => ProjectPlan::money($due['amount'], $project->currency),
                                             'percent' => \App\Support\Projects\Deposit::percentLabel($due['deposit']['percent'], app()->getLocale()), 'due' => ProjectPlan::money($due['due'], $project->currency)]) }}
                                     @endif
+                                    {{-- Whether Finance adds VAT to it today (App\Support\Finance\Vat) --}}
+                                    {{ \App\Support\Finance\Vat::describe(\App\Support\Finance\Vat::for((string) $project->organization_id, null, \App\Support\Finance\Vat::projectEntity($projectId))) }}
                                 @endif
                             </p>
                         @endif

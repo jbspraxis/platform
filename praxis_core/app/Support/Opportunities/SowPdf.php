@@ -45,12 +45,16 @@ final class SowPdf
         return Str::limit("{$sow->reference} v{$sow->version} - {$title}", 120, '') . '.pdf';
     }
 
-    /** What the PDF, the portal page and the email show of the price: the approved proposal's lines, totals and schedule, and the deposit */
+    /**
+     * What the PDF, the portal page and HQ show of the price: the approved proposal's lines, schedule and price before
+     * VAT, with the SOW's own VAT (Sows::vat: none when the issuing company doesn't charge it), and the deposit
+     */
     public static function fees(StatementOfWork $sow): array
     {
         $proposal = $sow->proposal;
         $lines = $proposal ? Proposals::lines($proposal) : collect();
-        $totals = Proposals::totals($lines, (float) ($proposal?->vat_rate ?? 0));
+        $vat = Sows::vat($sow);
+        $totals = Proposals::totals($lines, (float) $vat['rate']);
         $schedule = (string) ($proposal?->payment_schedule_type ?? '');
         $deposit = $proposal ? \App\Support\Finance\DepositInvoice::percent($schedule, $proposal->custom_deposit_percent ?? null) : 0;
         $milestones = Sows::cleanMilestones((array) $sow->milestones);
@@ -59,10 +63,11 @@ final class SowPdf
             'currency' => (string) ($proposal?->currency ?? ''),
             'lines' => $lines,
             'totals' => $totals,
-            'vat_rate' => (float) ($proposal?->vat_rate ?? 0),
+            'vat' => $vat,
+            'vat_rate' => (float) $vat['rate'],
             'schedule' => Lang::has('proposals.schedules.' . $schedule) ? __('proposals.schedules.' . $schedule) : null,
             'deposit_percent' => $deposit,
-            'deposit' => round($totals['subtotal'] * $deposit / 100 * (1 + (float) ($proposal?->vat_rate ?? 0) / 100), 2),
+            'deposit' => round($totals['subtotal'] * $deposit / 100 * (1 + (float) $vat['rate'] / 100), 2),
             'milestones' => $milestones,
             'amounts' => Sows::amounts($milestones, Sows::contractTotal($sow)),
         ];

@@ -659,12 +659,17 @@ class LiveConsultation extends Component
 
         // --- ONLY EXECUTE IF AI SUCCEEDED ---
         $proposalId = (string) Str::uuid();
+        // The draft's VAT as it stands today (App\Support\Finance\Vat; no opportunity here: Nigeria's company)
+        $vat = \App\Support\Finance\Vat::for((string) $this->activeOrgId);
         DB::table('proposals')->insert([
-            'id' => $proposalId, 
+            'id' => $proposalId,
             'organization_id' => $this->activeOrgId,
-            'created_by' => Auth::id() ?? 'system', 
+            'created_by' => Auth::id() ?? 'system',
             'status' => 'Draft',
             'subtotal' => 0,
+            'vat_rate' => $vat['rate'],
+            'vat_applied' => $vat['applies'],
+            'billing_entity_id' => $vat['entity_id'],
             'total_value' => 0,
             'payment_schedule_type' => 'Standard',
             'created_at' => now(), 

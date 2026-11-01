@@ -5,6 +5,7 @@ namespace App\Livewire\Hq\Opportunities;
 use App\Models\Opportunity;
 use App\Models\StatementOfWork;
 use App\Support\Ai\AiUnavailable;
+use App\Support\Finance\Vat;
 use App\Support\Opportunities\OpportunityAccess;
 use App\Support\Opportunities\Proposals;
 use App\Support\Opportunities\SowPdf;
@@ -312,6 +313,11 @@ class SowTab extends Component
         if (! $sow) {
             return;
         }
+        if (Sows::vatChanged($sow)) {
+            $this->addError('send', __('vat.sow_changed', ['now' => Vat::describe(Vat::for($opportunity->organization, null, $opportunity->billing_entity_id))]));
+
+            return;
+        }
         try {
             $unsent = Sows::send($sow, $this->sendTo, Auth::user());
         } catch (LogicException) {
@@ -475,7 +481,7 @@ class SowTab extends Component
             'drafting' => $drafting,
             'draftError' => $sow?->aiRun?->status === 'failed' ? $sow->aiRun->errorMessage() : null,
             'polling' => $drafting,
-            'legalName' => Sows::legalName(),
+            'legalName' => $sow ? Sows::providerName($sow) : Sows::legalName(),
             'partyName' => $sow ? Sows::partyName($sow) : (Sows::legalName() ?? Sows::LEGAL_NAME_PLACEHOLDER),
             // An imported SOW (opportunities:import, signed on paper) has no approved proposal: no fees or PDF from HQ
             'imported' => $sow !== null && Sows::isImported($sow),

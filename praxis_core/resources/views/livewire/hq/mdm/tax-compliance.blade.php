@@ -49,6 +49,12 @@
             <span>{{ $message }}</span>
         </div>
     @enderror
+    @error('tax_guard')
+        <div class="alert alert-danger mb-6" role="alert">
+            <i data-lucide="circle-alert"></i>
+            <span>{{ $message }}</span>
+        </div>
+    @enderror
 
     <div class="grid grid-cols-1 items-start gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
 

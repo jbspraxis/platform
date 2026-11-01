@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Opportunities;
 
 use App\Livewire\Hq\Opportunities\Concerns\PicksStaff;
 use App\Models\Opportunity;
+use App\Support\Finance\Vat;
 use App\Support\Opportunities\OpportunityAccess;
 use App\Support\Opportunities\Team;
 use Illuminate\Support\Facades\Auth;
@@ -45,6 +46,11 @@ class OpportunityPage extends Component
 
     public string $language = 'en';
 
+    /** The company that bills the work (empty: Nigeria's; Vat), and the client organisation's VAT or tax number */
+    public string $billingEntityId = '';
+
+    public string $clientTaxId = '';
+
     // Change the stage
     public string $stage = '';
 
@@ -83,6 +89,7 @@ class OpportunityPage extends Component
         $this->authorizeManage();
         $o = $this->opportunity();
         $this->fill(['title' => $o->title, 'leadUserId' => (string) $o->lead_user_id, 'language' => $o->language, 'editing' => true,
+            'billingEntityId' => (string) $o->billing_entity_id, 'clientTaxId' => (string) $o->organization?->tax_identification_number,
             'leadSearch' => '', 'teamSearch' => '', 'teamUserIds' => Team::memberIds($o)]);
     }
 
@@ -107,7 +114,10 @@ class OpportunityPage extends Component
             'teamUserIds' => ['array', 'max:20'],
             'teamUserIds.*' => ['string', Rule::exists('users', 'id')->where('status', 'Active')->whereNull('deleted_at')],
             'language' => ['required', Rule::in(Opportunity::LANGUAGES)],
+            'billingEntityId' => ['nullable', 'string', Rule::exists('mdm_legal_entities', 'id')->where('is_active', 1)],
+            'clientTaxId' => ['nullable', 'string', 'max:100'],
         ], [
+            'billingEntityId.exists' => __('vat.billing.invalid'),
             'title.required' => __('opportunities.create.errors.title'),
             'title.max' => __('opportunities.create.errors.title_long'),
             'leadUserId.required' => __('opportunities.create.errors.lead'),
@@ -120,6 +130,14 @@ class OpportunityPage extends Component
         ]);
 
         $o = $this->opportunity();
+        // The billing company (Nigeria's is the default, stored as null): only the owner or the opportunity's lead changes it
+        $billing = $this->billingEntityId !== '' && $this->billingEntityId !== Vat::issuer(null)?->id ? $this->billingEntityId : null;
+        if ($billing !== $o->billing_entity_id && ! OpportunityAccess::canApprove(Auth::user(), $o)) {
+            $this->addError('billingEntityId', __('vat.billing.only_lead'));
+
+            return;
+        }
+        $this->saveBillingAndTaxId($o, $billing);
         $old = $o->only(['title', 'lead_user_id', 'language']);
         $o->fill(['title' => $this->title, 'lead_user_id' => $this->leadUserId, 'language' => $this->language, 'updated_by' => Auth::id()]);
         if ($o->isDirty()) {
@@ -133,6 +151,27 @@ class OpportunityPage extends Component
         $this->canManage = OpportunityAccess::canManage(Auth::user(), $o->fresh());
         $this->editing = false;
         session()->flash('success', __('opportunities.page.saved'));
+    }
+
+    /** The billing company and the organisation's tax number, each change with its own history line */
+    private function saveBillingAndTaxId(Opportunity $o, ?string $billing): void
+    {
+        if ($billing !== $o->billing_entity_id) {
+            $name = fn (?string $id) => Vat::companyName($id ?? Vat::issuer(null)?->id) ?? 'Nigeria’s company';
+            $before = $o->billing_entity_id;
+            $from = $name($before);
+            $o->forceFill(['billing_entity_id' => $billing, 'updated_by' => Auth::id()])->save();
+            OpportunityAccess::log('OPPORTUNITY_BILLING_COMPANY_CHANGED', "Changed the billing company of “{$o->title}” from {$from} to {$name($billing)}.", 'opportunities', $o->id,
+                ['billing_entity_id' => $before], ['billing_entity_id' => $billing]);
+        }
+        $taxId = trim($this->clientTaxId) ?: null;
+        $organisation = $o->organization;
+        if ($organisation && $taxId !== ($organisation->tax_identification_number ?: null)) {
+            $before = $organisation->tax_identification_number;
+            DB::table('organizations')->where('id', $organisation->id)->update(['tax_identification_number' => $taxId, 'updated_by' => Auth::id(), 'updated_at' => now()]);
+            OpportunityAccess::log('ORGANISATION_TAX_ID_CHANGED', "Changed the VAT or tax number of {$organisation->name}.", 'opportunities', $o->id,
+                ['tax_identification_number' => $before], ['tax_identification_number' => $taxId]);
+        }
     }
 
     public function saveStage(): void
@@ -212,6 +251,9 @@ class OpportunityPage extends Component
             'history' => $history,
             'team' => Team::of($o),
             'canApprove' => OpportunityAccess::canApprove($user, $o),
+            'billingCompany' => Vat::companyName($o->billing_entity_id ?? Vat::issuer(null)?->id),
+            'billingCompanies' => $this->editing ? Vat::companies() : collect(),
+            'canChooseBilling' => OpportunityAccess::canApprove($user, $o),
             'canReadTranscripts' => OpportunityAccess::canReadTranscripts($user, $o),
             'canOpenProjects' => (bool) $user?->can('projects.view'),
         ] + ($this->editing ? $this->staffPickers() : []))->title($o->title . ' · ' . __('opportunities.title'));
