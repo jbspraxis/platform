@@ -319,4 +319,18 @@ return [
             'unknown_email' => 'Use the email address our invitation was sent to. To add a colleague, reply to our last email.',
         ],
     ],
+
+    // An internal meeting about a milestone (the team's meeting; a client meeting about one is its handover)
+    'milestone' => [
+        'label' => 'Milestone',
+        'none' => 'No milestone',
+        'form_help' => 'Optional. The meeting then shows on that milestone’s board for the team. The client never sees it.',
+        'details_help' => 'Shows this meeting on that milestone’s board. Nothing is sent to anyone.',
+        'tag' => 'Milestone: :milestone',
+        'default_title' => 'Team meeting: :milestone',
+        'linked' => 'Linked to :milestone. It shows on that milestone’s board.',
+        'unlinked' => 'No longer linked to a milestone.',
+        'internal_only' => 'Only an internal meeting that isn’t cancelled is linked to a milestone here. A client meeting about a milestone is its handover.',
+        'cannot_schedule' => 'Someone on the opportunity’s team, or who manages opportunities, schedules its meetings.',
+    ],
 ];
