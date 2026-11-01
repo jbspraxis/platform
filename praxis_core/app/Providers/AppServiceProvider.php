@@ -46,6 +46,7 @@ class AppServiceProvider extends ServiceProvider
             'proposal' => \App\Models\Proposal::class,
             'statement_of_work' => \App\Models\StatementOfWork::class,
             'project_draft' => \App\Models\ProjectDraft::class,
+            'milestone_plan' => \App\Models\MilestonePlan::class,
         ]);
     }
 }

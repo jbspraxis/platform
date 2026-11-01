@@ -23,13 +23,6 @@ return [
     'invoice_line' => ":milestone, sur acceptation écrite",
     'invoice_line_less' => ":milestone, sur acceptation écrite, déduction faite de l’acompte de :percent",
 
-    'planner' => [
-        'has_plan' => "Ce projet a déjà ses jalons\u{202F}: l’assistant ne le planifie pas une seconde fois. La planification à l’intérieur d’un jalon arrive bientôt\u{202F}; en attendant, ajoutez les tâches sur le tableau du jalon.",
-        'draft_pending' => "Le plan de ce projet se trouve dans le brouillon du projet issu de l’énoncé des travaux signé. Relisez-le et cliquez sur Créer le projet.",
-        'open_draft' => "Ouvrir le brouillon du projet",
-        'open_board' => "Ouvrir le tableau du jalon",
-    ],
-
     'formats' => [
         'date' => "j F Y",
         'short' => "j M",
@@ -516,5 +509,7 @@ return [
         'CHANGE_REPORT_DECLINED' => "A enregistré le refus du client (:date).",
         'PROJECT_CHANGED_BY_REPORT' => "Un rapport de modification approuvé a complété le plan et le montant du contrat.",
         'PROJECT_LEAD_CHANGED' => "A changé le responsable du projet.",
+        'PLAN_REQUESTED' => "A demandé à l’IA de planifier.",
+        'PLAN_SAVED' => "A enregistré des suggestions du plan de l’IA.",
     ],
 ];

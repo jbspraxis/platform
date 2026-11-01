@@ -21,14 +21,6 @@ return [
     'invoice_line' => ':milestone, on written acceptance',
     'invoice_line_less' => ':milestone, on written acceptance, less the :percent deposit',
 
-    // Plan milestones (ScrumMaster) until per-milestone planning comes (PR 5b)
-    'planner' => [
-        'has_plan' => 'This project already has its milestones, so the assistant doesn’t plan it again. Planning inside a milestone is coming; meanwhile add tasks on the milestone board.',
-        'draft_pending' => 'This project’s plan is in the project draft made from its signed statement of work. Review it and click Create project there.',
-        'open_draft' => 'Open the project draft',
-        'open_board' => 'Open the milestone board',
-    ],
-
     'formats' => [
         'date' => 'j F Y',
         'short' => 'j M',
@@ -519,5 +511,7 @@ return [
         'CHANGE_REPORT_DECLINED' => 'Recorded the client’s decline (:date).',
         'PROJECT_CHANGED_BY_REPORT' => 'An approved change report added to the plan and the contract total.',
         'PROJECT_LEAD_CHANGED' => 'Changed the project lead.',
+        'PLAN_REQUESTED' => 'Asked the AI to plan.',
+        'PLAN_SAVED' => 'Saved suggestions from the AI plan.',
     ],
 ];

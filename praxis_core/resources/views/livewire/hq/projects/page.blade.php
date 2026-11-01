@@ -39,6 +39,7 @@
         </div>
         @if ($canManage)
             <div class="pj-actions">
+                <a href="{{ route('hq.ops.scrum', $projectId) }}" class="btn btn-secondary" wire:navigate><i data-lucide="sparkles"></i> {{ __('projects.all.plan') }}</a>
                 <button type="button" class="btn btn-primary" wire:click="$dispatch('new-task')"><i data-lucide="plus"></i> {{ __('projects.backlog.new_task') }}</button>
             </div>
         @endif

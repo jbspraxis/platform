@@ -2,248 +2,241 @@
 
 namespace App\Livewire\Hq\Operations;
 
-use Livewire\Component;
+use App\Models\MilestonePlan;
+use App\Support\Ai\AiUnavailable;
+use App\Support\Projects\Planner;
+use App\Support\Projects\ProjectPlan;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
-use Carbon\Carbon;
-use App\Models\Opportunity;
-use App\Support\Opportunities\OpportunityAccess;
-use App\Support\Opportunities\OpportunityContext;
-use App\Support\Projects\PlanWriter;
+use Livewire\Component;
+use LogicException;
 
 /**
- * Plan milestones: the assistant drafts a project's milestones and their tasks from the scope of work; the lead checks
- * them and saves them to the project page. Milestones are the unit of work (sprints were folded into milestones on
- * 1 Nov 2026, docs/PROJECTS.md). A project from an opportunity starts from that opportunity's context (the signed SOW
- * and its milestones); a new project gets its first plan from the project draft on its opportunity (PR 5), so this
- * screen adds milestones to a running project.
+ * Plan milestones (PR 5b; the owner's decisions of 1 Nov 2026, docs/PROJECTS.md section 9). The scope box is
+ * prefilled from the project's opportunity, with the sources used, and stays editable. A project with milestones is
+ * planned one milestone at a time: the AI suggests new tasks, edits to that milestone's tasks and notes, in the
+ * background; the adopted plan shows in the review pane with every milestone collapsed to one line, its suggestions
+ * inside it with tick boxes, and saving writes only the ticked ones. A project whose plan waits in its project draft
+ * (PR 5) is sent there; one with neither gets a whole plan to check and save. App\Support\Projects\Planner holds the
+ * rules; every request checks the right to plan this project again (Planner::canPlan).
  */
 #[Layout('components.layouts.hq')]
 class ScrumMaster extends Component
 {
-    // Set in mount; the browser must not point the plan at another project
     #[Locked]
-    public $projectId;
+    public string $projectId;
+
+    /** The scope box: prefilled, editable before drafting */
+    public string $scope = '';
+
+    /** "Sources used" */
     #[Locked]
-    public $project;
+    public array $sources = [];
 
-    // Staging Data
-    public $sowContext = '';
-    public $generatedBacklog = []; // Holds the AI JSON before commit: [{milestone_title, goal, tasks: [{title, description}]}]
-    public $isGenerating = false;
+    /** The milestone to plan */
+    public string $phaseId = '';
 
-    /**
-     * Why the assistant won't plan this project (the lead's audit of PR 5, until per-milestone planning, PR 5b):
-     * has_plan (it has milestones: a second whole plan would stack on them, client-visible tasks and all), or
-     * draft_pending (its plan is in the project draft from its signed SOW). '' when it may.
-     */
+    /** The suggestions the lead keeps */
+    public array $ticked = [];
+
+    /** The plan under review and its revision when the page showed it (a page that is behind saves nothing) */
     #[Locked]
-    public string $blocked = '';
+    public string $planId = '';
 
-    /** The opportunity holding the pending project draft, for the link */
     #[Locked]
-    public ?string $draftOpportunityId = null;
+    public int $revision = 0;
 
-    public function mount($id)
+    #[Locked]
+    public string $notice = '';
+
+    /** Edits a save refused because their task changed after the AI read it */
+    #[Locked]
+    public string $warning = '';
+
+    public function mount($id): void
     {
-        // Strict Access Control: this screen only builds plans (milestones and their tasks), so projects.create
-        if (! Auth::user()->can('projects.create')) {
-            abort(403, 'You don’t have permission to plan milestones. Ask an administrator to change your role.');
-        }
-
-        $this->projectId = $id;
-        $this->project = DB::table('projects')->where('id', $id)->first();
-
-        if (!$this->project) abort(404);
-
-        $this->blocked = $this->whyBlocked();
-        $this->extractProposalContext();
+        $this->projectId = (string) $id;
+        abort_unless(DB::table('projects')->where('id', $this->projectId)->whereNull('deleted_at')->exists(), 404);
+        abort_unless(Planner::canPlan($this->projectId), 403, __('planner.errors.rights'));
+        [$this->scope, $this->sources] = Planner::scope($this->projectId, Auth::user());
+        $this->phaseId = (string) (ProjectPlan::boardDefault(ProjectPlan::milestones($this->projectId))?->id ?? '');
     }
 
-    private function whyBlocked(): string
+    /** Every later request: still allowed to plan this project */
+    public function hydrate(): void
     {
-        $draft = DB::table('project_drafts')->join('statements_of_work', 'statements_of_work.id', '=', 'project_drafts.sow_id')
-            ->where('statements_of_work.project_id', $this->projectId)->where('project_drafts.status', '!=', 'created')->whereNull('project_drafts.deleted_at')
-            ->first(['project_drafts.opportunity_id']);
-        $this->draftOpportunityId = $draft?->opportunity_id;
-
-        return match (true) {
-            $draft !== null => 'draft_pending',
-            DB::table('project_phases')->where('project_id', $this->projectId)->whereNull('deleted_at')->exists() => 'has_plan',
-            default => '',
-        };
+        abort_unless(Planner::canPlan($this->projectId), 403);
     }
 
-    private function extractProposalContext()
+    /** One milestone: the AI's suggestions, in the background */
+    public function suggest(): void
     {
-        // A project from an opportunity (PR 5) reads that opportunity: the organisation, the approved proposal and the
-        // signed SOW with its milestones (OpportunityContext). Meeting notes only for someone who may open the
-        // opportunity, so the assistant never reads more than the screens would show this person.
-        $opportunity = Opportunity::query()
-            ->where(fn ($q) => $q->where('project_id', $this->projectId)->when($this->project->opportunity_id ?? null, fn ($q) => $q->orWhere('id', $this->project->opportunity_id)))
-            ->orderByDesc('updated_at')->first();
-        if ($opportunity) {
-            $parts = OpportunityAccess::canView(Auth::user(), $opportunity)
-                ? ['profile', 'meetings', 'notes', 'questionnaire', 'proposal', 'sow']
-                : ['profile', 'proposal', 'sow'];
-            $this->sowContext = OpportunityContext::for($opportunity, include: $parts);
-
-            return;
-        }
-
-        // Else the organisation's latest signed proposal (projects from before the pipeline)
-        $proposal = DB::table('proposals')
-            ->where('organization_id', $this->project->organization_id)
-            ->whereIn('status', ['Authorized', 'Pending Auth'])
-            ->orderBy('created_at', 'desc')
-            ->first();
-
-        if ($proposal) {
-            $narrative = DB::table('proposal_ai_narratives')->where('proposal_id', $proposal->id)->first();
-
-            $this->sowContext = "Executive summary:\n" . ($proposal->executive_summary ?? 'Not provided') . "\n\n";
-            if ($narrative) {
-                $this->sowContext .= "Operational strategy:\n" . ($narrative->ai_operational_strategy ?? 'Not provided');
-            }
-        } else {
-            $this->sowContext = "No approved proposal is linked to this client. Type or paste the scope of work here, then draft the plan.";
-        }
+        $this->resetErrorBag();
+        $this->notice = $this->warning = '';
+        $this->validateScope();
+        $this->validate(['phaseId' => ['required', 'string']], ['phaseId.*' => __('planner.errors.milestone')]);
+        $this->startPlan($this->phaseId);
     }
 
-    public function generateScrumBacklog()
+    /** A whole plan, for a project with no milestones and no project draft */
+    public function draftPlan(): void
     {
-        abort_unless(Auth::user()->can('projects.create'), 403);
-        // Checked again on each request: a plan may have been created since the page opened
-        if ($this->blocked = $this->whyBlocked()) {
-            return;
-        }
+        $this->resetErrorBag();
+        $this->notice = $this->warning = '';
+        $this->validateScope();
+        $this->startPlan(null);
+    }
 
-        $this->validate([
-            'sowContext' => 'required|string|min:50'
-        ], [], ['sowContext' => 'scope of work']);
+    private function validateScope(): void
+    {
+        $this->scope = trim($this->scope);
+        $this->validate(['scope' => ['required', 'string', 'min:50', 'max:' . Planner::MAX_SCOPE]], [
+            'scope.required' => __('planner.errors.scope'),
+            'scope.min' => __('planner.errors.scope'),
+            'scope.max' => __('planner.errors.scope_long', ['max' => Planner::MAX_SCOPE]),
+        ]);
+    }
 
-        $this->isGenerating = true;
-
-        $prompt = "You are the delivery planner at JBS Praxis. Read the following scope of work.
-        Break this project down into its milestones, in delivery order, as the scope of work sets them out. Inside each
-        milestone, define the specific tasks required, and say in one sentence what the milestone delivers (its goal).
-        Write a 3-point acceptance criteria checklist in HTML <ul> format for the task description.
-        Write every title and criterion in plain British English and sentence case, with no hype and no military or technical jargon.
-
-        You must return ONLY a valid JSON array with this exact structure, nothing else:
-        [
-          {
-            \"milestone_title\": \"Discovery and design\",
-            \"goal\": \"An agreed design for the finance system\",
-            \"tasks\": [
-              {
-                \"title\": \"Interview the finance team\",
-                \"description\": \"<ul><li>Interview the finance director</li><li>Map the month-end close</li><li>Agree the findings with the primary contact</li></ul>\"
-              }
-            ]
-          }
-        ]
-
-        SCOPE OF WORK TO PARSE:
-        " . $this->sowContext;
-
+    private function startPlan(?string $phaseId): void
+    {
         try {
-             $apiKey = config('services.gemini.api_key');
+            $plan = Planner::start($this->projectId, $phaseId, $this->scope, Auth::user());
+        } catch (AiUnavailable $e) {
+            $this->addError('plan', $e->getMessage());
 
-            $response = Http::timeout(45)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", [
-                "contents" => [["parts" => [["text" => $prompt]]]]
-            ]);
-
-            if ($response->successful()) {
-                $rawText = $response->json('candidates.0.content.parts.0.text');
-
-                // Clean markdown wrappers
-                $jsonString = preg_replace('/```(?:json)?\n?|\n?```/', '', $rawText);
-                $parsedData = json_decode($jsonString, true);
-
-                if (json_last_error() === JSON_ERROR_NONE && is_array($parsedData)) {
-                    // Only what the review screen shows: a title, a goal, and tasks with a title and criteria
-                    $this->generatedBacklog = array_values(array_map(fn ($m) => [
-                        'milestone_title' => (string) ($m['milestone_title'] ?? 'Milestone'),
-                        'goal' => (string) ($m['goal'] ?? ''),
-                        'tasks' => array_values(array_map(fn ($t) => ['title' => (string) ($t['title'] ?? ''), 'description' => (string) ($t['description'] ?? '')],
-                            array_filter((array) ($m['tasks'] ?? []), 'is_array'))),
-                    ], array_filter($parsedData, 'is_array')));
-                    session()->flash('success', 'Plan drafted. Check the milestones and tasks, then save the plan.');
-                } else {
-                    session()->flash('error', 'We couldn’t read the assistant’s draft. Draft the plan again.');
-                }
-            } else {
-                session()->flash('error', 'We couldn’t reach the assistant. Try again in a few minutes; if it keeps failing, ask an administrator to check the AI settings.');
-            }
-        } catch (\Exception $e) {
-            session()->flash('error', 'The assistant took too long to answer. Shorten the scope of work and try again.');
-        }
-
-        $this->isGenerating = false;
-    }
-
-    public function removeTask($milestoneIndex, $taskIndex)
-    {
-        unset($this->generatedBacklog[$milestoneIndex]['tasks'][$taskIndex]);
-        // Re-index array to prevent Livewire rendering issues
-        $this->generatedBacklog[$milestoneIndex]['tasks'] = array_values($this->generatedBacklog[$milestoneIndex]['tasks']);
-    }
-
-    /**
-     * Each drafted milestone joins the project after its existing ones, two weeks long to start with (the lead sets the
-     * real dates and weights on the project page), with its tasks. Weights are shared out only when the project had no
-     * milestones yet: an existing plan's weights are never touched.
-     */
-    public function commitBacklogToDatabase()
-    {
-        abort_unless(Auth::user()->can('projects.create'), 403);
-        if ($this->blocked = $this->whyBlocked()) {
-            $this->generatedBacklog = [];
+            return;
+        } catch (LogicException) {
+            $this->addError('plan', __('planner.errors.state'));
 
             return;
         }
+        $this->planId = '';
+        $this->ticked = [];
+        if ($plan->status === 'ready') {
+            $this->notice = __('planner.ready');
+        }
+    }
 
-        if (empty($this->generatedBacklog)) {
-            session()->flash('error', 'There is no draft to save. Draft the plan first.');
+    /** wire:poll while the AI works: render() files what it finished */
+    public function check(): void {}
+
+    /** Saves the ticked suggestions; the others are set aside */
+    public function save(): void
+    {
+        $this->resetErrorBag();
+        $plan = $this->plan();
+        if (! $plan) {
             return;
         }
+        $result = Planner::save($plan, $this->ticked, Auth::user(), $this->revision);
+        if (is_string($result)) {
+            $this->addError('save', __('planner.errors.' . $result));
 
-        // Written through App\Support\Projects\PlanWriter, as PR 5's Create project does
-        DB::transaction(function () {
-            $existing = fn () => DB::table('project_phases')->where('project_id', $this->projectId)->whereNull('deleted_at');
-            $hadMilestones = $existing()->exists();
-            $lastDue = $existing()->max('due_date');
-            $start = $lastDue ? Carbon::parse($lastDue)->addDay() : Carbon::now();
-            $weight = $hadMilestones ? 0 : round(100 / max(1, count($this->generatedBacklog)), 2);
+            return;
+        }
+        $this->ticked = [];
+        $this->planId = '';
+        $this->notice = self::savedText($result);
+        $this->warning = $result['refused'] ? trans_choice('planner.saved.refused', count($result['refused']), [
+            'list' => implode(', ', array_map(fn ($title) => __('planner.saved.quote', ['title' => $title]), $result['refused'])),
+        ]) : '';
+    }
 
-            $plan = [];
-            foreach ($this->generatedBacklog as $milestone) {
-                $due = $start->copy()->addDays(13);
-                $plan[] = [
-                    'title' => $milestone['milestone_title'] ?? '',
-                    'goal' => $milestone['goal'] ?? '',
-                    'weight_percentage' => $weight,
-                    'amount' => round((float) $this->project->total_budget * $weight / 100, 2),
-                    'start_date' => $start->format('Y-m-d'),
-                    'due_date' => $due->format('Y-m-d'),
-                    'tasks' => array_map(fn ($t) => ['title' => $t['title'] ?? '', 'description' => $t['description'] ?? ''], (array) ($milestone['tasks'] ?? [])),
-                ];
-                $start = $due->copy()->addDay();
-            }
-            PlanWriter::write($this->projectId, $plan);
-            PlanWriter::announce($this->projectId, $this->project->title);
-        });
+    /** "Added 2 tasks. Changed 1 task. The other suggestions were set aside." */
+    private static function savedText(array $result): string
+    {
+        $parts = [];
+        if ($result['added']) {
+            $parts[] = trans_choice('planner.saved.added', $result['added'], ['count' => $result['added']]);
+        }
+        if ($result['changed']) {
+            $parts[] = trans_choice('planner.saved.changed', $result['changed'], ['count' => $result['changed']]);
+        }
+        $parts[] = $parts ? __('planner.saved.rest') : __('planner.saved.none');
 
-        session()->flash('success', 'Plan saved. The milestones and their tasks are on the project page.');
-        return $this->redirect(route('hq.ops.project', ['project' => $this->projectId, 'tab' => 'milestones']), navigate: true);
+        return implode(' ', $parts);
+    }
+
+    /** A whole plan: leave out one drafted task, or a drafted milestone */
+    public function removeDrafted(int $m, ?int $t = null): void
+    {
+        $this->resetErrorBag();
+        if (($plan = $this->plan()) && ! Planner::removeDrafted($plan, $m, $t, $this->revision)) {
+            $this->planId = '';
+            $this->addError('save', __('planner.errors.stale'));
+        }
+    }
+
+    public function saveWhole(): void
+    {
+        $this->resetErrorBag();
+        $plan = $this->plan();
+        if (! $plan) {
+            return;
+        }
+        $why = Planner::saveWhole($plan, Auth::user(), $this->revision);
+        if ($why !== null) {
+            $this->addError('save', __('planner.errors.' . $why));
+
+            return;
+        }
+        session()->flash('success', __('planner.whole.saved'));
+        $this->redirectRoute('hq.ops.project', ['project' => $this->projectId, 'tab' => 'milestones'], navigate: true);
+    }
+
+    private function plan(): ?MilestonePlan
+    {
+        return $this->planId !== '' ? MilestonePlan::where('project_id', $this->projectId)->find($this->planId) : null;
     }
 
     public function render()
     {
-        return view('livewire.hq.operations.scrum-master');
+        $project = ProjectPlan::project($this->projectId);
+        $mode = Planner::mode($this->projectId);
+        $plan = Planner::current($this->projectId);
+        if ($plan) {
+            Planner::sync($plan);
+            $plan->refresh()->load(['aiRun', 'transcriptMeeting']);
+            if ($plan->status === 'saved') {
+                $plan = null;
+            }
+        }
+        // A new review (or one changed elsewhere) starts with nothing ticked
+        if ($plan && $plan->status === 'ready' && ($this->planId !== $plan->id || $this->revision !== $plan->revision)) {
+            $this->planId = $plan->id;
+            $this->revision = $plan->revision;
+            $this->ticked = [];
+        } elseif (! $plan) {
+            // The suggestions this page showed were saved or replaced in another tab
+            if ($this->planId !== '') {
+                $this->resetErrorBag('save');
+                $this->addError('save', __('planner.errors.gone'));
+            }
+            $this->planId = '';
+        }
+
+        $milestones = ProjectPlan::milestones($this->projectId);
+        $tasks = DB::table('tasks')->leftJoin('users', 'users.id', '=', 'tasks.assigned_to')
+            ->whereIn('tasks.phase_id', $milestones->pluck('id'))->whereNull('tasks.deleted_at')->orderBy('tasks.created_at')->orderBy('tasks.id')
+            ->get(['tasks.id', 'tasks.phase_id', 'tasks.title', 'tasks.description', 'tasks.status', 'tasks.estimated_hours', 'users.first_name', 'users.last_name'])
+            ->groupBy('phase_id');
+        $suggestions = $plan && $plan->status === 'ready' && $plan->phase_id ? $plan->suggestions()->where('status', 'pending')->get() : collect();
+
+        return view('livewire.hq.operations.scrum-master', [
+            'project' => $project,
+            'mode' => $mode,
+            'plan' => $plan,
+            'drafting' => $plan?->status === 'drafting',
+            'milestones' => $milestones,
+            'tasks' => $tasks,
+            'newByPhase' => $suggestions->where('kind', 'new')->groupBy('phase_id'),
+            'editByTask' => $suggestions->where('kind', 'edit')->keyBy('task_id'),
+            'notesByTask' => $suggestions->where('kind', 'note')->groupBy('task_id'),
+            'countByPhase' => $suggestions->whereIn('kind', ['new', 'edit'])->groupBy('phase_id')->map->count(),
+            'notesByPhase' => $suggestions->where('kind', 'note')->groupBy('phase_id')->map->count(),
+            'draftOpportunityId' => $mode === 'draft_pending' ? Planner::pendingDraftOpportunity($this->projectId) : null,
+        ])->title(__('planner.title') . ' · ' . ($project->title ?? ''));
     }
 }

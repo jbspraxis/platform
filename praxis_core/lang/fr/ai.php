@@ -28,6 +28,8 @@ return [
         'proposal_changes' => "Modifications",
         'sow' => "Énoncé des travaux",
         'project_draft' => "Projet préparé",
+        'plan_milestone' => "Plan d’un jalon",
+        'plan_project' => "Plan du projet",
         'connection_test' => "Test de la clé",
     ],
 ];
