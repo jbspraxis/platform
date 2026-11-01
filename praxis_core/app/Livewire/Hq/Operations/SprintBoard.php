@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use App\Support\Access;
+use App\Support\Opportunities\Handovers;
 use App\Support\ProjectAccess;
 
 #[Layout('components.layouts.hq')]
@@ -20,6 +21,10 @@ class SprintBoard extends Component
     public $projectId;
     #[Locked]
     public $project;
+
+    // The project's opportunity, which holds its meetings; without one a milestone's handover can't be scheduled (PR 6)
+    #[Locked]
+    public ?string $opportunityId = null;
 
     // Task statuses a card can be dropped into (database values)
     private const COLUMNS = ['To-Do', 'In-Progress', 'QA_Review', 'Failed', 'Done'];
@@ -57,6 +62,7 @@ class SprintBoard extends Component
 
         $this->projectId = $id;
         $this->project = $project;
+        $this->opportunityId = Handovers::opportunityForProject($id)?->id;
 
         $this->sprints = DB::table('sprints')->where('project_id', $this->projectId)->orderBy('start_date', 'asc')->get()->toArray();
         
@@ -134,9 +140,12 @@ class SprintBoard extends Component
             ->where('project_id', $this->projectId)
             ->whereIn('status', ['Open', 'Investigating'])
             ->whereNotNull('task_id')
+            ->whereNull('deleted_at')
             ->select('id', 'task_id', 'title', 'description', 'severity')
+            ->orderByRaw("FIELD(severity, 'Critical', 'Medium', 'Low')")
+            ->orderBy('created_at')
             ->get()
-            ->keyBy('task_id');
+            ->groupBy('task_id'); // a task can have several (a handover's points): the most severe shows first
 
         $this->tasks = ['To-Do' => [], 'In-Progress' => [], 'QA_Review' => [], 'Failed' => [], 'Done' => []];
         $capacityTracker = [];
@@ -145,8 +154,9 @@ class SprintBoard extends Component
             $taskData = (array) $task;
             
             // Inject the rich QA data if a vulnerability exists
-            $qaTicket = $activeQaTickets->get($task->id);
+            $qaTicket = $activeQaTickets->get($task->id)?->first();
             $taskData['has_active_qa'] = $qaTicket !== null;
+            $taskData['qa_ticket_count'] = $activeQaTickets->get($task->id)?->count() ?? 0;
             
             if ($qaTicket) {
                 $taskData['qa_ticket_id'] = $qaTicket->id;
@@ -344,8 +354,23 @@ class SprintBoard extends Component
         session()->flash('error', 'We paused your timers because the 45-minute check wasn’t answered. Your tasks in progress are back in To do; move one into In progress to start again.');
     }
 
+    /**
+     * The milestone handovers this board shows: one per milestone whose tasks the selected sprint holds (MyCity: one),
+     * each Handovers::forMilestone(), the entry point any milestone screen uses (the row is
+     * partials/milestone-handover.blade.php)
+     */
+    private function handovers(): array
+    {
+        if (! $this->opportunityId || ! $this->activeSprintId) {
+            return [];
+        }
+
+        return Handovers::milestonesInSprint($this->projectId, $this->activeSprintId)
+            ->map(fn ($milestone) => Handovers::forMilestone($this->projectId, $milestone->id, Auth::user()))->all();
+    }
+
     public function render()
     {
-        return view('livewire.hq.operations.sprint-board');
+        return view('livewire.hq.operations.sprint-board', ['handovers' => $this->handovers()]);
     }
 }

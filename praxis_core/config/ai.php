@@ -116,6 +116,24 @@ return [
             ], 'required' => ['subject', 'summary', 'decisions', 'next_steps'], 'additionalProperties' => false],
         ],
 
+        // PR 6: the points raised in a milestone's handover meeting, from its transcript. MATERIAL numbers the milestone's
+        // tasks; task_number points at one of them (0: can't tell). Nothing is created until the lead confirms a point
+        // (App\Support\Opportunities\Handovers), which makes it a QA ticket the client also sees in the portal.
+        'handover_points' => [
+            'provider' => 'claude', 'model' => 'claude-haiku-5-5', 'effort' => 'medium', 'max_tokens' => 8000,
+            'stream' => false, 'sync' => false, 'expected_chars' => 3000,
+            'task' => 'This meeting handed over one milestone of the project to the client. List every point raised in it that the team has to act on: a defect, a change asked for, something missing, wrong or unclear in what was delivered. One point per item, in the order raised. title: the problem in a few specific words (under 12), fit for the client to read. asked: what exactly was asked or reported, in plain words, with the screen, data or step concerned when it was said. raised_by: the name of the person who raised it as the transcript gives it, or empty. severity: Critical when it stops the client using what was delivered or puts data at risk, Medium when it gets in the way but there is a workaround, Low for wording, look and small comforts. task_number: the number of the milestone task in MATERIAL that the point concerns when the meeting makes it clear, else 0. Leave out thanks and praise, questions answered there and then, and anything the lead’s instructions list as already recorded. Only what was said: never add a point, a fact or a figure.',
+            'schema' => ['type' => 'object', 'properties' => [
+                'points' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
+                    'title' => ['type' => 'string'],
+                    'asked' => ['type' => 'string'],
+                    'raised_by' => ['type' => 'string', 'description' => 'As the transcript names them; empty if unclear'],
+                    'severity' => ['type' => 'string', 'enum' => ['Low', 'Medium', 'Critical']],
+                    'task_number' => ['type' => 'integer', 'description' => 'The milestone task’s number in MATERIAL, or 0'],
+                ], 'required' => ['title', 'asked', 'raised_by', 'severity', 'task_number'], 'additionalProperties' => false]],
+            ], 'required' => ['points'], 'additionalProperties' => false],
+        ],
+
         // PR 3: the whole questionnaire, from the opportunity's context (meeting notes, not full transcripts). The
         // lead's count and focus areas come as instructions. App\Support\Opportunities\Questionnaires keeps the
         // first N questions that have 3 or more distinct answers and a recommendation that points at one of them.

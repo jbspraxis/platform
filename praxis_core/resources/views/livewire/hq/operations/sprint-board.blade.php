@@ -34,6 +34,26 @@
         <div class="alert alert-info mb-4"><i data-lucide="info"></i> <span>No sprints planned for this project yet. Once sprints are planned, their tasks appear here.</span></div>
     @endif
 
+    {{-- The handover meeting with the client of each milestone whose tasks this sprint holds (docs/OPPORTUNITIES.md section 12, PR 6) --}}
+    @if(!empty($sprints) && $activeSprintId)
+        <section class="card mb-4 flex items-start gap-3 py-4" aria-labelledby="handover-title" wire:key="handover-{{ $activeSprintId }}">
+            <i data-lucide="target" class="mt-0.5 h-5 w-5 shrink-0 text-deep-teal"></i>
+            <div class="min-w-0 flex-1">
+                <h2 id="handover-title" class="text-ui font-semibold text-ink">{{ trans_choice('handover.board.title', max(1, count($handovers))) }}</h2>
+                @if(! $opportunityId)
+                    <p class="mt-1 text-small text-slate">{{ __('handover.board.no_opportunity') }}</p>
+                @elseif(empty($handovers))
+                    <p class="mt-1 text-small text-slate">{{ __('handover.board.no_milestones') }}</p>
+                @endif
+                @foreach($handovers as $h)
+                    <div class="mt-3 {{ $loop->first ? '' : 'border-t border-line pt-3' }}" wire:key="handover-{{ $h['milestone']->id }}">
+                        @include('livewire.hq.operations.partials.milestone-handover', ['h' => $h])
+                    </div>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
     @if(!empty($teamCapacity))
         <div class="card mb-4 flex flex-wrap items-center gap-3 py-4">
             <span class="stat-label">Open hours assigned in this sprint</span>
@@ -125,7 +145,7 @@
                             @if($task['has_active_qa'] ?? false)
                                 <div class="group relative mt-3">
                                     <a href="{{ route('hq.ops.qa', ['ticket' => $task['qa_ticket_id']]) }}" class="btn btn-sm w-full border-danger bg-danger-tint text-danger no-underline" wire:navigate>
-                                        <i data-lucide="circle-alert"></i> Open issue
+                                        <i data-lucide="circle-alert"></i> {{ trans_choice('handover.board.issues', $task['qa_ticket_count'] ?? 1, ['count' => $task['qa_ticket_count'] ?? 1]) }}
                                     </a>
 
                                     <div class="pointer-events-none invisible absolute bottom-full left-1/2 z-10 mb-2 w-[240px] -translate-x-1/2 rounded-lg border border-line bg-paper p-3 text-left opacity-0 transition-opacity group-hover:visible group-hover:opacity-100" style="box-shadow: var(--shadow-float);">
