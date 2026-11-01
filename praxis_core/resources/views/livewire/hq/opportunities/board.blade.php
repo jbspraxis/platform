@@ -345,7 +345,7 @@
                         @enderror
                     </div>
 
-                    <x-hq.picker id="opb-lead" :label="__('opportunities.fields.lead')" model="leadSearch" :options="$leadOptions" :selected="$leadSelected"
+                    <x-hq.picker id="opb-lead-user" :label="__('opportunities.fields.lead')" model="leadSearch" :options="$leadOptions" :selected="$leadSelected"
                                  choose="chooseLead" remove="clearLead" :placeholder="__('opportunities.create.team_hint')" :help="__('opportunities.create.lead_help')"
                                  :error="$errors->first('leadUserId')" :empty="__('opportunities.create.no_staff')" :term="$leadSearch" :change="__('opportunities.create.change')" />
 

@@ -52,7 +52,7 @@
 @endphp
 <div {{ $attributes->class(['field', 'pk']) }} role="group" aria-labelledby="{{ $id }}-label"
      x-data="{
-        open: false, active: -1,
+        open: false, active: -1, wantFocus: false,
         items() { return this.$refs.list ? Array.from(this.$refs.list.querySelectorAll('[role=option]')) : [] },
         move(d) { const n = this.items().length; if (!n) { this.open = true; return } this.open = true; this.active = (this.active + d + n) % n; this.items()[this.active].scrollIntoView({ block: 'nearest' }) },
         pick() { const all = this.items(); const el = all[this.active] ?? (all.length === 1 ? all[0] : null); if (el) el.click() },
@@ -81,13 +81,15 @@
             @if ($avatars) <x-hq.avatar :user="$itemUser($one)" /> @endif
             <span class="pk-opt-text"><span>{{ $one['label'] }}</span>@if (! empty($one['meta']))<span class="pk-meta">{{ $one['meta'] }}</span>@endif</span>
             @if ($remove)
-                <button type="button" class="btn btn-ghost btn-sm" wire:click="{{ $remove }}" x-on:click="$nextTick(() => $refs.input?.focus())">{{ $change ?? 'Change' }}</button>
+                {{-- The input only exists once Livewire has answered: its x-init then focuses it, so the list opens at once --}}
+                <button type="button" class="btn btn-ghost btn-sm" x-on:click="wantFocus = true" wire:click="{{ $remove }}">{{ $change ?? 'Change' }}</button>
             @endif
         </div>
     @else
         <div class="pk-wrap">
             <input id="{{ $id }}" type="text" class="input" role="combobox" autocomplete="off" spellcheck="false" x-ref="input"
                    wire:model.live.debounce.150ms="{{ $model }}" placeholder="{{ $placeholder }}" @if ($autofocus) autofocus @endif
+                   x-init="if (wantFocus) { wantFocus = false; open = true; $nextTick(() => $el.focus()) }"
                    aria-autocomplete="list" aria-controls="{{ $id }}-list" aria-labelledby="{{ $id }}-label"
                    :aria-expanded="open ? 'true' : 'false'" :aria-activedescendant="active >= 0 ? '{{ $id }}-opt-' + active : null"
                    @if ($describedBy) aria-describedby="{{ $describedBy }}" @endif @if ($error) aria-invalid="true" @endif
