@@ -80,6 +80,9 @@ class ProposalBuilder extends Component
         $this->hqSignerName = Auth::user()->first_name . ' ' . Auth::user()->last_name;
 
         if ($id) {
+            if ($this->openReviewed($id)) {
+                return;
+            }
             $this->proposalId = $id;
             $this->activeTab = 'setup';
             $this->loadProposalData();
@@ -95,8 +98,24 @@ class ProposalBuilder extends Component
     private function proposalIsLocked(): bool
     {
         if (! $this->proposalId) return true;
-        $status = DB::table('proposals')->where('id', $this->proposalId)->value('status');
-        return $status === null || in_array($status, self::LOCKED_STATUSES, true);
+        $proposal = DB::table('proposals')->where('id', $this->proposalId)->first(['status', 'signing_mode']);
+        // A proposal v2 (signing_mode approve) is written in its opportunity's Proposals tab, never here
+        return $proposal === null || $proposal->signing_mode === 'approve' || in_array($proposal->status, self::LOCKED_STATUSES, true);
+    }
+
+    /**
+     * A proposal v2 belongs to its opportunity's Proposals tab (docs/OPPORTUNITIES.md, PR 4): open it there.
+     * True when the page is on its way there.
+     */
+    private function openReviewed(string $id): bool
+    {
+        $proposal = DB::table('proposals')->where('id', $id)->first(['id', 'opportunity_id', 'signing_mode']);
+        if (! $proposal || $proposal->signing_mode !== 'approve' || ! $proposal->opportunity_id) {
+            return false;
+        }
+        $this->redirectRoute('hq.crm.opportunity', ['opportunity' => $proposal->opportunity_id, 'tab' => 'proposals', 'version' => $proposal->id], navigate: true);
+
+        return true;
     }
 
     public function switchTab($tab)
@@ -188,6 +207,9 @@ class ProposalBuilder extends Component
 
     public function loadExistingProposal($id)
     {
+        if ($this->openReviewed((string) $id)) {
+            return;
+        }
         $this->proposalId = $id;
         $this->activeTab = 'setup';
         $this->loadProposalData();
@@ -530,7 +552,7 @@ class ProposalBuilder extends Component
         }
 
         // Prevent unlocking if the client already signed it (status read from the database, not the page)
-        $status = DB::table('proposals')->where('id', $this->proposalId)->value('status');
+        $status = DB::table('proposals')->where('id', $this->proposalId)->where('signing_mode', 'legacy')->value('status');
         $statusBefore = $status;
         if ($status === null || in_array($status, ['Authorized', 'Converted'])) {
             session()->flash('error', "This proposal can’t be unlocked because the client has already signed it.");

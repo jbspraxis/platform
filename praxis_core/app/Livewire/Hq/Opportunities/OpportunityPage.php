@@ -175,6 +175,10 @@ class OpportunityPage extends Component
     #[On('meetings-changed')]
     public function meetingsChanged(): void {}
 
+    /** The Proposals tab started, sent or discarded a version: redraw the tab count and the history */
+    #[On('proposals-changed')]
+    public function proposalsChanged(): void {}
+
     public function render()
     {
         $o = $this->opportunity();
@@ -203,7 +207,6 @@ class OpportunityPage extends Component
             'team' => Team::of($o),
             'canApprove' => OpportunityAccess::canApprove($user, $o),
             'canReadTranscripts' => OpportunityAccess::canReadTranscripts($user, $o),
-            'canOpenProposals' => (bool) $user?->can('crm.view'),
             'canOpenProjects' => (bool) $user?->can('projects.view'),
         ] + ($this->editing ? $this->staffPickers() : []))->title($o->title . ' · ' . __('opportunities.title'));
     }

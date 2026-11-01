@@ -229,11 +229,20 @@ return [
         'QUESTIONNAIRE_QUESTION_REMOVED' => 'Removed a question from the questionnaire.',
         'QUESTIONNAIRE_COMPLETED' => 'Marked the questionnaire complete.',
         'QUESTIONNAIRE_RESTARTED' => 'Set the questionnaire aside to draft it again.',
+        // Proposals (PR 4)
+        'PROPOSAL_STARTED' => 'Started the proposal.',
+        'PROPOSAL_DRAFT_REQUESTED' => 'Asked the AI to draft the proposal.',
+        'PROPOSAL_VERSION_STARTED' => 'Started a new version of the proposal.',
+        'PROPOSAL_VERSION_DISCARDED' => 'Discarded a draft version of the proposal.',
+        'PROPOSAL_APPROVED' => 'Approved the proposal for sending.',
+        'PROPOSAL_REOPENED' => 'Took the proposal back to draft.',
+        'PROPOSAL_SENT' => 'Sent the proposal to the client.',
+        'PROPOSAL_APPROVED_BY_CLIENT' => 'The client approved the proposal.',
+        'PROPOSAL_CHANGES_REQUESTED' => 'The client asked for changes to the proposal.',
     ],
 
     'stubs' => [
         'meetings' => 'Booking meetings from here, with a Google Meet link, invitations and transcripts collected automatically, is coming next. Meetings from earlier free audits are listed below.',
-        'proposals' => 'Drafting the proposal from this opportunity is coming soon. Until then, proposals made in Proposals are listed here.',
         'sow' => 'The statement of work is drafted from the approved proposal and signed by the client. This is coming soon.',
         'project' => 'The project is drafted here once the statement of work is signed.',
     ],
