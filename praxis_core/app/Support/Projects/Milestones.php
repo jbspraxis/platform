@@ -86,12 +86,15 @@ final class Milestones
         self::update($phase, $data, 'MILESTONE_MOVED');
     }
 
-    /** Only a milestone with no tasks, no invoice and no handover meeting (PR 6: meetings.phase_id, not cancelled) can go */
+    /**
+     * Only a milestone with no tasks, no invoice and no handover meeting (PR 6: a client meeting with meetings.phase_id,
+     * not cancelled) can go. The team's internal meetings about it don't hold it: deleting it unlinks them.
+     */
     public static function canDelete(object $phase): bool
     {
         return ! DB::table('tasks')->where('phase_id', $phase->id)->whereNull('deleted_at')->exists()
             && ! DB::table('invoices')->where('phase_id', $phase->id)->whereNull('deleted_at')->exists()
-            && ! DB::table('meetings')->where('phase_id', $phase->id)->where('status', '!=', 'cancelled')->whereNull('deleted_at')->exists();
+            && ! DB::table('meetings')->where('phase_id', $phase->id)->where('kind', 'client')->where('status', '!=', 'cancelled')->whereNull('deleted_at')->exists();
     }
 
     public static function delete(object $phase): bool
@@ -101,6 +104,7 @@ final class Milestones
         }
         DB::transaction(function () use ($phase) {
             DB::table('phase_dependencies')->where('phase_id', $phase->id)->orWhere('depends_on_phase_id', $phase->id)->delete();
+            DB::table('meetings')->where('phase_id', $phase->id)->where('kind', 'internal')->update(['phase_id' => null, 'updated_at' => now()]);
             DB::table('project_phases')->where('id', $phase->id)->update(['deleted_at' => now(), 'deleted_by' => Auth::id()]);
         });
         ProjectRules::log('MILESTONE_DELETED', "Deleted the milestone M{$phase->phase_number} “{$phase->title}”.", 'project_phases', $phase->id);

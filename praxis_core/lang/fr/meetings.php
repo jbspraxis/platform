@@ -320,4 +320,18 @@ return [
             'unknown_email' => 'Indiquez l’adresse e-mail à laquelle nous avons envoyé notre invitation. Pour ajouter un collègue, répondez à notre dernier e-mail.',
         ],
     ],
+
+    // Une réunion interne sur un jalon (la réunion de l’équipe ; une réunion client sur un jalon est sa livraison)
+    'milestone' => [
+        'label' => "Jalon",
+        'none' => "Aucun jalon",
+        'form_help' => "Facultatif. La réunion apparaît alors sur le tableau de ce jalon, pour l’équipe. Le client ne la voit jamais.",
+        'details_help' => "Affiche cette réunion sur le tableau de ce jalon. Rien n’est envoyé à personne.",
+        'tag' => "Jalon\u{00A0}: :milestone",
+        'default_title' => "Réunion d’équipe\u{00A0}: :milestone",
+        'linked' => "Liée à :milestone. Elle apparaît sur le tableau de ce jalon.",
+        'unlinked' => "Elle n’est plus liée à un jalon.",
+        'internal_only' => "Seule une réunion interne non annulée se lie à un jalon ici. Une réunion client sur un jalon est sa livraison.",
+        'cannot_schedule' => "Un membre de l’équipe de l’opportunité, ou une personne qui gère les opportunités, planifie ses réunions.",
+    ],
 ];

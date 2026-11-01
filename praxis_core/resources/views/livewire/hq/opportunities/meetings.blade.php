@@ -89,6 +89,8 @@
                                         <span class="pill pill-info mtg-handover-tag">{{ __('handover.tag', ['milestone' => $milestones[$m->phase_id]->title ?? '…']) }}</span>
                                         @if ($counts->get('draft'))<span class="pill pill-warning">{{ trans_choice('handover.counts.draft', $counts->get('draft'), ['count' => $counts->get('draft')]) }}</span>@endif
                                         @if ($counts->get('confirmed'))<span>{{ trans_choice('handover.counts.confirmed', $counts->get('confirmed'), ['count' => $counts->get('confirmed')]) }}</span>@endif
+                                    @elseif ($m->phase_id && isset($milestones[$m->phase_id]))
+                                        <span class="pill pill-info mtg-handover-tag">{{ __('meetings.milestone.tag', ['milestone' => $milestones[$m->phase_id]->title]) }}</span>
                                     @endif
                                     <span class="pill {{ $tone($m->status) }}">{{ __('opportunities.meetings.statuses.' . $m->status) }}</span>
                                     @if ($m->status === 'held' || ($m->status === 'scheduled' && $started))
@@ -137,6 +139,19 @@
                                         @endif
                                         @if ($m->kind === 'internal')
                                             <p class="help" style="margin: 12px 0 0">{{ __('meetings.internal_note') }}</p>
+                                            @if ($canLinkMilestone && $m->status !== 'cancelled' && $projectMilestones->isNotEmpty())
+                                                <div class="field" style="margin: 16px 0 0">
+                                                    <label for="m-milestone-{{ $m->id }}" class="label">{{ __('meetings.milestone.label') }}</label>
+                                                    <select id="m-milestone-{{ $m->id }}" class="select" aria-describedby="m-milestone-help-{{ $m->id }}"
+                                                            wire:change="linkMilestone('{{ $m->id }}', $event.target.value)" wire:loading.attr="disabled" wire:target="linkMilestone">
+                                                        <option value="" @selected(! $m->phase_id)>{{ __('meetings.milestone.none') }}</option>
+                                                        @foreach ($projectMilestones as $pm)
+                                                            <option value="{{ $pm->id }}" @selected($m->phase_id === $pm->id)>{{ $pm->title }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                    <span class="help" id="m-milestone-help-{{ $m->id }}">{{ __('meetings.milestone.details_help') }}</span>
+                                                </div>
+                                            @endif
                                         @endif
                                     </div>
                                 </div>
@@ -216,6 +231,21 @@
                             <span class="help">{{ __('meetings.form.kind_help.' . $kind) }}</span>
                         </fieldset>
                     @endunless
+
+                    @if (! $editing && ! $formMilestone && $kind === 'internal' && $canLinkMilestone && $projectMilestones->isNotEmpty())
+                        <div class="field">
+                            <label for="mtg-milestone" class="label">{{ __('meetings.milestone.label') }}</label>
+                            <select id="mtg-milestone" class="select" wire:model="teamMilestoneId" aria-describedby="mtg-milestone-help"
+                                    @error('teamMilestoneId') aria-invalid="true" @enderror>
+                                <option value="">{{ __('meetings.milestone.none') }}</option>
+                                @foreach ($projectMilestones as $pm)
+                                    <option value="{{ $pm->id }}">{{ $pm->title }}</option>
+                                @endforeach
+                            </select>
+                            @error('teamMilestoneId') <span class="field-error">{{ $message }}</span> @enderror
+                            <span class="help" id="mtg-milestone-help">{{ __('meetings.milestone.form_help') }}</span>
+                        </div>
+                    @endif
 
                     <div class="field">
                         <label for="mtg-title" class="label">{{ __('meetings.form.title_field') }}</label>

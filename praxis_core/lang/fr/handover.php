@@ -130,5 +130,9 @@ return [
         'review' => "{0} Aucun point à examiner|{1} 1 point à examiner|[2,*] :count points à examiner",
         'issue_count' => "{0} aucun incident pour l’instant|{1} 1 incident (ouverts\u{00A0}: :open)|[2,*] :count incidents (ouverts\u{00A0}: :open)",
         'issues' => "{1} Incident ouvert|[2,*] :count incidents ouverts",
+        'team' => "Réunions d’équipe",
+        'team_none' => "Aucune réunion d’équipe pour ce jalon.",
+        'team_schedule' => "Planifier une réunion d’équipe",
+        'team_open' => "Ouvrir",
     ],
 ];

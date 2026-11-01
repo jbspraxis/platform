@@ -131,5 +131,9 @@ return [
         'review' => '{0} No points to review|{1} 1 point to review|[2,*] :count points to review',
         'issue_count' => '{0} no issues yet|{1} 1 issue (:open open)|[2,*] :count issues (:open open)',
         'issues' => '{1} Open issue|[2,*] :count open issues',
+        'team' => 'Team meetings',
+        'team_none' => 'No team meeting for this milestone yet.',
+        'team_schedule' => 'Schedule a team meeting',
+        'team_open' => 'Open',
     ],
 ];
