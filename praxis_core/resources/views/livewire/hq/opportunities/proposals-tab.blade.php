@@ -81,7 +81,13 @@
         $tone = fn ($status) => match ($status) {
             'Client Approved' => 'pill-success', 'Changes Requested' => 'pill-warning', 'Superseded' => 'pill-neutral', 'Sent' => 'pill-info', default => 'pill-neutral',
         };
-        $statusLabel = fn ($p) => $p->status === 'Draft' && $p->approved_at ? __('proposals.statuses.approved') : __('proposals.statuses.' . \Illuminate\Support\Str::snake(str_replace(' ', '', $p->status)));
+        // A version the client never got an answer on, set aside because they approved an earlier one
+        $setAside = fn ($p) => $p->status === 'Superseded' && $approvedVersion && $p->version > $approvedVersion->version;
+        $statusLabel = fn ($p) => match (true) {
+            $p->status === 'Draft' && $p->approved_at !== null => __('proposals.statuses.approved'),
+            $setAside($p) => __('proposals.statuses.set_aside'),
+            default => __('proposals.statuses.' . \Illuminate\Support\Str::snake(str_replace(' ', '', $p->status))),
+        };
         $currency = $proposal?->isEditable() ? $this->currency : $proposal?->currency;
         $sectionTitles = $proposal ? collect((array) $proposal->sections)->pluck('title', 'key') : collect();
     @endphp
@@ -214,7 +220,7 @@
         @elseif ($proposal->status === 'Changes Requested')
             <div class="alert alert-warning" role="note"><i data-lucide="message-square-warning"></i><span>{{ __('proposals.client.changes') }}</span></div>
         @elseif ($proposal->status === 'Superseded')
-            <div class="callout pp-callout" role="note"><i data-lucide="history"></i><span>{{ __('proposals.client.superseded') }}</span></div>
+            <div class="callout pp-callout" role="note"><i data-lucide="history"></i><span>{{ $setAside($proposal) ? __('proposals.client.set_aside', ['n' => $approvedVersion->version]) : __('proposals.client.superseded') }}</span></div>
         @elseif ($proposal->status === 'Sent')
             <div class="callout pp-callout" role="note"><i data-lucide="send"></i><span>{{ $proposal->hasExpired() ? __('proposals.client.expired', ['date' => $day($proposal->validUntil())]) : __('proposals.client.waiting') }}</span></div>
         @endif
@@ -249,6 +255,29 @@
                 @error('send')
                     <div class="alert alert-danger" role="alert" style="margin-top: 12px"><i data-lucide="circle-alert"></i><span>{{ $message }}</span></div>
                 @enderror
+
+                {{-- With the client and still valid: the email (link and PDF) again, to the same people or others --}}
+                @if ($canEdit && $proposal->status === 'Sent' && ! $proposal->hasExpired() && $people)
+                    <form wire:submit="sendLinkAgain" class="pp-form" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--color-line)" novalidate>
+                        <fieldset class="field" style="border: 0; padding: 0; margin: 0; min-width: 0" aria-describedby="pp-link-help">
+                            <legend class="label">{{ __('proposals.send.link_title') }}</legend>
+                            <span class="help" id="pp-link-help">{{ __('proposals.send.link_intro', ['date' => $day($proposal->validUntil())]) }}</span>
+                            <div class="pp-people" style="margin-top: 8px">
+                                @foreach ($people as $email => $p)
+                                    <label class="pp-check" wire:key="again-{{ md5($email) }}">
+                                        <input type="checkbox" class="checkbox" value="{{ $email }}" wire:model="linkTo">
+                                        <span>{{ $p['name'] }} <small>{{ $email }}</small></span>
+                                    </label>
+                                @endforeach
+                            </div>
+                            @error('linkTo') <span class="field-error">{{ $message }}</span> @enderror
+                            @error('linkTo.*') <span class="field-error">{{ $message }}</span> @enderror
+                        </fieldset>
+                        <div class="pp-buttons">
+                            <button type="submit" class="btn btn-secondary" wire:loading.attr="disabled" wire:target="sendLinkAgain"><i data-lucide="send"></i> {{ __('proposals.send.link_submit') }}</button>
+                        </div>
+                    </form>
+                @endif
             </section>
         @endif
 

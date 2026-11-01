@@ -30,22 +30,28 @@ final class PortalLinks
 
     /**
      * One version of the proposal in the portal: read it, comment by section, approve it or ask for changes, book a
-     * follow-up. $clientUserId fills in who is reviewing.
+     * follow-up. $clientUserId fills in who is reviewing. Valid as long as the proposal (validUntil(), which can be
+     * longer than DAYS); before it is sent, DAYS.
      */
     public static function proposal(Proposal $proposal, ?string $clientUserId = null): string
     {
-        return self::signed('portal.proposals.review', array_filter(['proposal' => $proposal->id, 'c' => $clientUserId]));
+        return self::signed('portal.proposals.review', array_filter(['proposal' => $proposal->id, 'c' => $clientUserId]), self::proposalExpiry($proposal));
     }
 
-    /** The PDF of that version, from the portal page */
+    /** The PDF of that version, from the portal page; it expires with the proposal's link */
     public static function proposalPdf(Proposal $proposal): string
     {
-        return self::signed('portal.proposals.pdf', ['proposal' => $proposal->id]);
+        return self::signed('portal.proposals.pdf', ['proposal' => $proposal->id], self::proposalExpiry($proposal));
     }
 
-    private static function signed(string $route, array $parameters): string
+    private static function proposalExpiry(Proposal $proposal): \DateTimeInterface
     {
-        $relative = URL::temporarySignedRoute($route, now()->addDays(self::DAYS), $parameters, absolute: false);
+        return $proposal->validUntil() ?? now()->addDays(self::DAYS);
+    }
+
+    private static function signed(string $route, array $parameters, \DateTimeInterface $expires): string
+    {
+        $relative = URL::temporarySignedRoute($route, $expires, $parameters, absolute: false);
         $origin = preg_replace('~^(https?://[^/]+).*$~', '$1', route($route, ['proposal' => $parameters['proposal']]));
 
         return $origin . $relative;

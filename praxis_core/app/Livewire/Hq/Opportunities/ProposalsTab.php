@@ -70,6 +70,9 @@ class ProposalsTab extends Component
     #[Locked]
     public string $recipientsFor = '';
 
+    /** "Send the link again": who to, filled in with the version's recipients */
+    public array $linkTo = [];
+
     /** What was just done, announced politely */
     #[Locked]
     public string $notice = '';
@@ -385,13 +388,46 @@ class ProposalsTab extends Component
 
     public function discard(): void
     {
-        $this->authorizeEdit();
+        $opportunity = $this->authorizeEdit();
         $proposal = $this->current();
-        if ($proposal && Proposals::discard($proposal, Auth::user())) {
-            $this->show('');
-            $this->notice = __('proposals.versions.discarded', ['n' => $proposal->version]);
-            $this->dispatch('proposals-changed');
+        if (! $proposal) {
+            return;
         }
+        // An approved draft only by someone who may approve: the owner or the lead
+        if (! Proposals::discard($proposal, Auth::user(), Proposals::canApprove(Auth::user(), $opportunity))) {
+            $this->addError('proposal', __('proposals.versions.not_discarded'));
+
+            return;
+        }
+        $this->show('');
+        $this->notice = __('proposals.versions.discarded', ['n' => $proposal->version]);
+        $this->dispatch('proposals-changed');
+    }
+
+    /** The email with the link and the PDF again, to the same people or others chosen from people() */
+    public function sendLinkAgain(): void
+    {
+        $opportunity = $this->authorizeEdit();
+        $this->validate([
+            'linkTo' => ['required', 'array', 'min:1', 'max:' . Proposals::MAX_RECIPIENTS],
+            'linkTo.*' => [Rule::in(array_keys(Proposals::people($opportunity)))],
+        ], [
+            'linkTo.required' => __('proposals.send.errors.nobody'),
+            'linkTo.min' => __('proposals.send.errors.nobody'),
+            'linkTo.max' => __('proposals.send.errors.too_many', ['max' => Proposals::MAX_RECIPIENTS]),
+            'linkTo.*' => __('proposals.send.errors.unknown'),
+        ]);
+        if (! ($proposal = $this->current())) {
+            return;
+        }
+        try {
+            $unsent = Proposals::sendAgain($proposal, $this->linkTo, Auth::user());
+        } catch (LogicException) {
+            $this->addError('linkTo', __('proposals.send.errors.link_state'));
+
+            return;
+        }
+        $unsent ? $this->addError('send', __('proposals.send.still_unsent', ['emails' => implode(', ', $unsent)])) : $this->notice = __('proposals.send.link_done');
     }
 
     public function resolve(string $commentId, bool $resolved = true): void
@@ -496,6 +532,10 @@ class ProposalsTab extends Component
             if ($proposal->status === Proposal::DRAFT && $proposal->approved_at && $this->recipientsFor !== $proposal->id) {
                 $this->sendTo = $this->defaultRecipients($opportunity, $proposal);
                 $this->recipientsFor = $proposal->id;
+            } elseif ($proposal->status === Proposal::SENT && $this->recipientsFor !== $proposal->id . ':sent') {
+                $this->linkTo = array_values(array_intersect(array_map(fn ($r) => mb_strtolower((string) $r['email']), (array) $proposal->recipients),
+                    array_keys(Proposals::people($opportunity))));
+                $this->recipientsFor = $proposal->id . ':sent';
             }
         }
 
@@ -535,7 +575,8 @@ class ProposalsTab extends Component
             'reasons' => $reasons,
             'questionnaireComplete' => $opportunity->questionnaires()->where('status', 'complete')->exists(),
             'canStartVersion' => $canEdit && $latest && in_array($latest->status, [Proposal::SENT, Proposal::CHANGES_REQUESTED], true)
-                && ! $versions->contains(fn ($v) => $v->status === Proposal::DRAFT),
+                && ! $versions->contains(fn ($v) => in_array($v->status, [Proposal::DRAFT, Proposal::CLIENT_APPROVED], true)),
+            'approvedVersion' => $versions->firstWhere('status', Proposal::CLIENT_APPROVED),
         ]);
     }
 }

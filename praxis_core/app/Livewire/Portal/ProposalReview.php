@@ -58,12 +58,18 @@ class ProposalReview extends Component
     #[Locked]
     public string $done = '';
 
+    /** When the signed link stops working (its expires parameter, a Unix time); 0 when it has none */
+    #[Locked]
+    public int $linkExpiresAt = 0;
+
     public function mount(string $proposal): void
     {
         $p = Proposal::with('opportunity')->where('signing_mode', 'approve')->whereNotNull('sent_at')->find($proposal);
         abort_unless($p && $p->opportunity, 404);
         $this->useGatewayLanguage($p->opportunity->language);
         $this->proposalId = $p->id;
+        // The route checked the signature; later requests (Livewire updates) check this instead
+        $this->linkExpiresAt = (int) request()->query('expires') ?: (int) $p->validUntil()?->getTimestamp();
 
         $contact = request()->query('c');
         $contact = is_string($contact) && Str::isUuid($contact)
@@ -109,7 +115,7 @@ class ProposalReview extends Component
     public function comment(): void
     {
         $p = $this->proposal();
-        if (! $this->open($p) || $this->commenting === '') {
+        if (! $this->open($p) || ! $this->valid($p) || $this->commenting === '') {
             return;
         }
         $this->body = trim($this->body);
@@ -117,7 +123,8 @@ class ProposalReview extends Component
         if (! ($person = $this->known($p))) {
             return;
         }
-        $key = 'portal-proposal-comments:' . $p->id;
+        // Per person, so one busy commenter (or someone trying a forwarded link) doesn't silence the others
+        $key = 'portal-proposal-comments:' . $p->id . ':' . sha1($person['email']);
         if (RateLimiter::tooManyAttempts($key, Proposals::COMMENTS_PER_HOUR)) {
             $this->addError('body', __('proposals.portal.errors.too_many'));
 
@@ -137,17 +144,18 @@ class ProposalReview extends Component
     public function approve(): void
     {
         $p = $this->proposal();
-        if (! $this->open($p)) {
-            return;
-        }
-        if ($p->hasExpired()) {
-            $this->addError('mode', __('proposals.portal.errors.expired'));
-
+        if (! $this->open($p) || ! $this->valid($p)) {
             return;
         }
         $this->jobTitle = trim($this->jobTitle);
         $this->person(['jobTitle' => ['required', 'string', 'max:150']]);
         if (! ($person = $this->known($p))) {
+            return;
+        }
+        // Only the organisation's own active contacts approve; meeting guests read and comment
+        if (! Proposals::isActiveContact($p->opportunity, $person['email'])) {
+            $this->addError('email', __('proposals.portal.errors.not_contact', ['company' => $p->opportunity->organization?->name]));
+
             return;
         }
         if (! Proposals::approveForClient($p, ['name' => $this->name, 'email' => $person['email']], $this->jobTitle)) {
@@ -162,7 +170,7 @@ class ProposalReview extends Component
     public function requestChanges(): void
     {
         $p = $this->proposal();
-        if (! $this->open($p)) {
+        if (! $this->open($p) || ! $this->valid($p)) {
             return;
         }
         $this->changeNote = trim($this->changeNote);
@@ -180,13 +188,34 @@ class ProposalReview extends Component
         $this->done = 'changes';
     }
 
-    /** Still waiting for the client: sent, not answered, not replaced by a later version, and the work not lost */
+    /**
+     * The link is still valid (Livewire's update requests don't go through `signed`, so its expiry, kept at mount,
+     * is checked here), and the version still waits for the client: sent, not answered, not replaced by a later
+     * version, and the work not lost
+     */
     private function open(Proposal $p): bool
     {
         $this->resetErrorBag();
         $this->done = '';
+        if ($this->linkExpiresAt > 0 && now()->getTimestamp() > $this->linkExpiresAt) {
+            $this->addError('mode', __('proposals.portal.errors.link_expired'));
+
+            return false;
+        }
         if ($p->status !== Proposal::SENT || $p->opportunity?->stage === 'lost') {
             $this->addError('mode', __('proposals.portal.errors.closed'));
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /** Within the proposal's validity: after it, no comment, approval or change request (the page offers a meeting) */
+    private function valid(Proposal $p): bool
+    {
+        if ($p->hasExpired()) {
+            $this->addError('mode', __('proposals.portal.errors.expired'));
 
             return false;
         }
@@ -214,10 +243,18 @@ class ProposalReview extends Component
         ]);
     }
 
-    /** Someone HQ knows for this work; addresses it doesn't know are limited, so they can't be tried one after another */
+    /**
+     * Someone HQ knows for this work. Addresses it doesn't know count against this version and this visitor's IP (only
+     * misses count), so they can't be tried one after another, and someone trying them doesn't lock out the client
+     */
+    public static function unknownKey(string $proposalId, ?string $ip): string
+    {
+        return 'portal-proposal-unknown:' . $proposalId . ':' . sha1((string) $ip);
+    }
+
     private function known(Proposal $p): ?array
     {
-        $key = 'portal-proposal-unknown:' . $p->id;
+        $key = self::unknownKey($p->id, request()->ip());
         if (RateLimiter::tooManyAttempts($key, self::MAX_UNKNOWN)) {
             $this->addError('email', __('proposals.portal.errors.wait'));
 
@@ -251,7 +288,7 @@ class ProposalReview extends Component
             'newerUrl' => $newer ? PortalLinks::proposal($newer, $this->contactId) : null,
             'pdfUrl' => PortalLinks::proposalPdf($p),
             'meetingsUrl' => $o->stage !== 'lost' ? PortalLinks::meetings($o, $this->contactId) : null,
-            'reviewing' => $p->status === Proposal::SENT && $o->stage !== 'lost',
+            'reviewing' => $p->status === Proposal::SENT && $o->stage !== 'lost' && ! $p->hasExpired(),
         ])->title(__('proposals.portal.page_title', ['title' => $p->title]));
     }
 }

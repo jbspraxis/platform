@@ -29,6 +29,7 @@ return [
         'changes_requested' => 'Changes requested',
         'client_approved' => 'Approved by the client',
         'superseded' => 'Replaced by a later version',
+        'set_aside' => 'Set aside',
     ],
 
     'start' => [
@@ -156,6 +157,7 @@ return [
             'running' => 'Wait until the AI has finished, then approve it.',
             'empty' => 'Give it a title and write at least one section first.',
             'changes' => 'Say what changed since the previous version first: the client reads it before anything else.',
+            'client_approved' => 'The client has already approved a version of this proposal, so no other version can be approved or sent.',
         ],
     ],
 
@@ -176,12 +178,18 @@ return [
         'sent_to' => 'To',
         'unsent' => 'Not reached: :emails.',
         'again' => 'Send again to them',
+        'link_title' => 'Send the link again',
+        'link_intro' => 'The same email, with the PDF and a link to their page, to the same people or others. Its link works until :date.',
+        'link_submit' => 'Send the link again',
+        'link_done' => 'The link was sent again.',
         'errors' => [
             'nobody' => 'Choose at least one person to send it to.',
             'too_many' => 'Choose :max people or fewer.',
             'unknown' => 'Choose people from the list.',
-            'state' => 'This version can’t be sent now: it was sent already, or it is no longer approved. Reload the page.',
+            'state' => 'This version can’t be sent now: it was sent already, it is no longer approved, or the client approved another version. Reload the page.',
             'failed' => 'No email could be sent, so nothing went to the client. Check the mail settings, then try again.',
+            'busy' => 'This version is being sent right now. Wait a moment, then reload the page.',
+            'link_state' => 'The link can only be sent again while this version is with the client and still valid. Reload the page.',
         ],
     ],
 
@@ -193,6 +201,7 @@ return [
         'discard' => 'Discard this draft',
         'discard_confirm' => 'Discard the draft of version :n? The client never saw it.',
         'discarded' => 'The draft of version :n was discarded.',
+        'not_discarded' => 'This draft can’t be discarded: it was sent, or it is approved and only the owner or the lead can discard it now.',
     ],
 
     'client' => [
@@ -202,6 +211,7 @@ return [
         'next' => 'The statement of work is drafted from it next.',
         'changes' => 'The client asked for changes. Their comments are below; start the next version to answer them.',
         'superseded' => 'A later version replaced this one.',
+        'set_aside' => 'The client approved version :n, so this version was set aside.',
     ],
 
     'legacy' => [
@@ -290,7 +300,7 @@ return [
         'changes_requested' => 'Changes were asked for on this version. We will send you a new one.',
         'superseded' => 'A newer version of this proposal was sent to you.',
         'see_newer' => 'See the latest version',
-        'expired' => 'This proposal was valid until :date. Ask for changes or book a meeting, and we will send you an up-to-date version.',
+        'expired' => 'This proposal was valid until :date. Book a meeting or reply to our email, and we will send you an up-to-date version.',
         'errors' => [
             'name' => 'Enter your name.',
             'name_long' => 'Shorten your name to 150 characters or fewer.',
@@ -301,10 +311,12 @@ return [
             'job_title_long' => 'Shorten your title to 150 characters or fewer.',
             'body' => 'Write your comment.',
             'body_long' => 'Shorten it to :max characters or fewer.',
-            'too_many' => 'Many comments were sent in the last hour. Wait a little, or reply to our email.',
+            'too_many' => 'You sent many comments in the last hour. Wait a little, or reply to our email.',
             'full' => 'This version can’t take more comments. Reply to our email instead.',
             'closed' => 'This version is no longer open for review. Reload the page to see where it stands.',
-            'expired' => 'This proposal is no longer valid. Ask for changes or book a meeting instead.',
+            'expired' => 'This proposal is no longer valid. Book a meeting or reply to our email instead.',
+            'link_expired' => 'This link has expired. Reply to our email and we will send you a new one.',
+            'not_contact' => 'Only a contact of :company can approve the proposal. Ask a colleague who received our email, or reply to it.',
         ],
     ],
 ];

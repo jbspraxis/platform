@@ -63,6 +63,14 @@ class PortalProposalTest extends TestCase
         return $p->fresh();
     }
 
+    /** Someone invited to a client meeting of the opportunity: known for the work, but not one of the organisation's contacts */
+    private function guest(string $email): void
+    {
+        $meeting = \App\Models\Meeting::create(['opportunity_id' => $this->o->id, 'organization_id' => $this->o->organization_id, 'kind' => 'client', 'title' => 'Discovery',
+            'starts_at' => '2026-10-05 09:00:00', 'ends_at' => '2026-10-05 10:00:00', 'status' => 'held', 'transcript_status' => 'manual']);
+        $meeting->attendees()->create(['email' => $email, 'name' => 'Bola Ade', 'role' => 'guest']);
+    }
+
     private function page(Proposal $p, array $query = ['c' => true])
     {
         return Livewire::withQueryParams(isset($query['c']) ? ['c' => $this->contact] : [])->test(ProposalReview::class, ['proposal' => $p->id]);
@@ -112,16 +120,23 @@ class PortalProposalTest extends TestCase
         $this->assertSame(0, ProposalComment::count());
         $this->assertSame(Proposal::SENT, $p->fresh()->status);
 
-        // Someone invited to the opportunity's meetings is known; anyone else is tried at most MAX_UNKNOWN times in 15 minutes
+        // Anyone else is tried at most MAX_UNKNOWN times in 15 minutes from one IP (only misses count)
         foreach (range(3, ProposalReview::MAX_UNKNOWN) as $i) {
             $page->set('email', "guess{$i}@else.test")->call('comment')->assertHasErrors(['email']);
         }
         $page->set('email', 'ngozi@kilo.test')->call('comment')->assertSee('Trop d’adresses ont été essayées');
-        RateLimiter::clear('portal-proposal-unknown:' . $p->id);
+        $this->assertSame(0, ProposalComment::count());
+        RateLimiter::clear(ProposalReview::unknownKey($p->id, '127.0.0.1'));
         $page->call('comment')->assertSet('done', 'commented');
+
+        // Guesses from another IP don't lock the client out
+        foreach (range(1, ProposalReview::MAX_UNKNOWN + 2) as $i) {
+            RateLimiter::hit(ProposalReview::unknownKey($p->id, '203.0.113.9'), 900);
+        }
+        $this->page($p)->call('openComment', 'general')->set('body', 'Still here')->call('comment')->assertSet('done', 'commented');
     }
 
-    public function test_comments_are_limited_per_hour_and_per_version(): void
+    public function test_comments_are_limited_per_person_per_hour_and_per_version(): void
     {
         $p = $this->sent();
         $page = $this->page($p)->call('openComment', 'general');
@@ -130,14 +145,58 @@ class PortalProposalTest extends TestCase
         }
         $page->call('openComment', 'general')->set('body', 'One too many')->call('comment')->assertHasErrors(['body']);
         $this->assertSame(Proposals::COMMENTS_PER_HOUR, ProposalComment::count());
+        // Another person HQ knows still comments: the limit is per person
+        $this->guest('cfo@kilo.test');
+        $this->page($p, [])->call('openComment', 'general')->set('name', 'Bola Ade')->set('email', 'cfo@kilo.test')->set('body', 'My turn')
+            ->call('comment')->assertSet('done', 'commented');
 
         // The version's cap holds whatever the limiter says
-        RateLimiter::clear('portal-proposal-comments:' . $p->id);
-        foreach (range(Proposals::COMMENTS_PER_HOUR + 1, Proposals::MAX_CLIENT_COMMENTS) as $i) {
+        RateLimiter::clear('portal-proposal-comments:' . $p->id . ':' . sha1('ngozi@kilo.test'));
+        foreach (range(Proposals::COMMENTS_PER_HOUR + 2, Proposals::MAX_CLIENT_COMMENTS) as $i) {
             ProposalComment::create(['proposal_id' => $p->id, 'section_key' => 'general', 'author_type' => 'client', 'author_name' => 'N', 'body' => "c{$i}"]);
         }
         $page->call('openComment', 'general')->set('body', 'Over the cap')->call('comment')->assertSee('ne peut plus recevoir de commentaires');
         $this->assertSame(Proposals::MAX_CLIENT_COMMENTS, ProposalComment::count());
+    }
+
+    public function test_only_an_active_contact_of_the_organisation_approves(): void
+    {
+        $p = $this->sent();
+        // A meeting guest reads and comments, but doesn't approve
+        $this->guest('cfo@kilo.test');
+        $this->page($p, [])->call('openComment', 'general')->set('name', 'Bola Ade')->set('email', 'cfo@kilo.test')->set('body', 'Looks right')
+            ->call('comment')->assertSet('done', 'commented');
+        $this->page($p, [])->call('choose', 'approve')->set('name', 'Bola Ade')->set('email', 'cfo@kilo.test')->set('jobTitle', 'CFO')
+            ->call('approve')->assertHasErrors(['email'])->assertSee('Seul un contact de Kilo Pharma');
+        $this->assertFalse(Proposals::approveForClient($p, ['name' => 'Bola Ade', 'email' => 'cfo@kilo.test'], 'CFO'));
+
+        // A contact who was suspended neither approves nor is offered as a recipient any more
+        DB::table('client_users')->where('id', $this->contact)->update(['status' => 'Suspended']);
+        $this->page($p)->call('choose', 'approve')->call('approve')->assertHasErrors(['email']);
+        $this->assertSame(Proposal::SENT, $p->fresh()->status);
+        $this->assertArrayNotHasKey('ngozi@kilo.test', Proposals::people($this->o));
+    }
+
+    public function test_the_link_lasts_as_long_as_the_proposal_and_every_action_checks_it(): void
+    {
+        $p = $this->sent(['validity_days' => 90]);
+        parse_str((string) parse_url(PortalLinks::proposal($p, $this->contact), PHP_URL_QUERY), $query);
+        $this->assertSame($p->validUntil()->getTimestamp(), (int) $query['expires'], 'Signed until the proposal’s validity, past PortalLinks::DAYS');
+        parse_str((string) parse_url(PortalLinks::proposalPdf($p), PHP_URL_QUERY), $pdf);
+        $this->assertSame((int) $query['expires'], (int) $pdf['expires']);
+
+        // A page opened just before the link expires: its next action is refused (Livewire updates skip `signed`)
+        $page = Livewire::withQueryParams(['c' => $this->contact, 'expires' => now()->addMinutes(5)->getTimestamp()])->test(ProposalReview::class, ['proposal' => $p->id])
+            ->call('openComment', 'general')->set('body', 'In time?');
+        $this->travel(10)->minutes();
+        $page->call('comment')->assertHasErrors(['mode'])->assertSee('Ce lien a expiré');
+        $this->assertSame(0, ProposalComment::count());
+
+        // Past the proposal's validity: no comment, approval or change request, whoever calls
+        $this->travel(91)->days();
+        $this->assertNull(Proposals::comment($p->fresh(), 'general', ['name' => 'Ngozi Eze', 'email' => 'ngozi@kilo.test'], 'Late'));
+        $this->assertFalse(Proposals::requestChanges($p->fresh(), ['name' => 'Ngozi Eze', 'email' => 'ngozi@kilo.test'], 'Late'));
+        $this->assertSame(Proposal::SENT, $p->fresh()->status);
     }
 
     public function test_the_client_approves_with_one_click_and_it_happens_once(): void

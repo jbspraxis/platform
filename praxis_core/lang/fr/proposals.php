@@ -28,6 +28,7 @@ return [
         'changes_requested' => 'Modifications demandées',
         'client_approved' => 'Approuvée par le client',
         'superseded' => 'Remplacée par une version ultérieure',
+        'set_aside' => 'Mise de côté',
     ],
 
     'start' => [
@@ -155,6 +156,7 @@ return [
             'running' => 'Attendez que l’IA ait terminé, puis approuvez-la.',
             'empty' => 'Donnez-lui d’abord un titre et rédigez au moins une partie.',
             'changes' => "Indiquez d’abord ce qui a changé depuis la version précédente\u{00A0}: le client le lit avant tout le reste.",
+            'client_approved' => "Le client a déjà approuvé une version de cette proposition\u{202F}: aucune autre version ne peut être approuvée ni envoyée.",
         ],
     ],
 
@@ -175,12 +177,18 @@ return [
         'sent_to' => 'À',
         'unsent' => "Non jointes\u{00A0}: :emails.",
         'again' => 'Leur renvoyer',
+        'link_title' => 'Renvoyer le lien',
+        'link_intro' => 'Le même e-mail, avec le PDF et un lien vers leur page, aux mêmes personnes ou à d’autres. Son lien fonctionne jusqu’au :date.',
+        'link_submit' => 'Renvoyer le lien',
+        'link_done' => 'Le lien a été renvoyé.',
         'errors' => [
             'nobody' => 'Choisissez au moins un destinataire.',
             'too_many' => 'Choisissez :max personnes au plus.',
             'unknown' => 'Choisissez les destinataires dans la liste.',
-            'state' => "Cette version ne peut pas être envoyée maintenant\u{00A0}: elle l’a déjà été, ou elle n’est plus approuvée. Rechargez la page.",
+            'state' => "Cette version ne peut pas être envoyée maintenant\u{00A0}: elle l’a déjà été, elle n’est plus approuvée, ou le client a approuvé une autre version. Rechargez la page.",
             'failed' => "Aucun e-mail n’a pu partir\u{00A0}: rien n’a été envoyé au client. Vérifiez les réglages de messagerie, puis réessayez.",
+            'busy' => 'Cette version est en cours d’envoi. Patientez un instant, puis rechargez la page.',
+            'link_state' => 'Le lien ne peut être renvoyé que tant que cette version est chez le client et encore valable. Rechargez la page.',
         ],
     ],
 
@@ -192,6 +200,7 @@ return [
         'discard' => 'Abandonner ce brouillon',
         'discard_confirm' => "Abandonner le brouillon de la version :n\u{202F}? Le client ne l’a jamais vu.",
         'discarded' => 'Le brouillon de la version :n a été abandonné.',
+        'not_discarded' => "Ce brouillon ne peut pas être abandonné\u{00A0}: il a été envoyé, ou il est approuvé et seul le dirigeant ou le responsable peut désormais l’abandonner.",
     ],
 
     'client' => [
@@ -201,6 +210,7 @@ return [
         'next' => 'L’énoncé des travaux est rédigé à partir d’elle.',
         'changes' => "Le client a demandé des modifications. Ses commentaires figurent ci-dessous\u{202F}; commencez la version suivante pour y répondre.",
         'superseded' => 'Une version ultérieure a remplacé celle-ci.',
+        'set_aside' => 'Le client a approuvé la version :n, cette version a donc été mise de côté.',
     ],
 
     'legacy' => [
@@ -287,7 +297,7 @@ return [
         'changes_requested' => 'Des modifications ont été demandées sur cette version. Nous vous en enverrons une nouvelle.',
         'superseded' => 'Une version plus récente de cette proposition vous a été envoyée.',
         'see_newer' => 'Voir la dernière version',
-        'expired' => 'Cette proposition était valable jusqu’au :date. Demandez des modifications ou réservez une réunion, et nous vous enverrons une version à jour.',
+        'expired' => 'Cette proposition était valable jusqu’au :date. Réservez une réunion ou répondez à notre e-mail, et nous vous enverrons une version à jour.',
         'errors' => [
             'name' => 'Saisissez votre nom.',
             'name_long' => 'Raccourcissez votre nom à 150 caractères au plus.',
@@ -298,10 +308,12 @@ return [
             'job_title_long' => 'Raccourcissez votre fonction à 150 caractères au plus.',
             'body' => 'Rédigez votre commentaire.',
             'body_long' => 'Raccourcissez-le à :max caractères au plus.',
-            'too_many' => 'De nombreux commentaires ont été envoyés dans l’heure. Patientez un peu, ou répondez à notre e-mail.',
+            'too_many' => 'Vous avez envoyé de nombreux commentaires dans l’heure. Patientez un peu, ou répondez à notre e-mail.',
             'full' => 'Cette version ne peut plus recevoir de commentaires. Répondez plutôt à notre e-mail.',
             'closed' => "Cette version n’est plus ouverte à la relecture. Rechargez la page pour voir où elle en est.",
-            'expired' => "Cette proposition n’est plus valable. Demandez plutôt des modifications ou réservez une réunion.",
+            'expired' => "Cette proposition n’est plus valable. Réservez plutôt une réunion ou répondez à notre e-mail.",
+            'link_expired' => "Ce lien a expiré. Répondez à notre e-mail et nous vous en enverrons un nouveau.",
+            'not_contact' => "Seul un contact de :company peut approuver la proposition. Demandez à un collègue qui a reçu notre e-mail, ou répondez-y.",
         ],
     ],
 ];

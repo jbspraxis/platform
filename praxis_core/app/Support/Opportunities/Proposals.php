@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Support\Ai\Ai;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -305,9 +306,9 @@ final class Proposals
     public static function newVersion(Opportunity $opportunity, User $by): ?Proposal
     {
         return DB::transaction(function () use ($opportunity, $by) {
-            Opportunity::whereKey($opportunity->id)->lockForUpdate()->first();
+            self::lockOpportunity($opportunity->id);
             $latest = self::versions($opportunity)->first();
-            if (! $latest || ! in_array($latest->status, [Proposal::SENT, Proposal::CHANGES_REQUESTED], true)) {
+            if (! $latest || ! in_array($latest->status, [Proposal::SENT, Proposal::CHANGES_REQUESTED], true) || self::clientApproved($opportunity->id)) {
                 return null;
             }
             $next = $latest->replicate(['ai_run_id', 'changes_run_id', 'approved_by', 'approved_at', 'sent_at', 'recipients', 'recipients_unsent',
@@ -328,14 +329,26 @@ final class Proposals
         });
     }
 
-    /** Sets a draft version aside (soft delete, kept for the record); nothing about it reached the client */
-    public static function discard(Proposal $proposal, User $by): bool
+    /**
+     * Sets a draft version aside (soft delete, kept for the record); nothing about it reached the client. Claimed under
+     * the lock; an approved draft only by someone who may approve ($mayApprove: canApprove).
+     */
+    public static function discard(Proposal $proposal, User $by, bool $mayApprove = false): bool
     {
-        if ($proposal->status !== Proposal::DRAFT || $proposal->sent_at !== null) {
+        $done = DB::transaction(function () use ($proposal, $by, $mayApprove) {
+            self::lockOpportunity($proposal->opportunity_id);
+            $locked = Proposal::whereKey($proposal->id)->lockForUpdate()->first();
+            if (! $locked || $locked->status !== Proposal::DRAFT || $locked->sent_at !== null || ($locked->approved_at !== null && ! $mayApprove)) {
+                return false;
+            }
+            $locked->forceFill(['deleted_by' => $by->id])->save();
+            $locked->delete();
+
+            return true;
+        });
+        if (! $done) {
             return false;
         }
-        $proposal->forceFill(['deleted_by' => $by->id])->save();
-        $proposal->delete();
         OpportunityAccess::log('PROPOSAL_VERSION_DISCARDED', "Discarded the draft of version {$proposal->version} of the proposal.", 'opportunities', $proposal->opportunity_id,
             ['proposal_id' => $proposal->id, 'version' => $proposal->version], []);
 
@@ -343,14 +356,19 @@ final class Proposals
     }
 
     /**
-     * Approves a draft for sending (decision 7). Returns null when done, else why not: running (the AI is still
-     * writing), empty (no title or no section with text), changes (a later version says what changed), state.
+     * Approves a draft for sending (decision 7). Returns null when done, else why not: client_approved (the client
+     * already approved a version of this opportunity), running (the AI is still writing), empty (no title or no
+     * section with text), changes (a later version says what changed), state.
      */
     public static function approve(Proposal $proposal, User $by): ?string
     {
         self::sync($proposal);
         $why = DB::transaction(function () use ($proposal, $by) {
+            self::lockOpportunity($proposal->opportunity_id);
             $locked = Proposal::whereKey($proposal->id)->lockForUpdate()->first();
+            if ($locked && self::clientApproved($locked->opportunity_id)) {
+                return 'client_approved';
+            }
             if (! $locked || ! $locked->isEditable()) {
                 return 'state';
             }
@@ -392,16 +410,16 @@ final class Proposals
     }
 
     /**
-     * Who a proposal can be sent to, and who may act on it in the portal: the organisation's contacts and the people
-     * invited to the opportunity's client meetings. Keyed by lower-case email.
+     * Who a proposal can be sent to, and who may read and comment on it in the portal: the organisation's active
+     * contacts and the people invited to the opportunity's client meetings. Keyed by lower-case email.
      *
      * @return array<string, array{email: string, name: string, client_user_id: ?string}>
      */
     public static function people(Opportunity $opportunity): array
     {
         $people = [];
-        $contacts = DB::table('client_users')->where('organization_id', $opportunity->organization_id)->whereNull('deleted_at')->whereNotNull('email')
-            ->orderByDesc('is_primary_client')->orderBy('first_name')->get(['id', 'first_name', 'last_name', 'email']);
+        $contacts = DB::table('client_users')->where('organization_id', $opportunity->organization_id)->where('status', 'Active')->whereNull('deleted_at')
+            ->whereNotNull('email')->orderByDesc('is_primary_client')->orderBy('first_name')->get(['id', 'first_name', 'last_name', 'email']);
         foreach ($contacts as $c) {
             $email = mb_strtolower(trim((string) $c->email));
             if ($email !== '' && ! isset($people[$email])) {
@@ -437,96 +455,162 @@ final class Proposals
         return self::people($proposal->opportunity)[$email] ?? null;
     }
 
+    /** Only an active contact of the organisation itself approves a proposal; meeting guests read and comment */
+    public static function isActiveContact(Opportunity $opportunity, string $email): bool
+    {
+        return DB::table('client_users')->where('organization_id', $opportunity->organization_id)->where('status', 'Active')->whereNull('deleted_at')
+            ->whereRaw('LOWER(email) = ?', [mb_strtolower(trim($email))])->exists();
+    }
+
+    /** The version of this opportunity the client approved, if any: then nothing more is approved, sent or started */
+    public static function clientApproved(string $opportunityId): ?Proposal
+    {
+        return Proposal::where('opportunity_id', $opportunityId)->where('signing_mode', 'approve')->where('status', Proposal::CLIENT_APPROVED)->first();
+    }
+
     /**
      * Sends an approved version: the branded email with the PDF and the portal link, in the opportunity's language,
      * to the chosen people (only from people()). The row is claimed under a lock before any email goes, so a double
-     * click or two staff at once send it once. Returns the addresses it could not reach; when none was reached
-     * nothing counts as sent and the version stays approved, ready to send again. Earlier versions the client had
-     * are then superseded.
+     * click or two staff at once send it once; nothing is sent once the client approved a version. Every address
+     * starts on recipients_unsent and is crossed off as its email goes (a request cut short leaves exactly the ones
+     * to retry). Returns the addresses it could not reach; when none was reached nothing counts as sent and the
+     * version stays approved, ready to send again. Earlier versions the client had are then superseded.
      *
      * @param  list<string>  $emails
      */
     public static function send(Proposal $proposal, array $emails, User $by): array
     {
         $opportunity = $proposal->opportunity;
-        $people = self::people($opportunity);
-        $chosen = array_slice(array_values(array_filter(array_map(fn ($e) => $people[mb_strtolower(trim((string) $e))] ?? null, array_unique($emails)))), 0, self::MAX_RECIPIENTS);
+        $chosen = self::choose($opportunity, $emails);
         if (! $chosen) {
             throw new LogicException('Choose at least one person HQ knows for this work');
         }
         // Rendered before anything is claimed: if the PDF fails, nothing is sent
         $pdf = ProposalPdf::render($proposal);
 
-        $claimed = DB::transaction(function () use ($proposal, $chosen, $by) {
-            $locked = Proposal::whereKey($proposal->id)->lockForUpdate()->first();
-            if (! $locked || $locked->status !== Proposal::DRAFT || $locked->approved_at === null || $locked->sent_at !== null) {
-                return false;
+        return self::whileMailing($proposal, function () use ($proposal, $opportunity, $chosen, $pdf, $by) {
+            $claimed = DB::transaction(function () use ($proposal, $chosen, $by) {
+                self::lockOpportunity($proposal->opportunity_id);
+                $locked = Proposal::whereKey($proposal->id)->lockForUpdate()->first();
+                if (! $locked || $locked->status !== Proposal::DRAFT || $locked->approved_at === null || $locked->sent_at !== null
+                    || self::clientApproved($locked->opportunity_id)) {
+                    return false;
+                }
+                $locked->forceFill(['status' => Proposal::SENT, 'sent_at' => now(), 'recipients' => $chosen, 'recipients_unsent' => array_column($chosen, 'email'),
+                    'updated_by' => $by->id])->save();
+
+                return true;
+            });
+            if (! $claimed) {
+                throw new LogicException('Only an approved version that has not been sent can be sent');
             }
-            $locked->forceFill(['status' => Proposal::SENT, 'sent_at' => now(), 'recipients' => $chosen, 'recipients_unsent' => null, 'updated_by' => $by->id])->save();
+            $proposal->refresh();
 
-            return true;
-        });
-        if (! $claimed) {
-            throw new LogicException('Only an approved version that has not been sent can be sent');
-        }
-        $proposal->refresh();
+            $unsent = self::mail($proposal, $chosen, $pdf);
+            if (count($unsent) === count($chosen)) {
+                // Nothing went: not sent, so it can be sent again as it is
+                $proposal->forceFill(['status' => Proposal::DRAFT, 'sent_at' => null, 'recipients' => null, 'recipients_unsent' => null])->save();
 
-        $unsent = self::mail($proposal, $chosen, $pdf);
-        if (count($unsent) === count($chosen)) {
-            // Nothing went: not sent, so it can be sent again as it is
-            $proposal->forceFill(['status' => Proposal::DRAFT, 'sent_at' => null, 'recipients' => null])->save();
+                return $unsent;
+            }
+            $proposal->refresh();
+            self::afterSend($proposal, $opportunity, count($chosen) - count($unsent), $by);
 
             return $unsent;
-        }
-        $proposal->forceFill(['recipients_unsent' => $unsent ?: null])->save();
+        });
+    }
 
+    /** What follows the first send of a version: earlier versions superseded, the log, the stage and the event */
+    private static function afterSend(Proposal $proposal, Opportunity $opportunity, int $reached, User $by): void
+    {
         Proposal::where('opportunity_id', $opportunity->id)->where('signing_mode', 'approve')->where('version', '<', $proposal->version)
             ->whereIn('status', [Proposal::SENT, Proposal::CHANGES_REQUESTED])->update(['status' => Proposal::SUPERSEDED, 'updated_at' => now()]);
-        $reached = count($chosen) - count($unsent);
         OpportunityAccess::log('PROPOSAL_SENT', sprintf('Sent version %d of the proposal to %d %s.', $proposal->version, $reached, $reached === 1 ? 'person' : 'people'),
             'opportunities', $opportunity->id, [], ['proposal_id' => $proposal->id, 'version' => $proposal->version]);
         self::moveStage($opportunity, ['discovery', 'questionnaire', 'proposal'], 'proposal_sent');
         ProposalSent::dispatch($proposal->id, $opportunity->id, $by->id);
-
-        return $unsent;
     }
 
-    /** Sends a sent version again, only to the addresses it didn't reach, claimed under a lock like send() */
+    /**
+     * Sends a sent version again, only to the addresses it didn't reach (recipients_unsent). Under the same mail lock
+     * as send(), so two clicks never mail them twice; an address no longer among the recipients is dropped.
+     */
     public static function resend(Proposal $proposal, User $by): array
     {
-        $emails = DB::transaction(function () use ($proposal, $by) {
-            $locked = Proposal::whereKey($proposal->id)->lockForUpdate()->first();
-            $emails = $locked && $locked->status === Proposal::SENT ? array_map('mb_strtolower', (array) $locked->recipients_unsent) : [];
-            if ($emails) {
-                $locked->forceFill(['recipients_unsent' => null, 'updated_by' => $by->id])->save();
+        return self::whileMailing($proposal, function () use ($proposal) {
+            $proposal->refresh();
+            $emails = $proposal->status === Proposal::SENT ? array_map('mb_strtolower', (array) $proposal->recipients_unsent) : [];
+            if (! $emails) {
+                return [];
+            }
+            $recipients = array_values(array_filter((array) $proposal->recipients, fn ($r) => in_array(mb_strtolower((string) ($r['email'] ?? '')), $emails, true)));
+            $proposal->forceFill(['recipients_unsent' => array_column($recipients, 'email') ?: null])->save();
+            $unsent = $recipients ? self::mail($proposal, $recipients, ProposalPdf::render($proposal)) : [];
+            if (count($unsent) < count($recipients)) {
+                $reached = count($recipients) - count($unsent);
+                OpportunityAccess::log('PROPOSAL_SENT', sprintf('Sent version %d of the proposal again to %d %s.', $proposal->version, $reached, $reached === 1 ? 'person' : 'people'),
+                    'opportunities', $proposal->opportunity_id, [], ['proposal_id' => $proposal->id, 'version' => $proposal->version]);
             }
 
-            return $emails;
-        });
-        if (! $emails) {
-            return [];
-        }
-        $proposal->refresh();
-        $recipients = array_values(array_filter((array) $proposal->recipients, fn ($r) => in_array(mb_strtolower((string) ($r['email'] ?? '')), $emails, true)));
-        $unsent = self::mail($proposal, $recipients, ProposalPdf::render($proposal));
-        $proposal->forceFill(['recipients_unsent' => $unsent ?: null])->save();
-        if (count($unsent) < count($recipients)) {
-            $reached = count($recipients) - count($unsent);
-            OpportunityAccess::log('PROPOSAL_SENT', sprintf('Sent version %d of the proposal again to %d %s.', $proposal->version, $reached, $reached === 1 ? 'person' : 'people'),
-                'opportunities', $proposal->opportunity_id, [], ['proposal_id' => $proposal->id, 'version' => $proposal->version]);
-        }
+            return $unsent;
+        }, fn () => (array) $proposal->fresh()->recipients_unsent);
+    }
 
-        return $unsent;
+    /**
+     * Sends the email with the link (and the PDF) again for a version that is with the client and still valid: to the
+     * same people or others chosen from people(), who join its recipients. Under the mail lock; each address is on
+     * recipients_unsent until its email goes. Returns the addresses it could not reach.
+     *
+     * @param  list<string>  $emails
+     */
+    public static function sendAgain(Proposal $proposal, array $emails, User $by): array
+    {
+        $chosen = self::choose($proposal->opportunity, $emails);
+        if (! $chosen) {
+            throw new LogicException('Choose at least one person HQ knows for this work');
+        }
+        $pdf = ProposalPdf::render($proposal);
+
+        return self::whileMailing($proposal, function () use ($proposal, $chosen, $pdf, $by) {
+            $claimed = DB::transaction(function () use ($proposal, $chosen, $by) {
+                self::lockOpportunity($proposal->opportunity_id);
+                $locked = Proposal::whereKey($proposal->id)->lockForUpdate()->first();
+                if (! $locked || $locked->status !== Proposal::SENT || $locked->hasExpired()) {
+                    return false;
+                }
+                $known = array_map(fn ($r) => mb_strtolower((string) ($r['email'] ?? '')), (array) $locked->recipients);
+                $new = array_values(array_filter($chosen, fn ($r) => ! in_array($r['email'], $known, true)));
+                $locked->forceFill([
+                    'recipients' => [...(array) $locked->recipients, ...$new],
+                    'recipients_unsent' => array_values(array_unique([...(array) $locked->recipients_unsent, ...array_column($chosen, 'email')])),
+                    'updated_by' => $by->id,
+                ])->save();
+
+                return true;
+            });
+            if (! $claimed) {
+                throw new LogicException('Only a version that is with the client and still valid can be sent again');
+            }
+            $proposal->refresh();
+            $unsent = self::mail($proposal, $chosen, $pdf);
+            $reached = count($chosen) - count($unsent);
+            if ($reached > 0) {
+                OpportunityAccess::log('PROPOSAL_SENT', sprintf('Sent the link to version %d of the proposal again to %d %s.', $proposal->version, $reached, $reached === 1 ? 'person' : 'people'),
+                    'opportunities', $proposal->opportunity_id, [], ['proposal_id' => $proposal->id, 'version' => $proposal->version]);
+            }
+
+            return $unsent;
+        });
     }
 
     /**
      * A client's comment on one section (or the proposal as a whole: GENERAL), from the portal. The caller checks
-     * that the person is known (knows()) and rate-limits; null when the version no longer takes comments or has
-     * MAX_CLIENT_COMMENTS already.
+     * that the person is known (knows()) and rate-limits; null when the version no longer takes comments (answered,
+     * replaced or past its validity) or has MAX_CLIENT_COMMENTS already.
      */
     public static function comment(Proposal $proposal, string $sectionKey, array $person, string $body): ?ProposalComment
     {
-        if ($proposal->status !== Proposal::SENT || ! self::hasSection($proposal, $sectionKey)
+        if ($proposal->status !== Proposal::SENT || $proposal->hasExpired() || ! self::hasSection($proposal, $sectionKey)
             || ProposalComment::where('proposal_id', $proposal->id)->where('author_type', 'client')->count() >= self::MAX_CLIENT_COMMENTS) {
             return null;
         }
@@ -552,14 +636,20 @@ final class Proposals
     }
 
     /**
-     * The client approves the version in the portal with one click (decision 9): name, title and email recorded.
-     * Claimed under a lock, so it happens once. The opportunity moves to Proposal approved; the lead is told.
+     * The client approves the version in the portal with one click (decision 9): name, title and email recorded,
+     * and only by an active contact of the organisation (isActiveContact). Claimed under the opportunity's lock, so it
+     * happens once and for one version only: every other open version (a draft, or one with the client) is set aside
+     * (Superseded). The opportunity moves to Proposal approved; the lead is told.
      */
     public static function approveForClient(Proposal $proposal, array $person, string $jobTitle): bool
     {
+        if (! self::isActiveContact($proposal->opportunity, (string) $person['email'])) {
+            return false;
+        }
         $done = DB::transaction(function () use ($proposal, $person, $jobTitle) {
+            self::lockOpportunity($proposal->opportunity_id);
             $locked = Proposal::whereKey($proposal->id)->lockForUpdate()->first();
-            if (! $locked || $locked->status !== Proposal::SENT || $locked->hasExpired()) {
+            if (! $locked || $locked->status !== Proposal::SENT || $locked->hasExpired() || self::clientApproved($locked->opportunity_id)) {
                 return false;
             }
             $locked->forceFill([
@@ -569,6 +659,8 @@ final class Proposals
                 'client_approved_email' => mb_strtolower(trim((string) $person['email'])),
                 'client_approved_at' => now(),
             ])->save();
+            Proposal::where('opportunity_id', $locked->opportunity_id)->where('signing_mode', 'approve')->whereKeyNot($locked->id)
+                ->whereIn('status', [Proposal::DRAFT, Proposal::SENT, Proposal::CHANGES_REQUESTED])->update(['status' => Proposal::SUPERSEDED, 'updated_at' => now()]);
 
             return true;
         });
@@ -587,12 +679,16 @@ final class Proposals
         return true;
     }
 
-    /** The client asks for changes (with an optional message, kept as a comment on the whole proposal) */
+    /**
+     * The client asks for changes (with an optional message, kept as a comment on the whole proposal): only on the
+     * version with them, while it is valid and no version was approved. The stage goes back only from Proposal sent.
+     */
     public static function requestChanges(Proposal $proposal, array $person, string $message): bool
     {
         $done = DB::transaction(function () use ($proposal, $person, $message) {
+            self::lockOpportunity($proposal->opportunity_id);
             $locked = Proposal::whereKey($proposal->id)->lockForUpdate()->first();
-            if (! $locked || $locked->status !== Proposal::SENT) {
+            if (! $locked || $locked->status !== Proposal::SENT || $locked->hasExpired() || self::clientApproved($locked->opportunity_id)) {
                 return false;
             }
             if (trim($message) !== '') {
@@ -613,7 +709,7 @@ final class Proposals
         $opportunity = $proposal->opportunity;
         OpportunityAccess::log('PROPOSAL_CHANGES_REQUESTED', "{$person['name']} asked for changes to version {$proposal->version} of the proposal.",
             'opportunities', $opportunity->id, [], ['proposal_id' => $proposal->id, 'version' => $proposal->version]);
-        self::moveStage($opportunity, ['proposal_sent', 'proposal_approved'], 'proposal');
+        self::moveStage($opportunity, ['proposal_sent'], 'proposal');
         self::tellLead($opportunity, __('proposals.notify.changes_title', [], config('app.staff_locale', 'en')),
             __('proposals.notify.changes', ['name' => $person['name'], 'title' => $opportunity->title, 'version' => $proposal->version], config('app.staff_locale', 'en')));
         ProposalChangesRequested::dispatch($proposal->id, $opportunity->id);
@@ -880,7 +976,11 @@ final class Proposals
         $proposal->forceFill(['subtotal' => $totals['subtotal'], 'total_value' => $totals['total']])->save();
     }
 
-    /** One branded email per person, with the PDF; returns the addresses that failed */
+    /**
+     * One branded email per person, with the PDF. The caller has put every address on recipients_unsent; each is
+     * crossed off as soon as its email has gone, so a request cut short (a PHP timeout) leaves exactly the addresses
+     * still to send. Returns the addresses that failed.
+     */
     private static function mail(Proposal $proposal, array $recipients, string $pdf): array
     {
         $unsent = [];
@@ -891,10 +991,52 @@ final class Proposals
             } catch (Throwable $e) {
                 Log::warning('Proposals: the email could not be sent', ['proposal' => $proposal->id, 'error' => $e->getMessage()]);
                 $unsent[] = $r['email'];
+
+                continue;
             }
+            DB::transaction(function () use ($proposal, $r) {
+                $locked = Proposal::whereKey($proposal->id)->lockForUpdate()->first();
+                $left = array_values(array_filter((array) $locked?->recipients_unsent, fn ($e) => mb_strtolower((string) $e) !== mb_strtolower($r['email'])));
+                $locked?->forceFill(['recipients_unsent' => $left ?: null])->save();
+            });
         }
 
         return $unsent;
+    }
+
+    /** The chosen addresses that are among people(), once each, at most MAX_RECIPIENTS */
+    private static function choose(Opportunity $opportunity, array $emails): array
+    {
+        $people = self::people($opportunity);
+
+        return array_slice(array_values(array_filter(array_map(fn ($e) => $people[mb_strtolower(trim((string) $e))] ?? null,
+            array_unique(array_map(fn ($e) => mb_strtolower(trim((string) $e)), $emails))))), 0, self::MAX_RECIPIENTS);
+    }
+
+    /**
+     * Runs a send under the version's mail lock (an atomic cache lock), so a send, a resend and a "send again" never
+     * mail the same version at once. When the lock is taken, $busy answers (or a LogicException says so).
+     */
+    private static function whileMailing(Proposal $proposal, callable $send, ?callable $busy = null): array
+    {
+        $lock = Cache::lock('proposal-mail:' . $proposal->id, 600);
+        if (! $lock->get()) {
+            return $busy ? $busy() : throw new LogicException('This version is being sent already');
+        }
+        try {
+            return $send();
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * Locks the opportunity's row. Everything that changes which versions are open, sent or approved locks it first,
+     * then the version: so two versions are never approved by the client, nor one sent after another was approved.
+     */
+    private static function lockOpportunity(string $opportunityId): void
+    {
+        Opportunity::whereKey($opportunityId)->lockForUpdate()->first();
     }
 
     private static function firstName(array $recipient): ?string

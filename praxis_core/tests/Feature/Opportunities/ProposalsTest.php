@@ -429,6 +429,124 @@ class ProposalsTest extends TestCase
             ->assertDispatched('proposals-changed');
         $this->assertSoftDeleted($v2);
         $this->assertSame([1], Proposals::versions($o)->pluck('version')->all());
+
+        // An approved draft: not by someone who only edits; the lead (or the owner) can
+        $v3 = Proposals::newVersion($o, $lead);
+        Proposals::save($v3, ['title' => 'A faster close', 'sections' => $v3->sections, 'lines' => [], 'changes_summary' => 'Shorter.'], $lead);
+        $this->assertNull(Proposals::approve($v3, $lead));
+        $this->assertFalse(Proposals::discard($v3->fresh(), $lead, mayApprove: false));
+        $this->actingAs($this->staff('sales', ['sales']));
+        Livewire::test(ProposalsTab::class, ['opportunityId' => $o->id])->call('discard')->assertSee('This draft can’t be discarded');
+        $this->assertNotSoftDeleted($v3);
+        $this->actingAs($lead);
+        // (numbered 2 again: the draft discarded above never reached the client)
+        Livewire::test(ProposalsTab::class, ['opportunityId' => $o->id])->call('discard')->assertSee('The draft of version 2 was discarded.');
+        $this->assertSoftDeleted($v3);
+        // A version that was sent is never discarded
+        $this->assertFalse(Proposals::discard($v1->fresh(), $lead, mayApprove: true));
+    }
+
+    public function test_once_the_client_approves_a_version_no_other_is_approved_sent_or_started(): void
+    {
+        $lead = $this->staff('lead', ['sales']);
+        $o = $this->opportunity($lead);
+        $this->actingAs($lead);
+        $person = ['name' => 'Ngozi Eze', 'email' => 'ngozi@kilo.test'];
+        $v1 = $this->approved($o, $lead);
+        Proposals::send($v1, ['ngozi@kilo.test'], $lead);
+        // Version 2 is written and approved while the client still has version 1
+        $v2 = Proposals::newVersion($o, $lead);
+        Proposals::save($v2, ['title' => 'A faster close', 'sections' => $v2->sections, 'lines' => [], 'changes_summary' => 'Training added.'], $lead);
+        $this->assertNull(Proposals::approve($v2, $lead));
+
+        // The client approves version 1: version 2 is set aside and can't go out
+        $this->assertTrue(Proposals::approveForClient($v1->fresh(), $person, 'Finance director'));
+        $this->assertSame([Proposal::CLIENT_APPROVED, Proposal::SUPERSEDED], [$v1->fresh()->status, $v2->fresh()->status]);
+        try {
+            Proposals::send($v2->fresh(), ['ngozi@kilo.test'], $lead);
+            $this->fail('A version was sent after the client approved another');
+        } catch (LogicException) {
+        }
+        $this->assertSame('client_approved', Proposals::approve($v2->fresh(), $lead));
+        $this->assertNull(Proposals::newVersion($o, $lead));
+        Mail::assertSent(ProposalMail::class, 1);
+        // Nothing moves the stage back from Proposal approved
+        $this->assertFalse(Proposals::requestChanges($v1->fresh(), $person, 'More?'));
+        $this->assertSame('proposal_approved', $o->fresh()->stage);
+
+        Livewire::test(ProposalsTab::class, ['opportunityId' => $o->id])->call('show', $v2->id)
+            ->assertSee('Set aside')->assertSee('The client approved version 1, so this version was set aside.')->assertDontSee('Start version 3');
+    }
+
+    public function test_a_stale_page_can_not_approve_a_version_the_client_no_longer_has(): void
+    {
+        $lead = $this->staff('lead', ['sales']);
+        $o = $this->opportunity($lead);
+        $this->actingAs($lead);
+        $person = ['name' => 'Ngozi Eze', 'email' => 'ngozi@kilo.test'];
+        $v1 = $this->approved($o, $lead);
+        Proposals::send($v1, ['ngozi@kilo.test'], $lead);
+        $v2 = Proposals::newVersion($o, $lead);
+        Proposals::save($v2, ['title' => 'A faster close', 'sections' => $v2->sections, 'lines' => [], 'changes_summary' => 'Training added.'], $lead);
+        Proposals::approve($v2, $lead);
+        Proposals::send($v2->fresh(), ['ngozi@kilo.test'], $lead);
+
+        // Version 1's page, still open: replaced, so neither approval nor changes
+        $this->assertFalse(Proposals::approveForClient($v1->fresh(), $person, 'Finance director'));
+        $this->assertFalse(Proposals::requestChanges($v1->fresh(), $person, 'Hm'));
+        $this->assertTrue(Proposals::approveForClient($v2->fresh(), $person, 'Finance director'));
+        $this->assertSame(1, Proposal::where('opportunity_id', $o->id)->where('status', Proposal::CLIENT_APPROVED)->count());
+    }
+
+    public function test_the_unsent_list_is_right_at_every_moment_of_a_send(): void
+    {
+        $lead = $this->staff('lead', ['sales']);
+        $o = $this->opportunity($lead);
+        $this->actingAs($lead);
+        $p = $this->approved($o, $lead);
+        // What a request cut short at each email would leave to retry
+        Mail::swap(new MailManager($this->app));
+        $seen = [];
+        Event::listen(MessageSending::class, function (MessageSending $e) use ($p, &$seen) {
+            $seen[$e->message->getTo()[0]->getAddress()] = Proposal::find($p->id)->recipients_unsent;
+        });
+
+        $this->assertSame([], Proposals::send($p, ['ngozi@kilo.test', 'cfo@kilo.test'], $lead));
+        $this->assertSame(['ngozi@kilo.test' => ['ngozi@kilo.test', 'cfo@kilo.test'], 'cfo@kilo.test' => ['cfo@kilo.test']], $seen);
+        $this->assertNull($p->fresh()->recipients_unsent);
+    }
+
+    public function test_the_link_is_sent_again_to_people_hq_knows_once_at_a_time(): void
+    {
+        $lead = $this->staff('lead', ['sales']);
+        $o = $this->opportunity($lead);
+        $this->actingAs($lead);
+        $p = $this->approved($o, $lead);
+        Proposals::send($p, ['ngozi@kilo.test'], $lead);
+
+        Livewire::test(ProposalsTab::class, ['opportunityId' => $o->id])->assertSee('Send the link again')->assertSet('linkTo', ['ngozi@kilo.test'])
+            ->set('linkTo', ['stranger@elsewhere.test'])->call('sendLinkAgain')->assertHasErrors(['linkTo.0'])
+            ->set('linkTo', ['ngozi@kilo.test', 'cfo@kilo.test'])->call('sendLinkAgain')->assertSee('The link was sent again.');
+        Mail::assertSent(ProposalMail::class, 3);
+        $this->assertSame(['ngozi@kilo.test', 'cfo@kilo.test'], array_column($p->fresh()->recipients, 'email'));
+        $this->assertNull($p->fresh()->recipients_unsent);
+
+        // While another send of this version runs, nothing goes
+        $busy = \Illuminate\Support\Facades\Cache::lock('proposal-mail:' . $p->id, 600);
+        $this->assertTrue($busy->get());
+        try {
+            Proposals::sendAgain($p->fresh(), ['ngozi@kilo.test'], $lead);
+            $this->fail('Sent while another send of the version was running');
+        } catch (LogicException) {
+        }
+        $busy->release();
+        Mail::assertSent(ProposalMail::class, 3);
+
+        // Not once its validity is over
+        $this->travel(Proposals::VALIDITY_DAYS + 1)->days();
+        Livewire::test(ProposalsTab::class, ['opportunityId' => $o->id])->assertDontSee('Send the link again')
+            ->set('linkTo', ['ngozi@kilo.test'])->call('sendLinkAgain')->assertHasErrors(['linkTo']);
+        Mail::assertSent(ProposalMail::class, 3);
     }
 
     public function test_legacy_proposals_keep_the_old_builder_and_a_v2_proposal_never_opens_there(): void
