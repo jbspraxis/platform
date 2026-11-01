@@ -43,6 +43,7 @@
         .pr-sig strong { display: block; color: var(--color-ink); }
         .pr-sig img { display: block; max-width: 100%; height: 64px; object-fit: contain; margin: 6px 0; }
         .pr-hash { display: block; font-size: 0.6875rem; line-height: 1rem; color: var(--color-muted); }
+        .sr-fees { grid-template-columns: minmax(140px, auto) minmax(0, 1fr); }
         .otp-input { max-width: 220px; font-size: 1.5rem; line-height: 2rem; font-variant-numeric: tabular-nums; text-align: center; letter-spacing: 0.2em; }
         @media (max-width: 560px) {
             .pr-row2 { grid-template-columns: 1fr; }
@@ -64,7 +65,7 @@
                 <p class="page-subtitle">{{ __('sow.portal.subtitle', ['party' => $party, 'company' => $o->organization?->name]) }}</p>
                 <div class="pr-meta">
                     <span>{{ $s->reference }} · {{ __('sow.version', ['n' => $s->version]) }}</span>
-                    <span>{{ __('proposals.portal.sent', ['date' => $day($s->sent_at)]) }}</span>
+                    <span>{{ __('sow.portal.sent', ['date' => $day($s->sent_at)]) }}</span>
                     @if ($s->status !== 'signed')
                         <span>{{ __('sow.portal.sign_by', ['date' => $day($s->validUntil())]) }}</span>
                     @endif
@@ -127,7 +128,7 @@
 
             <section class="card" aria-labelledby="sr-fees">
                 <h2 id="sr-fees" class="card-title" style="margin-bottom: 12px">{{ __('sow.fees.title') }}</h2>
-                <dl class="pr-totals" style="margin-left: 0; max-width: none">
+                <dl class="pr-totals sr-fees" style="margin-left: 0; max-width: none">
                     <dt>{{ __('proposals.lines.subtotal') }}</dt><dd>{{ $money($fees['totals']['subtotal']) }}</dd>
                     <dt>{{ __('proposals.lines.vat', ['rate' => rtrim(rtrim(number_format($fees['vat_rate'], 2, $fr ? ',' : '.', ''), '0'), '.,')]) }}</dt><dd>{{ $money($fees['totals']['vat']) }}</dd>
                     <dt class="is-total">{{ __('proposals.lines.total') }}</dt><dd class="is-total">{{ $money($fees['totals']['total']) }}</dd>

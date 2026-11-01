@@ -122,7 +122,7 @@ return [
 
     'approve' => [
         'title' => 'Approuver et signer pour JBS Praxis',
-        'intro' => "Approuver le signe pour :party\u{00A0}: votre nom et votre signature figurent sur l’énoncé des travaux que reçoit le client. Vérifiez d’abord chaque partie, les jalons et les honoraires.",
+        'intro' => "En l’approuvant, vous le signez pour :party\u{00A0}: votre nom et votre signature figurent sur l’énoncé des travaux que reçoit le client. Vérifiez d’abord chaque partie, les jalons et les honoraires.",
         'who' => "Le dirigeant ou le responsable de l’opportunité (:name) l’approuve et le signe pour JBS Praxis.",
         'name' => 'Votre nom, tel qu’il figure au contrat',
         'signature' => 'Votre signature',
@@ -236,6 +236,7 @@ return [
         'kicker' => 'Énoncé des travaux',
         'page_title' => "Énoncé des travaux\u{00A0}: :title",
         'subtitle' => 'Entre :party et :company.',
+        'sent' => 'Envoyé le :date',
         'sign_by' => 'À signer avant le :date',
         'sign' => 'Le signer',
         'sign_help' => 'Avec votre nom, votre fonction et votre signature, puis un code envoyé par e-mail.',

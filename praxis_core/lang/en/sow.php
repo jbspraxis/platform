@@ -237,6 +237,7 @@ return [
         'kicker' => 'Statement of work',
         'page_title' => 'Statement of work: :title',
         'subtitle' => 'Between :party and :company.',
+        'sent' => 'Sent on :date',
         'sign_by' => 'To be signed by :date',
         'sign' => 'Sign it',
         'sign_help' => 'With your name, title and signature, then a code we email you.',
