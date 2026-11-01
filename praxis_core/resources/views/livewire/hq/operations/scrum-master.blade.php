@@ -36,10 +36,20 @@
         .plan-sugg-text strong { display: block; color: var(--color-ink); }
         .plan-detail { display: block; margin: 4px 0 0; white-space: pre-line; color: var(--color-slate); }
         .plan-why { display: block; margin-top: 4px; font-size: 0.75rem; color: var(--color-muted); }
+        .plan-sugg.is-stale { background: var(--color-mist); }
+        .plan-sugg.is-stale label { cursor: default; }
+        .plan-stale { color: var(--color-ink); }
+        .plan-diff { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 0 24px; }
+        .plan-diff-label { display: block; margin-bottom: 4px; font-size: 0.75rem; font-weight: 600; color: var(--color-slate); }
+        .plan-diff-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+        .plan-diff-old, .plan-diff-new { padding: 6px 8px; border-radius: var(--radius-control); background: var(--color-paper); white-space: pre-line; overflow-wrap: anywhere; }
+        .plan-diff-old { border: 1px solid var(--color-line); color: var(--color-slate); }
+        .plan-diff-new { border: 1px solid var(--color-deep-teal); color: var(--color-ink); }
+        .plan-diff-head { display: block; font-size: 0.6875rem; font-weight: 600; color: var(--color-muted); }
         .plan-tag { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 999px; font-size: 0.6875rem; line-height: 1.125rem; font-weight: 600; background: var(--color-paper); color: var(--color-deep-teal); border: 1px solid var(--color-deep-teal); }
         .plan-save { position: sticky; bottom: 0; margin-top: 8px; padding: 12px 0; border-top: 1px solid var(--color-line); background: var(--color-paper); display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
         @media (prefers-reduced-motion: reduce) { .plan-spin { animation: none; } .plan-ms > summary svg { transition: none; } }
-        @media (max-width: 600px) { .plan-save .btn, .plan-stack > .btn { width: 100%; } }
+        @media (max-width: 600px) { .plan-save .btn, .plan-stack > .btn { width: 100%; } .plan-diff { margin-left: 0; } .plan-diff-row { grid-template-columns: minmax(0, 1fr); } }
     </style>
 
     @php
@@ -60,6 +70,9 @@
 
     @if ($notice)
         <div class="alert alert-success mb-4" role="status"><i data-lucide="circle-check"></i><span>{{ $notice }}</span></div>
+    @endif
+    @if ($warning)
+        <div class="alert alert-warning mb-4" role="status"><i data-lucide="triangle-alert"></i><span>{{ $warning }}</span></div>
     @endif
 
     @if ($mode === 'draft_pending')
@@ -150,7 +163,13 @@
                             <summary>
                                 <i data-lucide="chevron-right" class="plan-chevron"></i>
                                 <span class="plan-name">{{ $m->code }} · {{ $m->name }}</span>
-                                <span class="plan-count">@if ($countByPhase->get($m->id)) {{ trans_choice('planner.review.suggestions', $countByPhase->get($m->id), ['count' => $countByPhase->get($m->id)]) }} @endif</span>
+                                @php
+                                    $badge = array_filter([
+                                        ($n = $countByPhase->get($m->id)) ? trans_choice('planner.review.suggestions', $n, ['count' => $n]) : null,
+                                        ($n = $notesByPhase->get($m->id)) ? trans_choice('planner.review.notes', $n, ['count' => $n]) : null,
+                                    ]);
+                                @endphp
+                                <span class="plan-count">{{ implode(' · ', $badge) }}</span>
                                 <span class="plan-meta">
                                     <span>{{ $short($m->start_date) }} – {{ $short($m->due_date) }}</span>
                                     <span>{{ __('projects.columns.' . $m->column) }}</span>
@@ -169,21 +188,39 @@
                                                 <span class="plan-task-meta">{{ __('projects.task_statuses.' . $task->status) }} · {{ $hours($task->estimated_hours) }} · {{ $task->first_name ? trim($task->first_name . ' ' . $task->last_name) : __('planner.review.no_lead') }}</span>
                                             </div>
                                             @if ($edit = $editByTask->get($task->id))
-                                                <div class="plan-sugg" wire:key="ps-{{ $edit->id }}">
+                                                {{-- Only the fields the AI changes, the task as it is now beside the suggestion --}}
+                                                @php
+                                                    $asRead = \App\Support\Projects\Planner::stillAsRead($task, $edit->base);
+                                                    $fields = array_filter([
+                                                        'title' => $edit->title !== null ? [$task->title, $edit->title] : null,
+                                                        'detail' => $edit->detail !== null ? [filled($task->description) ? $task->description : __('planner.review.empty'), $edit->detail] : null,
+                                                        'estimate' => $edit->estimate_hours !== null ? [$hours($task->estimated_hours), $hours($edit->estimate_hours)] : null,
+                                                    ]);
+                                                @endphp
+                                                <div class="plan-sugg {{ $asRead ? '' : 'is-stale' }}" wire:key="ps-{{ $edit->id }}">
                                                     <label>
-                                                        <input type="checkbox" class="checkbox" value="{{ $edit->id }}" wire:model.live="ticked">
+                                                        <input type="checkbox" class="checkbox" value="{{ $edit->id }}" wire:model.live="ticked" @disabled(! $asRead)>
                                                         <span class="plan-sugg-text">
                                                             <span class="plan-tag">{{ __('planner.review.edit') }}</span>
-                                                            <strong>{{ $edit->title }}</strong>
-                                                            <span class="plan-task-meta">{{ $hours($edit->estimate_hours) }}</span>
-                                                            @if (filled($edit->detail) && $edit->detail !== $task->description)
-                                                                <span class="plan-detail">{{ $edit->detail }}</span>
-                                                            @endif
                                                             @if (filled($edit->why))
                                                                 <span class="plan-why">{{ __('planner.review.why', ['why' => $edit->why]) }}</span>
                                                             @endif
+                                                            @unless ($asRead)
+                                                                <span class="plan-why plan-stale">{{ __('planner.review.stale') }}</span>
+                                                            @endunless
                                                         </span>
                                                     </label>
+                                                    <div class="plan-diff">
+                                                        @foreach ($fields as $field => [$before, $after])
+                                                            <div>
+                                                                <span class="plan-diff-label">{{ __('planner.review.fields.' . $field) }}</span>
+                                                                <div class="plan-diff-row">
+                                                                    <div class="plan-diff-old"><span class="plan-diff-head">{{ __('planner.review.now') }}</span>{{ $before }}</div>
+                                                                    <div class="plan-diff-new"><span class="plan-diff-head">{{ __('planner.review.suggested') }}</span>{{ $after }}</div>
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
                                                 </div>
                                             @endif
                                             @foreach ($notesByTask->get($task->id, collect()) as $note)

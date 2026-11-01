@@ -28,7 +28,7 @@ return [
     'milestone' => [
         'label' => 'Jalon à planifier',
         'suggest' => 'Suggérer des tâches pour ce jalon',
-        'help' => "L’IA suggère de nouvelles tâches et des modifications des tâches de ce jalon, et signale celles qui semblent en double ou hors périmètre. Elle ne retire jamais une tâche et ne nomme personne. Environ 0,05 à 0,15\u{00A0}$ du budget IA.",
+        'help' => "L’IA suggère de nouvelles tâches et des modifications des tâches de ce jalon, et signale celles qui semblent en double ou hors périmètre. Elle ne retire jamais une tâche et ne nomme personne. Environ 0,05 à 0,15\u{00A0}$ du budget IA, jusqu’à environ 0,30\u{00A0}$ quand elle lit une transcription.",
     ],
 
     'progress' => [
@@ -46,6 +46,7 @@ return [
         'collapse_all' => 'Tout replier',
         'done' => ':done sur :total terminées',
         'suggestions' => ':count suggestion|:count suggestions',
+        'notes' => ':count remarque|:count remarques',
         'no_tasks' => 'Pas encore de tâches.',
         'no_lead' => 'Sans responsable',
         'hours' => ":hours\u{00A0}h",
@@ -53,12 +54,28 @@ return [
         'new' => 'Nouvelle',
         'edit' => 'Modification suggérée',
         'note' => 'Remarque',
+        'now' => 'Actuellement',
+        'suggested' => 'Suggéré',
+        'empty' => 'Rien pour l’instant',
+        'fields' => [
+            'title' => 'Titre',
+            'detail' => 'Ce qui marque la fin',
+            'estimate' => 'Estimation',
+        ],
+        'stale' => "Cette tâche a changé après la lecture de l’IA\u{202F}: cette modification ne peut pas être enregistrée. Relancez la planification pour qu’elle en tienne compte.",
         'why' => "Pourquoi\u{00A0}: :why",
     ],
 
     'save' => 'Enregistrer la suggestion cochée (:count)|Enregistrer les suggestions cochées (:count)',
     'save_help' => "Les suggestions non cochées sont écartées. Rien n’est jamais retiré, et aucun jalon n’est ajouté.",
-    'saved' => ':count suggestion enregistrée. Les autres ont été écartées.|:count suggestions enregistrées. Les autres ont été écartées.',
+    'saved' => [
+        'added' => ':count tâche ajoutée.|:count tâches ajoutées.',
+        'changed' => ':count tâche modifiée.|:count tâches modifiées.',
+        'rest' => 'Les autres suggestions ont été écartées.',
+        'none' => "Rien n’a été ajouté ni modifié\u{202F}; les suggestions ont été écartées.",
+        'refused' => "Non modifiée, car la tâche a changé après la lecture de l’IA\u{00A0}: :list.|Non modifiées, car ces tâches ont changé après la lecture de l’IA\u{00A0}: :list.",
+        'quote' => "«\u{202F}:title\u{202F}»",
+    ],
 
     'whole' => [
         'title' => 'Plan à relire',

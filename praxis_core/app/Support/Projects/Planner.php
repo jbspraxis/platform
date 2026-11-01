@@ -7,11 +7,13 @@ use App\Models\Meeting;
 use App\Models\MilestonePlan;
 use App\Models\Opportunity;
 use App\Models\PlanSuggestion;
+use App\Models\StatementOfWork;
 use App\Models\User;
 use App\Support\Ai\Ai;
 use App\Support\Ai\AiUnavailable;
 use App\Support\Opportunities\OpportunityAccess;
 use App\Support\Opportunities\OpportunityContext;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +53,9 @@ final class Planner
     /** Characters of one transcript the second pass reads (an hour of talk is about 50,000) */
     public const MAX_TRANSCRIPT = 120000;
 
+    /** SOW sections about money, left out for someone who can't open the opportunity */
+    private const MONEY = '/fee|pric|payment|invoice|cost|budget|commercial|vat|tax|honorair|paiement|factur|prix|coût|tarif|tva/iu';
+
     public static function canPlan(string $projectId): bool
     {
         return ProjectRules::canManage($projectId);
@@ -85,8 +90,9 @@ final class Planner
     /**
      * The scope box, assembled from the project's opportunity in the owner's order: the signed SOW first, then the
      * approved proposal, the questionnaire's answers, the meetings' notes (the AI's summaries, never transcripts) and
-     * the approved change reports. Someone who can't open the opportunity gets what the project shows them: the SOW,
-     * the proposal and the change reports. A project without an opportunity starts from its organisation's latest
+     * the approved change reports. Someone who can't open the opportunity gets only what the project's screens show:
+     * the organisation's name and sector, the signed SOW without its fees, and the change reports (projectScope). A
+     * project without an opportunity starts from its organisation's latest
      * signed legacy proposal, else empty for pasting. Returns [text, sources] (sources: short labels for "Sources used").
      *
      * @return array{string, list<string>}
@@ -96,10 +102,8 @@ final class Planner
         $o = self::opportunity($projectId);
         $blocks = [];
         $sources = [];
-        if ($o) {
-            $full = OpportunityAccess::canView($user, $o);
-            $parts = $full ? ['profile', 'sow', 'proposal', 'questionnaire', 'notes'] : ['profile', 'sow', 'proposal'];
-            foreach ($parts as $part) {
+        if ($o && OpportunityAccess::canView($user, $o)) {
+            foreach (['profile', 'sow', 'proposal', 'questionnaire', 'notes'] as $part) {
                 $text = $part === 'notes'
                     ? OpportunityContext::for($o, include: ['meetings', 'internal', 'notes'])
                     : OpportunityContext::for($o, include: [$part]);
@@ -110,6 +114,12 @@ final class Planner
                 if ($part !== 'profile') {
                     $sources[] = self::sourceLabel($part, $o);
                 }
+            }
+        } elseif ($o) {
+            [$text, $hasSow] = self::projectScope($o);
+            $blocks[] = $text;
+            if ($hasSow) {
+                $sources[] = self::sourceLabel('sow', $o);
             }
         } else {
             $proposal = DB::table('proposals')->where('organization_id', DB::table('projects')->where('id', $projectId)->value('organization_id'))
@@ -126,6 +136,54 @@ final class Planner
         }
 
         return [Str::limit(implode("\n\n", $blocks), self::MAX_SCOPE, ''), $sources];
+    }
+
+    /**
+     * For someone who may plan the project but not open its opportunity (the owner's "same rights as the screens"):
+     * the organisation's name and sector, and the signed SOW's sections and milestones without its fees. No proposal,
+     * line items, prices, weights, turnover or budget. Returns [text, whether a signed SOW was found].
+     *
+     * @return array{string, bool}
+     */
+    private static function projectScope(Opportunity $o): array
+    {
+        $org = $o->organization;
+        $out = ['ORGANISATION', 'Name: ' . ($org?->name ?: '—')];
+        if (filled($org?->industry)) {
+            $out[] = 'Sector: ' . $org->industry;
+        }
+        $sow = StatementOfWork::where('opportunity_id', $o->id)->where('status', 'signed')->orderByDesc('version')->first();
+        if (! $sow) {
+            return [implode("\n", $out), false];
+        }
+        $out[] = '';
+        $out[] = 'STATEMENT OF WORK' . ($sow->reference ? " {$sow->reference}" : '') . ' (signed; its fees are left out)';
+        foreach ((array) $sow->sections as $section) {
+            $heading = (string) ($section['title'] ?? $section['key'] ?? '');
+            if (preg_match(self::MONEY, ($section['key'] ?? '') . ' ' . $heading)) {
+                continue;
+            }
+            $out[] = '';
+            $out[] = mb_strtoupper($heading);
+            $out[] = trim((string) ($section['body'] ?? ''));
+        }
+        if (is_array($sow->milestones) && $sow->milestones) {
+            $out[] = '';
+            $out[] = 'MILESTONES';
+            foreach (array_values($sow->milestones) as $i => $m) {
+                $out[] = sprintf('%d. %s (%d weeks): %s', $i + 1, $m['title'] ?? '', (int) ($m['weeks'] ?? 0), trim((string) ($m['description'] ?? '')));
+            }
+        }
+
+        return [implode("\n", $out), true];
+    }
+
+    /** A record for the AI between BEGIN and END lines; a marker line inside it is dropped, so the text can't close it */
+    private static function fence(string $label, string $text): string
+    {
+        $text = preg_replace('/^[ \t]*(BEGIN|END) (SCOPE|ADOPTED PLAN|TRANSCRIPT)\b.*$/m', '', $text);
+
+        return "BEGIN {$label}\n" . trim((string) $text) . "\nEND {$label}";
     }
 
     private static function sourceLabel(string $part, Opportunity $o): string
@@ -154,8 +212,9 @@ final class Planner
     }
 
     /**
-     * The adopted plan for the AI: every milestone (code, title, weight, dates, status) and its tasks numbered T1…
-     * (status, estimate, the start of the detail), the one to plan marked. Returns [text, task ids by number, ids of
+     * The adopted plan for the AI, fenced as a record: every milestone (code, title, weight, dates, status) and its
+     * tasks numbered T1… (status, estimate, the start of the detail; the planned milestone's own tasks with their detail
+     * in full, lines kept, so an edit never cuts it), the one to plan marked. Returns [text, task ids by number, ids of
      * the planned milestone's tasks].
      *
      * @return array{string, array<int, string>, list<string>}
@@ -164,7 +223,7 @@ final class Planner
     {
         $phases = DB::table('project_phases')->where('project_id', $projectId)->whereNull('deleted_at')->orderBy('phase_number')->get();
         $tasks = DB::table('tasks')->whereIn('phase_id', $phases->pluck('id'))->whereNull('deleted_at')->orderBy('created_at')->orderBy('id')->get()->groupBy('phase_id');
-        $out = ['THE ADOPTED PLAN (every milestone with its tasks; use the T-numbers for edits and notes):'];
+        $out = ['Every milestone with its tasks; the one TO PLAN gives each task’s detail in full. Use the T-numbers for edits and notes.'];
         $ids = [];
         $own = [];
         $n = 0;
@@ -177,15 +236,22 @@ final class Planner
             }
             foreach ($tasks->get($phase->id, collect()) as $task) {
                 $ids[++$n] = $task->id;
+                $head = sprintf('  T%d [%s%s] %s', $n, $task->status, $task->estimated_hours !== null ? ', ' . rtrim(rtrim((string) $task->estimated_hours, '0'), '.') . 'h' : '', $task->title);
                 if ($phase->id === $phaseId) {
                     $own[] = $task->id;
+                    $out[] = $head;
+                    $detail = trim(str_replace("\r", '', (string) $task->description));
+                    foreach ($detail !== '' ? explode("\n", $detail) : [] as $line) {
+                        $out[] = '      | ' . $line;
+                    }
+                } else {
+                    $detail = Str::limit(trim(preg_replace('/\s+/u', ' ', strip_tags((string) $task->description))), 120);
+                    $out[] = $head . ($detail !== '' ? ' — ' . $detail : '');
                 }
-                $detail = Str::limit(trim(preg_replace('/\s+/u', ' ', strip_tags((string) $task->description))), $phase->id === $phaseId ? 400 : 120);
-                $out[] = sprintf('  T%d [%s%s] %s%s', $n, $task->status, $task->estimated_hours !== null ? ', ' . rtrim(rtrim((string) $task->estimated_hours, '0'), '.') . 'h' : '', $task->title, $detail !== '' ? ' — ' . $detail : '');
             }
         }
 
-        return [implode("\n", $out), $ids, $own];
+        return [self::fence('ADOPTED PLAN', implode("\n", $out)), $ids, $own];
     }
 
     /** The meetings whose transcript the AI may ask for (only for someone who may read transcripts), in date order */
@@ -211,6 +277,9 @@ final class Planner
      */
     public static function start(string $projectId, ?string $phaseId, string $scope, User $by): MilestonePlan
     {
+        if (! self::canPlan($projectId)) {
+            throw new AuthorizationException(__('planner.errors.rights'));
+        }
         $mode = self::mode($projectId);
         if ($mode === 'draft_pending' || ($phaseId === null) !== ($mode === 'whole')
             || ($phaseId && ! DB::table('project_phases')->where('project_id', $projectId)->where('id', $phaseId)->whereNull('deleted_at')->exists())) {
@@ -253,16 +322,17 @@ final class Planner
 
     /**
      * The job: CONTEXT = the scope box; MATERIAL = the adopted plan, the meetings the AI may ask about (numbered; only
-     * when the person may read transcripts), and on a second pass the one transcript it asked for. What isn't sent
-     * stays on the run's input to read the answer back: task ids by number, the planned milestone's own tasks, the
-     * meetings by number.
+     * when the person may read transcripts), and on a second pass the one transcript it asked for. The scope, the plan
+     * and the transcript are fenced as records. What isn't sent stays on the run's input to read the answer back: the
+     * pass, task ids by number, the planned milestone's own tasks, the meetings by number.
      */
     private static function queue(MilestonePlan $plan, ?User $by, ?Meeting $transcriptOf, ?string $why = null): AiRun
     {
         $o = self::opportunity($plan->project_id);
         $language = $o?->language === 'fr' ? 'fr' : 'en';
+        $context = self::fence('SCOPE', (string) $plan->scope);
         if ($plan->phase_id === null) {
-            return Ai::queue('plan_project', $plan, ['context' => $plan->scope, 'language' => $language, 'plan_id' => $plan->id]);
+            return Ai::queue('plan_project', $plan, ['context' => $context, 'language' => $language, 'plan_id' => $plan->id, 'pass' => $plan->pass]);
         }
         [$text, $ids, $own] = self::adopted($plan->project_id, $plan->phase_id);
         $meetings = $transcriptOf ? collect() : self::meetings($o, $by ?? User::find($plan->created_by));
@@ -279,14 +349,15 @@ final class Planner
             $material[] = '';
             $material[] = sprintf('THE TRANSCRIPT OF “%s” (%s), AS YOU ASKED%s. This is the second pass: read_transcript must be 0.', $transcriptOf->title,
                 Carbon::parse($transcriptOf->starts_at)->setTimezone('Africa/Lagos')->format('j F Y'), $why ? ' (' . Str::limit($why, 300) . ')' : '');
-            $material[] = Str::limit((string) $transcript?->text, self::MAX_TRANSCRIPT, ' […]');
+            $material[] = self::fence('TRANSCRIPT', Str::limit((string) $transcript?->text, self::MAX_TRANSCRIPT, ' […]'));
         }
 
         return Ai::queue('plan_milestone', $plan, [
-            'context' => $plan->scope,
+            'context' => $context,
             'material' => implode("\n", $material),
             'language' => $language,
             'plan_id' => $plan->id,
+            'pass' => $plan->pass,
             'task_ids' => $ids,
             'own_task_ids' => $own,
             'meeting_ids' => $meetings->pluck('id')->values()->all(),
@@ -303,7 +374,8 @@ final class Planner
     }
 
     /**
-     * A planning job finished (FilePlanAi on AiRunFinished, or sync): filed once, under the plan's lock. A first pass
+     * A planning job finished (FilePlanAi on AiRunFinished, or sync): filed once, under the plan's lock, and only while
+     * the plan waits for that run on that pass (a first pass is never filed once the second has started). A first pass
      * that asks for one meeting's transcript (one of the meetings it was offered) starts the second pass instead; any
      * other answer becomes the plan's suggestions (or its drafted plan), ready for the lead.
      */
@@ -314,7 +386,7 @@ final class Planner
         }
         $second = DB::transaction(function () use ($run) {
             $plan = MilestonePlan::whereKey($run->subject_id)->lockForUpdate()->first();
-            if (! $plan || $plan->ai_run_id !== $run->id || $plan->status !== 'drafting') {
+            if (! $plan || $plan->ai_run_id !== $run->id || $plan->status !== 'drafting' || (int) ($run->input['pass'] ?? 1) !== $plan->pass) {
                 return null;
             }
             if ($run->status !== 'done') {
@@ -340,20 +412,34 @@ final class Planner
         if (! $second) {
             return;
         }
-        // The second pass, outside the lock: the same plan with that one transcript
+        // The second pass, outside the lock: the same plan with that one transcript. Until its run is recorded below,
+        // nothing files the first pass (its input says pass 1) and the second run's own filing waits for sync().
         try {
             $next = self::queue($second, null, Meeting::find($second->transcript_meeting_id), $second->transcript_reason);
         } catch (AiUnavailable) {
-            // Over the budget meanwhile: the first pass's answer is filed instead
+            // Over the budget meanwhile: the first pass's answer is filed instead, if the plan still waits for it
             DB::transaction(function () use ($second, $run) {
                 $plan = MilestonePlan::whereKey($second->id)->lockForUpdate()->first();
-                self::fileSuggestions($plan, $run, (array) $run->output);
+                if ($plan && $plan->status === 'drafting' && $plan->pass === 2 && $plan->ai_run_id === $run->id) {
+                    $plan->forceFill(['pass' => 1, 'transcript_meeting_id' => null, 'transcript_reason' => null]);
+                    self::fileSuggestions($plan, $run, (array) $run->output);
+                }
             });
 
             return;
         }
-        $second->forceFill(['ai_run_id' => $next->id])->save();
-        self::sync($second->fresh());
+        $waiting = DB::transaction(function () use ($second, $run, $next) {
+            $plan = MilestonePlan::whereKey($second->id)->lockForUpdate()->first();
+            if (! $plan || $plan->status !== 'drafting' || $plan->pass !== 2 || $plan->ai_run_id !== $run->id) {
+                return null;
+            }
+            $plan->forceFill(['ai_run_id' => $next->id])->save();
+
+            return $plan;
+        });
+        if ($waiting) {
+            self::sync($waiting);
+        }
     }
 
     /** The AI's answer for one milestone becomes suggestions: new tasks, edits to that milestone's tasks, notes */
@@ -376,20 +462,28 @@ final class Planner
             $known->put(mb_strtolower($title), true);
             $rows[] = ['kind' => 'new', 'task_id' => null, 'title' => $title, 'detail' => Str::limit(trim((string) ($t['detail'] ?? '')), 5000, ''), 'estimate_hours' => $hours($t['estimate_hours'] ?? null), 'why' => null];
         }
+        $edited = [];
         foreach (array_slice(array_filter((array) ($output['edits'] ?? []), 'is_array'), 0, self::MAX_EDITS) as $e) {
             $taskId = $ids[(int) ($e['task_number'] ?? 0)] ?? null;
             $task = $taskId ? $tasks->get($taskId) : null;
-            // Only the planned milestone's own tasks, and only a real change
-            if (! $task || ! isset($own[$taskId])) {
+            // Only the planned milestone's own tasks, one edit each
+            if (! $task || ! isset($own[$taskId]) || isset($edited[$taskId])) {
                 continue;
             }
-            $title = Str::limit(trim((string) ($e['title'] ?? '')), 255, '') ?: $task->title;
-            $detail = Str::limit(trim((string) ($e['detail'] ?? '')), 5000, '') ?: (string) $task->description;
-            $estimate = $hours($e['estimate_hours'] ?? null) ?? ($task->estimated_hours !== null ? (float) $task->estimated_hours : null);
-            if ($title === $task->title && $detail === (string) $task->description && $estimate === ($task->estimated_hours !== null ? (float) $task->estimated_hours : null)) {
+            // Only what the AI changes: "" and 0 keep a field, and so does the same value
+            $base = self::base($task);
+            $title = Str::limit(trim((string) ($e['title'] ?? '')), 255, '');
+            $detail = Str::limit(trim(str_replace("\r", '', (string) ($e['detail'] ?? ''))), 5000, '');
+            $estimate = $hours($e['estimate_hours'] ?? null);
+            $title = $title !== '' && $title !== $base['title'] ? $title : null;
+            $detail = $detail !== '' && $detail !== trim(str_replace("\r", '', $base['description'])) ? $detail : null;
+            $estimate = $estimate !== null && $estimate !== $base['estimated_hours'] ? $estimate : null;
+            if ($title === null && $detail === null && $estimate === null) {
                 continue;
             }
-            $rows[] = ['kind' => 'edit', 'task_id' => $taskId, 'title' => $title, 'detail' => $detail, 'estimate_hours' => $estimate, 'why' => Str::limit(trim((string) ($e['why'] ?? '')), 1000, '') ?: null];
+            $edited[$taskId] = true;
+            $rows[] = ['kind' => 'edit', 'task_id' => $taskId, 'title' => $title, 'detail' => $detail, 'estimate_hours' => $estimate,
+                'why' => Str::limit(trim((string) ($e['why'] ?? '')), 1000, '') ?: null, 'base' => $base];
         }
         foreach (array_slice(array_filter((array) ($output['notes'] ?? []), 'is_array'), 0, self::MAX_NOTES) as $n) {
             $taskId = $ids[(int) ($n['task_number'] ?? 0)] ?? null;
@@ -408,6 +502,27 @@ final class Planner
             ]);
         }
         $plan->forceFill(['status' => 'ready', 'revision' => $plan->revision + 1])->save();
+    }
+
+    /**
+     * A task as an edit's base: what the AI read, kept on the suggestion; saving refuses the edit if any of it changed
+     *
+     * @return array{title: string, description: string, estimated_hours: ?float, phase_id: ?string}
+     */
+    private static function base(object $task): array
+    {
+        return ['title' => (string) $task->title, 'description' => (string) $task->description,
+            'estimated_hours' => $task->estimated_hours !== null ? (float) $task->estimated_hours : null, 'phase_id' => $task->phase_id];
+    }
+
+    /** Whether a task is still as an edit's base says (same title, detail, estimate and milestone): the review and save use it */
+    public static function stillAsRead(object $task, ?array $base): bool
+    {
+        $now = self::base($task);
+
+        return $base !== null && $now['title'] === (string) ($base['title'] ?? '') && $now['description'] === (string) ($base['description'] ?? '')
+            && $now['phase_id'] === ($base['phase_id'] ?? null)
+            && $now['estimated_hours'] === (isset($base['estimated_hours']) ? (float) $base['estimated_hours'] : null);
     }
 
     /** The AI's whole plan, kept on the plan for the lead to check */
@@ -435,13 +550,16 @@ final class Planner
 
     /**
      * Saves a milestone's review: the ticked suggestions (new tasks and edits) are written through Tasks::create and
-     * Tasks::update, the others are set aside; notes are only read. Under the plan's lock, once, and only from a page at
-     * the plan's revision. Nothing is ever removed and no milestone is created. The people whose tasks changed get one
-     * bell each. Returns null when saved, else why not: rights, state, stale.
+     * Tasks::update, the others are set aside; notes are only read. An edit writes only the fields the AI changed, and
+     * only if its task is still as the AI read it (title, detail, estimate, milestone; the task's row locked): else it
+     * is refused and named. Under the plan's lock, once, and only from a page at the plan's revision. Nothing is ever
+     * removed and no milestone is created. The people whose tasks changed get one bell each. Returns why not (rights,
+     * state, stale), or what was done: added, changed, and the titles of the refused edits.
      *
      * @param  list<string>  $ticked
+     * @return string|array{added: int, changed: int, refused: list<string>}
      */
-    public static function save(MilestonePlan $plan, array $ticked, User $by, int $revision): ?string
+    public static function save(MilestonePlan $plan, array $ticked, User $by, int $revision): string|array
     {
         if (! self::canPlan($plan->project_id)) {
             return 'rights';
@@ -458,37 +576,49 @@ final class Planner
             }
             $added = 0;
             $changed = 0;
+            $refused = [];
             $leads = [];
             foreach ($locked->suggestions()->where('status', 'pending')->whereIn('kind', ['new', 'edit'])->get() as $s) {
-                $keep = isset($ticked[$s->id]);
-                if ($keep && $s->kind === 'new' && $s->phase_id && DB::table('project_phases')->where('id', $s->phase_id)->where('project_id', $locked->project_id)->whereNull('deleted_at')->exists()) {
-                    Tasks::create($locked->project_id, array_filter(['phase_id' => $s->phase_id, 'title' => $s->title, 'description' => (string) $s->detail,
-                        'estimated_hours' => $s->estimate_hours !== null ? (float) $s->estimate_hours : null], fn ($v) => $v !== null), notify: false);
-                    $added++;
-                } elseif ($keep && $s->kind === 'edit' && ($task = Tasks::find($locked->project_id, $s->task_id))) {
-                    Tasks::update($locked->project_id, $task, array_filter(['title' => $s->title, 'description' => $s->detail,
-                        'estimated_hours' => $s->estimate_hours !== null ? (float) $s->estimate_hours : null], fn ($v) => $v !== null));
-                    $changed++;
-                    if ($task->assigned_to) {
-                        $leads[] = $task->assigned_to;
+                $status = 'rejected';
+                if (isset($ticked[$s->id]) && $s->kind === 'new') {
+                    if ($s->phase_id && DB::table('project_phases')->where('id', $s->phase_id)->where('project_id', $locked->project_id)->whereNull('deleted_at')->exists()) {
+                        Tasks::create($locked->project_id, array_filter(['phase_id' => $s->phase_id, 'title' => $s->title, 'description' => (string) $s->detail,
+                            'estimated_hours' => $s->estimate_hours !== null ? (float) $s->estimate_hours : null], fn ($v) => $v !== null), notify: false);
+                        $added++;
+                        $status = 'accepted';
                     }
-                } else {
-                    $keep = false;
+                } elseif (isset($ticked[$s->id]) && $s->kind === 'edit') {
+                    DB::table('tasks')->where('id', $s->task_id)->lockForUpdate()->first();
+                    $task = Tasks::find($locked->project_id, $s->task_id);
+                    if ($task && self::stillAsRead($task, $s->base)) {
+                        Tasks::update($locked->project_id, $task, array_filter(['title' => $s->title, 'description' => $s->detail,
+                            'estimated_hours' => $s->estimate_hours !== null ? (float) $s->estimate_hours : null], fn ($v) => $v !== null));
+                        $changed++;
+                        $status = 'accepted';
+                        if ($task->assigned_to) {
+                            $leads[] = $task->assigned_to;
+                        }
+                    } else {
+                        // Changed, moved to another milestone or deleted after the AI read it
+                        $refused[] = (string) ($task->title ?? $s->base['title'] ?? $s->title);
+                        $status = 'refused';
+                    }
                 }
-                $s->forceFill(['status' => $keep ? 'accepted' : 'rejected', 'decided_by' => $by->id, 'decided_at' => now()])->save();
+                $s->forceFill(['status' => $status, 'decided_by' => $by->id, 'decided_at' => now()])->save();
             }
             $locked->forceFill(['status' => 'saved', 'revision' => $locked->revision + 1, 'updated_by' => $by->id])->save();
-            ProjectRules::log('PLAN_SAVED', "Saved the milestone plan ({$added} added, {$changed} changed).", 'projects', $locked->project_id, [],
-                ['plan_id' => $locked->id, 'phase_id' => $locked->phase_id, 'added' => $added, 'changed' => $changed]);
+            ProjectRules::log('PLAN_SAVED', sprintf('Saved the milestone plan (%d added, %d changed, %d refused because the task changed).', $added, $changed, count($refused)),
+                'projects', $locked->project_id, [], ['plan_id' => $locked->id, 'phase_id' => $locked->phase_id, 'added' => $added, 'changed' => $changed, 'refused' => count($refused)]);
 
-            return ['leads' => $leads];
+            return ['added' => $added, 'changed' => $changed, 'refused' => $refused, 'leads' => $leads];
         });
         if (is_string($result)) {
             return $result;
         }
         self::tellLeads($plan->project_id, $result['leads'], $by);
+        unset($result['leads']);
 
-        return null;
+        return $result;
     }
 
     /** One bell per person whose tasks the plan changed (never the person who saved it), in their language */

@@ -51,6 +51,10 @@ class ScrumMaster extends Component
     #[Locked]
     public string $notice = '';
 
+    /** Edits a save refused because their task changed after the AI read it */
+    #[Locked]
+    public string $warning = '';
+
     public function mount($id): void
     {
         $this->projectId = (string) $id;
@@ -70,7 +74,7 @@ class ScrumMaster extends Component
     public function suggest(): void
     {
         $this->resetErrorBag();
-        $this->notice = '';
+        $this->notice = $this->warning = '';
         $this->validateScope();
         $this->validate(['phaseId' => ['required', 'string']], ['phaseId.*' => __('planner.errors.milestone')]);
         $this->startPlan($this->phaseId);
@@ -80,7 +84,7 @@ class ScrumMaster extends Component
     public function draftPlan(): void
     {
         $this->resetErrorBag();
-        $this->notice = '';
+        $this->notice = $this->warning = '';
         $this->validateScope();
         $this->startPlan(null);
     }
@@ -126,16 +130,33 @@ class ScrumMaster extends Component
         if (! $plan) {
             return;
         }
-        $why = Planner::save($plan, $this->ticked, Auth::user(), $this->revision);
-        if ($why !== null) {
-            $this->addError('save', __('planner.errors.' . $why));
+        $result = Planner::save($plan, $this->ticked, Auth::user(), $this->revision);
+        if (is_string($result)) {
+            $this->addError('save', __('planner.errors.' . $result));
 
             return;
         }
-        $kept = count($this->ticked);
         $this->ticked = [];
         $this->planId = '';
-        $this->notice = trans_choice('planner.saved', $kept, ['count' => $kept]);
+        $this->notice = self::savedText($result);
+        $this->warning = $result['refused'] ? trans_choice('planner.saved.refused', count($result['refused']), [
+            'list' => implode(', ', array_map(fn ($title) => __('planner.saved.quote', ['title' => $title]), $result['refused'])),
+        ]) : '';
+    }
+
+    /** "Added 2 tasks. Changed 1 task. The other suggestions were set aside." */
+    private static function savedText(array $result): string
+    {
+        $parts = [];
+        if ($result['added']) {
+            $parts[] = trans_choice('planner.saved.added', $result['added'], ['count' => $result['added']]);
+        }
+        if ($result['changed']) {
+            $parts[] = trans_choice('planner.saved.changed', $result['changed'], ['count' => $result['changed']]);
+        }
+        $parts[] = $parts ? __('planner.saved.rest') : __('planner.saved.none');
+
+        return implode(' ', $parts);
     }
 
     /** A whole plan: leave out one drafted task, or a drafted milestone */
@@ -214,6 +235,7 @@ class ScrumMaster extends Component
             'editByTask' => $suggestions->where('kind', 'edit')->keyBy('task_id'),
             'notesByTask' => $suggestions->where('kind', 'note')->groupBy('task_id'),
             'countByPhase' => $suggestions->whereIn('kind', ['new', 'edit'])->groupBy('phase_id')->map->count(),
+            'notesByPhase' => $suggestions->where('kind', 'note')->groupBy('phase_id')->map->count(),
             'draftOpportunityId' => $mode === 'draft_pending' ? Planner::pendingDraftOpportunity($this->projectId) : null,
         ])->title(__('planner.title') . ' · ' . ($project->title ?? ''));
     }

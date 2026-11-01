@@ -9,8 +9,9 @@ use Illuminate\Support\Facades\Schema;
  * request (one milestone of a running project, or the whole plan of a project with no milestones and no project draft),
  * with the scope it read, its sources, its job and pass (a second pass reads one meeting's transcript when the AI asks),
  * and a revision so a page that is behind can't save it. plan_suggestions are what the AI proposed for a milestone: a
- * new task, an edit to an existing task, or a note (a task that looks duplicated or outside the SOW); the lead ticks
- * the ones to keep, and nothing is ever removed.
+ * new task, an edit to an existing task (only the fields the AI changes, and the task as it read it, so an edit to a
+ * task changed since is refused), or a note (a task that looks duplicated or outside the SOW); the lead ticks the ones
+ * to keep, and nothing is ever removed.
  */
 return new class extends Migration
 {
@@ -47,12 +48,13 @@ return new class extends Migration
             $table->char('phase_id', 36)->nullable();
             $table->enum('kind', ['new', 'edit', 'note']);
             $table->char('task_id', 36)->nullable();
-            $table->string('title', 255)->nullable();
-            $table->text('detail')->nullable();
-            $table->decimal('estimate_hours', 6, 1)->nullable();
+            $table->string('title', 255)->nullable()->comment('An edit: null when the AI leaves the title as it is');
+            $table->text('detail')->nullable()->comment('An edit: null when the AI leaves the detail as it is');
+            $table->decimal('estimate_hours', 6, 1)->nullable()->comment('An edit: null when the AI leaves the estimate as it is');
+            $table->json('base')->nullable()->comment('An edit: the task as the AI read it {title, description, estimated_hours, phase_id}; saving refuses the edit if it changed');
             $table->text('why')->nullable()->comment('The AI’s reason for an edit, or a note’s text');
             $table->unsignedSmallInteger('position')->default(0);
-            $table->enum('status', ['pending', 'accepted', 'rejected'])->default('pending');
+            $table->enum('status', ['pending', 'accepted', 'rejected', 'refused'])->default('pending')->comment('refused: ticked, but its task changed after the AI read it');
             $table->char('decided_by', 36)->nullable();
             $table->timestamp('decided_at')->nullable();
             $table->timestamps();

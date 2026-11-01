@@ -27,7 +27,7 @@ return [
     'milestone' => [
         'label' => 'Milestone to plan',
         'suggest' => 'Suggest tasks for this milestone',
-        'help' => 'The AI suggests new tasks and edits to this milestone’s tasks, and flags tasks that look duplicated or outside the scope. It never removes a task or names a person. About $0.05 to $0.15 of the AI budget.',
+        'help' => 'The AI suggests new tasks and edits to this milestone’s tasks, and flags tasks that look duplicated or outside the scope. It never removes a task or names a person. About $0.05 to $0.15 of the AI budget, up to about $0.30 when it reads a transcript.',
     ],
 
     'progress' => [
@@ -45,6 +45,7 @@ return [
         'collapse_all' => 'Collapse all',
         'done' => ':done of :total done',
         'suggestions' => ':count suggestion|:count suggestions',
+        'notes' => ':count note|:count notes',
         'no_tasks' => 'No tasks yet.',
         'no_lead' => 'No lead',
         'hours' => ':hours h',
@@ -52,12 +53,28 @@ return [
         'new' => 'New',
         'edit' => 'Suggested edit',
         'note' => 'Note',
+        'now' => 'Now',
+        'suggested' => 'Suggested',
+        'empty' => 'Nothing yet',
+        'fields' => [
+            'title' => 'Title',
+            'detail' => 'What done looks like',
+            'estimate' => 'Estimate',
+        ],
+        'stale' => 'This task changed after the AI read it, so this edit can’t be saved. Ask again to plan it with the change.',
         'why' => 'Why: :why',
     ],
 
-    'save' => 'Save the ticked suggestion (:count)|Save the ticked suggestions (:count)',
+    'save' =>'Save the ticked suggestion (:count)|Save the ticked suggestions (:count)',
     'save_help' => 'Unticked suggestions are set aside. Nothing is ever removed, and no milestone is added.',
-    'saved' => 'Saved :count suggestion. The others were set aside.|Saved :count suggestions. The others were set aside.',
+    'saved' => [
+        'added' => 'Added :count task.|Added :count tasks.',
+        'changed' => 'Changed :count task.|Changed :count tasks.',
+        'rest' => 'The other suggestions were set aside.',
+        'none' => 'Nothing was added or changed; the suggestions were set aside.',
+        'refused' => 'Not changed, because the task changed after the AI read it: :list.|Not changed, because these tasks changed after the AI read them: :list.',
+        'quote' => '“:title”',
+    ],
 
     'whole' => [
         'title' => 'Plan for review',

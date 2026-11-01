@@ -12,5 +12,5 @@ class PlanSuggestion extends Model
 
     protected $guarded = ['id'];
 
-    protected $casts = ['decided_at' => 'datetime', 'position' => 'integer'];
+    protected $casts = ['decided_at' => 'datetime', 'position' => 'integer', 'base' => 'array'];
 }
