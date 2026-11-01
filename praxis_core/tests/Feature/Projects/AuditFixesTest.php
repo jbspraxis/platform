@@ -98,7 +98,7 @@ class AuditFixesTest extends TestCase
 
     public function test_bells_are_written_in_hq_language_not_the_actors_screen(): void
     {
-        config(['app.hq_locale' => 'fr']);
+        config(['app.staff_locale' => 'fr']);
         app()->setLocale('en'); // the person acting is on an English screen
         [$lead, $watcher] = [$this->staff('lead', ['engineer']), $this->staff('watcher', ['engineer'])];
         $project = $this->project();

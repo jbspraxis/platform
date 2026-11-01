@@ -118,6 +118,7 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
         Route::prefix('opportunities')->group(function () {
             Route::get('/', \App\Livewire\Hq\Opportunities\OpportunityBoard::class)->name('hq.crm.opportunities');
             Route::get('/{opportunity}', \App\Livewire\Hq\Opportunities\OpportunityPage::class)->whereUuid('opportunity')->name('hq.crm.opportunity');
+            Route::get('/{opportunity}/proposals/{proposal}/pdf', [\App\Http\Controllers\ProposalPdfController::class, 'hq'])->whereUuid(['opportunity', 'proposal'])->name('hq.crm.proposal-pdf');
         });
 
         // 5. MARKETING & ROAS
@@ -233,6 +234,12 @@ Route::domain(Hosts::portal())->group(function () use ($notOwnRoute, $legacy) {
         // Signed, expiring links from HQ's emails (App\Support\Opportunities\PortalLinks); the signature covers path and query
         Route::get('/meetings/{opportunity}', \App\Livewire\Portal\MeetingsGateway::class)->whereUuid('opportunity')
             ->middleware('signed:relative')->name('portal.meetings');
+
+        // One version of an opportunity's proposal: read it, comment by section, approve it or ask for changes; and its PDF (PR 4)
+        Route::get('/proposals/{proposal}', \App\Livewire\Portal\ProposalReview::class)->whereUuid('proposal')
+            ->middleware('signed:relative')->name('portal.proposals.review');
+        Route::get('/proposals/{proposal}/pdf', [\App\Http\Controllers\ProposalPdfController::class, 'portal'])->whereUuid('proposal')
+            ->middleware('signed:relative')->name('portal.proposals.pdf');
     });
 
     // Client accounts only (guard 'client', table client_users)

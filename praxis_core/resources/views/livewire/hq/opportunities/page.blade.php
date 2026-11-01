@@ -234,43 +234,7 @@
             <livewire:hq.opportunities.questionnaire-tab :opportunity-id="$o->id" :key="'questionnaire-' . $o->id" />
 
         @elseif ($tab === 'proposals')
-            <div class="callout opp-callout mb-6" role="note"><i data-lucide="info"></i><span>{{ __('opportunities.stubs.proposals') }}</span></div>
-            @if ($proposals->isNotEmpty())
-                <div class="card" style="padding: 0">
-                    <div class="table-wrap">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th scope="col">{{ __('opportunities.proposals.reference') }}</th>
-                                    <th scope="col">{{ __('opportunities.proposals.title') }}</th>
-                                    <th scope="col">{{ __('opportunities.proposals.status') }}</th>
-                                    <th scope="col" class="num">{{ __('opportunities.proposals.value') }}</th>
-                                    <th scope="col">{{ __('opportunities.proposals.created') }}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($proposals as $p)
-                                    <tr wire:key="proposal-{{ $p->id }}">
-                                        <td>
-                                            @if ($canOpenProposals)
-                                                <a href="{{ route('hq.crm.proposal', ['id' => $p->id]) }}" wire:navigate>{{ $p->proposal_ref ?: __('opportunities.proposals.draft_ref') }}</a>
-                                            @else
-                                                {{ $p->proposal_ref ?: __('opportunities.proposals.draft_ref') }}
-                                            @endif
-                                        </td>
-                                        <td>{{ $p->title ?: '—' }}</td>
-                                        <td>{{ __('opportunities.proposals.statuses.' . \Illuminate\Support\Str::snake(str_replace(' ', '', $p->status))) }}</td>
-                                        <td class="num">{{ $money($p->total_value, $p->currency) }}</td>
-                                        <td style="white-space: nowrap">{{ $day($p->created_at) }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            @else
-                <div class="card empty-state"><strong>{{ __('opportunities.proposals.empty_title') }}</strong>{{ __('opportunities.proposals.empty_text') }}</div>
-            @endif
+            <livewire:hq.opportunities.proposals-tab :opportunity-id="$o->id" :key="'proposals-' . $o->id" />
 
         @elseif ($tab === 'sow')
             @if ($sows->isNotEmpty())

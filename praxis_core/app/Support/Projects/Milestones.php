@@ -86,11 +86,12 @@ final class Milestones
         self::update($phase, $data, 'MILESTONE_MOVED');
     }
 
-    /** Only a milestone with no tasks and no invoice can go */
+    /** Only a milestone with no tasks, no invoice and no handover meeting (PR 6: meetings.phase_id, not cancelled) can go */
     public static function canDelete(object $phase): bool
     {
         return ! DB::table('tasks')->where('phase_id', $phase->id)->whereNull('deleted_at')->exists()
-            && ! DB::table('invoices')->where('phase_id', $phase->id)->whereNull('deleted_at')->exists();
+            && ! DB::table('invoices')->where('phase_id', $phase->id)->whereNull('deleted_at')->exists()
+            && ! DB::table('meetings')->where('phase_id', $phase->id)->where('status', '!=', 'cancelled')->whereNull('deleted_at')->exists();
     }
 
     public static function delete(object $phase): bool

@@ -98,8 +98,9 @@ return [
 
     'locale' => env('APP_LOCALE', 'en'),
 
-    // HQ's own language for what staff receive (bells): App::setLocale() rewrites app.locale to the screen's language
-    'hq_locale' => env('APP_LOCALE', 'en'),
+    // The language HQ itself runs in. A client's portal page changes 'locale' (App::setLocale), so notifications
+    // for staff written while it runs read this instead (Opportunities PR 4).
+    'staff_locale' => env('APP_LOCALE', 'en'),
 
     'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
 

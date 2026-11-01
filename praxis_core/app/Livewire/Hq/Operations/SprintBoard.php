@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use App\Support\Access;
+use App\Support\Opportunities\Handovers;
 use App\Support\ProjectAccess;
 
 /**
@@ -153,9 +154,12 @@ class SprintBoard extends Component
             ->where('project_id', $this->projectId)
             ->whereIn('status', ['Open', 'Investigating'])
             ->whereNotNull('task_id')
+            ->whereNull('deleted_at')
             ->select('id', 'task_id', 'title', 'description', 'severity')
+            ->orderByRaw("FIELD(severity, 'Critical', 'Medium', 'Low')")
+            ->orderBy('created_at')
             ->get()
-            ->keyBy('task_id');
+            ->groupBy('task_id'); // a task can have several (a handover's points): the most severe shows first
 
         $this->tasks = ['To-Do' => [], 'In-Progress' => [], 'QA_Review' => [], 'Failed' => [], 'Done' => []];
         $capacityTracker = [];
@@ -164,8 +168,9 @@ class SprintBoard extends Component
             $taskData = (array) $task;
             
             // Inject the rich QA data if a vulnerability exists
-            $qaTicket = $activeQaTickets->get($task->id);
+            $qaTicket = $activeQaTickets->get($task->id)?->first();
             $taskData['has_active_qa'] = $qaTicket !== null;
+            $taskData['qa_ticket_count'] = $activeQaTickets->get($task->id)?->count() ?? 0;
             
             if ($qaTicket) {
                 $taskData['qa_ticket_id'] = $qaTicket->id;
@@ -257,8 +262,17 @@ class SprintBoard extends Component
     // The 45-minute presence check runs on every HQ page now (App\Livewire\Hq\TimerPresence, in the HQ layout), so a
     // timer started from the task drawer or any other tab is checked too; its pause is Tasks::pauseOpenTimers().
 
+    /**
+     * The handover of the milestone this board shows (PR 6): Handovers::forMilestone(), the entry point any milestone
+     * screen uses, shown by partials/milestone-handover.blade.php; null while the project has no milestone
+     */
+    private function handover(): ?array
+    {
+        return $this->activeMilestoneId ? Handovers::forMilestone($this->projectId, $this->activeMilestoneId, Auth::user()) : null;
+    }
+
     public function render()
     {
-        return view('livewire.hq.operations.sprint-board');
+        return view('livewire.hq.operations.sprint-board', ['handover' => $this->handover()]);
     }
 }

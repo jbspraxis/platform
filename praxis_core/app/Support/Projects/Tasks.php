@@ -353,12 +353,12 @@ final class Tasks
 
     /**
      * The language a staff member's bell is written in: HQ keeps no language per person yet, so HQ's own language
-     * (config app.hq_locale), never the language of the screen the person who acted happened to be on (App::setLocale
-     * rewrites app.locale to that one).
+     * (config app.staff_locale, like Opportunities PR 4's staff notices), never the language of the screen the person
+     * who acted happened to be on (App::setLocale rewrites app.locale to that one).
      */
     public static function localeFor(string $userId): string
     {
-        return config('app.hq_locale') === 'fr' ? 'fr' : 'en';
+        return config('app.staff_locale') === 'fr' ? 'fr' : 'en';
     }
 
     /**
