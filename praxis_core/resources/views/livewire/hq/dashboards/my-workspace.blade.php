@@ -90,7 +90,7 @@
                 @else
                     <div class="empty-state">
                         <strong>No open tasks</strong>
-                        Tasks assigned to you on a sprint board appear here.
+                        Tasks assigned to you on a milestone board appear here.
                     </div>
                 @endif
             </section>

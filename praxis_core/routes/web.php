@@ -133,8 +133,12 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
             Route::middleware('can:projects.view')->group(function () {
                 Route::get('/active-deployments', \App\Livewire\Hq\Operations\ActiveDeployments::class)->name('hq.ops.deployments');
                 Route::get('/scrum-master/{id}', \App\Livewire\Hq\Operations\ScrumMaster::class)->name('hq.ops.scrum');
-                Route::get('/sprint-boards', \App\Livewire\Hq\Operations\SprintBoardDirectory::class)->name('hq.ops.boards.directory');
-                Route::get('/sprint-board/{id}', \App\Livewire\Hq\Operations\SprintBoard::class)->name('hq.ops.board');
+                // One page per project: milestones, their boards, backlog, QA, meetings and money (docs/PROJECTS.md).
+                // Sprints were folded into milestones (1 Nov 2026): the old sprint board addresses lead to the new pages.
+                Route::get('/projects/{project}', \App\Livewire\Hq\Projects\ProjectPage::class)->whereUuid('project')->name('hq.ops.project');
+                Route::get('/milestone-boards', \App\Livewire\Hq\Operations\SprintBoardDirectory::class)->name('hq.ops.boards.directory');
+                Route::redirect('/sprint-boards', '/operations/milestone-boards');
+                Route::get('/sprint-board/{id}', fn (string $id) => redirect()->route('hq.ops.project', ['project' => $id, 'tab' => 'board']))->name('hq.ops.board');
             });
             Route::get('/qa-hub', \App\Livewire\Hq\Operations\QaHub::class)->middleware('can:qa.view')->name('hq.ops.qa');
             Route::get('/silent-timers', \App\Livewire\Hq\Operations\SilentTimers::class)->middleware('can:timesheets.view')->name('hq.ops.timers');

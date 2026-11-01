@@ -27,7 +27,7 @@ return [
 
     'points' => [
         'title' => "Points soulevés",
-        'help' => "Confirmez chaque point pour créer un incident sur le projet\u{00A0}: il apparaît dans Qualité et incidents, sur le tableau de sprint et dans le portail du client. Rien n’est créé sans votre confirmation.",
+        'help' => "Confirmez chaque point pour créer un incident sur le projet\u{00A0}: il apparaît dans Qualité et incidents, sur le tableau du jalon et dans le portail du client. Rien n’est créé sans votre confirmation.",
         'help_read' => "Le responsable de l’opportunité confirme chaque point comme incident sur le projet.",
         'waiting' => "Une fois la transcription reçue, l’IA liste ici les points soulevés.",
         'drafting' => "L’IA liste les points soulevés…",
@@ -75,13 +75,13 @@ return [
     ],
 
     'done' => [
-        'confirmed' => "Incident créé\u{00A0}: «\u{202F}:title\u{202F}». Il figure dans Qualité et incidents et sur le tableau de sprint.",
-        'confirmed_all' => "{0} Aucun incident créé\u{00A0}: chaque point était déjà confirmé ou écarté.|{1} 1 incident créé. Il figure dans Qualité et incidents et sur le tableau de sprint.|[2,*] :count incidents créés. Ils figurent dans Qualité et incidents et sur le tableau de sprint.",
+        'confirmed' => "Incident créé\u{00A0}: «\u{202F}:title\u{202F}». Il figure dans Qualité et incidents et sur le tableau du jalon.",
+        'confirmed_all' => "{0} Aucun incident créé\u{00A0}: chaque point était déjà confirmé ou écarté.|{1} 1 incident créé. Il figure dans Qualité et incidents et sur le tableau du jalon.|[2,*] :count incidents créés. Ils figurent dans Qualité et incidents et sur le tableau du jalon.",
         'dismissed' => "«\u{202F}:title\u{202F}» écarté\u{00A0}: aucun incident créé.",
     ],
 
     'errors' => [
-        'milestone' => "Ce jalon n’appartient pas au projet de cette opportunité. Ouvrez le tableau de sprint du projet et réessayez.",
+        'milestone' => "Ce jalon n’appartient pas au projet de cette opportunité. Ouvrez le tableau du jalon du projet et réessayez.",
         'cannot_schedule' => "Vous ne pouvez pas planifier de réunion pour cette opportunité. Demandez à un membre de son équipe, ou à une personne qui gère les opportunités, de planifier la livraison du jalon.",
         'decided' => "Ce point a déjà été confirmé ou écarté. La liste est maintenant à jour.",
         'no_project' => "Cette opportunité n’a pas de projet\u{00A0}: aucun incident ne peut être créé.",
@@ -121,7 +121,6 @@ return [
     'board' => [
         'title' => "Livraison du jalon|Livraison des jalons",
         'none' => "Aucune réunion de livraison pour ce jalon.",
-        'no_milestones' => "Ce sprint ne contient encore aucune tâche de jalon\u{00A0}: rien à livrer pour l’instant.",
         'schedule' => "Planifier la livraison",
         'schedule_another' => "En planifier une autre",
         'no_opportunity' => "Ce projet n’a pas d’opportunité\u{00A0}: la livraison de ses jalons ne peut pas être planifiée ici, car les réunions appartiennent à une opportunité.",

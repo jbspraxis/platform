@@ -3,7 +3,7 @@
         // Stored project statuses (database values) and what people read
         $statusLabels = ['Active' => 'Active', 'Scoping' => 'Scoping', 'Locked' => 'On hold', 'Completed' => 'Completed', 'Cancelled' => 'Cancelled'];
         $statusPills = ['Active' => 'pill-success', 'Scoping' => 'pill-neutral', 'Locked' => 'pill-warning', 'Completed' => 'pill-success', 'Cancelled' => 'pill-neutral'];
-        // The sprint board opens for managers and auditors, and for people with a task on the project (SprintBoard::maySeeBoard)
+        // The project page and its milestone board open for managers and auditors, and for people on the project (App\Support\ProjectAccess)
         $canOpenAnyBoard = auth()->user()->can('projects.approve') || auth()->user()->can('projects.export') || ! $canSeeAll;
     @endphp
 
@@ -87,8 +87,8 @@
                     <div class="stat-value">{{ $kpiActiveDeployments }}</div>
                 </div>
                 <div class="card">
-                    <div class="stat-label">Story points done in the last 7 days</div>
-                    <div class="stat-value">{{ $kpiSprintVelocity }} <span class="text-small font-normal text-muted">points</span></div>
+                    <div class="stat-label">{{ __('projects.all.done_week') }}</div>
+                    <div class="stat-value">{{ $kpiSprintVelocity }}</div>
                 </div>
 
                 @if($canSeeMoney)
@@ -135,7 +135,7 @@
                                 </div>
                             </div>
 
-                            <div class="relative grid h-[60px] w-[60px] shrink-0 place-items-center" role="img" aria-label="{{ $p['progress_percent'] }}% of story points done">
+                            <div class="relative grid h-[60px] w-[60px] shrink-0 place-items-center" role="img" aria-label="{{ __('projects.stats.progress_label', ['value' => $p['progress_percent'] . '%']) }}">
                                 <svg width="60" height="60" class="-rotate-90">
                                     <circle stroke="var(--color-line)" stroke-width="4" fill="transparent" r="24" cx="30" cy="30"/>
                                     <circle stroke="{{ $ringColor }}" stroke-width="4" stroke-linecap="round" fill="transparent" r="24" cx="30" cy="30" style="stroke-dasharray: {{ $circumference }}; stroke-dashoffset: {{ $offset }};"/>
@@ -146,7 +146,7 @@
 
                         <div class="flex flex-wrap justify-between gap-4 rounded-lg bg-mist px-4 py-3">
                             <div>
-                                <div class="stat-label">Story points done</div>
+                                <div class="stat-label">{{ __('projects.all.tasks_done') }}</div>
                                 <div class="text-small font-semibold text-ink num text-left">{{ $p['completed_points'] }} of {{ $p['total_points'] }}</div>
                             </div>
                             @if($canSeeMoney)
@@ -161,15 +161,22 @@
                         </div>
 
                         <div class="mt-auto flex flex-col gap-2 pt-4">
+                            {{-- The project page (docs/PROJECTS.md) follows the same rule --}}
+                            @if($canOpenAnyBoard)
+                                <a href="{{ route('hq.ops.project', $p['id']) }}" class="btn btn-primary w-full" wire:navigate>
+                                    <i data-lucide="folder-kanban"></i> {{ __('projects.open_page') }}
+                                </a>
+                            @endif
+
                             @if($canCreate)
                                 <a href="{{ route('hq.ops.scrum', $p['id']) }}" class="btn btn-secondary w-full">
-                                    <i data-lucide="list-checks"></i> Plan sprints
+                                    <i data-lucide="list-checks"></i> {{ __('projects.all.plan') }}
                                 </a>
                             @endif
 
                             @if($canOpenAnyBoard)
-                                <a href="{{ route('hq.ops.board', $p['id']) }}" class="btn btn-secondary w-full">
-                                    <i data-lucide="layout-dashboard"></i> Open sprint board
+                                <a href="{{ route('hq.ops.project', ['project' => $p['id'], 'tab' => 'board']) }}" class="btn btn-secondary w-full" wire:navigate>
+                                    <i data-lucide="layout-dashboard"></i> {{ __('projects.open_board') }}
                                 </a>
                             @endif
 
@@ -240,9 +247,11 @@
                                 <td>
                                     <div class="flex flex-wrap justify-end gap-2">
                                         @if($canCreate)
-                                            <a href="{{ route('hq.ops.scrum', $p['id']) }}" class="btn btn-secondary btn-sm">Plan sprints</a>
+                                            <a href="{{ route('hq.ops.scrum', $p['id']) }}" class="btn btn-secondary btn-sm">{{ __('projects.all.plan') }}</a>
                                         @endif
-                                        <a href="{{ route('hq.ops.boards.directory', ['project' => $p['id']]) }}" class="btn btn-secondary btn-sm">Sprint boards</a>
+                                        @if($canOpenAnyBoard)
+                                            <a href="{{ route('hq.ops.project', $p['id']) }}" class="btn btn-secondary btn-sm" wire:navigate>{{ __('projects.open_page') }}</a>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>
@@ -279,7 +288,7 @@
         <div class="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
             <div>
                 <h2 id="create-project-title" class="text-section font-semibold text-ink">Create project</h2>
-                <p class="help mt-1">Set up the project. You can plan its sprints next.</p>
+                <p class="help mt-1">Set up the project. You can plan its milestones next.</p>
             </div>
             <button type="button" @click="openCreateDrawer = false" class="btn btn-ghost btn-sm" aria-label="Close"><i data-lucide="x"></i></button>
         </div>

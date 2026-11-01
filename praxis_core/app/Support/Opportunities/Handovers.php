@@ -20,8 +20,8 @@ use LogicException;
 /**
  * Milestone handovers (docs/OPPORTUNITIES.md section 12, PR 6). For a milestone (project_phases) of a project that has
  * an opportunity (opportunities.project_id), the lead schedules the client meeting that hands it over, through
- * Meetings::schedule (meetings.phase_id); forMilestone() is what a screen shows for one milestone (today's sprint board
- * shows it for the milestones whose tasks the sprint holds). Its transcript is collected like any other; once filed,
+ * Meetings::schedule (meetings.phase_id); forMilestone() is what a screen shows for one milestone (the milestone board,
+ * docs/PROJECTS.md, shows it for the milestone it shows). Its transcript is collected like any other; once filed,
  * the AI drafts the points raised (handover_points, Haiku) as meeting_points. The lead edits them and confirms each
  * one, which creates a QA ticket on the project, linked to the milestone's task when known; nothing is created
  * without that confirmation. The meeting then shows every point with its ticket's status, and signoffText() lists
@@ -29,7 +29,7 @@ use LogicException;
  *
  * Who (always for this opportunity: the permission, or being on its team, OpportunityAccess): anyone who can view it
  * sees the points; drafting them reads the transcript (canManage + canReadTranscripts). The milestone's task titles
- * (agenda, task picker) and creating QA tickets on the project also need the project, as the sprint board and the QA
+ * (agenda, task picker) and creating QA tickets on the project also need the project, as the milestone board and the QA
  * hub do (ProjectAccess::maySee); confirming creates tickets the client sees, so it is the lead's or the owner's
  * (canReview: canManage + canApprove + the project).
  */
@@ -67,14 +67,6 @@ final class Handovers
 
         return DB::table('project_phases')->where('id', $phaseId)->where('project_id', $opportunity->project_id)->whereNull('deleted_at')
             ->first(['id', 'project_id', 'phase_number', 'title', 'description', 'status']);
-    }
-
-    /** The milestones whose tasks a sprint holds, in milestone order (MyCity: one per sprint); today's sprint board only */
-    public static function milestonesInSprint(string $projectId, string $sprintId): Collection
-    {
-        return DB::table('project_phases')->where('project_phases.project_id', $projectId)->whereNull('project_phases.deleted_at')
-            ->whereExists(fn ($q) => $q->from('tasks')->whereColumn('tasks.phase_id', 'project_phases.id')->where('tasks.sprint_id', $sprintId)->whereNull('tasks.deleted_at'))
-            ->orderBy('phase_number')->orderBy('title')->get(['id', 'phase_number', 'title']);
     }
 
     /**
@@ -135,7 +127,7 @@ final class Handovers
         return $phaseId !== null && DB::table('tasks')->where('id', $taskId)->where('phase_id', $phaseId)->whereNull('deleted_at')->exists();
     }
 
-    /** The signed-in person sees the opportunity's project (its sprint board and QA tickets) */
+    /** The signed-in person sees the opportunity's project (its milestone board and QA tickets) */
     public static function canSeeProject(Opportunity $opportunity): bool
     {
         return $opportunity->project_id !== null && ProjectAccess::maySee($opportunity->project_id);

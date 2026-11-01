@@ -31,7 +31,7 @@ use LogicException;
  * internal meetings through Google (Meetings), add a transcript by hand when Google has none, read the AI's notes,
  * and edit and send the client minutes. "Transcripts" lists every transcript of the opportunity together.
  * opportunities.view reads it; opportunities.manage acts; full transcripts need canReadTranscripts.
- * A milestone's handover meeting (PR 6, Handovers) is scheduled here from the sprint board (?handover=<milestone id>) and
+ * A milestone's handover meeting (PR 6, Handovers) is scheduled here from the milestone board (?handover=<milestone id>) and
  * lists the points raised in it; the lead or the owner (Handovers::canReview) edits and confirms them as QA tickets.
  */
 class MeetingsTab extends Component
@@ -49,7 +49,7 @@ class MeetingsTab extends Component
     #[Locked]
     public bool $canReview = false;
 
-    /** From the sprint board: open the form for that milestone's handover meeting, then forget it */
+    /** From the milestone board: open the form for that milestone's handover meeting, then forget it */
     #[Url(as: 'handover', except: '')]
     public string $handover = '';
 
@@ -205,7 +205,7 @@ class MeetingsTab extends Component
 
             return;
         }
-        // The agenda lists the milestone's tasks: the project's own rule (its sprint board and QA tickets)
+        // The agenda lists the milestone's tasks: the project's own rule (its milestone board and QA tickets)
         if (! Handovers::canSeeProject($o)) {
             $this->say(__('handover.errors.project_access'), 'warning');
 
@@ -960,7 +960,7 @@ class MeetingsTab extends Component
             'taskOptions' => $shown && $this->canReview && $o->project_id ? Handovers::milestoneTasks($o->project_id, $shown->phase_id) : collect(),
             'formMilestone' => $this->formOpen && $this->milestoneId !== '' ? Handovers::milestoneFor($o, $this->milestoneId) : null,
             'canQa' => (bool) Auth::user()?->can('qa.view'),
-            // Task titles are the project's: shown to those who see its sprint board (ProjectAccess)
+            // Task titles are the project's: shown to those who see its milestone board (ProjectAccess)
             'canSeeProject' => $handovers->isNotEmpty() && Handovers::canSeeProject($o),
         ]);
     }

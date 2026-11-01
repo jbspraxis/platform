@@ -1,0 +1,222 @@
+<?php
+
+namespace App\Livewire\Hq\Projects;
+
+use App\Models\Opportunity;
+use App\Support\Access;
+use App\Support\Opportunities\OpportunityAccess;
+use App\Support\Projects\Milestones;
+use App\Support\Projects\ProjectHistory;
+use App\Support\Projects\ProjectPlan;
+use App\Support\Projects\ProjectRules;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
+use Livewire\Component;
+
+/**
+ * One project (docs/PROJECTS.md section 2): Overview, Milestones (the kanban of decision 2), Milestone board (one
+ * milestone's tasks by status: the sprint board, now taking a milestone), Backlog, QA, and Meetings and money.
+ * Milestones, tasks and change reports open in their drawers (MilestoneDrawer, TaskDrawer, ChangeReportDrawer), which
+ * dispatch project-changed after each change. projects.view and the board rule open it; the project's lead and
+ * managers edit (App\Support\Projects\ProjectRules).
+ */
+#[Layout('components.layouts.hq')]
+class ProjectPage extends Component
+{
+    public const TABS = ['overview', 'milestones', 'board', 'backlog', 'qa', 'money'];
+
+    #[Locked]
+    public string $projectId;
+
+    #[Url(except: 'overview')]
+    public string $tab = 'overview';
+
+    // The milestone the board opens on (?board=<id>, from a kanban card); the board's own menu changes it after that
+    #[Url(as: 'board', except: '')]
+    public string $boardMilestone = '';
+
+    // Backlog filters: lead '' (anyone), 'none' or an id
+    #[Url(as: 'lead', except: '')]
+    public string $filterLead = '';
+
+    #[Url(as: 'status', except: '')]
+    public string $filterStatus = '';
+
+    #[Url(as: 'overdue', except: false)]
+    public bool $filterOverdue = false;
+
+    // The project lead (projects.lead_user_id): set by managers (projects.create)
+    public string $leadUserId = '';
+
+    public function mount(string $project): void
+    {
+        $row = ProjectPlan::project($project);
+        abort_unless($row, 404);
+        abort_unless(ProjectRules::canView($project), 403, __('projects.errors.no_access'));
+        $this->projectId = $project;
+        $this->leadUserId = (string) $row->lead_user_id;
+        if (! in_array($this->tab, self::TABS, true)) {
+            $this->tab = 'overview';
+        }
+    }
+
+    public function saveLead(): void
+    {
+        abort_unless(ProjectRules::canView($this->projectId) && Auth::user()->can('projects.create'), 403);
+        $this->validate(['leadUserId' => ['required', Rule::in(ProjectRules::team($this->projectId)->pluck('id')->all())]],
+            ['leadUserId.*' => __('projects.lead.error')]);
+        $old = DB::table('projects')->where('id', $this->projectId)->value('lead_user_id');
+        if ($old !== $this->leadUserId) {
+            DB::table('projects')->where('id', $this->projectId)->update(['lead_user_id' => $this->leadUserId, 'updated_by' => Auth::id(), 'updated_at' => now()]);
+            ProjectRules::log('PROJECT_LEAD_CHANGED', 'Changed the project lead.', 'projects', $this->projectId, ['lead_user_id' => $old], ['lead_user_id' => $this->leadUserId]);
+        }
+        session()->flash('success', __('projects.lead.saved'));
+    }
+
+    public function show(string $tab): void
+    {
+        $this->tab = in_array($tab, self::TABS, true) ? $tab : 'overview';
+    }
+
+    /** A drawer changed something: draw the page again */
+    #[On('project-changed')]
+    public function refresh(): void
+    {
+        abort_unless(ProjectRules::canView($this->projectId), 403, __('projects.errors.no_access'));
+    }
+
+    public function clearFilters(): void
+    {
+        $this->reset('filterLead', 'filterStatus', 'filterOverdue');
+    }
+
+    /**
+     * A milestone card dropped on a column (or moved from its menu). The four status columns are set here (Accepted
+     * asks who accepted it, in the drawer); Invoiced opens Finance's Create invoice for it, Paid follows Finance.
+     */
+    public function moveMilestone(string $phaseId, string $column): void
+    {
+        abort_unless(ProjectRules::canManage($this->projectId), 403);
+        $phase = Milestones::find($this->projectId, $phaseId);
+        if (! $phase || ! in_array($column, ProjectPlan::COLUMNS, true)) {
+            return;
+        }
+        $milestone = ProjectPlan::milestones($this->projectId)->firstWhere('id', $phase->id);
+        if ($milestone->column === $column) {
+            return;
+        }
+
+        if (in_array($milestone->column, ['invoiced', 'paid'], true)) {
+            session()->flash('warning', __('projects.milestones.invoice_decides', ['code' => $milestone->code]));
+        } elseif ($column === 'paid') {
+            session()->flash('info', __('projects.milestones.paid_follows'));
+        } elseif ($column === 'invoiced') {
+            $this->invoice($milestone);
+        } elseif ($column === 'accepted') {
+            $this->dispatch('open-milestone', id: $phase->id, accept: true);
+        } else {
+            Milestones::move($phase, $column);
+            session()->flash('success', __('projects.milestones.moved', ['code' => $milestone->code, 'column' => __('projects.columns.' . $column)]));
+        }
+    }
+
+    /** Finance raises the invoice (finance.create); everyone else is told who can */
+    private function invoice(object $milestone): void
+    {
+        if (Auth::user()->can('finance.create')) {
+            $this->redirectRoute('hq.finance.invoices', ['create' => 1, 'project' => $this->projectId, 'phase' => $milestone->id], navigate: true);
+
+            return;
+        }
+        $names = DB::table('users')->whereIn('id', Access::staffWith('finance.create'))->whereNull('deleted_at')
+            ->orderBy('first_name')->get(['first_name', 'last_name'])->map(fn ($u) => trim($u->first_name . ' ' . $u->last_name))->take(4)->implode(', ');
+        session()->flash('warning', __('projects.milestones.invoice_who', ['code' => $milestone->code, 'names' => $names ?: __('projects.milestones.finance_team')]));
+    }
+
+    public function render()
+    {
+        $project = ProjectPlan::project($this->projectId);
+        abort_unless($project, 404);
+        $milestones = ProjectPlan::milestones($this->projectId);
+        $canManage = ProjectRules::canManage($this->projectId);
+        $opportunity = Opportunity::query()
+            ->where(fn ($q) => $q->where('project_id', $this->projectId)->when($project->opportunity_id, fn ($q) => $q->orWhere('id', $project->opportunity_id)))
+            ->orderByDesc('updated_at')->first();
+
+        $data = [
+            'project' => $project,
+            'milestones' => $milestones,
+            'progress' => ProjectPlan::progress($milestones),
+            'weightTotal' => ProjectPlan::weightTotal($milestones),
+            'nextDue' => ProjectPlan::nextDue($milestones),
+            'overdueTasks' => ProjectPlan::overdueTasks($this->projectId),
+            'openQa' => ProjectPlan::openQaCount($this->projectId),
+            'canManage' => $canManage,
+            'canSeeMoney' => ProjectRules::canSeeMoney($this->projectId),
+            'opportunity' => $opportunity,
+            // The opportunity's team opens it too (OpportunityAccess, PR #14)
+            'canOpenOpportunity' => $opportunity && OpportunityAccess::canView(Auth::user(), $opportunity),
+        ];
+
+        $data += match ($this->tab) {
+            'overview' => [
+                'current' => ProjectPlan::current($milestones),
+                'activity' => ProjectHistory::activity($this->projectId, $milestones),
+                'canSetLead' => Auth::user()->can('projects.create'),
+                'team' => Auth::user()->can('projects.create') ? ProjectRules::team($this->projectId) : collect(),
+            ],
+            // A kanban card's link, else the milestone running now (the board decides)
+            'board' => ['boardMilestoneId' => $milestones->firstWhere('id', $this->boardMilestone)?->id],
+            'backlog' => $this->backlog(),
+            'qa' => ['tickets' => DB::table('qa_tickets')->leftJoin('tasks', 'tasks.id', '=', 'qa_tickets.task_id')
+                ->where('qa_tickets.project_id', $this->projectId)->whereNull('qa_tickets.deleted_at')
+                ->orderByRaw("FIELD(qa_tickets.status, 'Open', 'Investigating', 'Resolved', 'Closed')")
+                ->orderByRaw("FIELD(qa_tickets.severity, 'Critical', 'Medium', 'Low')")->orderByDesc('qa_tickets.created_at')
+                ->get(['qa_tickets.id', 'qa_tickets.title', 'qa_tickets.severity', 'qa_tickets.status', 'qa_tickets.created_at', 'tasks.title as task_title'])],
+            'money' => [
+                'invoices' => DB::table('invoices')->leftJoin('project_phases', 'project_phases.id', '=', 'invoices.phase_id')
+                    ->where('invoices.project_id', $this->projectId)->whereNull('invoices.deleted_at')->orderBy('invoices.issued_at')
+                    ->get(['invoices.id', 'invoices.invoice_number', 'invoices.status', 'invoices.total_amount', 'invoices.currency', 'invoices.due_date', 'invoices.paid_at', 'project_phases.phase_number']),
+                'reports' => DB::table('change_reports')->where('project_id', $this->projectId)->whereNull('deleted_at')->orderBy('number')->get(),
+                'sow' => $data['opportunity'] ? DB::table('statements_of_work')->where('opportunity_id', $data['opportunity']->id)->whereNull('deleted_at')
+                    ->orderByDesc('version')->first(['id', 'reference', 'version', 'status', 'signed_at']) : null,
+            ],
+            default => [],
+        };
+
+        return view('livewire.hq.projects.page', $data)->title($project->title . ' · ' . __('projects.title'));
+    }
+
+    /** Every task, filtered, grouped by milestone (every task has one); each with its lead, sharing count and open "waits on" */
+    private function backlog(): array
+    {
+        $tasks = DB::table('tasks')->join('project_phases', 'project_phases.id', '=', 'tasks.phase_id')
+            ->leftJoin('users', 'users.id', '=', 'tasks.assigned_to')
+            ->where('project_phases.project_id', $this->projectId)->whereNull('project_phases.deleted_at')->whereNull('tasks.deleted_at')
+            ->when($this->filterLead === 'none', fn ($q) => $q->whereNull('tasks.assigned_to'))
+            ->when($this->filterLead !== '' && $this->filterLead !== 'none', fn ($q) => $q->where('tasks.assigned_to', $this->filterLead))
+            ->when(in_array($this->filterStatus, ProjectPlan::TASK_STATUSES, true), fn ($q) => $q->where('tasks.status', $this->filterStatus))
+            ->when($this->filterOverdue, fn ($q) => $q->whereNotNull('tasks.due_date')->where('tasks.due_date', '<', ProjectPlan::today())->where('tasks.status', '!=', 'Done'))
+            ->orderByRaw("FIELD(tasks.status, 'In-Progress', 'Failed', 'QA_Review', 'To-Do', 'Done')")->orderBy('tasks.due_date')->orderBy('tasks.created_at')
+            ->get(['tasks.id', 'tasks.phase_id', 'tasks.title', 'tasks.status', 'tasks.due_date', 'tasks.assigned_to', 'users.first_name', 'users.last_name']);
+
+        $ids = $tasks->pluck('id')->all();
+        $sharing = $ids ? DB::table('task_people')->whereIn('task_id', $ids)->where('role', 'sharing')->groupBy('task_id')->selectRaw('task_id, COUNT(*) AS n')->pluck('n', 'task_id') : collect();
+
+        return [
+            'tasks' => $tasks->groupBy('phase_id'),
+            'taskCount' => $tasks->count(),
+            'waits' => ProjectPlan::openWaits($ids),
+            'sharing' => $sharing,
+            'leads' => DB::table('users')->whereIn('id', DB::table('tasks')->join('project_phases', 'project_phases.id', '=', 'tasks.phase_id')
+                ->where('project_phases.project_id', $this->projectId)->whereNotNull('tasks.assigned_to')->select('tasks.assigned_to'))
+                ->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
+            'filtered' => $this->filterLead !== '' || $this->filterStatus !== '' || $this->filterOverdue,
+        ];
+    }
+}

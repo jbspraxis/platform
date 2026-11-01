@@ -169,6 +169,7 @@ class ImportEngagement extends Command
             'status' => $p['status'] ?? 'Active',
             'start_date' => $p['start_date'] ?? null,
             'target_end_date' => $p['target_end_date'] ?? null,
+            'lead_user_id' => $leadId, // the opportunity's lead leads the project (docs/PROJECTS.md)
         ] + $stamp());
 
         $opportunityId = (string) Str::uuid();
@@ -194,7 +195,10 @@ class ImportEngagement extends Command
                 'title' => $phase['title'],
                 'description' => $phase['description'] ?? null,
                 'weight_percentage' => $phase['weight'] ?? 0,
+                'amount' => round((float) ($p['total_budget'] ?? 0) * (float) ($phase['weight'] ?? 0) / 100, 2),
                 'status' => $phase['status'] ?? 'Pending',
+                'start_date' => $phase['start'] ?? $this->sprintSpan($b, $phase['key'])['start'] ?? null,
+                'due_date' => $phase['due'] ?? $this->sprintSpan($b, $phase['key'])['end'] ?? null,
             ] + $stamp());
         }
 
@@ -335,6 +339,22 @@ class ImportEngagement extends Command
             count($b['meetings'] ?? []) + count($fromGoogle)), 'opportunities', $opportunityId);
 
         return $opportunityId;
+    }
+
+    /**
+     * A milestone's dates from the bundle's sprints that hold its tasks and no other milestone's (sprints were folded
+     * into milestones, docs/PROJECTS.md): ['start', 'end'], or [] when no sprint does.
+     */
+    private function sprintSpan(array $b, string $phaseKey): array
+    {
+        $tasks = collect($b['tasks'] ?? [])->filter(fn ($t) => isset($t['sprint']));
+        $sprints = collect($b['sprints'])->filter(function ($s) use ($tasks, $phaseKey) {
+            $phases = $tasks->where('sprint', $s['key'])->pluck('phase')->unique();
+
+            return $phases->count() === 1 && $phases->first() === $phaseKey;
+        });
+
+        return $sprints->isEmpty() ? [] : ['start' => $sprints->min('start'), 'end' => $sprints->max('end')];
     }
 
     /** One past meeting, held, with its attendees and transcript (times are stored in UTC) */

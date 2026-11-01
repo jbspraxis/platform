@@ -91,23 +91,37 @@ class EscrowGateway extends Component
                 'status' => 'Active', 'pipeline_stage' => 'Won', 'updated_at' => now()
             ]);
 
-            // 3. Auto-Spawn Project (15-A)
+            // 3. Auto-Spawn Project (15-A), led by the opportunity's lead, else whoever wrote the proposal (docs/PROJECTS.md)
             $projectId = (string) Str::uuid();
+            $lead = (! empty($this->proposal->opportunity_id) ? DB::table('opportunities')->where('id', $this->proposal->opportunity_id)->value('lead_user_id') : null)
+                ?? $this->proposal->created_by;
             DB::table('projects')->insert([
                 'id' => $projectId, 'organization_id' => $this->organization->id,
                 'title' => 'Deployment: ' . $this->organization->name,
                 'total_budget' => $this->proposal->total_value, 'currency' => $this->proposal->currency,
+                'lead_user_id' => $lead, 'created_by' => $this->proposal->created_by,
                 'status' => 'Scoping', 'created_at' => now(), 'updated_at' => now()
             ]);
 
-            // 4. Auto-Spawn Sprints from AI Phases
-            $phases = json_decode($this->narrative->ai_phases_json ?? '[]', true);
-            foreach ($phases as $phase) {
-                DB::table('sprints')->insert([
-                    'id' => (string) Str::uuid(), 'project_id' => $projectId,
-                    'title' => $phase['title'], 'status' => 'Planned',
-                    'start_date' => now(), 'end_date' => now()->addWeeks(2), 'created_at' => now()
+            // 4. Milestones from the proposal's phases (sprints were folded into milestones, docs/PROJECTS.md): each its
+            // share of the contract by the phases' relative weights, two weeks each from today; without phases, one M1
+            // named after the proposal
+            $phases = array_values(array_filter((array) json_decode($this->narrative->ai_phases_json ?? '[]', true), 'is_array'))
+                ?: [['title' => $this->proposal->title ?: 'Delivery']];
+            $weights = array_map(fn ($p) => max(0.0, (float) ($p['weight'] ?? 1)), $phases);
+            $sum = array_sum($weights);
+            $shares = array_map(fn ($w) => $sum > 0 ? round($w / $sum * 100, 2) : round(100 / count($phases), 2), $weights);
+            $shares[count($shares) - 1] = round(100 - array_sum(array_slice($shares, 0, -1)), 2); // the rounding goes to the last
+            $start = now('Africa/Lagos')->startOfDay();
+            foreach ($phases as $i => $phase) {
+                DB::table('project_phases')->insert([
+                    'id' => (string) Str::uuid(), 'project_id' => $projectId, 'phase_number' => $i + 1,
+                    'title' => Str::limit(trim((string) ($phase['title'] ?? '')) ?: 'M' . ($i + 1), 140),
+                    'weight_percentage' => $shares[$i], 'amount' => round((float) $this->proposal->total_value * $shares[$i] / 100, 2),
+                    'status' => 'Pending', 'start_date' => $start->toDateString(), 'due_date' => $start->copy()->addDays(13)->toDateString(),
+                    'created_by' => $this->proposal->created_by, 'created_at' => now(), 'updated_at' => now(),
                 ]);
+                $start->addDays(14);
             }
 
             // 5. Auto-Generate Mobilization Invoice (14-A)

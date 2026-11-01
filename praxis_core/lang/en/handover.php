@@ -1,7 +1,7 @@
 <?php
 
 // Milestone handovers (docs/OPPORTUNITIES.md section 12, PR 6): the handover meeting of a milestone, scheduled from the
-// sprint board, and the points raised in it, confirmed as QA tickets. defaults, ticket and signoff are in the
+// milestone board, and the points raised in it, confirmed as QA tickets. defaults, ticket and signoff are in the
 // opportunity's language (the client reads them); the rest is HQ's.
 return [
 
@@ -28,7 +28,7 @@ return [
 
     'points' => [
         'title' => 'Points raised',
-        'help' => 'Confirm each point to create an issue on the project: it appears in Quality and issues, on the sprint board and in the client’s portal. Nothing is created until you confirm.',
+        'help' => 'Confirm each point to create an issue on the project: it appears in Quality and issues, on the milestone board and in the client’s portal. Nothing is created until you confirm.',
         'help_read' => 'The opportunity’s lead confirms each point as an issue on the project.',
         'waiting' => 'Once the transcript is in, the AI lists the points raised here.',
         'drafting' => 'The AI is listing the points raised…',
@@ -76,13 +76,13 @@ return [
     ],
 
     'done' => [
-        'confirmed' => 'Issue created: “:title”. It’s in Quality and issues and on the sprint board.',
-        'confirmed_all' => '{0} No issues created: every point was already confirmed or left out.|{1} 1 issue created. It’s in Quality and issues and on the sprint board.|[2,*] :count issues created. They’re in Quality and issues and on the sprint board.',
+        'confirmed' => 'Issue created: “:title”. It’s in Quality and issues and on the milestone board.',
+        'confirmed_all' => '{0} No issues created: every point was already confirmed or left out.|{1} 1 issue created. It’s in Quality and issues and on the milestone board.|[2,*] :count issues created. They’re in Quality and issues and on the milestone board.',
         'dismissed' => '“:title” left out: no issue created.',
     ],
 
     'errors' => [
-        'milestone' => 'That milestone isn’t on this opportunity’s project. Open the project’s sprint board and try again.',
+        'milestone' => 'That milestone isn’t on this opportunity’s project. Open the project’s milestone board and try again.',
         'cannot_schedule' => 'You can’t schedule meetings for this opportunity. Ask someone on its team, or who manages opportunities, to schedule the milestone handover.',
         'decided' => 'This point was already confirmed or left out. The list is up to date now.',
         'no_project' => 'This opportunity has no project, so no issue can be created.',
@@ -122,7 +122,6 @@ return [
     'board' => [
         'title' => 'Milestone handover|Milestone handovers',
         'none' => 'No handover meeting for this milestone yet.',
-        'no_milestones' => 'This sprint holds no milestone’s tasks yet, so there’s nothing to hand over.',
         'schedule' => 'Schedule handover',
         'schedule_another' => 'Schedule another',
         'no_opportunity' => 'This project has no opportunity, so its milestone handovers can’t be scheduled here: meetings belong to an opportunity.',

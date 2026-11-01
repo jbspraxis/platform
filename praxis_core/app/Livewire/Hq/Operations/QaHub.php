@@ -27,6 +27,9 @@ class QaHub extends Component
 
     // Firehose State
     public $filterStatus = 'Open'; // Default to Open/Investigating
+    // One project's tickets (?project=<id>, from its project page); the visibility rule still applies
+    #[\Livewire\Attributes\Url(as: 'project', except: '')]
+    public string $filterProject = '';
     #[Locked]
     public $tickets = [];
 
@@ -125,12 +128,21 @@ class QaHub extends Component
                 $query->where('qa_tickets.status', $this->filterStatus);
             }
         }
+        if ($this->filterProject !== '') {
+            $query->where('qa_tickets.project_id', $this->filterProject);
+        }
 
         $this->tickets = $query->get()->map(fn ($ticket) => $this->withSla($ticket))->toArray();
     }
 
     public function updatedFilterStatus()
     {
+        $this->loadFirehose();
+    }
+
+    public function showEveryProject(): void
+    {
+        $this->filterProject = '';
         $this->loadFirehose();
     }
 

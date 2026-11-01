@@ -133,11 +133,17 @@ class ClientNotify
         });
     }
 
-    /** A task now waiting for the client's review (the QA_Review column) to the project's client accounts. */
+    /**
+     * A task now waiting for the client's review (the QA_Review column) to the project's client accounts. An internal
+     * task (tasks.is_client_visible = 0, docs/PROJECTS.md) is never announced: the client doesn't see it.
+     */
     public static function task(?string $taskId): int
     {
         return self::quietly(function () use ($taskId) {
-            $task = DB::table('tasks')->where('id', $taskId)->first();
+            $task = DB::table('tasks')->where('id', $taskId)->whereNull('deleted_at')->first();
+            if (! $task || ! $task->is_client_visible) {
+                return 0;
+            }
             $projectId = $task ? (DB::table('project_phases')->where('id', $task->phase_id)->value('project_id')
                 ?? ($task->sprint_id ? DB::table('sprints')->where('id', $task->sprint_id)->value('project_id') : null)) : null;
             $project = $projectId ? DB::table('projects')->where('id', $projectId)->first() : null;

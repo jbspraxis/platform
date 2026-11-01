@@ -210,13 +210,19 @@ class Dashboard extends Component
         return $projectId && collect($this->allProjects)->contains('id', $projectId);
     }
 
+    // A task the client may see and act on: on their project, and shown to the client (tasks.is_client_visible, docs/PROJECTS.md)
     private function ownsTask($taskId): bool
     {
-        return $taskId && $this->activeProject && DB::table('tasks')
-            ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
-            ->where('tasks.id', $taskId)
+        return $taskId && $this->activeProject && $this->clientTasks()->where('tasks.id', $taskId)->exists();
+    }
+
+    /** The active project's tasks the client sees: shown to the client, not deleted, on a milestone that isn't deleted */
+    private function clientTasks()
+    {
+        return DB::table('tasks')->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
             ->where('project_phases.project_id', $this->activeProject->id)
-            ->exists();
+            ->where('tasks.is_client_visible', 1)
+            ->whereNull('tasks.deleted_at')->whereNull('project_phases.deleted_at');
     }
 
     public function switchProject($projectId)
@@ -278,7 +284,7 @@ class Dashboard extends Component
         $architect = DB::table('users')->where('id', $this->activeProject->created_by)->first();
         $this->leadArchitect = $architect ? trim($architect->first_name . ' ' . mb_substr((string) $architect->last_name, 0, 1) . '.') : __('portal.overview.lead_fallback');
         
-        $rawPhases = DB::table('project_phases')->where('project_id', $this->activeProject->id)->orderBy('phase_number', 'asc')->get();
+        $rawPhases = DB::table('project_phases')->where('project_id', $this->activeProject->id)->whereNull('deleted_at')->orderBy('phase_number', 'asc')->get();
         $completedWeight = 0;
         $this->phases = $rawPhases->map(function ($phase) use (&$completedWeight) {
             if ($phase->status === 'Completed') $completedWeight += $phase->weight_percentage;
@@ -286,19 +292,23 @@ class Dashboard extends Component
         })->toArray();
         $this->overallProgress = $completedWeight;
 
-        $logs = DB::table('task_comments')->join('tasks', 'task_comments.task_id', '=', 'tasks.id')->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')->where('project_phases.project_id', $this->activeProject->id)->orderBy('task_comments.created_at', 'desc')->limit(15)->select('task_comments.comment_text', 'task_comments.created_at');
+        // The client's own approvals only: staff comments on a task stay inside HQ (docs/PROJECTS.md)
+        $logs = $this->clientTasks()->join('task_comments', 'task_comments.task_id', '=', 'tasks.id')->where('task_comments.author_type', 'client')->whereNull('task_comments.deleted_at')
+            ->orderBy('task_comments.created_at', 'desc')->limit(15)->select('task_comments.comment_text', 'task_comments.created_at');
         $this->liveLogs = People::joinAuthor($logs, 'task_comments.user_id', 'task_comments.author_type')->get()->map(function($log) {
             return ['time' => PortalFormat::date($log->created_at, 'datetime'), 'author' => trim(mb_substr((string) $log->first_name, 0, 1) . '. ' . $log->last_name), 'text' => $log->comment_text];
         })->toArray();
 
-        $this->activeTasks = DB::table('tasks')->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')->where('project_phases.project_id', $this->activeProject->id)->select('tasks.*', 'project_phases.title as phase_title')->orderByRaw("FIELD(tasks.status, 'QA_Review', 'In-Progress', 'To-Do', 'Done')")->orderBy('tasks.updated_at', 'desc')->get()->toArray();
+        $this->activeTasks = $this->clientTasks()->select('tasks.*', 'project_phases.title as phase_title')->orderByRaw("FIELD(tasks.status, 'QA_Review', 'In-Progress', 'To-Do', 'Done')")->orderBy('tasks.updated_at', 'desc')->get()->toArray();
     }
 
     public function loadQaHub()
     {
         if (!$this->activeProject || !$this->allowed('qa.view')) return;
-        $this->activeTasks = DB::table('tasks')->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')->where('project_phases.project_id', $this->activeProject->id)->select('tasks.id', 'tasks.title', 'tasks.status')->get()->toArray();
-        $this->qaTickets = DB::table('qa_tickets')->leftJoin('tasks', 'qa_tickets.task_id', '=', 'tasks.id')->where('qa_tickets.project_id', $this->activeProject->id)->select('qa_tickets.*', 'tasks.title as task_title')->orderBy('qa_tickets.created_at', 'desc')->get()->toArray();
+        $this->activeTasks = $this->clientTasks()->select('tasks.id', 'tasks.title', 'tasks.status')->get()->toArray();
+        // A ticket on an internal task keeps its own title; the task's is not shown
+        $this->qaTickets = DB::table('qa_tickets')->leftJoin('tasks', fn ($j) => $j->on('qa_tickets.task_id', '=', 'tasks.id')->where('tasks.is_client_visible', 1))
+            ->where('qa_tickets.project_id', $this->activeProject->id)->select('qa_tickets.*', 'tasks.title as task_title')->orderBy('qa_tickets.created_at', 'desc')->get()->toArray();
     }
 
     public function loadFinancials()

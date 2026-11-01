@@ -114,8 +114,8 @@
                 @if (request()->routeIs('hq.ops.*'))
                     <div class="rail-sub">
                         @can('projects.view')
-                            <a href="{{ route('hq.ops.deployments') }}" class="{{ $on('hq.ops.deployments') }}" wire:navigate>All projects</a>
-                            <a href="{{ route('hq.ops.boards.directory') }}" class="{{ $on('hq.ops.boards.directory', 'hq.ops.board') }}" wire:navigate>Sprint boards</a>
+                            <a href="{{ route('hq.ops.deployments') }}" class="{{ $on('hq.ops.deployments', 'hq.ops.project') }}" wire:navigate>All projects</a>
+                            <a href="{{ route('hq.ops.boards.directory') }}" class="{{ $on('hq.ops.boards.directory', 'hq.ops.board') }}" wire:navigate>Milestone boards</a>
                         @endcan
                         @can('qa.view')
                             <a href="{{ route('hq.ops.qa') }}" class="{{ $on('hq.ops.qa') }}" wire:navigate>Quality and issues</a>
@@ -326,6 +326,10 @@
         </main>
     </div>
 </div>
+{{-- The 45-minute check while a task timer runs, on every HQ page (docs/PROJECTS.md) --}}
+@auth
+    <livewire:hq.timer-presence />
+@endauth
 @livewireScripts
 </body>
 </html>

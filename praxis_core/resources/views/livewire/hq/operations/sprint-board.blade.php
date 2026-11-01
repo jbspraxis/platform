@@ -1,62 +1,56 @@
 <div>
     @php
         // Stored task statuses (database values) and what people read; QA_Review is the client’s 5-hour review, as named in the Client Portal
-        $columnLabels = ['To-Do' => 'To do', 'In-Progress' => 'In progress', 'QA_Review' => 'Client review', 'Failed' => 'Changes requested', 'Done' => 'Done'];
+        $columnLabels = collect(['To-Do', 'In-Progress', 'QA_Review', 'Failed', 'Done'])->mapWithKeys(fn ($s) => [$s => __('projects.task_statuses.' . $s)])->all();
     @endphp
 
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">Sprint board: {{ $project->title }}</h1>
-            <p class="page-subtitle">Drag a task to change its status; moving it into In progress starts your timer.</p>
+    {{-- On the project page's Milestone board tab (docs/PROJECTS.md); the page holds the header and the drawers --}}
+    <div class="page-header" style="margin-bottom: 16px">
+        <div style="min-width: 0">
+            <p class="page-subtitle" style="margin-top: 0">{{ __('projects.board.subtitle') }}</p>
         </div>
 
         <div class="flex flex-wrap items-end gap-3">
-            @if(!empty($sprints))
-                <div class="field">
-                    <label for="sprint-select" class="label">Sprint</label>
-                    <select id="sprint-select" wire:model.live="activeSprintId" class="select min-w-[240px]">
-                        @foreach($sprints as $sprint)
-                            <option value="{{ $sprint->id }}">{{ $sprint->title }} ({{ \Carbon\Carbon::parse($sprint->start_date)->format('j M') }} to {{ \Carbon\Carbon::parse($sprint->end_date)->format('j M') }})</option>
+            @if(!empty($milestones))
+                <div class="field" style="min-width: 0; max-width: 100%">
+                    <label for="milestone-select" class="label">{{ __('projects.board.milestone') }}</label>
+                    <select id="milestone-select" wire:model.live="activeMilestoneId" class="select" style="min-width: min(280px, 100%); max-width: 100%">
+                        @foreach($milestones as $m)
+                            <option value="{{ $m->id }}">{{ $m->code }} · {{ $m->name }}@if($m->start_date || $m->due_date) ({{ \App\Support\Projects\ProjectPlan::day($m->start_date, 'short') ?: '…' }} – {{ \App\Support\Projects\ProjectPlan::day($m->due_date, 'short') ?: '…' }})@endif</option>
                         @endforeach
                     </select>
                 </div>
+                @if($activeMilestoneId)
+                    <button type="button" class="btn btn-secondary" wire:click="$dispatch('open-milestone', { id: '{{ $activeMilestoneId }}' })">
+                        <i data-lucide="pencil"></i> {{ __('projects.board.details') }}
+                    </button>
+                @endif
             @endif
-
-            <a href="{{ route('hq.ops.deployments') }}" class="btn btn-secondary" wire:navigate>
-                <i data-lucide="arrow-left"></i> All projects
-            </a>
         </div>
     </div>
 
     <x-flash class="mb-4" />
 
-    @if(empty($sprints))
-        <div class="alert alert-info mb-4"><i data-lucide="info"></i> <span>No sprints planned for this project yet. Once sprints are planned, their tasks appear here.</span></div>
+    @if(empty($milestones))
+        <div class="alert alert-info mb-4"><i data-lucide="info"></i> <span>{{ __('projects.board.no_milestones') }}</span></div>
     @endif
 
-    {{-- The handover meeting with the client of each milestone whose tasks this sprint holds (docs/OPPORTUNITIES.md section 12, PR 6) --}}
-    @if(!empty($sprints) && $activeSprintId)
-        <section class="card mb-4 flex items-start gap-3 py-4" aria-labelledby="handover-title" wire:key="handover-{{ $activeSprintId }}">
+    {{-- The handover meeting with the client of the milestone this board shows (docs/OPPORTUNITIES.md section 12, PR 6) --}}
+    @if($handover && $handover['milestone'])
+        <section class="card mb-4 flex items-start gap-3 py-4" aria-labelledby="handover-title" wire:key="handover-{{ $handover['milestone']->id }}">
             <i data-lucide="target" class="mt-0.5 h-5 w-5 shrink-0 text-deep-teal"></i>
             <div class="min-w-0 flex-1">
-                <h2 id="handover-title" class="text-ui font-semibold text-ink">{{ trans_choice('handover.board.title', max(1, count($handovers))) }}</h2>
-                @if(! $opportunityId)
-                    <p class="mt-1 text-small text-slate">{{ __('handover.board.no_opportunity') }}</p>
-                @elseif(empty($handovers))
-                    <p class="mt-1 text-small text-slate">{{ __('handover.board.no_milestones') }}</p>
-                @endif
-                @foreach($handovers as $h)
-                    <div class="mt-3 {{ $loop->first ? '' : 'border-t border-line pt-3' }}" wire:key="handover-{{ $h['milestone']->id }}">
-                        @include('livewire.hq.operations.partials.milestone-handover', ['h' => $h])
-                    </div>
-                @endforeach
+                <h2 id="handover-title" class="text-ui font-semibold text-ink">{{ trans_choice('handover.board.title', 1) }}</h2>
+                <div class="mt-3">
+                    @include('livewire.hq.operations.partials.milestone-handover', ['h' => $handover])
+                </div>
             </div>
         </section>
     @endif
 
     @if(!empty($teamCapacity))
         <div class="card mb-4 flex flex-wrap items-center gap-3 py-4">
-            <span class="stat-label">Open hours assigned in this sprint</span>
+            <span class="stat-label">{{ __('projects.board.capacity') }}</span>
             @foreach($teamCapacity as $userId => $data)
                 @php
                     $capClass = 'pill-success';
@@ -70,24 +64,8 @@
         </div>
     @endif
 
-    @php
-        // Detect if the logged-in user has an active task to trigger the Alpine monitor
-        $hasActiveTasks = collect($tasks['In-Progress'])->where('assigned_to', auth()->id())->count() > 0;
-    @endphp
-
-    <div class="flex items-stretch gap-4 overflow-x-auto pb-4" x-data="sprintBoard({{ $hasActiveTasks ? 'true' : 'false' }})">
-
-        <!-- Presence check -->
-        <div class="modal-backdrop" x-show="showPresenceModal" style="display: none;" x-transition.opacity>
-            <div class="modal text-center" role="dialog" aria-modal="true" aria-labelledby="presence-title">
-                <i data-lucide="clock" class="mx-auto mb-3 h-8 w-8 text-deep-teal"></i>
-                <h2 id="presence-title" class="modal-title">Are you still working on this?</h2>
-                <p class="text-small text-slate">Your timer has run for 45 minutes. Confirm within 5 minutes, or we’ll pause your timer and move the task back to To do.</p>
-                <div class="modal-actions justify-center">
-                    <button type="button" @click="confirmPresence()" class="btn btn-primary">Keep timer running</button>
-                </div>
-            </div>
-        </div>
+    {{-- The 45-minute presence check is on every HQ page now (livewire:hq.timer-presence in the HQ layout) --}}
+    <div class="flex items-stretch gap-4 overflow-x-auto pb-4" x-data="sprintBoard()">
 
         @foreach(['To-Do', 'In-Progress', 'QA_Review', 'Failed', 'Done'] as $column)
             <div class="flex w-[280px] min-w-[280px] flex-col rounded-lg border border-line bg-paper"
@@ -99,22 +77,37 @@
 
                 <div class="flex items-center justify-between border-b border-line px-4 py-3">
                     <span class="text-ui font-semibold text-ink">{{ $columnLabels[$column] }}</span>
-                    <span class="rounded-full bg-mist px-2.5 text-caption font-semibold text-slate num" aria-label="{{ count($tasks[$column]) }} tasks">{{ count($tasks[$column]) }}</span>
+                    <span class="rounded-full bg-mist px-2.5 text-caption font-semibold text-slate num" aria-label="{{ trans_choice('projects.backlog.count', count($tasks[$column]), ['count' => count($tasks[$column])]) }}">{{ count($tasks[$column]) }}</span>
                 </div>
 
                 <div class="flex min-h-[300px] flex-1 flex-col gap-3 p-3">
                     @foreach($tasks[$column] as $task)
                         @php
-                            $isDraggable = (($task['assigned_to'] === auth()->id() && $canMoveOwn) || $canMoveAny) ? 'true' : 'false';
+                            // The lead or someone sharing it, the project's lead or a manager (App\Support\Projects\ProjectRules)
+                            $isDraggable = ($task['can_move'] ?? false) ? 'true' : 'false';
                         @endphp
 
                         <div class="rounded-lg border border-line bg-paper p-3 transition-colors hover:border-deep-teal {{ $isDraggable === 'true' ? 'cursor-grab' : '' }}"
-                             draggable="{{ $isDraggable }}"
+                             draggable="{{ $isDraggable }}" wire:key="card-{{ $task['id'] }}"
                              @dragstart="dragStart($event, '{{ $task['id'] }}', '{{ $column }}')"
                              style="{{ $isDraggable === 'false' && $task['assigned_to'] ? 'opacity: 0.6; cursor: not-allowed;' : '' }}">
 
-                            <div class="text-caption text-muted">{{ $task['phase_title'] }}</div>
-                            <div class="mt-1 mb-3 text-small font-semibold text-ink">{{ $task['title'] }}</div>
+                            {{-- Opens the task drawer (docs/PROJECTS.md section 3); every card is on the milestone in the menu --}}
+                            <button type="button" class="mb-3 block w-full cursor-pointer border-0 bg-transparent p-0 text-left text-small font-semibold text-ink hover:text-deep-teal"
+                                    wire:click="$dispatch('open-task', { id: '{{ $task['id'] }}' })">{{ $task['title'] }}</button>
+
+                            @if(!empty($task['due_date']) || !empty($task['waits_on']))
+                                <div class="mb-3 flex flex-wrap gap-1.5">
+                                    @if(!empty($task['due_date']))
+                                        <span class="pill {{ ($task['is_overdue'] ?? false) ? 'pill-danger' : 'pill-neutral' }}">
+                                            {{ ($task['is_overdue'] ?? false) ? __('projects.overdue') . ' · ' : '' }}{{ __('projects.due', ['date' => \App\Support\Projects\ProjectPlan::day($task['due_date'], 'short')]) }}
+                                        </span>
+                                    @endif
+                                    @if(!empty($task['waits_on']))
+                                        <span class="pill pill-warning" title="{{ implode(' · ', $task['waits_on']) }}">{{ trans_choice('projects.waits.card', count($task['waits_on']), ['count' => count($task['waits_on'])]) }}</span>
+                                    @endif
+                                </div>
+                            @endif
 
                             @if($column === 'QA_Review' && $task['qa_sla_expires_at'])
                                 @php
@@ -122,23 +115,26 @@
                                     $isExpired = $expires->isPast();
                                 @endphp
                                 <span class="pill {{ $isExpired ? 'pill-danger' : 'pill-warning' }} mb-3">
-                                    {{ $isExpired ? 'Client review window passed' : 'Client review due ' . $expires->diffForHumans() }}
+                                    {{ $isExpired ? __('projects.board.review_passed') : __('projects.board.review_due', ['when' => $expires->locale(app()->getLocale())->diffForHumans()]) }}
                                 </span>
                             @endif
 
                             @if(!$task['assigned_to'])
                                 @if($canMoveOwn)
                                     <button type="button" wire:click="assignToMe('{{ $task['id'] }}')" class="btn btn-secondary btn-sm w-full">
-                                        <i data-lucide="user-plus"></i> Assign to me
+                                        <i data-lucide="user-plus"></i> {{ __('projects.task.assign_to_me') }}
                                     </button>
                                 @endif
                             @else
-                                <div class="flex items-center justify-between border-t border-line pt-2">
-                                    <span class="grid h-6 min-w-6 place-items-center rounded-full bg-teal-tint px-1.5 text-caption font-semibold text-petrol num" title="{{ $task['story_points'] }} story points">{{ $task['story_points'] }}</span>
-                                    <span class="inline-flex items-center gap-1 text-caption text-slate">
+                                {{-- Story points stay in the database for the timers but are no longer shown (decision 3) --}}
+                                <div class="flex items-center justify-between gap-2 border-t border-line pt-2">
+                                    <span class="inline-flex min-w-0 items-center gap-1 text-caption text-slate">
                                         <i data-lucide="user" class="h-3.5 w-3.5"></i>
                                         {{ substr($task['first_name'], 0, 1) }}. {{ $task['last_name'] }}
                                     </span>
+                                    @if(($task['sharing_count'] ?? 0) > 0)
+                                        <span class="tag" title="{{ __('projects.task.sharing') }}">+{{ $task['sharing_count'] }}</span>
+                                    @endif
                                 </div>
                             @endif
 
@@ -149,9 +145,9 @@
                                     </a>
 
                                     <div class="pointer-events-none invisible absolute bottom-full left-1/2 z-10 mb-2 w-[240px] -translate-x-1/2 rounded-lg border border-line bg-paper p-3 text-left opacity-0 transition-opacity group-hover:visible group-hover:opacity-100" style="box-shadow: var(--shadow-float);">
-                                        <div class="text-caption font-semibold text-danger">{{ isset($task['qa_ticket_title']) ? preg_replace('/^\[(DIRECT COMM|BUG REPORT)\]\s*/', '', $task['qa_ticket_title']) : 'Issue reported' }}</div>
-                                        <div class="mt-1 text-caption text-slate">{{ $task['qa_ticket_description'] ?? 'No description yet.' }}</div>
-                                        <div class="mt-2 text-caption text-muted">Select to open it in Quality and issues.</div>
+                                        <div class="text-caption font-semibold text-danger">{{ isset($task['qa_ticket_title']) ? preg_replace('/^\[(DIRECT COMM|BUG REPORT)\]\s*/', '', $task['qa_ticket_title']) : __('projects.board.issue_reported') }}</div>
+                                        <div class="mt-1 text-caption text-slate">{{ $task['qa_ticket_description'] ?? __('projects.board.no_description') }}</div>
+                                        <div class="mt-2 text-caption text-muted">{{ __('projects.board.issue_hint') }}</div>
                                     </div>
                                 </div>
                             @endif
@@ -160,7 +156,7 @@
 
                     @if(count($tasks[$column]) === 0)
                         <div class="rounded-lg border border-dashed border-line p-4 text-center text-caption text-muted">
-                            No tasks. Drag a task here.
+                            {{ __('projects.board.empty_column') }}
                         </div>
                     @endif
                 </div>
@@ -169,45 +165,12 @@
     </div>
 
     <script>
-        function sprintBoard(hasActiveTasks) {
+        function sprintBoard() {
             return {
                 dragover: false,
                 dragStatus: null,
                 draggedTaskId: null,
                 sourceColumn: null,
-
-                // Presence check
-                showPresenceModal: false,
-                presenceTimeout: null,
-                warningTimeout: null,
-
-                init() {
-                    if (hasActiveTasks) {
-                        this.startPresenceMonitor();
-                    }
-                },
-
-                startPresenceMonitor() {
-                    clearTimeout(this.presenceTimeout);
-                    clearTimeout(this.warningTimeout);
-                    this.showPresenceModal = false;
-
-                    // 45 minutes = 2700000 ms
-                    this.presenceTimeout = setTimeout(() => {
-                        this.showPresenceModal = true;
-
-                        // 5 minutes to answer = 300000 ms
-                        this.warningTimeout = setTimeout(() => {
-                            this.showPresenceModal = false;
-                            @this.call('forcePauseTimers'); // pauses this person’s open timers
-                        }, 300000);
-
-                    }, 2700000);
-                },
-
-                confirmPresence() {
-                    this.startPresenceMonitor(); // Resets the clocks
-                },
 
                 dragStart(event, taskId, sourceColumn) {
                     this.draggedTaskId = taskId;

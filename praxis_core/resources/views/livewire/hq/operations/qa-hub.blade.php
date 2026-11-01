@@ -38,6 +38,19 @@
 
     <x-flash class="mb-4" />
 
+    @if($filterProject !== '')
+        @php $filteredProject = \Illuminate\Support\Facades\DB::table('projects')->where('id', $filterProject)->value('title'); @endphp
+        <div class="callout mb-4 flex flex-wrap items-center justify-between gap-3" role="note">
+            <span>{{ __('projects.qa.hub_filtered', ['project' => $filteredProject ?? '—']) }}</span>
+            <span class="flex flex-wrap gap-2">
+                @if($filteredProject && \App\Support\Projects\ProjectRules::canView($filterProject))
+                    <a href="{{ route('hq.ops.project', ['project' => $filterProject, 'tab' => 'qa']) }}" class="btn btn-secondary btn-sm" wire:navigate><i data-lucide="folder-kanban"></i> {{ __('projects.open_page') }}</a>
+                @endif
+                <button type="button" class="btn btn-ghost btn-sm" wire:click="showEveryProject">{{ __('projects.qa.hub_all') }}</button>
+            </span>
+        </div>
+    @endif
+
     <div class="card p-0">
         <div class="table-wrap">
             <table class="table">

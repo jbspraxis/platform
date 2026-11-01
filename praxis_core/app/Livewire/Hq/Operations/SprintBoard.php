@@ -13,6 +13,11 @@ use App\Support\Access;
 use App\Support\Opportunities\Handovers;
 use App\Support\ProjectAccess;
 
+/**
+ * The milestone board (docs/PROJECTS.md): one milestone's tasks by status, on the project page's Milestone board tab.
+ * Sprints were folded into milestones (owner, 1 Nov 2026), so the board takes a milestone and reads its tasks through
+ * tasks.phase_id; the class keeps its old name. Timers, the 45-minute check and the client review window are unchanged.
+ */
 #[Layout('components.layouts.hq')]
 class SprintBoard extends Component
 {
@@ -21,10 +26,6 @@ class SprintBoard extends Component
     public $projectId;
     #[Locked]
     public $project;
-
-    // The project's opportunity, which holds its meetings; without one a milestone's handover can't be scheduled (PR 6)
-    #[Locked]
-    public ?string $opportunityId = null;
 
     // Task statuses a card can be dropped into (database values)
     private const COLUMNS = ['To-Do', 'In-Progress', 'QA_Review', 'Failed', 'Done'];
@@ -35,9 +36,9 @@ class SprintBoard extends Component
     #[Locked]
     public bool $canMoveAny = false; // projects.approve: move anyone’s task
 
-    // Board State
-    public $activeSprintId = null;
-    public $sprints = [];
+    // Board State: the milestone shown (the Milestone menu) and the project's milestones
+    public $activeMilestoneId = null;
+    public $milestones = [];
     public $tasks = [
         'To-Do' => [],
         'In-Progress' => [],
@@ -49,31 +50,36 @@ class SprintBoard extends Component
     // Telemetry State
     public $teamCapacity = []; // Tracks burnout risk
 
-    public function mount($id)
+    /** $milestone: the one to open on (a kanban card's link); else the one running now (ProjectPlan::boardDefault) */
+    public function mount($id, ?string $milestone = null)
     {
         $this->canMoveOwn = Auth::user()->can('projects.edit');
         $this->canMoveAny = Auth::user()->can('projects.approve');
         $project = DB::table('projects')->where('id', $id)->first();
         if (!$project) abort(404);
 
-        // Same rule as the sprint boards list: managers and auditors see every board,
-        // everyone else only the boards of projects where they have an assigned task
-        abort_unless(self::maySeeBoard($id), 403, 'You don’t have permission to open this sprint board. Ask a project lead to assign you a task on this project, or an administrator to change your role.');
+        // Same rule as the milestone boards list: managers and auditors see every board,
+        // everyone else only the boards of projects they lead or have a task on
+        abort_unless(self::maySeeBoard($id), 403, __('projects.errors.no_access'));
 
         $this->projectId = $id;
         $this->project = $project;
-        $this->opportunityId = Handovers::opportunityForProject($id)?->id;
 
-        $this->sprints = DB::table('sprints')->where('project_id', $this->projectId)->orderBy('start_date', 'asc')->get()->toArray();
-        
-        // Auto-select the currently active sprint, or default to the first one
-        $activeSprint = collect($this->sprints)->where('status', 'Active')->first() ?? collect($this->sprints)->first();
-        $this->activeSprintId = $activeSprint ? $activeSprint->id : null;
-
-        $this->loadBoardData();
+        $this->loadMilestones();
+        $this->activeMilestoneId = $milestone;
+        $this->updatedActiveMilestoneId($milestone);
     }
 
-    /** The sprint boards list (SprintBoardDirectory) and the QA hub use the same rule (App\Support\ProjectAccess) */
+    /** The project's milestones for the menu, in order, with their dates */
+    private function loadMilestones(): void
+    {
+        $this->milestones = \App\Support\Projects\ProjectPlan::milestones($this->projectId)
+            ->map(fn ($m) => (object) ['id' => $m->id, 'code' => $m->code, 'name' => $m->name, 'column' => $m->column,
+                'start_date' => $m->start_date, 'due_date' => $m->due_date])
+            ->all();
+    }
+
+    /** The milestone boards list (SprintBoardDirectory) and the QA hub use the same rule (App\Support\ProjectAccess) */
     public static function maySeeBoard($projectId): bool
     {
         return ProjectAccess::maySee($projectId);
@@ -82,7 +88,7 @@ class SprintBoard extends Component
     /** Checked again on every change: access can end while the board is open (a task reassigned, a role changed) */
     private function authoriseBoard(): void
     {
-        abort_unless(self::maySeeBoard($this->projectId), 403, 'You no longer have access to this sprint board. Ask a project lead to assign you a task on this project, or an administrator to change your role.');
+        abort_unless(self::maySeeBoard($this->projectId), 403, __('projects.errors.no_access'));
     }
 
     /** A task on this board’s project, or null (task ids come from the browser) */
@@ -96,38 +102,46 @@ class SprintBoard extends Component
             ->first();
     }
 
-    public function switchSprint($sprintId)
+    /** A drawer on the project page changed a milestone or a task: the menu and the cards follow */
+    #[\Livewire\Attributes\On('project-changed')]
+    public function refreshFromProject(): void
     {
-        $this->activeSprintId = $sprintId;
-        $this->updatedActiveSprintId($sprintId);
+        $this->authoriseBoard();
+        $this->loadMilestones();
+        $this->updatedActiveMilestoneId($this->activeMilestoneId);
+    }
+
+    public function switchMilestone($milestoneId)
+    {
+        $this->activeMilestoneId = $milestoneId;
+        $this->updatedActiveMilestoneId($milestoneId);
     }
 
     /**
-     * The Sprint menu (wire:model.live="activeSprintId"): the board follows at once. Only this project's sprints;
-     * anything else falls back to the active one. Without this the menu changed but the tasks stayed on the
-     * sprint chosen when the page opened.
+     * The Milestone menu (wire:model.live="activeMilestoneId"): the board follows at once. Only this project's
+     * milestones; anything else falls back to the one running now.
      */
-    public function updatedActiveSprintId($sprintId): void
+    public function updatedActiveMilestoneId($milestoneId): void
     {
-        $sprints = collect($this->sprints);
-        if (! $sprints->contains(fn ($s) => data_get($s, 'id') === $sprintId)) {
-            $fallback = $sprints->first(fn ($s) => data_get($s, 'status') === 'Active') ?? $sprints->first();
-            $this->activeSprintId = data_get($fallback, 'id');
+        $milestones = collect($this->milestones);
+        if (! $milestones->contains(fn ($m) => data_get($m, 'id') === $milestoneId)) {
+            $this->activeMilestoneId = data_get(\App\Support\Projects\ProjectPlan::boardDefault($milestones), 'id');
         }
         $this->loadBoardData();
     }
 
-    // Runs when the page opens, when the sprint changes and after every move, so access is checked again here too
+    // Runs when the page opens, when the milestone changes and after every move, so access is checked again here too
     public function loadBoardData()
     {
         $this->authoriseBoard();
-        if (!$this->activeSprintId) return;
+        if (!$this->activeMilestoneId) return;
 
         $rawTasks = DB::table('tasks')
             ->leftJoin('users', 'tasks.assigned_to', '=', 'users.id')
             ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
-            ->where('project_phases.project_id', $this->projectId) 
-            ->where('tasks.sprint_id', $this->activeSprintId)
+            ->where('project_phases.project_id', $this->projectId)
+            ->where('tasks.phase_id', $this->activeMilestoneId)
+            ->whereNull('tasks.deleted_at')
             ->select(
                 'tasks.*', 
                 'users.first_name', 'users.last_name', 
@@ -180,6 +194,29 @@ class SprintBoard extends Component
         }
 
         $this->teamCapacity = $capacityTracker;
+        $this->decorateCards();
+    }
+
+    /**
+     * What a card shows since the project page (docs/PROJECTS.md): due date and Overdue, the open tasks it waits on
+     * (a warning only), how many share it, and whether this person may drag it (lead or sharing it, or a manager).
+     */
+    private function decorateCards(): void
+    {
+        $ids = collect($this->tasks)->flatten(1)->pluck('id')->all();
+        $waits = \App\Support\Projects\ProjectPlan::openWaits($ids);
+        $sharing = $ids ? DB::table('task_people')->whereIn('task_id', $ids)->where('role', 'sharing')->groupBy('task_id')->selectRaw('task_id, COUNT(*) AS n')->pluck('n', 'task_id') : collect();
+        $mayMove = \App\Support\Projects\ProjectRules::mover($this->projectId);
+        foreach ($this->tasks as $column => $cards) {
+            foreach ($cards as $i => $card) {
+                $this->tasks[$column][$i] += [
+                    'is_overdue' => \App\Support\Projects\ProjectPlan::taskOverdue($card),
+                    'waits_on' => collect($waits->get($card['id'], []))->pluck('title')->all(),
+                    'sharing_count' => (int) ($sharing[$card['id']] ?? 0),
+                    'can_move' => $mayMove($card),
+                ];
+            }
+        }
     }
 
     // --- CHECKOUT SYSTEM (Rule 8: C) ---
@@ -189,17 +226,11 @@ class SprintBoard extends Component
         $this->authoriseBoard();
 
         // Only a task on this board
-        if (! $this->boardTask($taskId)) return;
+        $task = $this->boardTask($taskId);
+        if (! $task) return;
 
-        // Only an unassigned task, unless the user may move anyone’s task
-        $updated = DB::table('tasks')->where('id', $taskId)
-            ->when(! Auth::user()->can('projects.approve'), fn ($q) => $q->whereNull('assigned_to'))
-            ->update([
-                'assigned_to' => Auth::id(),
-                'updated_at' => now()
-            ]);
-
-        if ($updated) $this->logAudit('TASK_CHECKOUT', "Staff member assigned task {$taskId} to themselves");
+        // Only an unassigned task, unless the user may move anyone’s task; the new lead stops sharing or watching it
+        \App\Support\Projects\Tasks::assignToMe($task, Auth::user()->can('projects.approve'));
         $this->loadBoardData();
     }
 
@@ -212,165 +243,36 @@ class SprintBoard extends Component
         $task = $this->boardTask($taskId);
         if (!$task || $task->status === $newStatus || ! in_array($newStatus, self::COLUMNS, true)) return;
 
-        // Security Gate: own tasks need projects.edit; someone else’s (or unassigned) need projects.approve
-        $isOwn = $task->assigned_to === Auth::id();
-        if (! Auth::user()->can($isOwn ? 'projects.edit' : 'projects.approve')) {
-            session()->flash('error', 'You can only move tasks assigned to you. Ask a project lead to move this one.');
+        // Security gate: the lead or someone sharing the task (projects.edit), the project's lead or a manager, or
+        // projects.approve for anyone's (App\Support\Projects\ProjectRules)
+        if (! \App\Support\Projects\ProjectRules::canMove($task, $this->projectId)) {
+            session()->flash('error', __('projects.task.move_own'));
             return;
         }
 
-        DB::transaction(function () use ($task, $newStatus) {
-            $oldStatus = $task->status;
-            $updateData = ['status' => $newStatus, 'updated_at' => now()];
-
-            // 1. The 5-Hour Client QA SLA (Rule 6)
-            if ($newStatus === 'QA_Review') {
-                $updateData['qa_sla_expires_at'] = now()->addHours(5);
-                $this->notifyAdmins("‘{$task->title}’ is waiting for the client’s review. If the client doesn’t respond within 5 hours, it’s approved automatically.");
-            }
-
-            // 2. Clear SLA if pulled out of QA
-            if ($oldStatus === 'QA_Review' && $newStatus !== 'QA_Review' && $newStatus !== 'Done') {
-                $updateData['qa_sla_expires_at'] = null;
-            }
-
-            DB::table('tasks')->where('id', $task->id)->update($updateData);
-
-            // ==========================================
-            // THE SILENT TIMER ENGINE
-            // ==========================================
-            
-            // TIMER START: Dragged INTO 'In-Progress'
-            if ($newStatus === 'In-Progress' && $oldStatus !== 'In-Progress') {
-                DB::table('task_time_logs')->insert([
-                    'task_id' => $task->id,
-                    'user_id' => Auth::id(),
-                    'start_time' => now(),
-                    'created_at' => now()
-                ]);
-            } 
-            // TIMER STOP: Dragged OUT OF 'In-Progress'
-            elseif ($oldStatus === 'In-Progress' && $newStatus !== 'In-Progress') {
-                
-                // Find the open timer
-                $openLog = DB::table('task_time_logs')
-                    ->where('task_id', $task->id)
-                    ->where('user_id', Auth::id())
-                    ->whereNull('end_time')
-                    ->orderBy('start_time', 'desc')
-                    ->first();
-
-                if ($openLog) {
-                    $endTime = now();
-                    $durationMinutes = Carbon::parse($openLog->start_time)->diffInMinutes($endTime);
-                    
-                    // Fetch Engineer’s Hourly Rate for Live Margin Deduction (Fallback to $50/hr if unset)
-                    $rate = DB::table('compensation_history')
-                                ->where('user_id', Auth::id())
-                                ->orderBy('effective_from', 'desc')
-                                ->value('hourly_rate') ?? 50.00;
-                    
-                    $costCalculated = ($durationMinutes / 60) * $rate;
-
-                    // Close the log and stamp the cost
-                    DB::table('task_time_logs')->where('id', $openLog->id)->update([
-                        'end_time' => $endTime,
-                        'duration_minutes' => $durationMinutes,
-                        'cost_calculated' => $costCalculated
-                    ]);
-
-                    // Add elapsed time to total task actuals
-                    DB::table('tasks')->where('id', $task->id)->update([
-                        'actual_hours_logged' => DB::raw("actual_hours_logged + " . round($durationMinutes / 60, 2))
-                    ]);
-                }
-            }
-        });
-        // Waiting for the client's review: the project's client accounts hear about it (docs/PWA.md)
-        if ($newStatus === 'QA_Review') {
-            \App\Support\Pwa\ClientNotify::task($task->id);
-        }
+        // The client review window, the timers and the notices (moved to App\Support\Projects\Tasks::move, which the
+        // project page's task drawer uses too)
+        \App\Support\Projects\Tasks::move($this->projectId, $task, $newStatus);
+        $this->dispatch('timers-changed'); // the page-wide 45-minute check follows (App\Livewire\Hq\TimerPresence)
 
         $this->loadBoardData();
+        $this->dispatch('project-changed')->to(\App\Livewire\Hq\Projects\ProjectPage::class); // the page's header and counts
     }
 
-    private function notifyAdmins($message)
-    {
-        // QA approvers (they follow what lands in client review)
-        $inserts = [];
-        foreach(Access::staffWith('qa.approve') as $adminId) {
-            $inserts[] = [
-                'id' => (string) Str::uuid(), 'user_id' => $adminId,
-                'title' => 'Task ready for client review', 'message' => $message,
-                'type' => 'Project', 'created_at' => now()
-            ];
-        }
-        if(!empty($inserts)) DB::table('notifications')->insert($inserts);
-    }
-
-    private function logAudit($action, $description)
-    {
-        DB::table('system_audit_logs')->insert([
-            // Removed UUID insertion to allow DB Auto-Increment
-            'user_id' => Auth::id(),
-            'action' => $action, 
-            'description' => $description,
-            'ip_address' => request()->ip(), 
-            'created_at' => now()
-        ]);
-    }
-    
-    // --- PRESENCE MONITOR KILLSWITCH ---
-    public function forcePauseTimers()
-    {
-        $openLogs = DB::table('task_time_logs')
-            ->where('user_id', Auth::id())
-            ->whereNull('end_time')
-            ->get();
-
-        if ($openLogs->isEmpty()) return;
-
-        $rate = DB::table('compensation_history')->where('user_id', Auth::id())->orderBy('effective_from', 'desc')->value('hourly_rate') ?? 50.00;
-
-        foreach ($openLogs as $log) {
-            $endTime = now();
-            $durationMinutes = \Carbon\Carbon::parse($log->start_time)->diffInMinutes($endTime);
-            $costCalculated = ($durationMinutes / 60) * $rate;
-
-            DB::table('task_time_logs')->where('id', $log->id)->update([
-                'end_time' => $endTime,
-                'duration_minutes' => $durationMinutes,
-                'cost_calculated' => $costCalculated
-            ]);
-
-            DB::table('tasks')->where('id', $log->task_id)->update([
-                'status' => 'To-Do', // Kick it out of In-Progress
-                'actual_hours_logged' => DB::raw("actual_hours_logged + " . round($durationMinutes / 60, 2)),
-                'updated_at' => now()
-            ]);
-        }
-
-        $this->loadBoardData();
-        session()->flash('error', 'We paused your timers because the 45-minute check wasn’t answered. Your tasks in progress are back in To do; move one into In progress to start again.');
-    }
+    // The 45-minute presence check runs on every HQ page now (App\Livewire\Hq\TimerPresence, in the HQ layout), so a
+    // timer started from the task drawer or any other tab is checked too; its pause is Tasks::pauseOpenTimers().
 
     /**
-     * The milestone handovers this board shows: one per milestone whose tasks the selected sprint holds (MyCity: one),
-     * each Handovers::forMilestone(), the entry point any milestone screen uses (the row is
-     * partials/milestone-handover.blade.php)
+     * The handover of the milestone this board shows (PR 6): Handovers::forMilestone(), the entry point any milestone
+     * screen uses, shown by partials/milestone-handover.blade.php; null while the project has no milestone
      */
-    private function handovers(): array
+    private function handover(): ?array
     {
-        if (! $this->opportunityId || ! $this->activeSprintId) {
-            return [];
-        }
-
-        return Handovers::milestonesInSprint($this->projectId, $this->activeSprintId)
-            ->map(fn ($milestone) => Handovers::forMilestone($this->projectId, $milestone->id, Auth::user()))->all();
+        return $this->activeMilestoneId ? Handovers::forMilestone($this->projectId, $this->activeMilestoneId, Auth::user()) : null;
     }
 
     public function render()
     {
-        return view('livewire.hq.operations.sprint-board', ['handovers' => $this->handovers()]);
+        return view('livewire.hq.operations.sprint-board', ['handover' => $this->handover()]);
     }
 }
