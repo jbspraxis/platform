@@ -218,6 +218,8 @@ return [
         'TRANSCRIPT_ADDED' => "Transcription d’une réunion ajoutée.",
         'TRANSCRIPT_NOT_FOUND' => "Aucune transcription trouvée dans Google pour une réunion.",
         'MINUTES_SENT' => "Compte rendu d’une réunion envoyé au client.",
+        'HANDOVER_POINT_CONFIRMED' => "Point d’une réunion de livraison confirmé comme incident.",
+        'HANDOVER_POINT_DISMISSED' => "Point d’une réunion de livraison écarté des incidents.",
         'OPPORTUNITY_OPENED' => "Opportunité ouverte.",
         'OPPORTUNITY_UPDATED' => "Informations modifiées.",
         'OPPORTUNITY_STAGE_CHANGED' => "Étape modifiée.",

@@ -21,6 +21,7 @@ return [
     'purposes' => [
         'meeting_notes' => "Notes de réunion",
         'client_minutes' => "Comptes rendus au client",
+        'handover_points' => "Points de la réunion de livraison",
         'questionnaire' => "Questionnaire",
         'questionnaire_question' => "Questionnaire\u{00A0}: une question",
         'proposal' => "Proposition",

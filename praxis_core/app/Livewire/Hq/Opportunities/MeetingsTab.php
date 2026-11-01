@@ -3,12 +3,14 @@
 namespace App\Livewire\Hq\Opportunities;
 
 use App\Models\Meeting;
+use App\Models\MeetingPoint;
 use App\Models\MeetingTranscript;
 use App\Models\Opportunity;
 use App\Models\User;
 use App\Support\Ai\AiUnavailable;
 use App\Support\Google\GoogleUnavailable;
 use App\Support\Google\GoogleWorkspace;
+use App\Support\Opportunities\Handovers;
 use App\Support\Opportunities\MeetingChange;
 use App\Support\Opportunities\Meetings;
 use App\Support\Opportunities\OpportunityAccess;
@@ -29,6 +31,8 @@ use LogicException;
  * internal meetings through Google (Meetings), add a transcript by hand when Google has none, read the AI's notes,
  * and edit and send the client minutes. "Transcripts" lists every transcript of the opportunity together.
  * opportunities.view reads it; opportunities.manage acts; full transcripts need canReadTranscripts.
+ * A sprint's handover meeting (PR 6, Handovers) is scheduled here from the sprint board (?handover=<sprint id>) and
+ * lists the points raised in it; the lead or the owner (Handovers::canReview) edits and confirms them as QA tickets.
  */
 class MeetingsTab extends Component
 {
@@ -40,6 +44,14 @@ class MeetingsTab extends Component
 
     #[Locked]
     public bool $canReadTranscripts = false;
+
+    /** Edit and confirm a handover meeting's points (Handovers::canReview) */
+    #[Locked]
+    public bool $canReview = false;
+
+    /** From the sprint board: open the form for that sprint's handover meeting, then forget it */
+    #[Url(as: 'handover', except: '')]
+    public string $handover = '';
 
     /** The meeting whose details are open (from a notification link: ?meeting=…) */
     #[Url(as: 'meeting', except: '')]
@@ -53,6 +65,10 @@ class MeetingsTab extends Component
 
     #[Locked]
     public string $editingId = '';
+
+    /** A new meeting that hands over this sprint (checked again on save) */
+    #[Locked]
+    public string $sprintId = '';
 
     public string $kind = 'client';
 
@@ -90,6 +106,17 @@ class MeetingsTab extends Component
     #[Locked]
     public array $minutesSeen = [];
 
+    /** A handover meeting's draft points being edited, by point id: title, detail, raised_by, severity, task_id */
+    public array $points = [];
+
+    // Add a point by hand to a handover meeting
+    #[Locked]
+    public string $addingPointTo = '';
+
+    public string $newPointTitle = '';
+
+    public string $newPointSeverity = 'Medium';
+
     /** The last action's outcome, shown above the list */
     public ?string $notice = null;
 
@@ -102,8 +129,13 @@ class MeetingsTab extends Component
         $this->opportunityId = $opportunity->id;
         $this->canManage = OpportunityAccess::canManage(Auth::user(), $opportunity);
         $this->canReadTranscripts = OpportunityAccess::canReadTranscripts(Auth::user(), $opportunity);
+        $this->canReview = Handovers::canReview(Auth::user(), $opportunity);
         if ($this->open !== '' && ! Meeting::where('opportunity_id', $opportunity->id)->whereKey($this->open)->exists()) {
             $this->open = '';
+        }
+        if ($this->handover !== '') {
+            $this->canManage ? $this->openHandover($this->handover) : $this->say(__('handover.errors.cannot_schedule'), 'warning');
+            $this->handover = '';
         }
     }
 
@@ -156,9 +188,27 @@ class MeetingsTab extends Component
         ]);
     }
 
+    /** The form for a sprint's handover: a client meeting, titled after the sprint, its agenda what the sprint delivered */
+    public function openHandover(string $sprintId): void
+    {
+        $this->authorizeManage();
+        $o = $this->opportunity();
+        $sprint = Handovers::sprintFor($o, $sprintId);
+        if (! $sprint) {
+            $this->say(__('handover.errors.sprint'), 'warning');
+
+            return;
+        }
+        $this->openSchedule('client');
+        $this->fill(['sprintId' => $sprint->id, 'title' => Handovers::defaultTitle($o, $sprint), 'agenda' => Handovers::defaultAgenda($o, $sprint)]);
+    }
+
     public function updatedKind(string $kind): void
     {
-        if ($this->editingId !== '') {
+        if ($this->sprintId !== '') {
+            $this->kind = 'client'; // a handover is always with the client
+        }
+        if ($this->editingId !== '' || $this->sprintId !== '') {
             return;
         }
         $o = $this->opportunity();
@@ -217,7 +267,13 @@ class MeetingsTab extends Component
 
             return;
         }
-        $kind = $editing?->kind ?? $this->kind;
+        $kind = $editing?->kind ?? ($this->sprintId !== '' ? 'client' : $this->kind);
+        $sprint = null;
+        if (! $editing && $this->sprintId !== '' && ! ($sprint = Handovers::sprintFor($o, $this->sprintId))) {
+            $this->addError('sprint', __('handover.errors.sprint'));
+
+            return;
+        }
         $wasRequested = $editing?->status === 'requested';
         $this->title = trim($this->title);
         $this->agenda = trim($this->agenda);
@@ -279,6 +335,7 @@ class MeetingsTab extends Component
             'staff' => $this->staff,
             'contacts' => $contacts,
             'guests' => array_map(fn ($e) => ['email' => $e], $guests),
+            'sprint_id' => $sprint?->id,
         ];
         try {
             $change = $editing ? Meetings::update($editing, $data) : Meetings::schedule($o, $data);
@@ -490,7 +547,191 @@ class MeetingsTab extends Component
         $this->notice = null;
     }
 
+    // ---- A sprint's handover: the points raised, confirmed as QA tickets ------------------------------------------
+
+    /** Ask the AI for the points raised (again): it reads the transcript, so it needs the right to read it */
+    public function draftPoints(string $transcriptId): void
+    {
+        $this->authorizeManage();
+        abort_unless(OpportunityAccess::canReadTranscripts(Auth::user(), $this->opportunity()), 403);
+        $t = $this->transcript($transcriptId);
+        $running = Handovers::latestRuns([$t->id])[$t->id] ?? null;
+        if (! $t->meeting->isHandover() || ($running && ! $running->isFinished())) {
+            return; // one draft per click: this one is still being written
+        }
+        try {
+            Handovers::draftPoints($t);
+        } catch (AiUnavailable $e) {
+            $this->say($e->getMessage(), 'error');
+        } catch (LogicException) {
+            $this->say(__('handover.errors.sprint'), 'warning');
+        }
+    }
+
+    /** A draft point's field, saved as soon as it is left (wire:model.blur) */
+    public function updatedPoints(mixed $value, string $key): void
+    {
+        [$id, $field] = array_pad(explode('.', $key, 2), 2, '');
+        if (! in_array($field, ['title', 'detail', 'raised_by', 'severity', 'task_id'], true)) {
+            return;
+        }
+        $this->authorizeReview();
+        $point = $this->point($id);
+        if ($error = $this->pointError($point, $field, $value)) {
+            $this->addError("points.{$id}.{$field}", $error);
+
+            return;
+        }
+        if (! Handovers::updatePoint($point, $field, $value)) {
+            unset($this->points[$id]);
+            $this->say(__('handover.errors.decided'), 'warning');
+        }
+    }
+
+    /** The lead confirms a point: a QA ticket on the project, linked to its task */
+    public function confirmPoint(string $pointId): void
+    {
+        $this->authorizeReview();
+        $point = $this->point($pointId);
+        if (! $this->saveBuffered($point)) {
+            return;
+        }
+        try {
+            $ticket = Handovers::confirm($point->fresh());
+        } catch (LogicException) {
+            $this->say(__('handover.errors.no_project'), 'error');
+
+            return;
+        }
+        unset($this->points[$point->id]);
+        $ticket ? $this->say(__('handover.done.confirmed', ['title' => $point->fresh()->title])) : $this->say(__('handover.errors.decided'), 'warning');
+    }
+
+    /** Every draft point of the meeting, as it stands on screen */
+    public function confirmAll(string $meetingId): void
+    {
+        $this->authorizeReview();
+        $m = $this->meeting($meetingId);
+        $created = 0;
+        foreach ($m->points()->where('status', 'draft')->get() as $point) {
+            if (! $this->saveBuffered($point)) {
+                return; // that point's errors show; the ones before it are created
+            }
+            try {
+                $created += Handovers::confirm($point->fresh()) ? 1 : 0;
+            } catch (LogicException) {
+                $this->say(__('handover.errors.no_project'), 'error');
+
+                return;
+            }
+            unset($this->points[$point->id]);
+        }
+        $this->say(trans_choice('handover.done.confirmed_all', $created, ['count' => $created]));
+    }
+
+    public function dismissPoint(string $pointId): void
+    {
+        $this->authorizeReview();
+        $point = $this->point($pointId);
+        Handovers::dismiss($point) ? $this->say(__('handover.done.dismissed', ['title' => $point->title])) : $this->say(__('handover.errors.decided'), 'warning');
+        unset($this->points[$point->id]);
+    }
+
+    public function restorePoint(string $pointId): void
+    {
+        $this->authorizeReview();
+        Handovers::dismiss($this->point($pointId), dismiss: false);
+    }
+
+    public function openAddPoint(string $meetingId): void
+    {
+        $this->authorizeReview();
+        $this->fill(['addingPointTo' => $this->meeting($meetingId)->id, 'newPointTitle' => '', 'newPointSeverity' => 'Medium']);
+    }
+
+    public function closeAddPoint(): void
+    {
+        $this->fill(['addingPointTo' => '', 'newPointTitle' => '', 'newPointSeverity' => 'Medium']);
+        $this->resetErrorBag();
+    }
+
+    public function addPoint(): void
+    {
+        $this->authorizeReview();
+        $m = $this->meeting($this->addingPointTo);
+        if (! $m->isHandover()) {
+            $this->closeAddPoint();
+
+            return;
+        }
+        $this->validate([
+            'newPointTitle' => ['required', 'string', 'max:' . Handovers::MAX_TITLE],
+            'newPointSeverity' => ['required', Rule::in(Handovers::SEVERITIES)],
+        ], [
+            'newPointTitle.required' => __('handover.errors.title'),
+            'newPointTitle.max' => __('handover.errors.title_long'),
+            'newPointSeverity.*' => __('handover.errors.severity'),
+        ]);
+        try {
+            Handovers::addPoint($m, ['title' => $this->newPointTitle, 'severity' => $this->newPointSeverity]);
+        } catch (LogicException) {
+            $this->addError('newPointTitle', __('handover.errors.full', ['max' => Handovers::MAX_POINTS]));
+
+            return;
+        }
+        $this->closeAddPoint();
+        $this->open = $m->id;
+    }
+
+    private function point(string $id): MeetingPoint
+    {
+        return MeetingPoint::whereHas('meeting', fn ($q) => $q->where('opportunity_id', $this->opportunityId))->findOrFail($id);
+    }
+
+    /** What is wrong with a value for a point's field, or null */
+    private function pointError(MeetingPoint $point, string $field, mixed $value): ?string
+    {
+        if ($value !== null && ! is_string($value)) {
+            return __('handover.errors.invalid');
+        }
+        $value = trim((string) $value);
+
+        return match ($field) {
+            'title' => $value === '' ? __('handover.errors.title') : (mb_strlen($value) > Handovers::MAX_TITLE ? __('handover.errors.title_long') : null),
+            'detail' => mb_strlen($value) > Handovers::MAX_DETAIL ? __('handover.errors.detail_long') : null,
+            'raised_by' => mb_strlen($value) > Handovers::MAX_RAISED_BY ? __('handover.errors.raised_by_long') : null,
+            'severity' => in_array($value, Handovers::SEVERITIES, true) ? null : __('handover.errors.severity'),
+            'task_id' => $value === '' || Handovers::taskOnProject($value, (string) $this->opportunity()->project_id) ? null : __('handover.errors.task'),
+            default => __('handover.errors.invalid'),
+        };
+    }
+
+    /** What the lead typed on a draft point and hasn't left yet goes in first; false (with the errors) when it can't */
+    private function saveBuffered(MeetingPoint $point): bool
+    {
+        foreach ((array) ($this->points[$point->id] ?? []) as $field => $value) {
+            if (! in_array($field, ['title', 'detail', 'raised_by', 'severity', 'task_id'], true)
+                || ((is_string($value) || $value === null) && (string) $value === (string) $point->{$field})) {
+                continue;
+            }
+            if ($error = $this->pointError($point, $field, $value)) {
+                $this->addError("points.{$point->id}.{$field}", $error);
+            } else {
+                Handovers::updatePoint($point, $field, $value);
+            }
+        }
+
+        return $this->getErrorBag()->isEmpty();
+    }
+
     // ---- Helpers -------------------------------------------------------------------------------------------------
+
+    private function authorizeReview(): void
+    {
+        abort_unless(Handovers::canReview(Auth::user(), $this->opportunity()), 403);
+        $this->resetErrorBag();
+        $this->notice = null;
+    }
 
     private function authorizeManage(): void
     {
@@ -501,7 +742,7 @@ class MeetingsTab extends Component
 
     private function resetForm(): void
     {
-        $this->reset(['formOpen', 'editingId', 'kind', 'title', 'date', 'time', 'duration', 'staff', 'contacts', 'guests', 'agenda']);
+        $this->reset(['formOpen', 'editingId', 'sprintId', 'kind', 'title', 'date', 'time', 'duration', 'staff', 'contacts', 'guests', 'agenda']);
         $this->resetErrorBag();
     }
 
@@ -621,6 +862,23 @@ class MeetingsTab extends Component
         }
         $pending = collect($runs)->flatten()->contains(fn ($r) => ! $r->isFinished());
 
+        // Sprint handovers: which sprint, how many points each, and the open one's points with their tickets
+        $handovers = $meetings->filter->isHandover();
+        $sprints = $handovers->isEmpty() ? collect() : DB::table('sprints')->whereIn('id', $handovers->pluck('sprint_id')->unique()->all())
+            ->get(['id', 'title', 'start_date', 'end_date'])->keyBy('id');
+        $pointCounts = $handovers->isEmpty() ? collect() : MeetingPoint::whereIn('meeting_id', $handovers->pluck('id')->all())
+            ->selectRaw('meeting_id, status, count(*) as total')->groupBy('meeting_id', 'status')->get()->groupBy('meeting_id')
+            ->map(fn ($rows) => $rows->pluck('total', 'status')->map(fn ($n) => (int) $n));
+        $pointRuns = Handovers::latestRuns($handovers->flatMap->transcripts->pluck('id')->all());
+        $pending = $pending || collect($pointRuns)->contains(fn ($r) => ! $r->isFinished());
+        $shown = $this->open !== '' ? $handovers->firstWhere('id', $this->open) : null;
+        $pointList = $shown ? Handovers::points($shown) : collect();
+        foreach ($pointList->where('status', 'draft') as $p) {
+            // Edit boxes start from what HQ holds; what someone is typing stays
+            $this->points[$p->id] ??= ['title' => $p->title, 'detail' => (string) $p->detail, 'raised_by' => (string) $p->raised_by, 'severity' => $p->severity, 'task_id' => (string) $p->task_id];
+        }
+        $confirmed = $pointList->where('status', 'confirmed');
+
         return view('livewire.hq.opportunities.meetings', [
             'o' => $o,
             'upcoming' => $upcoming->values(),
@@ -637,6 +895,15 @@ class MeetingsTab extends Component
             'editing' => $this->editingId !== '' ? $meetings->firstWhere('id', $this->editingId) : null,
             'cancelling' => $this->cancellingId !== '' ? $meetings->firstWhere('id', $this->cancellingId) : null,
             'addingTo' => $this->transcriptFor !== '' ? $meetings->firstWhere('id', $this->transcriptFor) : null,
+            'sprints' => $sprints,
+            'pointCounts' => $pointCounts,
+            'pointRuns' => $pointRuns,
+            'pointList' => $pointList,
+            'closingNotes' => Handovers::closingNotes($confirmed->pluck('qa_ticket_id')->filter()->values()->all()),
+            'signoff' => $shown && $confirmed->isNotEmpty() ? Handovers::signoffText($shown) : null,
+            'taskOptions' => $shown && $this->canReview && $o->project_id ? Handovers::sprintTasks($o->project_id, $shown->sprint_id) : collect(),
+            'formSprint' => $this->formOpen && $this->sprintId !== '' ? Handovers::sprintFor($o, $this->sprintId) : null,
+            'canQa' => (bool) Auth::user()?->can('qa.view'),
         ]);
     }
 }

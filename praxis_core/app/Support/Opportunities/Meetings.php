@@ -34,7 +34,8 @@ use Throwable;
  *
  * $data: kind (client|internal), title, agenda, starts_at, ends_at (any time zone; stored in UTC), staff (user
  * ids), contacts (the organisation's client_users ids; client meetings only), guests ([['email' => …, 'name' => …]]),
- * appointment_id (the website booking it comes from).
+ * appointment_id (the website booking it comes from), sprint_id (a client meeting that hands over that sprint of the
+ * opportunity's project: App\Support\Opportunities\Handovers checks it before scheduling).
  */
 final class Meetings
 {
@@ -64,6 +65,7 @@ final class Meetings
             $meeting = DB::transaction(function () use ($opportunity, $data, $kind, $starts, $ends, $attendees, $event) {
                 $meeting = Meeting::create([
                     'opportunity_id' => $opportunity->id,
+                    'sprint_id' => $kind === 'client' ? ($data['sprint_id'] ?? null) : null,
                     'organization_id' => $opportunity->organization_id,
                     'kind' => $kind,
                     'title' => self::title($data),

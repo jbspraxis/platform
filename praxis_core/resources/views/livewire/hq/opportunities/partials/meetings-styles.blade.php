@@ -49,6 +49,22 @@
     .mtg-sent { display: flex; flex-direction: column; gap: 8px; font-size: 0.875rem; line-height: 1.375rem; color: var(--color-slate); }
     .mtg-sent ul { margin: 0; padding-left: 18px; list-style: disc; }
     .mtg-sent p { margin: 0; }
+    /* A sprint's handover meeting (PR 6): the points raised and their issues */
+    .mtg-handover-tag { white-space: normal; overflow-wrap: anywhere; }
+    .mtg-inline-icon { width: 14px; height: 14px; margin-right: 4px; vertical-align: -2px; }
+    .mtg-points { border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .mtg-points-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+    .mtg-point-list, .mtg-issue-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+    .mtg-point { border: 1px solid var(--color-line); border-radius: var(--radius-control); padding: 12px; }
+    .mtg-point-grid { display: grid; gap: 12px 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .mtg-point-wide { grid-column: 1 / -1; }
+    .mtg-point-read { font-size: 0.875rem; line-height: 1.375rem; color: var(--color-ink); overflow-wrap: anywhere; }
+    .mtg-issue-list > li { padding-bottom: 12px; border-bottom: 1px solid var(--color-line); font-size: 0.875rem; line-height: 1.375rem; }
+    .mtg-issue-list > li:last-child { padding-bottom: 0; border-bottom: 0; }
+    .mtg-issue-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--color-ink); overflow-wrap: anywhere; }
+    .mtg-issue-head .pill { white-space: normal; }
+    .mtg-left-out { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.875rem; color: var(--color-slate); }
+    .mtg-left-out li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; overflow-wrap: anywhere; }
     @media (max-width: 760px) {
         .mtg-head { grid-template-columns: 1fr; }
         .mtg-actions { justify-content: flex-start; }
@@ -59,6 +75,9 @@
         .mtg-item { padding: 16px; }
         .mtg-row { grid-template-columns: 1fr 1fr; }
         .mtg-row > :first-child { grid-column: 1 / -1; }
+        .mtg-point-grid { grid-template-columns: 1fr; }
+        .mtg-points { padding: 12px; }
+        .mtg-points-head .mtg-buttons, .mtg-points-head .mtg-buttons .btn { width: 100%; }
         .mtg-modal .modal-actions { flex-direction: column-reverse; }
         .mtg-modal .modal-actions .btn { width: 100%; }
     }

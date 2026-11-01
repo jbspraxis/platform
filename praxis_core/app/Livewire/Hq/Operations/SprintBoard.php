@@ -9,7 +9,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
+use App\Models\Meeting;
+use App\Models\MeetingPoint;
 use App\Support\Access;
+use App\Support\Opportunities\Handovers;
+use App\Support\Opportunities\Meetings;
+use App\Support\Opportunities\OpportunityAccess;
 use App\Support\ProjectAccess;
 
 #[Layout('components.layouts.hq')]
@@ -20,6 +25,10 @@ class SprintBoard extends Component
     public $projectId;
     #[Locked]
     public $project;
+
+    // The project's opportunity, which holds its meetings; without one a sprint's handover can't be scheduled (PR 6)
+    #[Locked]
+    public ?string $opportunityId = null;
 
     // Task statuses a card can be dropped into (database values)
     private const COLUMNS = ['To-Do', 'In-Progress', 'QA_Review', 'Failed', 'Done'];
@@ -57,6 +66,7 @@ class SprintBoard extends Component
 
         $this->projectId = $id;
         $this->project = $project;
+        $this->opportunityId = Handovers::opportunityForProject($id)?->id;
 
         $this->sprints = DB::table('sprints')->where('project_id', $this->projectId)->orderBy('start_date', 'asc')->get()->toArray();
         
@@ -134,9 +144,12 @@ class SprintBoard extends Component
             ->where('project_id', $this->projectId)
             ->whereIn('status', ['Open', 'Investigating'])
             ->whereNotNull('task_id')
+            ->whereNull('deleted_at')
             ->select('id', 'task_id', 'title', 'description', 'severity')
+            ->orderByRaw("FIELD(severity, 'Critical', 'Medium', 'Low')")
+            ->orderBy('created_at')
             ->get()
-            ->keyBy('task_id');
+            ->groupBy('task_id'); // a task can have several (a handover's points): the most severe shows first
 
         $this->tasks = ['To-Do' => [], 'In-Progress' => [], 'QA_Review' => [], 'Failed' => [], 'Done' => []];
         $capacityTracker = [];
@@ -145,8 +158,9 @@ class SprintBoard extends Component
             $taskData = (array) $task;
             
             // Inject the rich QA data if a vulnerability exists
-            $qaTicket = $activeQaTickets->get($task->id);
+            $qaTicket = $activeQaTickets->get($task->id)?->first();
             $taskData['has_active_qa'] = $qaTicket !== null;
+            $taskData['qa_ticket_count'] = $activeQaTickets->get($task->id)?->count() ?? 0;
             
             if ($qaTicket) {
                 $taskData['qa_ticket_id'] = $qaTicket->id;
@@ -344,8 +358,41 @@ class SprintBoard extends Component
         session()->flash('error', 'We paused your timers because the 45-minute check wasn’t answered. Your tasks in progress are back in To do; move one into In progress to start again.');
     }
 
+    /**
+     * The selected sprint's handover meeting (the latest not cancelled) and its points, and the links to schedule or
+     * open it. Scheduling happens on the opportunity's Meetings tab, which checks opportunities.manage again.
+     */
+    private function handover(): array
+    {
+        $user = Auth::user();
+        $canSchedule = $this->opportunityId !== null && OpportunityAccess::canManage($user);
+        $meeting = $this->opportunityId && $this->activeSprintId
+            ? Meeting::where('opportunity_id', $this->opportunityId)->where('sprint_id', $this->activeSprintId)->where('kind', 'client')
+                ->where('status', '!=', 'cancelled')->orderByDesc('starts_at')->first()
+            : null;
+        $counts = $meeting ? MeetingPoint::where('meeting_id', $meeting->id)->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status') : collect();
+        $openIssues = $meeting ? MeetingPoint::where('meeting_points.meeting_id', $meeting->id)->where('meeting_points.status', 'confirmed')
+            ->join('qa_tickets', 'qa_tickets.id', '=', 'meeting_points.qa_ticket_id')->whereNull('qa_tickets.deleted_at')
+            ->whereIn('qa_tickets.status', ['Open', 'Investigating'])->count() : 0;
+        $link = fn (array $query) => route('hq.crm.opportunity', ['opportunity' => $this->opportunityId, 'tab' => 'meetings'] + $query);
+
+        return [
+            'meeting' => $meeting,
+            'when' => $meeting ? __('handover.board.when', [
+                'date' => $meeting->starts_at->copy()->setTimezone($meeting->time_zone ?: Meetings::TIME_ZONE)->locale(app()->getLocale())->translatedFormat(__('opportunities.formats.date')),
+                'time' => $meeting->starts_at->copy()->setTimezone($meeting->time_zone ?: Meetings::TIME_ZONE)->locale(app()->getLocale())->translatedFormat(__('opportunities.formats.time')),
+            ]) : null,
+            'review' => (int) ($counts['draft'] ?? 0),
+            'issues' => (int) ($counts['confirmed'] ?? 0),
+            'openIssues' => $openIssues,
+            'canSchedule' => $canSchedule,
+            'scheduleUrl' => $canSchedule && $this->activeSprintId && (! $meeting || $meeting->status === 'held') ? $link(['handover' => $this->activeSprintId]) : null,
+            'meetingUrl' => $meeting && OpportunityAccess::canView($user) ? $link(['meeting' => $meeting->id]) : null,
+        ];
+    }
+
     public function render()
     {
-        return view('livewire.hq.operations.sprint-board');
+        return view('livewire.hq.operations.sprint-board', ['handover' => $this->handover()]);
     }
 }

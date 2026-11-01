@@ -84,6 +84,12 @@
                                 <h3 class="mtg-title" id="m-title-{{ $m->id }}">{{ $m->title }}</h3>
                                 <div class="mtg-tags">
                                     <span class="tag">{{ __('opportunities.meetings.kinds.' . $m->kind) }}</span>
+                                    @if ($m->isHandover())
+                                        @php $counts = $pointCounts[$m->id] ?? collect(); @endphp
+                                        <span class="pill pill-info mtg-handover-tag">{{ __('handover.tag', ['sprint' => $sprints[$m->sprint_id]->title ?? '…']) }}</span>
+                                        @if ($counts->get('draft'))<span class="pill pill-warning">{{ trans_choice('handover.counts.draft', $counts->get('draft'), ['count' => $counts->get('draft')]) }}</span>@endif
+                                        @if ($counts->get('confirmed'))<span>{{ trans_choice('handover.counts.confirmed', $counts->get('confirmed'), ['count' => $counts->get('confirmed')]) }}</span>@endif
+                                    @endif
                                     <span class="pill {{ $tone($m->status) }}">{{ __('opportunities.meetings.statuses.' . $m->status) }}</span>
                                     @if ($m->status === 'held' || ($m->status === 'scheduled' && $started))
                                         <span>{{ __('meetings.transcript_status.' . $m->transcript_status) }}</span>
@@ -166,6 +172,10 @@
                                         @endif
                                     </div>
                                 @endif
+
+                                @if ($m->isHandover() && (($started && in_array($m->status, ['scheduled', 'held'], true)) || $pointList->isNotEmpty()))
+                                    @include('livewire.hq.opportunities.partials.handover-points')
+                                @endif
                             </div>
                         @endif
                     </article>
@@ -179,14 +189,23 @@
         <div class="modal-backdrop" wire:key="mtg-form" x-data x-on:keydown.escape.window="$wire.closeForm()">
             <div class="modal mtg-modal" role="dialog" aria-modal="true" aria-labelledby="mtg-form-title">
                 <h2 class="modal-title" id="mtg-form-title">
-                    {{ $editing ? ($editing->status === 'requested' ? __('meetings.form.confirm_title') : __('meetings.form.change_title')) : __('meetings.form.title') }}
+                    {{ $editing ? ($editing->status === 'requested' ? __('meetings.form.confirm_title') : __('meetings.form.change_title')) : ($formSprint ? __('handover.form.title') : __('meetings.form.title')) }}
                 </h2>
                 <p class="help" style="margin: 0 0 16px">{{ $editing ? __('meetings.form.change_intro') : __('meetings.form.intro') }}</p>
                 @error('google')
                     <div class="alert alert-danger" role="alert" style="margin-bottom: 16px"><i data-lucide="circle-alert"></i><span>{{ $message }}</span></div>
                 @enderror
+                @error('sprint')
+                    <div class="alert alert-danger" role="alert" style="margin-bottom: 16px"><i data-lucide="circle-alert"></i><span>{{ $message }}</span></div>
+                @enderror
+                @if ($formSprint)
+                    <div class="callout" role="note" style="display: flex; gap: 10px; align-items: flex-start; margin-bottom: 16px">
+                        <i data-lucide="target" style="width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px"></i>
+                        <span>{{ __('handover.form.callout', ['sprint' => $formSprint->title]) }}</span>
+                    </div>
+                @endif
                 <form wire:submit="save" class="mtg-form" novalidate>
-                    @unless ($editing)
+                    @unless ($editing || $formSprint)
                         <fieldset class="field mtg-fieldset">
                             <legend class="label">{{ __('meetings.form.kind') }}</legend>
                             <div class="mtg-radios">
@@ -311,6 +330,38 @@
                         {{ $request ? __('meetings.cancel.decline_confirm') : __('meetings.cancel.confirm') }}
                     </button>
                 </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Add a point by hand to a handover meeting --}}
+    @if ($addingPointTo !== '')
+        <div class="modal-backdrop" wire:key="mtg-add-point" x-data x-on:keydown.escape.window="$wire.closeAddPoint()">
+            <div class="modal mtg-modal" role="dialog" aria-modal="true" aria-labelledby="mtg-point-title">
+                <h2 class="modal-title" id="mtg-point-title">{{ __('handover.actions.add_title') }}</h2>
+                <form wire:submit="addPoint" class="mtg-form" novalidate>
+                    <div class="field">
+                        <label for="mtg-point-name" class="label">{{ __('handover.fields.title') }}</label>
+                        <input id="mtg-point-name" type="text" class="input" wire:model="newPointTitle" maxlength="{{ \App\Support\Opportunities\Handovers::MAX_TITLE }}" autofocus
+                               @error('newPointTitle') aria-invalid="true" aria-describedby="mtg-point-name-error" @enderror>
+                        @error('newPointTitle') <span class="field-error" id="mtg-point-name-error">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="field">
+                        <label for="mtg-point-sev" class="label">{{ __('handover.fields.severity') }}</label>
+                        <select id="mtg-point-sev" class="select" wire:model="newPointSeverity">
+                            @foreach (\App\Support\Opportunities\Handovers::SEVERITIES as $s)
+                                <option value="{{ $s }}">{{ __('handover.severity.' . $s) }}</option>
+                            @endforeach
+                        </select>
+                        @error('newPointSeverity') <span class="field-error">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" wire:click="closeAddPoint">{{ __('opportunities.cancel') }}</button>
+                        <button type="submit" class="btn btn-primary" wire:loading.attr="disabled" wire:target="addPoint">
+                            <i data-lucide="plus"></i> {{ __('handover.actions.add_submit') }}
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     @endif
