@@ -23,7 +23,8 @@ final class DepositInvoice
     }
 
     /**
-     * $terms: subtotal, currency, payment_schedule_type, custom_deposit_percent (optional), title, reference.
+     * $terms: subtotal, billing_entity_id (the issuing company; null: Nigeria's), currency, payment_schedule_type,
+     * custom_deposit_percent (optional), title, reference.
      * Returns the invoice's id, number and total.
      *
      * @return array{id: string, number: string, total: float}
@@ -32,7 +33,7 @@ final class DepositInvoice
     {
         $depositPercentage = self::percent((string) $terms['payment_schedule_type'], $terms['custom_deposit_percent'] ?? null);
         $depositSubtotal = (float) $terms['subtotal'] * ($depositPercentage / 100);
-        $vat = Vat::for($organization, $timestamp);
+        $vat = Vat::for($organization, $timestamp, $terms['billing_entity_id'] ?? null);
         $depositVat = $vat['applies'] ? round($depositSubtotal * $vat['rate'] / 100, 2) : 0.0;
         $depositTotal = $depositSubtotal + $depositVat;
 
@@ -65,6 +66,7 @@ final class DepositInvoice
             'vat_amount' => $depositVat,
             'vat_rate' => $vat['rate'],
             'vat_applied' => $vat['applies'],
+            'billing_entity_id' => $vat['entity_id'],
             'region_code' => $vat['region'] ?? Vat::HOME,
             'wht_amount' => 0.00,
             'total_amount' => $depositTotal,

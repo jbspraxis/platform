@@ -253,7 +253,7 @@ class ProposalGateway extends Component
                 'description' => 'Created from signed proposal ' . $proposal->proposal_ref . '.',
                 'status' => 'Scoping',
                 'currency' => $proposal->currency,
-                'total_budget' => $proposal->total_value,
+                'total_budget' => $proposal->subtotal, // before VAT: Finance adds VAT per invoice (docs/PROJECTS.md 9)
                 'lead_user_id' => $opportunityLead ?: $proposal->created_by,
                 'created_by' => $proposal->created_by,
                 'created_at' => $timestamp,
@@ -278,7 +278,7 @@ class ProposalGateway extends Component
                         'phase_number' => $index + 1,
                         'weight_percentage' => $weight,
                         // The milestone's agreed amount (docs/PROJECTS.md 4), so Finance's pre-fill never drifts
-                        'amount' => round((float) $proposal->total_value * $weight / 100, 2),
+                        'amount' => round((float) $proposal->subtotal * $weight / 100, 2),
                         'status' => 'Pending',
                         'created_at' => $timestamp
                     ]);
@@ -301,6 +301,8 @@ class ProposalGateway extends Component
             // 4. Invoice #001, the deposit, posted to the general ledger (App\Support\Finance\DepositInvoice)
             $invNumber = DepositInvoice::raise($projectId, $organization, [
                 'subtotal' => $proposal->subtotal,
+                // The company HQ signed it for, else the opportunity's billing company (App\Support\Finance\Vat)
+                'billing_entity_id' => $proposal->billing_entity_id ?? DB::table('opportunities')->where('id', $proposal->opportunity_id)->value('billing_entity_id'),
                 'currency' => $proposal->currency,
                 'payment_schedule_type' => $proposal->payment_schedule_type,
                 'custom_deposit_percent' => $proposal->custom_deposit_percent ?? null,

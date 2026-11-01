@@ -29,10 +29,27 @@ return [
     // Vat::describe(): one sentence on whether a document gets VAT, and why
     'describe' => [
         'applies' => 'VAT at :rate%: :company charges VAT from :date (VAT no. :number).',
+        'zero_rated' => 'VAT at 0%: :company (VAT no. :number) exports the service to a client in another country, so it is zero-rated.',
         'off' => 'No VAT: :company doesn’t charge VAT yet.',
         'not_yet' => 'No VAT: :company charges VAT from :date.',
         'no_rate' => 'No VAT: there is no active VAT rate for :company’s country in Master data › Tax compliance.',
         'no_company' => 'No VAT: no active JBS Praxis company in Master data › Legal entities bills this client.',
+    ],
+
+    // On a document for a client abroad, when the issuing company charges VAT (Vat::note); then the client's number when HQ has it
+    'zero_rated' => 'Zero-rated export of services. Customer to account for any VAT under the reverse charge in their country.',
+    'client_tax' => 'Customer’s VAT or tax number: :number.',
+
+    // The billing company of an opportunity (open-opportunity form, edit details, overview)
+    'billing' => [
+        'label' => 'Billing company',
+        'default' => ':company (default)',
+        'default_none' => 'Nigeria’s company (default)',
+        'help' => 'The JBS Praxis company that signs and bills this work. Documents already sent keep the company they were issued by.',
+        'only_lead' => 'Only the owner or the opportunity’s lead chooses the billing company.',
+        'invalid' => 'Choose one of the active companies in Master data › Legal entities.',
+        'client_tax' => 'Client’s VAT or tax number (optional)',
+        'client_tax_help' => 'Printed on zero-rated documents when the client is abroad. It is the organisation’s, for all its opportunities.',
     ],
 
     // Sending a SOW whose VAT HQ signed differs from today's (SowTab)

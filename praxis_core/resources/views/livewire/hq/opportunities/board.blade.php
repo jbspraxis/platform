@@ -364,6 +364,7 @@
                         <span class="help">{{ __('opportunities.create.language_help') }}</span>
                         @error('language') <span class="field-error">{{ $message }}</span> @enderror
                     </fieldset>
+                    @include('livewire.hq.opportunities.partials.billing-company', ['prefix' => 'opb'])
                     <div class="modal-actions">
                         <button type="button" class="btn btn-secondary" wire:click="closeCreate">{{ __('opportunities.cancel') }}</button>
                         <button type="submit" class="btn btn-primary" wire:loading.attr="disabled" wire:target="create" @if ($newOrg) disabled @endif>

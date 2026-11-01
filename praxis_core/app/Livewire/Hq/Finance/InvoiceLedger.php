@@ -144,9 +144,9 @@ class InvoiceLedger extends Component
         $project = DB::table('projects')->where('id', $this->new_project_id)->first();
         $org = DB::table('organizations')->where('id', $project->organization_id)->first();
         
-        // 1. VAT: only when the company issuing it (the client's country's, else Nigeria's) charges VAT today
-        // (App\Support\Finance\Vat, Master data › Legal entities); the invoice records what it applied
-        $vat = Vat::for($org);
+        // 1. VAT: only when the company issuing it (the project's opportunity's billing company, else Nigeria's) charges
+        // VAT today, at 0% for a client abroad (App\Support\Finance\Vat); the invoice records what it applied, and who
+        $vat = Vat::for($org, null, Vat::projectEntity($project->id));
         $vatAmount = $vat['applies'] ? round((float) $this->new_amount_due * $vat['rate'] / 100, 2) : 0.0;
         $totalAmount = (float) $this->new_amount_due + $vatAmount;
 
@@ -182,6 +182,7 @@ class InvoiceLedger extends Component
                 'vat_amount' => $vatAmount,
                 'vat_rate' => $vat['rate'],
                 'vat_applied' => $vat['applies'],
+                'billing_entity_id' => $vat['entity_id'],
                 'region_code' => $vat['region'] ?? Vat::HOME,
                 'total_amount' => $totalAmount,
                 'wht_amount' => 0.00,
@@ -364,10 +365,10 @@ class InvoiceLedger extends Component
     public function render()
     {
         // What Create invoice adds for the project chosen: VAT, or a line saying why none (App\Support\Finance\Vat)
-        $project = $this->showCreateModal && $this->new_project_id ? DB::table('projects')->where('id', $this->new_project_id)->first(['organization_id']) : null;
+        $project = $this->showCreateModal && $this->new_project_id ? DB::table('projects')->where('id', $this->new_project_id)->first(['id', 'organization_id']) : null;
 
         return view('livewire.hq.finance.invoice-ledger', [
-            'vat' => $project ? Vat::for((string) $project->organization_id) : null,
+            'vat' => $project ? Vat::for((string) $project->organization_id, null, Vat::projectEntity($project->id)) : null,
         ]);
     }
 }

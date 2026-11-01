@@ -61,6 +61,9 @@
                 <span><i data-lucide="building-2"></i> {{ $o->organization?->name }}</span>
                 <span><i data-lucide="user-round"></i> {{ __('opportunities.page.led_by', ['name' => $person($o->lead)]) }}</span>
                 <span class="tag">{{ __('opportunities.languages.' . $o->language) }}</span>
+                @if ($billingCompany)
+                    <span title="{{ __('vat.billing.label') }}"><i data-lucide="landmark"></i> <span class="sr-only">{{ __('vat.billing.label') }}: </span>{{ $billingCompany }}</span>
+                @endif
                 @if ($o->source === 'backfill')
                     <span class="tag">{{ __('opportunities.sources.backfill') }}</span>
                 @elseif ($o->source === 'website_booking')
@@ -110,6 +113,14 @@
                             </div>
                             <span class="help">{{ __('opportunities.create.language_help') }}</span>
                         </fieldset>
+                        @include('livewire.hq.opportunities.partials.billing-company', ['prefix' => 'opp'])
+                        <div class="field">
+                            <label class="label" for="opp-client-tax">{{ __('vat.billing.client_tax') }}</label>
+                            <input id="opp-client-tax" type="text" class="input" wire:model="clientTaxId" maxlength="100" autocomplete="off" aria-describedby="opp-client-tax-help"
+                                   @error('clientTaxId') aria-invalid="true" @enderror>
+                            <span class="help" id="opp-client-tax-help">{{ __('vat.billing.client_tax_help') }}</span>
+                            @error('clientTaxId') <span class="field-error">{{ $message }}</span> @enderror
+                        </div>
                         <div class="opp-actions">
                             <button type="submit" class="btn btn-primary" wire:loading.attr="disabled" wire:target="saveDetails"><i data-lucide="save"></i> {{ __('opportunities.page.save') }}</button>
                             <button type="button" class="btn btn-secondary" wire:click="cancelEdit">{{ __('opportunities.cancel') }}</button>

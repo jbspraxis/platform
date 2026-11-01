@@ -141,6 +141,9 @@
                     @endif
                     <dt>{{ __('sow.fees.deposit') }}</dt><dd>{{ __('sow.fees.deposit_text', ['percent' => rtrim(rtrim(number_format($fees['deposit_percent'], 2, '.', ''), '0'), '.'), 'amount' => $money($fees['deposit'])]) }}</dd>
                 </dl>
+                @if ($vatNote = \App\Support\Finance\Vat::note($fees['vat']))
+                    <p class="help" style="margin: 8px 0 0">{{ $vatNote }}</p>
+                @endif
             </section>
 
             <section class="card" aria-labelledby="sr-sigs">

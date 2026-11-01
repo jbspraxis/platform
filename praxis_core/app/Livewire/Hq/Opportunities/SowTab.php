@@ -314,7 +314,7 @@ class SowTab extends Component
             return;
         }
         if (Sows::vatChanged($sow)) {
-            $this->addError('send', __('vat.sow_changed', ['now' => Vat::describe(Vat::for($opportunity->organization))]));
+            $this->addError('send', __('vat.sow_changed', ['now' => Vat::describe(Vat::for($opportunity->organization, null, $opportunity->billing_entity_id))]));
 
             return;
         }
@@ -481,7 +481,7 @@ class SowTab extends Component
             'drafting' => $drafting,
             'draftError' => $sow?->aiRun?->status === 'failed' ? $sow->aiRun->errorMessage() : null,
             'polling' => $drafting,
-            'legalName' => Sows::legalName(),
+            'legalName' => $sow ? Sows::providerName($sow) : Sows::legalName(),
             'partyName' => $sow ? Sows::partyName($sow) : (Sows::legalName() ?? Sows::LEGAL_NAME_PLACEHOLDER),
             // An imported SOW (opportunities:import, signed on paper) has no approved proposal: no fees or PDF from HQ
             'imported' => $sow !== null && Sows::isImported($sow),

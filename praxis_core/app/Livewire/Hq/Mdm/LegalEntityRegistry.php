@@ -8,8 +8,10 @@ use Livewire\Attributes\Title;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Models\Opportunity;
 use App\Support\Finance\Vat;
 use Exception;
+use Illuminate\Database\QueryException;
 
 #[Layout('components.layouts.hq')]
 #[Title('Legal entities')]
@@ -95,7 +97,7 @@ class LegalEntityRegistry extends Component
             'legal_representative_name' => 'required|string|max:100',
             'legal_representative_title' => 'required|string|max:100',
             'vat_number' => [$this->charges_vat ? 'required' : 'nullable', 'string', 'max:100'],
-            'vat_starts_on' => [$this->charges_vat ? 'required' : 'nullable', 'date'],
+            'vat_starts_on' => [$this->charges_vat ? 'required' : 'nullable', 'date_format:Y-m-d'],
         ], [
             'vat_number.required' => __('vat.entity.errors.number'),
             'vat_starts_on.required' => __('vat.entity.errors.starts_on'),
@@ -155,6 +157,10 @@ class LegalEntityRegistry extends Component
             $this->showSuccessModal = true;
             $this->loadEntities();
 
+        } catch (QueryException $e) {
+            // Never the database's own words on screen: they are logged for the administrator
+            report($e);
+            $this->addError('form_error', 'The database refused these details, so nothing was saved. Check them and save again; if it keeps happening, tell the HQ administrator.');
         } catch (Exception $e) {
             $this->addError('form_error', $e->getMessage());
         }
@@ -225,14 +231,46 @@ class LegalEntityRegistry extends Component
         return \Illuminate\Support\Facades\Lang::has('vat.entity.countries.' . $code) ? __('vat.entity.countries.' . $code) : $code;
     }
 
+    /**
+     * Deactivates or reactivates a company, as it stands now (not as the page last saw it), with an audit line. A company
+     * that bills open opportunities stays active (Nigeria's also bills those without a billing company): they would
+     * lose their billing company.
+     */
     public function toggleStatus($id, $currentStatus)
     {
         abort_unless(Auth::user()->can('mdm.edit'), 403);
 
-        DB::table('mdm_legal_entities')->where('id', $id)->update([
-            'is_active' => !$currentStatus, 
-            'updated_at' => now()
-        ]);
+        $entity = DB::table('mdm_legal_entities')->where('id', $id)->first();
+        if (! $entity) {
+            return;
+        }
+        $active = ! $entity->is_active;
+        if (! $active) {
+            $open = Opportunity::whereNotIn('stage', Opportunity::CLOSED)
+                ->where(fn ($q) => $q->where('billing_entity_id', $entity->id)->when($entity->region_code === Vat::HOME, fn ($q) => $q->orWhereNull('billing_entity_id')))
+                ->count();
+            if ($open > 0) {
+                $this->addError('form_error', "{$entity->legal_name} bills {$open} open " . ($open === 1 ? 'opportunity' : 'opportunities')
+                    . ', so it stays active. Choose another billing company on ' . ($open === 1 ? 'it' : 'them') . ' first, or close ' . ($open === 1 ? 'it' : 'them') . '.');
+
+                return;
+            }
+        }
+        DB::transaction(function () use ($entity, $active) {
+            DB::table('mdm_legal_entities')->where('id', $entity->id)->update(['is_active' => $active, 'updated_at' => now()]);
+            DB::table('system_audit_logs')->insert([
+                'user_id' => Auth::id(),
+                'action' => $active ? 'LEGAL_ENTITY_REACTIVATED' : 'LEGAL_ENTITY_DEACTIVATED',
+                'description' => "{$entity->legal_name} ({$entity->region_code}) " . ($active ? 'reactivated.' : 'deactivated.'),
+                'target_table' => 'mdm_legal_entities',
+                'target_id' => $entity->id,
+                'old_values' => json_encode(['is_active' => (bool) $entity->is_active]),
+                'new_values' => json_encode(['is_active' => $active]),
+                'ip_address' => request()?->ip(),
+                'created_at' => now(),
+            ]);
+        });
+        $this->resetErrorBag();
         $this->loadEntities();
     }
 

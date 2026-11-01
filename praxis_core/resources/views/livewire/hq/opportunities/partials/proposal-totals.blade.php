@@ -10,6 +10,9 @@
             <dt class="is-total">{{ __('vat.total') }}</dt><dd class="is-total">{{ $money($totals['total'], $currency) }}</dd>
         @endif
     </dl>
+    @if ($vatNote = \App\Support\Finance\Vat::note($vat))
+        <p class="help" style="margin: 8px 0 0; text-align: right">{{ $vatNote }}</p>
+    @endif
     @if ($proposal->status === \App\Models\Proposal::DRAFT && $proposal->sent_at === null)
         <p class="help" style="margin: 8px 0 0; text-align: right">{{ \App\Support\Finance\Vat::describe($vat) }}</p>
     @endif

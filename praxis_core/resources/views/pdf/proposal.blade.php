@@ -95,6 +95,10 @@
                     {{-- No VAT (App\Support\Finance\Vat): no VAT line, and the total is the subtotal --}}
                     <tr class="total"><td colspan="3">{{ __('vat.total') }}</td><td class="num">{{ $money($totals['total']) }}</td></tr>
                 @endif
+                @if ($vatNote = \App\Support\Finance\Vat::note($vat))
+                    {{-- A client abroad: zero-rated export of services (App\Support\Finance\Vat) --}}
+                    <tr><td colspan="4" style="font-size: 8.5pt; padding-top: 6pt">{{ $vatNote }}</td></tr>
+                @endif
             </tfoot>
         </table>
     @else

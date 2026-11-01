@@ -241,6 +241,8 @@ class ImportEngagement extends Command
                 'po_sow_reference' => $invoice['reference'] ?? null,
                 'amount_due' => $total,
                 'vat_amount' => 0,
+                'vat_rate' => 0, // engagements signed before HQ had a VAT switch were billed without VAT
+                'vat_applied' => false,
                 'wht_amount' => 0,
                 'total_amount' => $total,
                 'currency' => $invoice['currency'] ?? 'NGN',
@@ -273,6 +275,8 @@ class ImportEngagement extends Command
                 'version' => 1,
                 'sections' => json_encode($s['sections'] ?? [], JSON_UNESCAPED_UNICODE),
                 'status' => 'signed',
+                'vat_rate' => 0,
+                'vat_applied' => false,
                 'approved_by' => $leadId,
                 'approved_at' => $date($s['signed_at'] ?? null),
                 'sent_at' => $date($s['signed_at'] ?? null),

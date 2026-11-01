@@ -200,7 +200,7 @@
                     </div>
 
                     <div class="callout text-sm">
-                        {{ $vat ? \App\Support\Finance\Vat::describe($vat) : __('vat.invoice_help') }} If the invoice isn’t in USD, the exchange rate is fixed when you create it.
+                        {{ $vat ? \App\Support\Finance\Vat::describe($vat) : __('vat.invoice_help') }} {{ $vat ? \App\Support\Finance\Vat::note($vat) : '' }} If the invoice isn’t in USD, the exchange rate is fixed when you create it.
                     </div>
 
                     <div class="modal-actions">

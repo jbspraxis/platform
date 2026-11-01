@@ -137,6 +137,9 @@
                         <dt class="is-total">{{ __('vat.total') }}</dt><dd class="is-total">{{ $money($totals['total']) }}</dd>
                     @endif
                 </dl>
+                @if ($vatNote = \App\Support\Finance\Vat::note($vat))
+                    <p class="help" style="margin: 8px 0 0">{{ $vatNote }}</p>
+                @endif
                 @if (\Illuminate\Support\Facades\Lang::has('proposals.schedules.' . $p->payment_schedule_type))
                     <p class="help" style="margin: 12px 0 0">{{ __('proposals.terms.schedule') }}: {{ __('proposals.schedules.' . $p->payment_schedule_type) }}</p>
                 @endif

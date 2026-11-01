@@ -112,7 +112,7 @@ final class Proposals
             if ($existing = self::versions($opportunity)->first()) {
                 return $existing;
             }
-            $vat = Vat::for($opportunity->organization);
+            $vat = Vat::for($opportunity->organization, null, $opportunity->billing_entity_id);
             $proposal = Proposal::create([
                 'organization_id' => $opportunity->organization_id,
                 'opportunity_id' => $opportunity->id,
@@ -124,6 +124,7 @@ final class Proposals
                 'subtotal' => 0,
                 'vat_rate' => $vat['rate'],
                 'vat_applied' => $vat['applies'],
+                'billing_entity_id' => $vat['entity_id'],
                 'total_value' => 0,
                 'currency' => self::currencies()->contains($currency) ? $currency : 'USD',
                 'payment_schedule_type' => self::SCHEDULES[0],
@@ -855,18 +856,16 @@ final class Proposals
     }
 
     /**
-     * The VAT a version shows (Vat::for's answer): today's while it hasn't been sent (the issuing company's switch and
-     * start date decide), else what it recorded when it was sent, whatever the switch says now.
+     * The VAT a version shows (Vat::for's answer): today's while it hasn't been sent (the opportunity's billing company,
+     * its switch and start date decide), else what it recorded when it was sent, whatever has changed since.
      */
     public static function vat(Proposal $proposal): array
     {
         if ($proposal->status === Proposal::DRAFT && $proposal->sent_at === null) {
-            return Vat::for($proposal->organization_id);
+            return Vat::for($proposal->organization_id, null, $proposal->opportunity?->billing_entity_id);
         }
-        $applies = Vat::applied($proposal->vat_applied, $proposal->vat_rate);
 
-        return ['applies' => $applies, 'rate' => $applies ? (float) $proposal->vat_rate : 0.0, 'why' => $applies ? null : 'off',
-            'region' => null, 'company' => null, 'vat_number' => null, 'starts_on' => null];
+        return Vat::recorded($proposal->vat_applied, $proposal->vat_rate, $proposal->billing_entity_id, $proposal->organization_id);
     }
 
     /** Brings a version not sent yet to today's VAT, under the lock, when the switch has changed since it was saved */
@@ -882,19 +881,20 @@ final class Proposals
     }
 
     /**
-     * A version not sent yet takes today's VAT (rate, vat_applied and the total from its subtotal); a sent one keeps
-     * what it had. The caller saves. True when something changed.
+     * A version not sent yet takes today's VAT (rate, vat_applied, the issuing company and the total from its
+     * subtotal); a sent one keeps what it had. The caller saves. True when something changed.
      */
     private static function followVat(Proposal $proposal): bool
     {
         if ($proposal->status !== Proposal::DRAFT || $proposal->sent_at !== null) {
             return false;
         }
-        $vat = Vat::for($proposal->organization_id);
+        $vat = Vat::for($proposal->organization_id, null, $proposal->opportunity?->billing_entity_id);
         $subtotal = (float) $proposal->subtotal;
         $total = round($subtotal + round($subtotal * $vat['rate'] / 100, 2), 2);
-        $changed = round((float) $proposal->vat_rate, 2) !== round($vat['rate'], 2) || $proposal->vat_applied !== $vat['applies'] || round((float) $proposal->total_value, 2) !== $total;
-        $proposal->forceFill(['vat_rate' => $vat['rate'], 'vat_applied' => $vat['applies'], 'total_value' => $total]);
+        $changed = round((float) $proposal->vat_rate, 2) !== round($vat['rate'], 2) || $proposal->vat_applied !== $vat['applies']
+            || $proposal->billing_entity_id !== $vat['entity_id'] || round((float) $proposal->total_value, 2) !== $total;
+        $proposal->forceFill(['vat_rate' => $vat['rate'], 'vat_applied' => $vat['applies'], 'billing_entity_id' => $vat['entity_id'], 'total_value' => $total]);
 
         return $changed;
     }

@@ -87,6 +87,12 @@ class TaxCompliance extends Component
         ];
 
         if ($this->editMode && $this->recordId) {
+            $row = DB::table('mdm_tax_compliance')->where('id', $this->recordId)->first();
+            if ($row && ($why = $this->vatGuard($row, (float) $this->vat_rate, $data['country_code']))) {
+                $this->addError('vat_rate', $why);
+
+                return;
+            }
             DB::table('mdm_tax_compliance')->where('id', $this->recordId)->update($data);
             $this->successMessage = "VAT rule updated.";
         } else {
@@ -116,8 +122,33 @@ class TaxCompliance extends Component
     {
         abort_unless(Auth::user()->can('mdm.edit'), 403);
 
+        $row = DB::table('mdm_tax_compliance')->where('id', $id)->first();
+        if ($row && $row->is_active && ($why = $this->vatGuard($row, null, $row->country_code))) {
+            $this->addError('tax_guard', $why);
+
+            return;
+        }
+
         DB::table('mdm_tax_compliance')->where('id', $id)->update(['is_active' => !$currentStatus, 'updated_at' => now()]);
         $this->loadData();
+    }
+
+    /**
+     * A company that charges VAT keeps an active rate above 0 for its country (App\Support\Finance\Vat): why the change
+     * to this active rule can't go ahead (deactivating it: $rate null; setting it to 0; moving it to another country),
+     * or null when another active rule still covers the country
+     */
+    private function vatGuard(object $row, ?float $rate, string $country): ?string
+    {
+        if (! $row->is_active || ($rate !== null && $rate > 0 && strtoupper($country) === strtoupper($row->country_code))) {
+            return null;
+        }
+        $company = DB::table('mdm_legal_entities')->where('is_active', 1)->where('charges_vat', 1)->where('region_code', $row->country_code)->value('legal_name');
+        $covered = DB::table('mdm_tax_compliance')->where('id', '!=', $row->id)->where('is_active', 1)->where('country_code', $row->country_code)->where('vat_rate', '>', 0)->exists();
+
+        return $company && ! $covered
+            ? "{$company} charges VAT at this rate. Switch its VAT off in Legal entities first, then deactivate the rate, set it to 0 or move it to another country."
+            : null;
     }
 
     // ==========================================
