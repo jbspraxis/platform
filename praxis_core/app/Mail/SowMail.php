@@ -36,6 +36,8 @@ class SowMail extends BrandedMail
         $s = $this->sow;
         $language = app()->getLocale() === 'fr' ? 'fr' : 'en';
         $validUntil = $s->validUntil() ?? Carbon::now()->addDays(max(1, (int) $s->validity_days));
+        $vat = Sows::vat($s);
+        $subtotal = (float) ($s->proposal?->subtotal ?? 0);
 
         return new Content(view: 'emails.sow', with: [
             'company' => $s->opportunity?->organization?->name ?? '',
@@ -43,8 +45,8 @@ class SowMail extends BrandedMail
             'facts' => [
                 __('emails.sow.reference') => "{$s->reference} · " . __('emails.sow.version', ['n' => $s->version]),
                 __('emails.sow.between') => Sows::partyName($s),
-                // VAT included, as the approved proposal states it (the milestones share out the price before VAT)
-                __('emails.sow.total') => ProposalPdf::money((float) ($s->proposal?->total_value ?? 0), (string) ($s->proposal?->currency ?? ''), $language),
+                // The approved proposal's price before VAT plus the SOW's own VAT (Sows::vat); "Total" alone when it carries none
+                ($vat['applies'] ? __('emails.sow.total') : __('vat.total')) => ProposalPdf::money($subtotal + round($subtotal * $vat['rate'] / 100, 2), (string) ($s->proposal?->currency ?? ''), $language),
                 __('emails.sow.valid_until') => $validUntil->copy()->setTimezone('Africa/Lagos')->locale($language)->translatedFormat(__('emails.sow.date_format')),
             ],
             'portalUrl' => $s->opportunity ? PortalLinks::sow($s, $this->clientUserId) : null,
@@ -64,11 +66,11 @@ class SowMail extends BrandedMail
         $organisation = (new Organization)->forceFill(['id' => '7f6c2a52-1b1e-4a8e-9a7a-0c0d1e2f3a4b', 'name' => 'Acme Ltd (demo)']);
         $opportunity = (new Opportunity)->forceFill(['id' => '0b5c8d1e-2f3a-4b5c-8d6e-7f8091a2b3c4', 'title' => 'Finance system', 'language' => 'en'])
             ->setRelation('organization', $organisation);
-        $proposal = (new Proposal)->forceFill(['id' => '5d6e7f80-91a2-4b3c-8d4e-5f6071829304', 'currency' => 'USD', 'total_value' => 26875.00]);
+        $proposal = (new Proposal)->forceFill(['id' => '5d6e7f80-91a2-4b3c-8d4e-5f6071829304', 'currency' => 'USD', 'subtotal' => 25000.00, 'total_value' => 26875.00]);
         $sow = fn (int $version, ?string $changes) => (new StatementOfWork)->forceFill([
             'id' => $version === 1 ? '8e9fa0b1-c2d3-4e5f-8a6b-7c8d9e0f1a2b' : '9fa0b1c2-d3e4-4f5a-9b6c-8d9e0f1a2b3c',
             'reference' => 'SOW-20261112-731', 'version' => $version, 'title' => 'A faster month-end close for the Lagos entities',
-            'validity_days' => 30, 'changes_summary' => $changes, 'provider_legal_name' => 'JBS Praxis (demo legal name)',
+            'validity_days' => 30, 'changes_summary' => $changes, 'provider_legal_name' => 'JBS Praxis (demo legal name)', 'vat_rate' => 7.5, 'vat_applied' => true,
             'sent_at' => CarbonImmutable::parse('2026-11-12 09:00:00', 'UTC'),
         ])->setRelation('opportunity', $opportunity)->setRelation('proposal', $proposal);
 

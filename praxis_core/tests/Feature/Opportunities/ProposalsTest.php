@@ -114,7 +114,8 @@ class ProposalsTest extends TestCase
         $lines = Proposals::lines($p);
         $this->assertSame([['#1292P', '2 Phase', '890.90', '1781.80']], $lines->map(fn ($l) => [$l->code, $l->quantity, $l->unit_price, $l->total_price])->all());
         $this->assertSame(1781.80, (float) $p->subtotal);
-        $this->assertSame(round(1781.80 * 1.075, 2), (float) $p->total_value, 'VAT of the organisation’s country (Nigeria)');
+        $this->assertSame(1781.80, (float) $p->total_value, 'No VAT: no JBS Praxis company charges VAT yet (VatSwitchTest has the rest)');
+        $this->assertFalse($p->vat_applied);
         $this->assertSame('proposal', $o->fresh()->stage);
         $this->assertNull($p->ai_run_id, 'Applied once, then unlinked');
 
@@ -254,14 +255,13 @@ class ProposalsTest extends TestCase
             ->set('sections.0.body', "We recommend it.\n\n- One\n- Two")
             ->set('addCode', '#1292P')->call('addDictionaryLine')
             ->set('lines.0.quantity', '3 phases')
-            ->call('addCustomLine')->set('lines.1.description', 'Travel')->set('lines.1.unit_price', '250')
-            ->set('vatRate', '10');
+            ->call('addCustomLine')->set('lines.1.description', 'Travel')->set('lines.1.unit_price', '250');
         $p->refresh();
         $this->assertSame('Close in five days', $p->title);
         $this->assertSame("We recommend it.\n\n- One\n- Two", $p->sections[0]['body']);
         $this->assertSame(3250.0, (float) $p->subtotal);
-        $this->assertSame(3575.0, (float) $p->total_value);
-        $tab->assertSee("USD 3,575.00");
+        $this->assertSame(3250.0, (float) $p->total_value, 'No VAT while the company doesn’t charge it');
+        $tab->assertSee("USD 3,250.00")->assertDontSee('VAT (');
 
         // A new currency prices the dictionary's items in it; the lead's own items keep their price
         $tab->set('currency', 'EUR');

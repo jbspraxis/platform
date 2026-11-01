@@ -85,7 +85,9 @@
                     </table>
                     <div class="mt-6 text-right font-mono text-sm text-gray-400">
                         <div class="mb-1">SUBTOTAL: {{ $proposal->currency }} {{ number_format($proposal->subtotal, 2) }}</div>
-                        <div class="mb-2">TAX ({{ $proposal->tax_rate }}%): {{ $proposal->currency }} {{ number_format($proposal->tax_amount, 2) }}</div>
+                        @if (\App\Support\Finance\Vat::applied($proposal->vat_applied ?? null, $proposal->vat_rate ?? 0))
+                            <div class="mb-2">VAT ({{ $proposal->vat_rate }}%): {{ $proposal->currency }} {{ number_format($proposal->total_value - $proposal->subtotal, 2) }}</div>
+                        @endif
                         <div class="text-xl text-[#00E5FF] font-black border-t border-white/10 pt-4 mt-2">
                             GRAND TOTAL: {{ $proposal->currency }} {{ number_format($proposal->total_value, 2) }}
                         </div>

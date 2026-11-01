@@ -5,6 +5,8 @@
     $ref = filled($proposal->proposal_ref ?? null) ? $proposal->proposal_ref : 'PRX-' . strtoupper(substr($token ?? '', 0, 8));
     $isSigned = ($viewState ?? '') === 'completed';
     $vatAmount = ($proposal->total_value ?? 0) - ($proposal->subtotal ?? 0);
+    // The VAT HQ signed it with (App\Support\Finance\Vat): without it there is no VAT line and the total is the subtotal
+    $vatApplies = \App\Support\Finance\Vat::applied($proposal->vat_applied ?? null, $proposal->vat_rate ?? 0);
     $validityDays = (int) ($proposal->validity_days ?? 7);
 
     // Payment terms: a custom deposit, or instalments stored as "50_50" / "40_30_30"
@@ -173,7 +175,7 @@
                 </div>
                 <div class="summary-grid">
                     <div class="summary-box">
-                        <div class="stat-label">{{ __('gateway.proposal.total_incl_vat') }}</div>
+                        <div class="stat-label">{{ $vatApplies ? __('gateway.proposal.total_incl_vat') : __('gateway.proposal.total') }}</div>
                         <div class="headline-number summary-total">{{ F::money($proposal->total_value ?? 0, $currency) }}</div>
                     </div>
                     <div class="summary-box">
@@ -270,8 +272,10 @@
                     <p class="muted">{{ __('gateway.proposal.fees_empty') }}</p>
                 @endif
                 <div class="totals" style="margin-top: 12px;">
-                    <div><span>{{ __('gateway.proposal.subtotal') }}</span><span class="num">{{ F::money($proposal->subtotal ?? 0, $currency) }}</span></div>
-                    <div><span>{{ __('gateway.proposal.vat', ['rate' => F::percent($proposal->vat_rate ?? 0)]) }}</span><span class="num">{{ F::money($vatAmount, $currency) }}</span></div>
+                    @if ($vatApplies)
+                        <div><span>{{ __('gateway.proposal.subtotal') }}</span><span class="num">{{ F::money($proposal->subtotal ?? 0, $currency) }}</span></div>
+                        <div><span>{{ __('gateway.proposal.vat', ['rate' => F::percent($proposal->vat_rate ?? 0)]) }}</span><span class="num">{{ F::money($vatAmount, $currency) }}</span></div>
+                    @endif
                     <div class="totals-grand"><span>{{ __('gateway.proposal.total') }}</span><span class="num">{{ F::money($proposal->total_value ?? 0, $currency) }}</span></div>
                 </div>
 
@@ -468,8 +472,10 @@
                     </tbody>
                 </table>
                 <div class="doc-totals">
-                    <div><span>{{ __('gateway.proposal.subtotal') }}</span><span>{{ F::money($proposal->subtotal ?? 0, $currency) }}</span></div>
-                    <div><span>{{ __('gateway.proposal.vat', ['rate' => F::percent($proposal->vat_rate ?? 0)]) }}</span><span>{{ F::money($vatAmount, $currency) }}</span></div>
+                    @if ($vatApplies)
+                        <div><span>{{ __('gateway.proposal.subtotal') }}</span><span>{{ F::money($proposal->subtotal ?? 0, $currency) }}</span></div>
+                        <div><span>{{ __('gateway.proposal.vat', ['rate' => F::percent($proposal->vat_rate ?? 0)]) }}</span><span>{{ F::money($vatAmount, $currency) }}</span></div>
+                    @endif
                     <div class="grand"><span>{{ __('gateway.proposal.total') }}</span><span>{{ F::money($proposal->total_value ?? 0, $currency) }}</span></div>
                 </div>
             </div>

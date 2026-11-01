@@ -290,7 +290,7 @@ class MilestoneDrawer extends Component
 
             return view('livewire.hq.projects.milestone-drawer', ['milestone' => null]);
         }
-        $project = DB::table('projects')->where('id', $this->projectId)->first(['total_budget', 'currency']);
+        $project = DB::table('projects')->where('id', $this->projectId)->first(['total_budget', 'currency', 'organization_id']);
 
         return view('livewire.hq.projects.milestone-drawer', [
             'milestone' => $milestone,

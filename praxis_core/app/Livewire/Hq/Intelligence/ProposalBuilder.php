@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Str;
+use App\Support\Finance\Vat;
 
 #[Layout('components.layouts.hq')]
 class ProposalBuilder extends Component
@@ -42,7 +43,13 @@ class ProposalBuilder extends Component
     public $title = 'Proposal';
     public $archetype = [];
     public $currency = 'USD';
-    public $vatRate = 7.50;
+    // VAT isn't typed here: the issuing company's switch decides it until HQ signs (App\Support\Finance\Vat)
+    #[Locked]
+    public $vatRate = 0.00;
+    #[Locked]
+    public bool $vatApplies = false;
+    #[Locked]
+    public string $vatNote = '';
     public $paymentSchedule = '40_30_30';
     public $customDepositPercent = 0.00;
     public $validityDays = 14;
@@ -145,9 +152,6 @@ class ProposalBuilder extends Component
         // Group Tech Catalog by Category
         $rawTech = DB::table('mdm_tech_catalog')->where('is_active', 1)->get();
         $this->techCatalog = collect($rawTech)->groupBy('category')->toArray();
-
-        $taxRegion = DB::table('mdm_tax_compliance')->where('country_code', 'NG')->where('is_active', 1)->first();
-        $this->vatRate = $taxRegion ? (float) $taxRegion->vat_rate : 7.50;
     }
 
     private function loadLedgerData()
@@ -176,6 +180,7 @@ class ProposalBuilder extends Component
         // Both rows or neither, so a failed insert never leaves a proposal without its narrative
         // (exclusions live on proposals, not on the narrative)
         DB::transaction(function () use ($ref, $token) {
+            $vat = Vat::for((string) $this->selectedLeadId);
             DB::table('proposals')->insert([
                 'id' => $this->proposalId,
                 'organization_id' => $this->selectedLeadId,
@@ -184,6 +189,8 @@ class ProposalBuilder extends Component
                 'proposal_ref' => $ref,
                 'token_hash' => $token,
                 'subtotal' => 0.00,
+                'vat_rate' => $vat['rate'],
+                'vat_applied' => $vat['applies'],
                 'total_value' => 0.00,
                 'payment_schedule_type' => '40_30_30',
                 'status' => 'Draft',
@@ -236,7 +243,7 @@ class ProposalBuilder extends Component
 
         $this->archetype = $this->proposal->archetype_id ? explode(' | ', $this->proposal->archetype_id) : [];
         $this->currency = $this->proposal->currency ?? 'USD';
-        $this->vatRate = (float) $this->proposal->vat_rate;
+        $this->followVat();
         $this->paymentSchedule = $this->proposal->payment_schedule_type ?? '40_30_30';
         $this->customDepositPercent = (float) $this->proposal->custom_deposit_percent;
         $this->validityDays = $this->proposal->validity_days ?? 14;
@@ -418,6 +425,24 @@ class ProposalBuilder extends Component
         $this->calculateCommercials();
     }
 
+    /**
+     * A draft takes today's VAT for its client (Vat::for: the issuing company's switch and start date); once HQ has
+     * signed it, it keeps what it was signed with
+     */
+    private function followVat(): void
+    {
+        if ($this->proposal && ! in_array($this->proposal->status, self::LOCKED_STATUSES, true)) {
+            $vat = Vat::for((string) $this->proposal->organization_id);
+            $this->vatRate = $vat['rate'];
+            $this->vatApplies = $vat['applies'];
+            $this->vatNote = Vat::describe($vat);
+        } else {
+            $this->vatApplies = Vat::applied($this->proposal->vat_applied ?? null, $this->proposal->vat_rate ?? 0);
+            $this->vatRate = $this->vatApplies ? (float) $this->proposal->vat_rate : 0.0;
+            $this->vatNote = '';
+        }
+    }
+
     public function calculateCommercials()
     {
         $this->subtotal = array_sum(array_column($this->lineItems, 'total_price'));
@@ -429,6 +454,7 @@ class ProposalBuilder extends Component
     {
         // Also runs on every tab switch, so viewers without crm.edit just don’t save
         if ($this->isLocked || $this->proposalIsLocked() || ! Auth::user()->can('crm.edit')) return;
+        $this->followVat();
         $this->calculateCommercials();
 
         // Structure Phases for JSON
@@ -445,7 +471,8 @@ class ProposalBuilder extends Component
                 'exclusions' => $this->exclusions, 
                 'archetype_id' => implode(' | ', $this->archetype), // Saves as "Tech A | Tech B"
                 'currency' => $this->currency,
-                'vat_rate' => $this->vatRate, 
+                'vat_rate' => $this->vatRate,
+                'vat_applied' => $this->vatApplies,
                 'payment_schedule_type' => $this->paymentSchedule,
                 'custom_deposit_percent' => $this->paymentSchedule === 'custom' ? $this->customDepositPercent : null,
                 'validity_days' => $this->validityDays, 

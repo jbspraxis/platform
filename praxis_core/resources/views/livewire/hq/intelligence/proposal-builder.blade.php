@@ -193,8 +193,8 @@
                     </select>
                 </div>
                 <div class="field">
-                    <label class="label" for="pb-vat">VAT rate (%)</label>
-                    <input id="pb-vat" type="number" step="0.01" wire:model.blur="vatRate" class="input" {{ $isLocked ? 'disabled' : '' }}>
+                    <span class="label" id="pb-vat">VAT</span>
+                    <p class="help" style="margin: 0" aria-labelledby="pb-vat">{{ $vatNote ?: ($vatApplies ? 'VAT at ' . $vatRate . '%, as signed.' : 'No VAT, as signed.') }}</p>
                 </div>
                 <div class="field">
                     <label class="label" for="pb-schedule">Payment plan</label>
@@ -257,8 +257,10 @@
             <button type="button" wire:click="addLineItem()" class="btn btn-secondary" style="margin-top: 12px;" {{ $isLocked ? 'disabled' : '' }}><i data-lucide="plus"></i> Add blank line</button>
 
             <dl class="text-small" style="display: grid; grid-template-columns: 1fr auto; gap: 4px 0; margin: 20px 0 0 auto; max-width: 360px; font-variant-numeric: tabular-nums;">
-                <dt class="text-muted">Subtotal</dt><dd style="margin: 0; padding-left: 24px; text-align: right;">{{ $money($currency, $subtotal) }}</dd>
-                <dt class="text-muted">VAT ({{ $vatRate }}%)</dt><dd style="margin: 0; padding-left: 24px; text-align: right;">{{ $money($currency, $taxAmount) }}</dd>
+                @if ($vatApplies)
+                    <dt class="text-muted">Subtotal</dt><dd style="margin: 0; padding-left: 24px; text-align: right;">{{ $money($currency, $subtotal) }}</dd>
+                    <dt class="text-muted">VAT ({{ $vatRate }}%)</dt><dd style="margin: 0; padding-left: 24px; text-align: right;">{{ $money($currency, $taxAmount) }}</dd>
+                @endif
                 <dt class="font-semibold text-ink" style="padding-top: 8px; border-top: 1px solid var(--color-line);">Total</dt>
                 <dd class="font-semibold text-ink" style="margin: 0; padding-left: 24px; text-align: right; padding-top: 8px; border-top: 1px solid var(--color-line); font-size: 1.125rem;">{{ $money($currency, $grandTotal) }}</dd>
             </dl>
@@ -559,8 +561,10 @@
                 </table>
 
                 <dl style="display: grid; grid-template-columns: 1fr auto; gap: 4px 0; margin: 12px 0 0 auto; max-width: 320px; font-size: 0.8125rem; font-variant-numeric: tabular-nums;">
-                    <dt class="text-muted">{{ $doc('subtotal') }}</dt><dd style="margin: 0; padding-left: 24px; text-align: right;">{{ $money($currency, $subtotal) }}</dd>
-                    <dt class="text-muted">VAT ({{ $vatRate }}%)</dt><dd style="margin: 0; padding-left: 24px; text-align: right;">{{ $money($currency, $taxAmount) }}</dd>
+                    @if ($vatApplies)
+                        <dt class="text-muted">{{ $doc('subtotal') }}</dt><dd style="margin: 0; padding-left: 24px; text-align: right;">{{ $money($currency, $subtotal) }}</dd>
+                        <dt class="text-muted">VAT ({{ $vatRate }}%)</dt><dd style="margin: 0; padding-left: 24px; text-align: right;">{{ $money($currency, $taxAmount) }}</dd>
+                    @endif
                     <dt class="text-ink font-semibold" style="padding-top: 6px; border-top: 1px solid var(--color-line);">{{ $doc('total') }}</dt>
                     <dd class="text-ink font-semibold" style="margin: 0; padding-left: 24px; text-align: right; padding-top: 6px; border-top: 1px solid var(--color-line);">{{ $money($currency, $grandTotal) }}</dd>
                 </dl>

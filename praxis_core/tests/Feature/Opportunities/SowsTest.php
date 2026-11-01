@@ -87,7 +87,8 @@ class SowsTest extends TestCase
     }
 
     /**
-     * An opportunity led by $lead whose client approved version 1 of the proposal (USD 1,000 + 7.5% VAT, 40/30/30). A
+     * An opportunity led by $lead whose client approved version 1 of the proposal (USD 1,000, no VAT: no JBS Praxis
+     * company charges VAT here; VatSwitchTest signs one with VAT, 40/30/30). A
      * second one in the same test needs its own contact address ($email).
      */
     private function approvedOpportunity(User $lead, string $email = 'ngozi@kilo.test'): Opportunity
@@ -288,9 +289,9 @@ class SowsTest extends TestCase
         $project = DB::table('projects')->where('id', $sow->project_id)->first();
         $this->assertSame(['Scoping', $lead->id, $o->id, '1000.00', 'USD'], [$project->status, $project->lead_user_id, $project->opportunity_id, $project->total_budget, $project->currency]);
         $this->assertSame(0, DB::table('project_phases')->where('project_id', $project->id)->count());
-        // Deposit: 40% of 1,000 + 7.5% VAT
+        // Deposit: 40% of 1,000, no VAT (the switch is off)
         $invoice = DB::table('invoices')->where('id', $sow->deposit_invoice_id)->first();
-        $this->assertSame([$project->id, '400.00', '30.00', '430.00', $sow->reference, 'Pending'],
+        $this->assertSame([$project->id, '400.00', '0.00', '400.00', $sow->reference, 'Pending'],
             [$invoice->project_id, $invoice->amount_due, $invoice->vat_amount, $invoice->total_amount, $invoice->po_sow_reference, $invoice->status]);
         // Won, but the opportunity points at the project only once it is created
         $o->refresh();
@@ -476,7 +477,7 @@ class SowsTest extends TestCase
         $html = view('pdf.sow', (new \ReflectionMethod(SowPdf::class, 'data'))->invoke(null, $sow, 'en'))->render();
         $this->assertStringContainsString('JBS Praxis LLC', $html);
         $this->assertStringContainsString('Kilo Pharma', $html);
-        $this->assertStringContainsString("USD\u{00A0}430.00", $html, 'The deposit');
+        $this->assertStringContainsString("USD\u{00A0}400.00", $html, 'The deposit');
         $this->assertStringContainsString($sow->hq_signature_hash, $html);
 
         foreach (SowMail::samples() as $name => $mail) {
@@ -609,7 +610,7 @@ class SowsTest extends TestCase
         $this->assertSame([['Diagnostic & Audit', '1 Phase', '1000.00']], DB::table('project_budgets')->where('project_id', $sow->project_id)->get()
             ->map(fn ($b) => [$b->description, $b->quantity, $b->total_allocated])->all());
         $invoice = DB::table('invoices')->where('id', $sow->deposit_invoice_id)->first();
-        $this->assertSame(['250.00', '18.75', '268.75'], [$invoice->amount_due, $invoice->vat_amount, $invoice->total_amount]);
+        $this->assertSame(['250.00', '0.00', '250.00'], [$invoice->amount_due, $invoice->vat_amount, $invoice->total_amount]);
     }
 
     public function test_a_legacy_proposal_and_a_sow_never_both_sign(): void

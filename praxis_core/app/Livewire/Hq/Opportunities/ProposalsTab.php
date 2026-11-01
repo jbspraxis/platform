@@ -50,8 +50,6 @@ class ProposalsTab extends Component
 
     public array $lines = [];
 
-    public $vatRate = 0;
-
     public string $schedule = '';
 
     public $validityDays = Proposals::VALIDITY_DAYS;
@@ -210,7 +208,7 @@ class ProposalsTab extends Component
     public function updated(string $name): void
     {
         $field = explode('.', $name, 2)[0];
-        if (in_array($field, ['title', 'sections', 'lines', 'vatRate', 'schedule', 'validityDays', 'changesSummary', 'currency'], true) && $this->loaded !== '') {
+        if (in_array($field, ['title', 'sections', 'lines', 'schedule', 'validityDays', 'changesSummary', 'currency'], true) && $this->loaded !== '') {
             if ($field === 'currency') {
                 $this->repriceLines();
             }
@@ -454,7 +452,6 @@ class ProposalsTab extends Component
             'sections' => $this->sections,
             'lines' => $this->lines,
             'currency' => $this->currency,
-            'vat_rate' => is_numeric($this->vatRate) ? $this->vatRate : $proposal->vat_rate,
             'payment_schedule_type' => $this->schedule,
             'validity_days' => is_numeric($this->validityDays) ? $this->validityDays : $proposal->validity_days,
             'changes_summary' => $this->changesSummary,
@@ -487,7 +484,6 @@ class ProposalsTab extends Component
             'code' => $l->code, 'description' => $l->description, 'quantity' => $l->quantity, 'unit_price' => (float) $l->unit_price,
         ])->all();
         $this->currency = (string) $proposal->currency;
-        $this->vatRate = (float) $proposal->vat_rate;
         $this->schedule = (string) $proposal->payment_schedule_type;
         $this->validityDays = (int) $proposal->validity_days;
         $this->changesSummary = (string) $proposal->changes_summary;
@@ -568,7 +564,9 @@ class ProposalsTab extends Component
             // While a later version is written, the client's comments on the one they have show under its sections
             'previousComments' => $proposal?->isEditable() && $previous ? $previous->comments()->where('author_type', 'client')->get()->groupBy('section_key') : collect(),
             'readLines' => $proposal ? Proposals::lines($proposal) : collect(),
-            'totals' => $proposal ? Proposals::totals($proposal->isEditable() ? $this->lines : Proposals::lines($proposal), (float) ($proposal->isEditable() && is_numeric($this->vatRate) ? $this->vatRate : $proposal->vat_rate)) : null,
+            // VAT is the issuing company's to decide (App\Support\Finance\Vat): today's until the version is sent, then its own
+            'vat' => $vat = $proposal ? Proposals::vat($proposal) : null,
+            'totals' => $proposal ? Proposals::totals($proposal->isEditable() ? $this->lines : Proposals::lines($proposal), (float) $vat['rate']) : null,
             'dictionary' => $canEdit && $proposal?->isEditable() ? Proposals::dictionary()->groupBy('category') : collect(),
             'currencies' => Proposals::currencies(),
             'people' => $canEdit ? Proposals::people($opportunity) : [],

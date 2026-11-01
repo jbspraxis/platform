@@ -12,6 +12,7 @@ use App\Models\Proposal;
 use App\Models\ProposalComment;
 use App\Models\User;
 use App\Support\Ai\Ai;
+use App\Support\Finance\Vat;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -111,6 +112,7 @@ final class Proposals
             if ($existing = self::versions($opportunity)->first()) {
                 return $existing;
             }
+            $vat = Vat::for($opportunity->organization);
             $proposal = Proposal::create([
                 'organization_id' => $opportunity->organization_id,
                 'opportunity_id' => $opportunity->id,
@@ -120,7 +122,8 @@ final class Proposals
                 'sections' => array_map(fn ($key) => ['key' => $key, 'title' => __('proposals.sections.' . $key, [], $opportunity->language), 'body' => ''], self::BLANK_SECTIONS),
                 'validity_days' => self::VALIDITY_DAYS,
                 'subtotal' => 0,
-                'vat_rate' => self::vatRate($opportunity),
+                'vat_rate' => $vat['rate'],
+                'vat_applied' => $vat['applies'],
                 'total_value' => 0,
                 'currency' => self::currencies()->contains($currency) ? $currency : 'USD',
                 'payment_schedule_type' => self::SCHEDULES[0],
@@ -262,8 +265,9 @@ final class Proposals
 
     /**
      * Saves the lead's edits to a draft nobody has approved, while the AI isn't rewriting it. $data: title,
-     * sections ([key, title, body]), lines ([code, description, quantity, unit_price]), currency, vat_rate,
-     * payment_schedule_type, validity_days, changes_summary. False when the version can't be changed now.
+     * sections ([key, title, body]), lines ([code, description, quantity, unit_price]), currency,
+     * payment_schedule_type, validity_days, changes_summary. False when the version can't be changed now. Its VAT
+     * isn't the lead's to set: it follows the issuing company's switch until it is sent (followVat()).
      */
     public static function save(Proposal $proposal, array $data, User $by): bool
     {
@@ -275,13 +279,11 @@ final class Proposals
             $sections = self::cleanSections((array) ($data['sections'] ?? []), keepEmpty: true);
             $lines = self::cleanLines((array) ($data['lines'] ?? []));
             $currency = self::currencies()->contains($data['currency'] ?? null) ? $data['currency'] : $locked->currency;
-            $vat = max(0, min(100, round((float) ($data['vat_rate'] ?? $locked->vat_rate), 2)));
 
             $locked->forceFill([
                 'title' => Str::limit(trim((string) ($data['title'] ?? $locked->title)), self::MAX_TITLE, '') ?: $locked->title,
                 'sections' => $sections,
                 'currency' => $currency,
-                'vat_rate' => $vat,
                 'payment_schedule_type' => in_array($data['payment_schedule_type'] ?? null, self::SCHEDULES, true) ? $data['payment_schedule_type'] : $locked->payment_schedule_type,
                 'validity_days' => max(7, min(90, (int) ($data['validity_days'] ?? $locked->validity_days))),
                 // While the AI writes "what changed", the text it files wins over a page that hasn't seen it yet
@@ -382,6 +384,7 @@ final class Proposals
             if ($locked->version > 1 && trim((string) $locked->changes_summary) === '') {
                 return 'changes';
             }
+            self::followVat($locked);
             $locked->forceFill(['approved_by' => $by->id, 'approved_at' => now(), 'updated_by' => $by->id])->save();
             $proposal->setRawAttributes($locked->getAttributes(), true);
 
@@ -485,7 +488,9 @@ final class Proposals
         if (! $chosen) {
             throw new LogicException('Choose at least one person HQ knows for this work');
         }
-        // Rendered before anything is claimed: if the PDF fails, nothing is sent
+        // The VAT of the day it goes (the switch may have changed since it was approved), then the PDF, rendered
+        // before anything is claimed: if the PDF fails, nothing is sent
+        self::refreshVat($proposal);
         $pdf = ProposalPdf::render($proposal);
 
         return self::whileMailing($proposal, function () use ($proposal, $opportunity, $chosen, $pdf, $by) {
@@ -849,15 +854,49 @@ final class Proposals
         return $ref;
     }
 
-    /** VAT of the organisation's country (mdm_tax_compliance), else Nigeria's, as ProposalBuilder */
-    private static function vatRate(Opportunity $opportunity): float
+    /**
+     * The VAT a version shows (Vat::for's answer): today's while it hasn't been sent (the issuing company's switch and
+     * start date decide), else what it recorded when it was sent, whatever the switch says now.
+     */
+    public static function vat(Proposal $proposal): array
     {
-        $country = mb_strtolower(trim((string) $opportunity->organization?->country));
-        $rates = DB::table('mdm_tax_compliance')->where('is_active', 1)->get(['region_name', 'country_code', 'vat_rate']);
-        $match = $rates->first(fn ($r) => $country !== '' && (mb_strtolower($r->country_code) === $country || str_starts_with(mb_strtolower($r->region_name), $country)))
-            ?? $rates->firstWhere('country_code', 'NG');
+        if ($proposal->status === Proposal::DRAFT && $proposal->sent_at === null) {
+            return Vat::for($proposal->organization_id);
+        }
+        $applies = Vat::applied($proposal->vat_applied, $proposal->vat_rate);
 
-        return $match ? (float) $match->vat_rate : 7.5;
+        return ['applies' => $applies, 'rate' => $applies ? (float) $proposal->vat_rate : 0.0, 'why' => $applies ? null : 'off',
+            'region' => null, 'company' => null, 'vat_number' => null, 'starts_on' => null];
+    }
+
+    /** Brings a version not sent yet to today's VAT, under the lock, when the switch has changed since it was saved */
+    public static function refreshVat(Proposal $proposal): void
+    {
+        DB::transaction(function () use ($proposal) {
+            $locked = Proposal::whereKey($proposal->id)->lockForUpdate()->first();
+            if ($locked && self::followVat($locked)) {
+                $locked->save();
+                $proposal->setRawAttributes($locked->getAttributes(), true);
+            }
+        });
+    }
+
+    /**
+     * A version not sent yet takes today's VAT (rate, vat_applied and the total from its subtotal); a sent one keeps
+     * what it had. The caller saves. True when something changed.
+     */
+    private static function followVat(Proposal $proposal): bool
+    {
+        if ($proposal->status !== Proposal::DRAFT || $proposal->sent_at !== null) {
+            return false;
+        }
+        $vat = Vat::for($proposal->organization_id);
+        $subtotal = (float) $proposal->subtotal;
+        $total = round($subtotal + round($subtotal * $vat['rate'] / 100, 2), 2);
+        $changed = round((float) $proposal->vat_rate, 2) !== round($vat['rate'], 2) || $proposal->vat_applied !== $vat['applies'] || round((float) $proposal->total_value, 2) !== $total;
+        $proposal->forceFill(['vat_rate' => $vat['rate'], 'vat_applied' => $vat['applies'], 'total_value' => $total]);
+
+        return $changed;
     }
 
     /** The financial dictionary for the AI (codes, no prices), then, for a later version, the one the client had and their comments */
@@ -962,7 +1001,7 @@ final class Proposals
         return $lines;
     }
 
-    /** Replaces the version's line items and sets its subtotal and total (VAT at its rate) */
+    /** Replaces the version's line items and sets its subtotal and total (VAT at its rate; today's while not sent: followVat()) */
     private static function writeLines(Proposal $proposal, array $lines): void
     {
         DB::table('proposal_line_items')->where('proposal_id', $proposal->id)->delete();
@@ -972,6 +1011,7 @@ final class Proposals
                 'unit_price' => $line['unit_price'], 'total_price' => round(self::units($line['quantity']) * (float) $line['unit_price'], 2), 'sort_order' => $i,
             ]);
         }
+        self::followVat($proposal);
         $totals = self::totals($lines, (float) $proposal->vat_rate);
         $proposal->forceFill(['subtotal' => $totals['subtotal'], 'total_value' => $totals['total']])->save();
     }

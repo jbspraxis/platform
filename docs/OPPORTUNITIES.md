@@ -281,3 +281,48 @@ Permissions seeded by PR 1 and granted to existing roles as the owner's roles al
 - **Same rights as the screens** (the lead's audit of #20): a project lead who can't open the opportunity plans from the organisation's name and sector and the signed SOW without its fees; never the proposal, its line items, the turnover or the budget (`docs/PROJECTS.md` section 9).
 - **PR 5's refusal** on projects with milestones is replaced by planning one milestone at a time; the `draft_pending` route (plan in the project draft, link to it) stays.
 - **Local**: port 8115 (`hq-opp-pr5b` / `hq-opp-pr5b-fr`), database `praxis_opp_pr5b`.
+
+### VAT per JBS Praxis company (1 Nov 2026)
+
+- **The owner's words**: "We are not billing VAT until we fully register JBS Praxis. We have started already."
+  - The switch lives on each company in **Master data › Legal entities**. Registering in one country doesn't switch on the other.
+  - Only new documents get VAT. Anything sent, signed or invoiced before the start date stays without VAT.
+- **Data** (migration `2026_11_01_970000`):
+  - `mdm_legal_entities` gets `charges_vat` (every company starts **off**), `vat_number` and `vat_starts_on`.
+  - `proposals` gets `vat_applied`.
+  - `statements_of_work` gets `vat_rate` and `vat_applied`. Both stay null while HQ hasn't signed the draft.
+  - `invoices` gets `vat_rate` and `vat_applied`. Both stay null on invoices issued before this change; their `vat_amount` says what they had.
+  - Backfill: proposals and SOWs that were sent, approved or signed record the VAT they already have, and their `updated_at` doesn't move. Proposals not sent yet follow the switch, so their VAT goes to 0. Issued invoices aren't touched.
+- **The contract**: `App\Support\Finance\Vat::for($organisation, $date = today in Lagos)`. Every VAT decision goes through it.
+  - It returns `applies`, `rate` (0 when VAT doesn't apply), `why` (`off`, `not_yet`, `no_rate` or `no_company`), `region`, `company`, `vat_number` and `starts_on`.
+  - `Vat::describe()` turns that answer into one sentence. `Vat::issuer()` picks the company.
+- **Which company issues a document** (the lead should confirm this with the owner):
+  - It is the active legal entity whose `region_code` is the client organisation's country, else Nigeria's. The country is read from `organizations.country` as typed ("Nigeria", "NG", "Cameroun"…).
+  - **The rate is the issuing company's country rate** in Tax compliance, not the client's. A UK client is billed by the Nigerian company at 7.5%, never at the UK's 20%. Before this change HQ used the client's country rate.
+  - A company that charges VAT but has no active rate for its country bills none. The screen won't switch VAT on without that rate.
+- **When a document fixes its VAT**:
+  - A **proposal** (PR 4's, and the legacy builder's) follows today's VAT while it is a draft, even once approved. It keeps the VAT of the day it is sent; for the legacy builder, the day HQ signs it. Nobody types the VAT rate any more.
+  - A **SOW** follows today's VAT until HQ signs it (approval).
+    - Its fees are the approved proposal's price before VAT plus the SOW's own VAT, because the SOW is a later document.
+    - If the VAT changed between HQ's signature and sending, *Send* is refused: take the version back to draft and approve it again. This is because HQ's fingerprint covers the fees; the fingerprint now includes the SOW's VAT instead of the proposal's.
+  - An **invoice** gets the VAT of the day it is raised, and records it with the company's region. That covers the deposit on signing, Finance's *Create invoice* and the escrow page. The general ledger posts the invoice's `vat_amount` as before, so an invoice without VAT gets no VAT payable line.
+- **What documents show**:
+  - Without VAT, documents show no VAT line. The total is the subtotal and is labelled "Total". This covers HQ's tabs, the portal pages, the PDFs and the emails.
+  - With VAT, the lines are the same as before this change.
+  - Drafts in HQ, and Finance's *Create invoice*, show one line saying whether VAT applies and why.
+- **The screen**: Legal entities has a VAT block with the switch, the VAT number, the start date, the help text and the country's rate.
+  - Only `mdm.edit` changes it. The inputs are disabled for everyone else, and a forged request answers 403.
+  - Each change writes a `LEGAL_ENTITY_VAT_CHANGED` audit line with the values before and after.
+  - Strings are in `lang/{en,fr}/vat.php`. The rest of the page is still English only.
+- **Not VAT, so not touched**: payroll tax (`app/Services/Payroll`, the Tax configurator) and `Support/Projects/Deposit` (it works on amounts before VAT). The general ledger is unchanged too: it posts what each invoice recorded.
+- **Open owner decisions**:
+  1. The issuing-company rule above. In particular, should a client in a country without a JBS Praxis company be billed by Nigeria at Nigeria's rate, or zero-rated as an export?
+  2. A document sent before the start date but signed or invoiced after it. Example: a SOW sent without VAT and signed after Nigeria's start date. The SOW keeps no VAT, but the deposit invoice raised on signing gets VAT, because "invoices raised from the start date get VAT". MyCity's later milestone invoices work the same way (`docs/PROJECTS.md` section 9).
+- **Tests**: `tests/Feature/Finance/VatSwitchTest.php` (7 tests).
+  - With the switch off there is no VAT anywhere: proposal, PDF, email, SOW, deposit, general ledger, Finance invoice.
+  - Switched on from a date, documents sent before keep no VAT, while new drafts and invoices get 7.5%. Switching off again changes nothing already issued.
+  - A SOW whose VAT changed after HQ signed it has to be approved again.
+  - The two companies are independent. The tests also cover an inactive company, a missing rate and no company at all.
+  - The screen: who may change VAT, and the audit line.
+  - French, and the EN/FR keys match.
+  - `ProposalsTest`, `SowsTest` and `PortalProposalTest` now expect no VAT. They had assumed Nigeria's 7.5% was always on.

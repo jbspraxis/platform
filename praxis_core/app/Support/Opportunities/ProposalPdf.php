@@ -108,6 +108,7 @@ final class ProposalPdf
     {
         $date = fn ($at) => $at ? Carbon::parse($at)->setTimezone('Africa/Lagos')->locale($language)->translatedFormat(__('proposals.formats.date')) : null;
         $lines = Proposals::lines($proposal);
+        $vat = Proposals::vat($proposal);
 
         return [
             'proposal' => $proposal,
@@ -116,7 +117,8 @@ final class ProposalPdf
             'sections' => array_map(fn ($s) => $s + ['blocks' => MeetingMinutesMail::blocks((string) ($s['body'] ?? ''))], (array) $proposal->sections),
             'changes' => $proposal->version > 1 && filled($proposal->changes_summary) ? MeetingMinutesMail::blocks((string) $proposal->changes_summary) : [],
             'lines' => $lines,
-            'totals' => Proposals::totals($lines, (float) $proposal->vat_rate),
+            'vat' => $vat,
+            'totals' => Proposals::totals($lines, (float) $vat['rate']),
             'money' => fn ($amount) => self::money((float) $amount, (string) $proposal->currency, $language),
             'issued' => $date($proposal->sent_at ?? $proposal->approved_at ?? $proposal->updated_at),
             'validUntil' => $date($proposal->validUntil() ?? now()->addDays(max(1, (int) $proposal->validity_days))),

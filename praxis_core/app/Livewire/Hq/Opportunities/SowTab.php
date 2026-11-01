@@ -5,6 +5,7 @@ namespace App\Livewire\Hq\Opportunities;
 use App\Models\Opportunity;
 use App\Models\StatementOfWork;
 use App\Support\Ai\AiUnavailable;
+use App\Support\Finance\Vat;
 use App\Support\Opportunities\OpportunityAccess;
 use App\Support\Opportunities\Proposals;
 use App\Support\Opportunities\SowPdf;
@@ -310,6 +311,11 @@ class SowTab extends Component
             'sendTo.*' => __('proposals.send.errors.unknown'),
         ]);
         if (! $sow) {
+            return;
+        }
+        if (Sows::vatChanged($sow)) {
+            $this->addError('send', __('vat.sow_changed', ['now' => Vat::describe(Vat::for($opportunity->organization))]));
+
             return;
         }
         try {

@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Support\Access;
 use App\Support\Ai\Ai;
 use App\Support\Finance\DepositInvoice;
+use App\Support\Finance\Vat;
 use App\Support\Portal\SignerOnboarding;
 use App\Support\Signing\SigningCodes;
 use App\Support\WebsiteSettings;
@@ -268,7 +269,7 @@ final class Sows
             $next = $latest->replicate(['ai_run_id', 'approved_by', 'approved_at', 'sent_at', 'recipients', 'recipients_unsent', 'token_hash', 'auth_otp', 'otp_expires_at',
                 'hq_signer_name', 'hq_signature_b64', 'hq_signature_hash', 'hq_ip_address', 'hq_signed_at', 'provider_legal_name', 'signed_by_name', 'signed_by_title',
                 'signed_by_email', 'client_signature_b64', 'client_signature_hash', 'client_ip_address', 'ip_security_flag', 'signed_at', 'deposit_invoice_id', 'project_id',
-                'changes_request', 'changes_requested_by', 'changes_requested_at', 'changes_summary', 'deleted_by']);
+                'changes_request', 'changes_requested_by', 'changes_requested_at', 'changes_summary', 'deleted_by', 'vat_rate', 'vat_applied']);
             $next->forceFill([
                 'version' => $latest->version + 1,
                 'previous_version_id' => $latest->id,
@@ -345,6 +346,9 @@ final class Sows
                 return 'proposal';
             }
             $at = now();
+            // The VAT HQ signs with the rest (App\Support\Finance\Vat): the issuing company's as of today; it is in the fingerprint
+            $vat = Vat::for($locked->opportunity?->organization, $at);
+            $locked->forceFill(['vat_rate' => $vat['rate'], 'vat_applied' => $vat['applies']]);
             $locked->forceFill([
                 'milestones' => $milestones,
                 'approved_by' => $by->id,
@@ -374,7 +378,7 @@ final class Sows
     {
         $done = (bool) StatementOfWork::whereKey($sow->id)->where('status', StatementOfWork::DRAFT)->whereNotNull('approved_at')->whereNull('sent_at')->update([
             'approved_by' => null, 'approved_at' => null, 'hq_signer_name' => null, 'hq_signature_b64' => null, 'hq_signature_hash' => null,
-            'hq_ip_address' => null, 'hq_signed_at' => null, 'provider_legal_name' => null, 'updated_by' => $by->id, 'updated_at' => now(),
+            'hq_ip_address' => null, 'hq_signed_at' => null, 'provider_legal_name' => null, 'vat_rate' => null, 'vat_applied' => null, 'updated_by' => $by->id, 'updated_at' => now(),
         ]);
         if ($done) {
             $sow->refresh();
@@ -416,6 +420,9 @@ final class Sows
         $chosen = self::choose($opportunity, $emails);
         if (! $chosen) {
             throw new LogicException('Choose at least one person HQ knows for this work');
+        }
+        if (self::vatChanged($sow)) {
+            throw new LogicException('The VAT changed since HQ signed this version: take it back to draft and approve it again');
         }
         $pdf = SowPdf::render($sow);
 
@@ -616,6 +623,32 @@ final class Sows
     }
 
     /**
+     * The VAT on a version's fees (Vat::for's answer): fixed when HQ signs it (vat_rate, vat_applied), and until then
+     * today's for the issuing company, so a draft follows the switch. The approved proposal's own VAT doesn't count:
+     * the SOW is a later document.
+     */
+    public static function vat(StatementOfWork $sow): array
+    {
+        if ($sow->vat_applied === null) {
+            return Vat::for($sow->opportunity?->organization);
+        }
+
+        return ['applies' => (bool) $sow->vat_applied, 'rate' => $sow->vat_applied ? (float) $sow->vat_rate : 0.0, 'why' => $sow->vat_applied ? null : 'off',
+            'region' => null, 'company' => null, 'vat_number' => null, 'starts_on' => null];
+    }
+
+    /** An approved version whose VAT is no longer today's (the switch changed after HQ signed): it goes back to draft before it is sent */
+    public static function vatChanged(StatementOfWork $sow): bool
+    {
+        if ($sow->vat_applied === null || $sow->sent_at !== null) {
+            return false;
+        }
+        $today = Vat::for($sow->opportunity?->organization);
+
+        return (bool) $sow->vat_applied !== $today['applies'] || round((float) $sow->vat_rate, 2) !== round($today['rate'], 2);
+    }
+
+    /**
      * A digest of what is signed: title, sections, milestones and the fees' figures. Both fingerprints (HQ's and the
      * client's) include it, so a change to the text after signing shows.
      */
@@ -627,7 +660,7 @@ final class Sows
             'title' => (string) $sow->title,
             'sections' => array_values((array) $sow->sections),
             'milestones' => self::cleanMilestones((array) $sow->milestones),
-            'fees' => [(string) $proposal?->currency, (string) $proposal?->subtotal, (string) $proposal?->vat_rate, (string) $proposal?->total_value, (string) $proposal?->payment_schedule_type,
+            'fees' => [(string) $proposal?->currency, (string) $proposal?->subtotal, ($vat = self::vat($sow))['applies'], (string) $vat['rate'], (string) $proposal?->payment_schedule_type,
                 (string) ($proposal?->custom_deposit_percent ?? ''), self::lineDigest($proposal)],
         ], JSON_UNESCAPED_UNICODE));
     }
@@ -721,7 +754,6 @@ final class Sows
             }
             $invoice = DepositInvoice::raise($projectId, $organization, [
                 'subtotal' => $proposal->subtotal,
-                'vat_rate' => $proposal->vat_rate,
                 'currency' => $proposal->currency,
                 'payment_schedule_type' => $proposal->payment_schedule_type,
                 'custom_deposit_percent' => $proposal->custom_deposit_percent ?? null,

@@ -301,7 +301,6 @@ class ProposalGateway extends Component
             // 4. Invoice #001, the deposit, posted to the general ledger (App\Support\Finance\DepositInvoice)
             $invNumber = DepositInvoice::raise($projectId, $organization, [
                 'subtotal' => $proposal->subtotal,
-                'vat_rate' => $proposal->vat_rate,
                 'currency' => $proposal->currency,
                 'payment_schedule_type' => $proposal->payment_schedule_type,
                 'custom_deposit_percent' => $proposal->custom_deposit_percent ?? null,

@@ -89,7 +89,8 @@ class PortalProposalTest extends TestCase
         $this->get($url . 'x')->assertForbidden();
         $this->get($url)->assertOk()->assertSee('A close in five days')->assertSee('Diagnostic &amp; Audit', false)
             // In the opportunity's language: French
-            ->assertSee('Approuver la proposition')->assertSee("1\u{202F}075,00\u{00A0}USD");
+            // No JBS Praxis company charges VAT here: no VAT line, the total is the subtotal (VatSwitchTest has VAT)
+            ->assertSee('Approuver la proposition')->assertSee("1\u{202F}000,00\u{00A0}USD")->assertDontSee('TVA (');
     }
 
     public function test_a_known_contact_comments_on_a_section_and_the_lead_is_told(): void

@@ -129,9 +129,13 @@
             <section class="card" aria-labelledby="sr-fees">
                 <h2 id="sr-fees" class="card-title" style="margin-bottom: 12px">{{ __('sow.fees.title') }}</h2>
                 <dl class="pr-totals sr-fees" style="margin-left: 0; max-width: none">
-                    <dt>{{ __('proposals.lines.subtotal') }}</dt><dd>{{ $money($fees['totals']['subtotal']) }}</dd>
-                    <dt>{{ __('proposals.lines.vat', ['rate' => rtrim(rtrim(number_format($fees['vat_rate'], 2, $fr ? ',' : '.', ''), '0'), '.,')]) }}</dt><dd>{{ $money($fees['totals']['vat']) }}</dd>
-                    <dt class="is-total">{{ __('proposals.lines.total') }}</dt><dd class="is-total">{{ $money($fees['totals']['total']) }}</dd>
+                    @if ($fees['vat']['applies'])
+                        <dt>{{ __('proposals.lines.subtotal') }}</dt><dd>{{ $money($fees['totals']['subtotal']) }}</dd>
+                        <dt>{{ __('proposals.lines.vat', ['rate' => \App\Support\Finance\Vat::percent($fees['vat_rate'], $fr ? 'fr' : 'en')]) }}</dt><dd>{{ $money($fees['totals']['vat']) }}</dd>
+                        <dt class="is-total">{{ __('proposals.lines.total') }}</dt><dd class="is-total">{{ $money($fees['totals']['total']) }}</dd>
+                    @else
+                        <dt class="is-total">{{ __('vat.total') }}</dt><dd class="is-total">{{ $money($fees['totals']['total']) }}</dd>
+                    @endif
                     @if ($fees['schedule'])
                         <dt>{{ __('proposals.terms.schedule') }}</dt><dd>{{ $fees['schedule'] }}</dd>
                     @endif

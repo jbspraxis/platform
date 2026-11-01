@@ -129,9 +129,13 @@
                     </table>
                 @endif
                 <dl class="pr-totals">
-                    <dt>{{ __('proposals.lines.subtotal') }}</dt><dd>{{ $money($totals['subtotal']) }}</dd>
-                    <dt>{{ __('proposals.lines.vat', ['rate' => rtrim(rtrim(number_format((float) $p->vat_rate, 2, $fr ? ',' : '.', ''), '0'), '.,')]) }}</dt><dd>{{ $money($totals['vat']) }}</dd>
-                    <dt class="is-total">{{ __('proposals.lines.total') }}</dt><dd class="is-total">{{ $money($totals['total']) }}</dd>
+                    @if ($vat['applies'])
+                        <dt>{{ __('proposals.lines.subtotal') }}</dt><dd>{{ $money($totals['subtotal']) }}</dd>
+                        <dt>{{ __('proposals.lines.vat', ['rate' => \App\Support\Finance\Vat::percent((float) $vat['rate'], $fr ? 'fr' : 'en')]) }}</dt><dd>{{ $money($totals['vat']) }}</dd>
+                        <dt class="is-total">{{ __('proposals.lines.total') }}</dt><dd class="is-total">{{ $money($totals['total']) }}</dd>
+                    @else
+                        <dt class="is-total">{{ __('vat.total') }}</dt><dd class="is-total">{{ $money($totals['total']) }}</dd>
+                    @endif
                 </dl>
                 @if (\Illuminate\Support\Facades\Lang::has('proposals.schedules.' . $p->payment_schedule_type))
                     <p class="help" style="margin: 12px 0 0">{{ __('proposals.terms.schedule') }}: {{ __('proposals.schedules.' . $p->payment_schedule_type) }}</p>
