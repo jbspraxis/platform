@@ -18,6 +18,7 @@ use App\Support\Opportunities\OpportunityContext;
 use App\Support\Opportunities\Questionnaires;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Livewire\Livewire;
 use Tests\Feature\UsesThrowawayDatabase;
@@ -123,6 +124,8 @@ class QuestionnaireTest extends TestCase
         // A second click asks for nothing
         Livewire::test(QuestionnaireTab::class, ['opportunityId' => $o->id])->call('draft');
         $this->assertCount(1, $ai->requestsFor('questionnaire'));
+        // The job ran while the lead waited on the page (before its questionnaire was saved): no bell
+        $this->assertSame(0, DB::table('notifications')->count());
     }
 
     public function test_only_the_lead_drafts_and_answers(): void
@@ -386,9 +389,51 @@ class QuestionnaireTest extends TestCase
         Livewire::test(QuestionnaireTab::class, ['opportunityId' => $o->id])->assertSee('Drafting 5 questions…');
         $this->actingAs($lead);
 
+        // The worker runs it: the questions go in at once and the lead gets a bell, page open or not
         Ai::run(AiRun::sole());
+        $this->assertSame(['open', 5], [Questionnaires::current($o)->status, QuestionnaireQuestion::count()]);
+        $bell = DB::table('notifications')->where('user_id', $lead->id)->sole();
+        $this->assertSame(['Questions ready: Month-end close', '5 questions are ready for your answers.', route('hq.crm.opportunity', ['opportunity' => $o->id, 'tab' => 'questionnaire'])],
+            [$bell->title, $bell->message, $bell->link_url]);
+
+        // The screen that was waiting says so on its next check, though the listener filed them
         $tab->call('check')->assertSee('5 questions drafted.')->assertSee('Question 5?')->assertDontSeeHtml('wire:poll');
-        $this->assertSame(5, QuestionnaireQuestion::count());
+        $this->assertSame(1, DB::table('notifications')->count());
+    }
+
+    public function test_a_background_draft_that_fails_rings_the_lead_with_why(): void
+    {
+        $lead = $this->staff('sales', ['sales']);
+        $this->actingAs($lead);
+        $o = $this->opportunityWithNotes($lead);
+        FakeAi::install()->refuse('questionnaire')
+            ->respond('questionnaire', ['questions' => [$this->aiQuestion('Only two?', ['Yes', 'No'])]])
+            ->respond('questionnaire_question', $this->aiQuestion('Who signs off the close?'));
+        config(['ai.queue.connection' => 'database']);
+        $tab = Livewire::test(QuestionnaireTab::class, ['opportunityId' => $o->id])->set('questionCount', 3);
+        $bells = fn () => DB::table('notifications')->where('user_id', $lead->id)->get(['title', 'message']);
+
+        // Claude declined
+        $tab->call('draft');
+        Ai::run(AiRun::where('status', 'queued')->sole());
+        $this->assertSame('Questionnaire not drafted: Month-end close', $bells()->sole()->title);
+        $this->assertSame('The AI couldn’t draft the questions. Claude declined to write this. Reword the instructions, then try again.', $bells()->sole()->message);
+        $tab->call('check')->assertSee('The last draft didn’t work.')->assertDontSee('questions drafted');
+
+        // Nothing usable came back (a lead reading French)
+        $tab->call('draft');
+        App::setLocale('fr');
+        Ai::run(AiRun::where('status', 'queued')->sole());
+        $french = $bells()->firstWhere('title', "Questionnaire non rédigé\u{00A0}: Month-end close");
+        $this->assertNotNull($french);
+        $this->assertStringStartsWith('L’IA n’a pas pu rédiger les questions.', $french->message);
+        App::setLocale('en');
+
+        // A redraft of one question rings no one: the lead is on the page
+        $questionnaire = $this->openQuestionnaire($this->opportunityFor($this->organisation(), ['lead_user_id' => $lead->id]), $lead);
+        Questionnaires::redraft($questionnaire->questions->first(), '', $lead);
+        Ai::run(AiRun::where('purpose', 'questionnaire_question')->sole());
+        $this->assertCount(2, $bells());
     }
 
     public function test_start_again_sets_the_questionnaire_aside(): void

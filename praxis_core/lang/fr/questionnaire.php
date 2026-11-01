@@ -115,6 +115,14 @@ return [
         'done' => "Le questionnaire a été mis de côté. Rédigez-en un nouveau ci-dessous.",
     ],
 
+    // La cloche du responsable quand une rédaction se termine en arrière-plan
+    'notify' => [
+        'ready_title' => "Questions prêtes\u{00A0}: :title",
+        'ready' => "{1} 1\u{00A0}question attend votre réponse.|[2,*] :count\u{00A0}questions attendent vos réponses.",
+        'failed_title' => "Questionnaire non rédigé\u{00A0}: :title",
+        'failed' => "L’IA n’a pas pu rédiger les questions. :message",
+    ],
+
     'errors' => [
         'count' => "Choisissez entre :min et :max\u{00A0}questions.",
         'focus' => "Choisissez les thèmes dans la liste.",

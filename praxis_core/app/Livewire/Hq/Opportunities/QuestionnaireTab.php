@@ -56,6 +56,10 @@ class QuestionnaireTab extends Component
     #[Locked]
     public string $notice = '';
 
+    /** This screen showed the draft in progress, so it says when the questions are in (whoever filed them) */
+    #[Locked]
+    public bool $awaitingDraft = false;
+
     public function mount(string $opportunityId): void
     {
         abort_unless(OpportunityAccess::canView(Auth::user()), 403);
@@ -285,7 +289,8 @@ class QuestionnaireTab extends Component
                 unset($this->answers[$id]); // rewritten by the AI: show what is saved now
             }
             $questionnaire->load(['aiRun', 'completedBy', 'questions.aiRun']);
-            if ($wasDrafting && $questionnaire->status === 'open') {
+            // Filed here, or by FileQuestionnaireAi as the job finished
+            if (($wasDrafting || $this->awaitingDraft) && $questionnaire->status === 'open') {
                 $this->draftedNotice($questionnaire);
             }
             foreach ($questionnaire->questions as $q) {
@@ -298,6 +303,7 @@ class QuestionnaireTab extends Component
 
         $run = $questionnaire?->aiRun;
         $drafting = $questionnaire?->status === 'drafting' && $run && ! $run->isFinished();
+        $this->awaitingDraft = $drafting;
         $questions = $questionnaire && $questionnaire->status !== 'drafting' ? $questionnaire->questions : collect();
         $redrafting = $questions->filter(fn (QuestionnaireQuestion $q) => $q->aiRun && ! $q->aiRun->isFinished());
 

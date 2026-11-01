@@ -22,7 +22,9 @@ use Illuminate\Support\Str;
  * own questions or removes one; answers save as they go. complete() locks it for the proposal (PR 4).
  *
  * The AI's answers are applied by sync(), which the tab calls on every load and while it polls, with the row
- * locked, so each is applied once whoever is looking. Callers check the lead (canAnswer) first.
+ * locked, so each is applied once whoever is looking. A whole draft is also filed as soon as its job finishes
+ * (fileAiOutput, on AiRunFinished), and the lead gets a bell, so they needn't wait on the page. Callers check the
+ * lead (canAnswer) first.
  */
 final class Questionnaires
 {
@@ -141,6 +143,33 @@ final class Questionnaires
         }
 
         return $changed;
+    }
+
+    /**
+     * AiRunFinished: a finished draft goes in at once and the lead gets a bell saying the questions are ready, or why
+     * there are none. Only the job the questionnaire is waiting for counts (not one it was set aside from, or one
+     * that ran before its questionnaire was saved). A redraft of one question is left to the tab: the lead is there.
+     */
+    public static function fileAiOutput(AiRun $run): void
+    {
+        if ($run->purpose !== 'questionnaire' || $run->subject_type !== 'questionnaire' || ! $run->isFinished()) {
+            return;
+        }
+        $questionnaire = Questionnaire::find($run->subject_id);
+        if (! $questionnaire || $questionnaire->ai_run_id !== $run->id || $questionnaire->status !== 'drafting') {
+            return;
+        }
+
+        self::sync($questionnaire);
+        $opportunity = $questionnaire->opportunity;
+        if ($questionnaire->status === 'open') {
+            $count = $questionnaire->questions()->count();
+            self::tellLead($opportunity, __('questionnaire.notify.ready_title', ['title' => $opportunity->title]),
+                trans_choice('questionnaire.notify.ready', $count, ['count' => $count]));
+        } elseif (($run = $run->fresh())->status === 'failed') { // failed in the job, or nothing usable came back
+            self::tellLead($opportunity, __('questionnaire.notify.failed_title', ['title' => $opportunity->title]),
+                __('questionnaire.notify.failed', ['message' => $run->errorMessage()]));
+        }
     }
 
     /**
@@ -450,6 +479,25 @@ final class Questionnaires
 
             return true;
         });
+    }
+
+    /** A bell for the opportunity's lead (and so a phone push), opening the Questionnaire tab */
+    private static function tellLead(Opportunity $opportunity, string $title, string $message): void
+    {
+        $lead = $opportunity->lead_user_id ? User::where('id', $opportunity->lead_user_id)->where('status', 'Active')->first() : null;
+        if (! $lead) {
+            return;
+        }
+        DB::table('notifications')->insert([
+            'id' => (string) Str::uuid(),
+            'user_id' => $lead->id,
+            'type' => 'System',
+            'title' => Str::limit($title, 149, '…'), // the column holds 150
+            'message' => $message,
+            'link_url' => route('hq.crm.opportunity', ['opportunity' => $opportunity->id, 'tab' => 'questionnaire']),
+            'is_read' => 0,
+            'created_at' => now(),
+        ]);
     }
 
     private static function moveStage(Opportunity $opportunity, string $stage, User $by): void
