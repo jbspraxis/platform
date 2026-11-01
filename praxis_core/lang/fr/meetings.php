@@ -83,7 +83,23 @@ return [
         'failed' => "Les notes n’ont pas pu être rédigées\u{00A0}: :reason",
         'draft' => 'Rédiger les notes',
         'retry' => 'Réessayer',
-        'redraft' => 'Les rédiger à nouveau',
+        'download' => 'Télécharger',
+        'download_label' => 'Télécharger les notes de :title',
+        'download_notes' => 'Notes et détails de la réunion',
+        'download_transcript' => 'Notes et transcription complète',
+    ],
+
+    // Les notes en fichier Markdown (App\Support\Opportunities\MeetingNotesFile), dans la langue de l’opportunité
+    'file' => [
+        'field' => ":label\u{00A0}:",
+        'opportunity' => 'Opportunité',
+        'meeting' => 'Réunion',
+        'milestone' => 'Jalon',
+        'attendees' => 'Participants',
+        'transcript' => 'Transcription complète',
+        'footer' => 'Notes rédigées par l’IA à partir de la transcription de la réunion. Téléchargé depuis JBS Praxis HQ le :date.',
+        'name_notes' => 'notes',
+        'name_transcript' => 'notes-et-transcription',
     ],
 
     'minutes' => [

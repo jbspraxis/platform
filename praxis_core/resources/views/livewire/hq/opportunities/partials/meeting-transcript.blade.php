@@ -15,11 +15,10 @@
         <h4>{{ __('meetings.notes.title') }}</h4>
         @if (is_array($t->notes) && $t->notes && ! $busy($notesRun))
             @include('livewire.hq.opportunities.partials.meeting-notes', ['notes' => $t->notes])
-            @if ($canManage)
-                <button type="button" class="btn btn-ghost btn-sm" style="margin-top: 8px" wire:click="draftNotes('{{ $t->id }}')" wire:loading.attr="disabled" wire:target="draftNotes('{{ $t->id }}')">
-                    <i data-lucide="refresh-cw"></i> {{ __('meetings.notes.redraft') }}
-                </button>
-            @endif
+            {{-- Once written, the notes stay as the AI wrote them (no rewrite, to keep the AI spend down); they can be downloaded --}}
+            <div style="margin-top: 8px">
+                @include('livewire.hq.opportunities.partials.meeting-notes-download', ['where' => 'meeting'])
+            </div>
         @elseif ($busy($notesRun))
             <div class="mtg-status" role="status"><i data-lucide="loader-circle" class="animate-spin"></i><span>{{ __('meetings.notes.drafting') }}</span></div>
             <div class="mtg-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ (int) $notesRun->progress }}" aria-label="{{ __('meetings.notes.drafting') }}"><span style="width: {{ max(5, (int) $notesRun->progress) }}%"></span></div>

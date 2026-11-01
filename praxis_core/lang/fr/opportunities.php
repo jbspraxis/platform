@@ -218,6 +218,8 @@ return [
         'TRANSCRIPT_COLLECTED' => "Transcription d’une réunion récupérée auprès de Google.",
         'TRANSCRIPT_ADDED' => "Transcription d’une réunion ajoutée.",
         'TRANSCRIPT_NOT_FOUND' => "Aucune transcription trouvée dans Google pour une réunion.",
+        'NOTES_DOWNLOADED' => "Notes d’une réunion téléchargées.",
+        'TRANSCRIPT_DOWNLOADED' => "Notes et transcription complète d’une réunion téléchargées.",
         'MINUTES_SENT' => "Compte rendu d’une réunion envoyé au client.",
         'HANDOVER_POINT_CONFIRMED' => "Point d’une livraison de jalon confirmé comme incident.",
         'HANDOVER_POINT_DISMISSED' => "Point d’une livraison de jalon écarté des incidents.",
