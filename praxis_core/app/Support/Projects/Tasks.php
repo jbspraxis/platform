@@ -36,7 +36,8 @@ final class Tasks
             ->select('tasks.*')->first();
     }
 
-    public static function create(string $projectId, array $data): string
+    /** $notify false: the caller rings the lead itself (a whole plan written at once rings each person once: PlanWriter) */
+    public static function create(string $projectId, array $data, bool $notify = true): string
     {
         $id = (string) Str::uuid();
         $row = array_intersect_key($data, array_flip(self::FIELDS));
@@ -50,7 +51,7 @@ final class Tasks
             'updated_at' => now(),
         ]);
         ProjectRules::log('TASK_CREATED', "Added the task “{$row['title']}”.", 'tasks', $id, [], $row);
-        if (! empty($row['assigned_to'])) {
+        if ($notify && ! empty($row['assigned_to'])) {
             self::tellLead($projectId, $id, $row['title'], $row['assigned_to']);
         }
 

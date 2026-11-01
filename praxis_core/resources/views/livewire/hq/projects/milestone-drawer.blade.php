@@ -172,6 +172,12 @@
                                 {{ __('projects.milestone.no_invoice') }}
                                 @if ($canSeeMoney && $project && (float) $project->total_budget > 0)
                                     {{ __('projects.milestone.invoice_amount', ['amount' => ProjectPlan::money(\App\Support\Projects\Milestones::amount($milestone, (float) $project->total_budget), $project->currency)]) }}
+                                    {{-- "Less deposit, every milestone" (owner, 1 Nov 2026): what its invoice will be due --}}
+                                    @php $due = \App\Support\Projects\Deposit::forMilestone($milestone); @endphp
+                                    @if ($due['deposit'])
+                                        {{ __('projects.milestone.invoice_less', ['code' => 'M' . $milestone->phase_number, 'amount' => ProjectPlan::money($due['amount'], $project->currency),
+                                            'percent' => \App\Support\Projects\Deposit::percentLabel($due['deposit']['percent'], app()->getLocale()), 'due' => ProjectPlan::money($due['due'], $project->currency)]) }}
+                                    @endif
                                 @endif
                             </p>
                         @endif

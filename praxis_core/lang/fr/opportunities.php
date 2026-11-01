@@ -241,11 +241,22 @@ return [
         'PROPOSAL_SENT' => "Proposition envoyée au client.",
         'PROPOSAL_APPROVED_BY_CLIENT' => "Le client a approuvé la proposition.",
         'PROPOSAL_CHANGES_REQUESTED' => "Le client a demandé des modifications à la proposition.",
+        // Énoncé des travaux et projet (PR 5)
+        'SOW_STARTED' => "Énoncé des travaux commencé.",
+        'SOW_DRAFT_REQUESTED' => "Rédaction de l’énoncé des travaux demandée à l’IA.",
+        'SOW_VERSION_STARTED' => "Nouvelle version de l’énoncé des travaux commencée.",
+        'SOW_VERSION_DISCARDED' => "Version brouillon de l’énoncé des travaux abandonnée.",
+        'SOW_APPROVED' => "Énoncé des travaux approuvé et signé pour JBS Praxis.",
+        'SOW_REOPENED' => "Énoncé des travaux remis en brouillon.",
+        'SOW_SENT' => "Énoncé des travaux envoyé au client.",
+        'SOW_CHANGES_REQUESTED' => "Le client a demandé des modifications à l’énoncé des travaux.",
+        'SOW_SIGNED' => "Le client a signé l’énoncé des travaux\u{202F}; la facture d’acompte a été émise.",
+        'PROJECT_DRAFT_REQUESTED' => "Planification du projet demandée à l’IA.",
+        'PROJECT_CREATED' => "Projet créé à partir du brouillon du projet.",
     ],
 
     'stubs' => [
         'meetings' => "La planification des réunions depuis cette page, avec un lien Google Meet, les invitations et la récupération automatique des transcriptions, arrive prochainement. Les réunions des audits offerts précédents figurent ci-dessous.",
-        'sow' => "L’énoncé des travaux est rédigé à partir de la proposition approuvée, puis signé par le client. Cette fonction arrive prochainement.",
         'project' => "Le projet est préparé ici une fois l’énoncé des travaux signé.",
     ],
 

@@ -240,11 +240,22 @@ return [
         'PROPOSAL_SENT' => 'Sent the proposal to the client.',
         'PROPOSAL_APPROVED_BY_CLIENT' => 'The client approved the proposal.',
         'PROPOSAL_CHANGES_REQUESTED' => 'The client asked for changes to the proposal.',
+        // Statement of work and project (PR 5)
+        'SOW_STARTED' => 'Started the statement of work.',
+        'SOW_DRAFT_REQUESTED' => 'Asked the AI to draft the statement of work.',
+        'SOW_VERSION_STARTED' => 'Started a new version of the statement of work.',
+        'SOW_VERSION_DISCARDED' => 'Discarded a draft version of the statement of work.',
+        'SOW_APPROVED' => 'Approved and signed the statement of work for JBS Praxis.',
+        'SOW_REOPENED' => 'Took the statement of work back to draft.',
+        'SOW_SENT' => 'Sent the statement of work to the client.',
+        'SOW_CHANGES_REQUESTED' => 'The client asked for changes to the statement of work.',
+        'SOW_SIGNED' => 'The client signed the statement of work; the deposit invoice was raised.',
+        'PROJECT_DRAFT_REQUESTED' => 'Asked the AI to draft the project plan.',
+        'PROJECT_CREATED' => 'Created the project from the project draft.',
     ],
 
     'stubs' => [
         'meetings' => 'Booking meetings from here, with a Google Meet link, invitations and transcripts collected automatically, is coming next. Meetings from earlier free audits are listed below.',
-        'sow' => 'The statement of work is drafted from the approved proposal and signed by the client. This is coming soon.',
         'project' => 'The project is drafted here once the statement of work is signed.',
     ],
 

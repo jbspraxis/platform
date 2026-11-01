@@ -13,13 +13,23 @@ class ProjectDraft extends Model
     use HasUuids, SoftDeletes;
 
     protected $fillable = [
-        'opportunity_id', 'sow_id', 'payload', 'status', 'ai_run_id', 'created_project_id', 'created_by', 'updated_by', 'deleted_by',
+        'opportunity_id', 'sow_id', 'payload', 'status', 'revision', 'ai_run_id', 'created_project_id', 'created_by', 'updated_by', 'deleted_by',
     ];
 
-    protected $casts = ['payload' => 'array'];
+    protected $casts = ['payload' => 'array', 'revision' => 'integer'];
 
     public function opportunity(): BelongsTo
     {
         return $this->belongsTo(Opportunity::class);
+    }
+
+    public function sow(): BelongsTo
+    {
+        return $this->belongsTo(StatementOfWork::class, 'sow_id');
+    }
+
+    public function aiRun(): BelongsTo
+    {
+        return $this->belongsTo(AiRun::class);
     }
 }

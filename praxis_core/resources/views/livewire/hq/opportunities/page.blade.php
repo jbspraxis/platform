@@ -46,7 +46,7 @@
             'meetings' => __('opportunities.tabs.meetings') . ($meetings->count() ? ' (' . $meetings->count() . ')' : ''),
             'questionnaire' => __('opportunities.tabs.questionnaire'),
             'proposals' => __('opportunities.tabs.proposals') . ($proposals->count() ? ' (' . $proposals->count() . ')' : ''),
-            'sow' => __('opportunities.tabs.sow'),
+            'sow' => __('opportunities.tabs.sow') . ($sows->count() ? ' (' . $sows->count() . ')' : ''),
             'project' => __('opportunities.tabs.project'),
         ];
     @endphp
@@ -237,20 +237,14 @@
             <livewire:hq.opportunities.proposals-tab :opportunity-id="$o->id" :key="'proposals-' . $o->id" />
 
         @elseif ($tab === 'sow')
-            @if ($sows->isNotEmpty())
-                <div class="card">
-                    <ul style="margin: 0; padding-left: 18px">
-                        @foreach ($sows as $sow)
-                            <li wire:key="sow-{{ $sow->id }}">{{ $sow->reference ?: __('opportunities.tabs.sow') }} · {{ __('opportunities.sow.version', ['n' => $sow->version]) }} · {{ __('opportunities.sow.statuses.' . $sow->status) }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            @else
-                <div class="card empty-state"><strong>{{ __('opportunities.sow.empty_title') }}</strong>{{ __('opportunities.stubs.sow') }}</div>
-            @endif
+            {{-- PR 5: App\Livewire\Hq\Opportunities\SowTab --}}
+            <livewire:hq.opportunities.sow-tab :opportunity-id="$o->id" :key="'sow-' . $o->id" />
 
         @elseif ($tab === 'project')
-            @if ($project)
+            {{-- PR 5: the project draft until Create project (App\Livewire\Hq\Opportunities\ProjectDraftTab), then the project --}}
+            @if ($draftOpen)
+                <livewire:hq.opportunities.project-draft-tab :opportunity-id="$o->id" :key="'project-draft-' . $o->id" />
+            @elseif ($project)
                 <section class="card" aria-labelledby="opp-project-title">
                     <h2 class="card-title" id="opp-project-title" style="margin-bottom: 12px">{{ $project->title }}</h2>
                     <dl class="opp-dl" style="margin-bottom: 16px">

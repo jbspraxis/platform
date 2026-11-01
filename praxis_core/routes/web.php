@@ -119,6 +119,7 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
             Route::get('/', \App\Livewire\Hq\Opportunities\OpportunityBoard::class)->name('hq.crm.opportunities');
             Route::get('/{opportunity}', \App\Livewire\Hq\Opportunities\OpportunityPage::class)->whereUuid('opportunity')->name('hq.crm.opportunity');
             Route::get('/{opportunity}/proposals/{proposal}/pdf', [\App\Http\Controllers\ProposalPdfController::class, 'hq'])->whereUuid(['opportunity', 'proposal'])->name('hq.crm.proposal-pdf');
+            Route::get('/{opportunity}/sow/{sow}/pdf', [\App\Http\Controllers\SowPdfController::class, 'hq'])->whereUuid(['opportunity', 'sow'])->name('hq.crm.sow-pdf');
         });
 
         // 5. MARKETING & ROAS
@@ -240,6 +241,12 @@ Route::domain(Hosts::portal())->group(function () use ($notOwnRoute, $legacy) {
             ->middleware('signed:relative')->name('portal.proposals.review');
         Route::get('/proposals/{proposal}/pdf', [\App\Http\Controllers\ProposalPdfController::class, 'portal'])->whereUuid('proposal')
             ->middleware('signed:relative')->name('portal.proposals.pdf');
+
+        // One version of an opportunity's statement of work: read it, sign it with the one-time code or ask for changes; and its PDF (PR 5)
+        Route::get('/sow/{sow}', \App\Livewire\Portal\SowReview::class)->whereUuid('sow')
+            ->middleware('signed:relative')->name('portal.sow');
+        Route::get('/sow/{sow}/pdf', [\App\Http\Controllers\SowPdfController::class, 'portal'])->whereUuid('sow')
+            ->middleware('signed:relative')->name('portal.sow.pdf');
     });
 
     // Client accounts only (guard 'client', table client_users)

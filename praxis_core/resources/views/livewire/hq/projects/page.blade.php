@@ -46,6 +46,17 @@
 
     <x-flash class="mb-6" />
 
+    @if ($planPending)
+        <div class="callout mb-6" role="note" style="display: flex; gap: 10px; align-items: flex-start">
+            <i data-lucide="info" style="width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px"></i>
+            <span>{{ __('projects.money.plan_pending') }}
+                @if ($opportunity && $canOpenOpportunity)
+                    <a href="{{ route('hq.crm.opportunity', ['opportunity' => $opportunity->id, 'tab' => 'project']) }}" wire:navigate>{{ __('projects.money.open_draft') }}</a>
+                @endif
+            </span>
+        </div>
+    @endif
+
     <section class="pj-stats" aria-label="{{ __('projects.stats.label') }}">
         <div class="pj-stat">
             <div class="stat-label">{{ __('projects.stats.progress') }}</div>
@@ -480,6 +491,14 @@
                     @endif
                 </section>
             </div>
+
+            {{-- PR 5: every transcript and the minutes of the opportunity, read only (PR 2's TranscriptList: full text only with transcript rights) --}}
+            @if ($opportunity && $canOpenOpportunity)
+                <section aria-labelledby="pj-transcripts-title" style="margin-top: 16px">
+                    <h2 class="card-title" id="pj-transcripts-title" style="margin-bottom: 12px">{{ __('projects.money.transcripts') }}</h2>
+                    <livewire:hq.opportunities.transcript-list :opportunity-id="$opportunity->id" :key="'transcripts-' . $opportunity->id" />
+                </section>
+            @endif
         @endif
     </div>
 

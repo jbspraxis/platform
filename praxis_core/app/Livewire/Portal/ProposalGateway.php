@@ -4,15 +4,16 @@ namespace App\Livewire\Portal;
 
 use App\Livewire\Portal\Concerns\WithGatewayLanguage;
 use App\Mail\SigningCode;
-use App\Mail\UserInvitation;
 use App\Support\Access;
+use App\Support\Finance\DepositInvoice;
 use App\Support\MailLocale;
+use App\Support\Portal\SignerOnboarding;
+use App\Support\Signing\SigningCodes;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -51,10 +52,11 @@ class ProposalGateway extends Component
         'go-live and handover' => 'go_live_handover',
     ];
 
-    // Signing code limits: 3 codes per proposal and per email address, 5 wrong codes per proposal, every 15 minutes
-    public const MAX_CODES = 3;
-    public const MAX_WRONG_CODES = 5;
-    public const LOCK_SECONDS = 900;
+    // Signing code limits (App\Support\Signing\SigningCodes): 3 codes per proposal and per email address, 5 wrong
+    // codes per proposal, every 15 minutes
+    public const MAX_CODES = SigningCodes::MAX_CODES;
+    public const MAX_WRONG_CODES = SigningCodes::MAX_WRONG_CODES;
+    public const LOCK_SECONDS = SigningCodes::LOCK_SECONDS;
 
     // Validation messages in the page language (lang/<locale>/gateway.php)
     protected function messages(): array
@@ -134,26 +136,17 @@ class ProposalGateway extends Component
         }
 
         // At most 3 signing codes every 15 minutes per proposal and per email address, whichever device asks
-        $sendKeys = [
-            'too_many_codes' => self::sendKey($proposal->id),
-            'too_many_codes_email' => self::sendKeyForEmail($this->signerEmail),
-        ];
-        foreach ($sendKeys as $message => $key) {
-            if (RateLimiter::tooManyAttempts($key, self::MAX_CODES)) {
-                $this->addError('signingCode', __('gateway.proposal.' . $message, ['wait' => self::waitFor($key)]));
-                return;
-            }
-        }
-        foreach ($sendKeys as $key) {
-            RateLimiter::hit($key, self::LOCK_SECONDS);
+        if ($refused = SigningCodes::claimSend('proposal', $proposal->id, $this->signerEmail)) {
+            $this->addError('signingCode', __('gateway.proposal.' . $refused[0], ['wait' => self::minutes($refused[1])]));
+            return;
         }
 
         // Generate OTP
-        $otp = (string) random_int(100000, 999999);
+        $otp = SigningCodes::newCode();
         
         // PRE-SAVE: Secure the signature immediately so it survives F5 refreshes
         DB::table('proposals')->where('id', $proposal->id)->update([
-            'auth_otp' => $otp,
+            'auth_otp' => SigningCodes::hash($otp), // an HMAC: the code itself is only in the email
             'otp_expires_at' => now()->addMinutes(10),
             'signed_by_name' => $this->signerName . ' (' . $this->signerTitle . ')',
             'client_signature_b64' => $this->signatureBase64,
@@ -201,25 +194,15 @@ class ProposalGateway extends Component
 
         // At most 5 wrong codes per proposal (from any device), then a 15-minute wait. The fifth wrong code also
         // cancels the code, so it can't be guessed after the wait: the signer asks for a new one.
-        $checkKey = self::checkKey($proposal->id);
-        if (RateLimiter::tooManyAttempts($checkKey, self::MAX_WRONG_CODES)) {
-            $this->addError('otpInput', __('gateway.proposal.too_many_attempts', ['wait' => self::waitFor($checkKey)]));
-            return;
-        }
-
-        // Validate OTP
-        if (! $proposal->auth_otp || ! hash_equals((string) $proposal->auth_otp, (string) $this->otpInput) || now()->greaterThan($proposal->otp_expires_at)) {
-            RateLimiter::hit($checkKey, self::LOCK_SECONDS);
-            if (RateLimiter::tooManyAttempts($checkKey, self::MAX_WRONG_CODES)) {
+        $refused = SigningCodes::check('proposal', $proposal->id, $proposal->auth_otp ? (string) $proposal->auth_otp : null, $proposal->otp_expires_at, (string) $this->otpInput);
+        if ($refused) {
+            if ($refused[0] === 'cancel') {
                 // updated_at kept as it is: the proposal's validity runs from it
                 DB::table('proposals')->where('id', $proposal->id)->update(['auth_otp' => null, 'otp_expires_at' => null, 'updated_at' => $proposal->updated_at]);
-                $this->addError('otpInput', __('gateway.proposal.too_many_attempts', ['wait' => self::waitFor($checkKey)]));
-                return;
             }
-            $this->addError('otpInput', __('gateway.proposal.code_invalid'));
+            $this->addError('otpInput', $refused[0] === 'wrong' ? __('gateway.proposal.code_invalid') : __('gateway.proposal.too_many_attempts', ['wait' => self::minutes($refused[1])]));
             return;
         }
-        RateLimiter::clear($checkKey);
 
         $organization = DB::table('organizations')->where('id', $proposal->organization_id)->first();
         $ipAddress = Request::ip();
@@ -231,6 +214,14 @@ class ProposalGateway extends Component
         $clientHash = 'SHA256-CLIENT-' . strtoupper(hash('sha256', $proposal->id . $finalName . $ipAddress . $timestamp));
 
         $signed = DB::transaction(function () use ($proposal, $organization, $ipAddress, $timestamp, $clientHash, $finalName) {
+
+            // The opportunity's row first, as the SOW's signing does: a SOW signed meanwhile stops this one
+            if ($proposal->opportunity_id) {
+                DB::table('opportunities')->where('id', $proposal->opportunity_id)->lockForUpdate()->first();
+                if (\App\Support\Opportunities\Sows::signed($proposal->opportunity_id)) {
+                    return false;
+                }
+            }
 
             // 1. Lock the proposal (code cleared, fingerprint applied), only while it still awaits the
             // client: HQ may have unlocked it since the page was opened
@@ -251,16 +242,19 @@ class ProposalGateway extends Component
 
             DB::table('organizations')->where('id', $organization->id)->update(['status' => 'Active Client', 'updated_at' => $timestamp]);
 
-            // 2. Create the project
+            // 2. Create the project, led by the opportunity's lead (else the proposal's author: docs/PROJECTS.md 9)
             $projectId = (string) Str::uuid();
+            $opportunityLead = $proposal->opportunity_id ? DB::table('opportunities')->where('id', $proposal->opportunity_id)->value('lead_user_id') : null;
             DB::table('projects')->insert([
                 'id' => $projectId,
                 'organization_id' => $organization->id,
+                'opportunity_id' => $proposal->opportunity_id,
                 'title' => $proposal->title,
                 'description' => 'Created from signed proposal ' . $proposal->proposal_ref . '.',
-                'status' => 'Scoping', 
+                'status' => 'Scoping',
                 'currency' => $proposal->currency,
                 'total_budget' => $proposal->total_value,
+                'lead_user_id' => $opportunityLead ?: $proposal->created_by,
                 'created_by' => $proposal->created_by,
                 'created_at' => $timestamp,
                 'updated_at' => $timestamp
@@ -275,14 +269,17 @@ class ProposalGateway extends Component
 
             if ($phases && is_array($phases)) {
                 foreach ($phases as $index => $phase) {
+                    $weight = ((float)($phase['weight'] ?? 1) / 4.0) * 100;
                     DB::table('project_phases')->insert([
-                        'id' => (string) Str::uuid(), 
+                        'id' => (string) Str::uuid(),
                         'project_id' => $projectId,
-                        'title' => current(explode(':', $phase['title'] ?? 'Phase ' . ($index + 1))), 
+                        'title' => current(explode(':', $phase['title'] ?? 'Phase ' . ($index + 1))),
                         'description' => ($phase['title'] ?? 'Phase') . ': scope as set out in the proposal.',
-                        'phase_number' => $index + 1, 
-                        'weight_percentage' => ((float)($phase['weight'] ?? 1) / 4.0) * 100, 
-                        'status' => 'Pending', 
+                        'phase_number' => $index + 1,
+                        'weight_percentage' => $weight,
+                        // The milestone's agreed amount (docs/PROJECTS.md 4), so Finance's pre-fill never drifts
+                        'amount' => round((float) $proposal->total_value * $weight / 100, 2),
+                        'status' => 'Pending',
                         'created_at' => $timestamp
                     ]);
                 }
@@ -301,69 +298,16 @@ class ProposalGateway extends Component
                 ]);
             }
 
-            // 4. CALCULATE INVOICE #001 (Automated Deposit Generation)
-            $depositPercentage = $proposal->payment_schedule_type === 'custom' 
-                ? (float) $proposal->custom_deposit_percent 
-                : (float) current(explode('_', $proposal->payment_schedule_type));
-
-            $depositSubtotal = $proposal->subtotal * ($depositPercentage / 100);
-            $depositVat = $proposal->vat_rate ? ($depositSubtotal * ($proposal->vat_rate / 100)) : 0;
-            $depositTotal = $depositSubtotal + $depositVat;
-
-            $invoiceId = (string) Str::uuid();
-            $invNumber = 'INV-' . date('Ym') . '-' . random_int(1000, 9999);
-            
-            // Auto-FX Lock
-            $fxRate = 1.000000;
-            if ($proposal->currency !== 'USD') {
-                $fxRate = DB::table('mdm_exchange_rates')->where('currency_code', $proposal->currency)->value('rate_to_usd') ?? 1.000000;
-            }
-
-            $remittanceId = DB::table('mdm_remittance_accounts')->where('is_active', 1)->value('id');
-
-            // Due in 10 days
-            $dueDate = now()->addDays(10);
-            
-            // SHA-256 fingerprint of the invoice
-            $invHashData = $invoiceId . $depositTotal . $timestamp;
-            $invoiceHash = 'SHA256-INV-' . strtoupper(hash('sha256', $invHashData));
-
-            DB::table('invoices')->insert([
-                'id' => $invoiceId, 
-                'project_id' => $projectId, 
-                'invoice_number' => $invNumber,
-                'invoice_type' => 'Tax Invoice - Initial Deposit', 
-                'po_sow_reference' => $proposal->proposal_ref,
-                'client_billing_address' => $organization->billing_address ?? 'TBD', 
-                'client_tax_id' => $organization->tax_identification_number ?? null,
-                'amount_due' => $depositSubtotal, 
-                'vat_amount' => $depositVat, 
-                'wht_amount' => 0.00,
-                'total_amount' => $depositTotal,
-                'currency' => $proposal->currency, 
-                'exchange_rate_locked' => $fxRate,
-                'status' => 'Pending', // Direct to Active
-                'due_date' => $dueDate, 
-                'payment_terms' => 'Net 10',
-                'remittance_account_id' => $remittanceId, 
-                'jbs_signature_hash' => $invoiceHash,
-                'created_by' => $proposal->created_by, // Attributed to the admin who drafted it
-                'issued_at' => $timestamp,
-                'created_at' => $timestamp, 
-                'updated_at' => $timestamp
-            ]);
-
-            DB::table('invoice_lines')->insert([
-                'invoice_id' => $invoiceId, 
-                'description' => "Deposit ({$depositPercentage}%): " . $proposal->title,
-                'metric_of_billing' => 'Fixed Milestone', 
-                'quantity' => 1, 
-                'unit_price' => $depositSubtotal, 
-                'total_price' => $depositSubtotal
-            ]);
-
-            // 5. TRIGGER THE IFRS GENERAL LEDGER ENGINE
-            \App\Livewire\Hq\Finance\GeneralLedgerManager::recordInvoiceIssued($invoiceId);
+            // 4. Invoice #001, the deposit, posted to the general ledger (App\Support\Finance\DepositInvoice)
+            $invNumber = DepositInvoice::raise($projectId, $organization, [
+                'subtotal' => $proposal->subtotal,
+                'vat_rate' => $proposal->vat_rate,
+                'currency' => $proposal->currency,
+                'payment_schedule_type' => $proposal->payment_schedule_type,
+                'custom_deposit_percent' => $proposal->custom_deposit_percent ?? null,
+                'title' => $proposal->title,
+                'reference' => $proposal->proposal_ref,
+            ], $proposal->created_by, $timestamp)['number']; // attributed to the admin who drafted it
 
             // 6. Notify HQ: the sales team (deal won) and finance (deposit invoice issued)
             $recipients = array_unique(array_merge(Access::staffWith('crm.edit'), Access::staffWith('finance.approve')));
@@ -378,35 +322,8 @@ class ProposalGateway extends Component
             }
             if(!empty($notifications)) DB::table('notifications')->insert($notifications);
 
-            // 7. Make the signer the primary contact and send the account setup link
-            // The signer's lead contact becomes the organisation's primary portal account
-            $clientUser = DB::table('client_users')->where('organization_id', $organization->id)->where('email', $this->signerEmail)->whereNull('deleted_at')->first();
-            if (!$clientUser) {
-                $clientUser = DB::table('client_users')->where('organization_id', $organization->id)->whereNull('deleted_at')->orderBy('created_at')->first();
-            }
-
-            if ($clientUser) {
-                $invitationToken = Str::random(60);
-
-                DB::table('client_users')->where('id', $clientUser->id)->update([
-                    'invitation_token' => $invitationToken,
-                    'lifecycle_stage' => 'Onboarding',
-                    'is_primary_client' => 1, 
-                    'updated_at' => $timestamp
-                ]);
-                
-                $setupUrl = route('client.setup', ['token' => $invitationToken]);
-                // Only contacts who have never set a password get the setup email; a returning client already has access
-                if ($clientUser->password === null) {
-                    try {
-                        $locale = session()->has('locale') ? MailLocale::forVisitor() : MailLocale::forRecipient($organization->preferred_language ?? null);
-                        Mail::to($clientUser->email)->locale($locale)
-                            ->send(new UserInvitation($clientUser->first_name, $invitationToken, true, $proposal->title ?: $proposal->proposal_ref));
-                    } catch (\Exception $e) {
-                        Log::info("Praxis Setup URL for {$clientUser->email}: {$setupUrl}");
-                    }
-                }
-            }
+            // 7. The signer becomes the primary portal account and gets the setup link (App\Support\Portal\SignerOnboarding)
+            SignerOnboarding::welcome($organization, $this->signerEmail, $proposal->title ?: $proposal->proposal_ref, $timestamp);
 
             return true;
         });
@@ -420,34 +337,37 @@ class ProposalGateway extends Component
         $this->dispatch('reinit-deck');
     }
 
-    /** Limiter keys for codes sent and wrong codes; the email address is hashed so it isn't stored in the cache */
+    /** Limiter keys for codes sent and wrong codes (SigningCodes); the email address is hashed so it isn't stored in the cache */
     public static function sendKey(string $proposalId): string
     {
-        return 'proposal-otp-send:' . $proposalId;
+        return SigningCodes::sendKey('proposal', $proposalId);
     }
 
     public static function sendKeyForEmail(string $email): string
     {
-        return 'proposal-otp-send-email:' . sha1(mb_strtolower(trim($email)));
+        return SigningCodes::sendKeyForEmail($email);
     }
 
     public static function checkKey(string $proposalId): string
     {
-        return 'proposal-otp-check:' . $proposalId;
+        return SigningCodes::checkKey('proposal', $proposalId);
     }
 
     /** "12 minutes" (in the page language): how long until the limiter lets the person try again */
-    private static function waitFor(string $key): string
+    private static function minutes(int $minutes): string
     {
-        $minutes = max(1, (int) ceil(RateLimiter::availableIn($key) / 60));
-
         return trans_choice('gateway.proposal.wait_minutes', $minutes, ['count' => $minutes]);
     }
 
-    /** Only a proposal HQ has signed and sent (status Pending Auth) can be signed by the client */
+    /**
+     * Only a proposal HQ has signed and sent (status Pending Auth) can be signed by the client, and never once a
+     * statement of work of its opportunity was signed (PR 5): one piece of work is signed once. A Won opportunity alone
+     * doesn't stop it: the backfill put each organisation's earlier work into one opportunity, Won when any of it was.
+     */
     private function awaitsClientSignature(object $proposal): bool
     {
-        return $proposal->status === 'Pending Auth' && filled($proposal->hq_signature_hash);
+        return $proposal->status === 'Pending Auth' && filled($proposal->hq_signature_hash)
+            && ! ($proposal->opportunity_id && \App\Support\Opportunities\Sows::signed($proposal->opportunity_id));
     }
 
     public function render()

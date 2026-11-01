@@ -1,0 +1,286 @@
+<?php
+
+// L’onglet Énoncé des travaux de l’opportunité, la page de signature du client et le PDF (Opportunités PR 5). Mêmes clés que lang/en/sow.php.
+// Typographie : U+202F avant ; ? ! % et dans « », U+00A0 avant :, apostrophe ’.
+return [
+    'empty_title' => 'Pas encore d’énoncé des travaux',
+    'empty_text' => 'L’énoncé des travaux se rédige ici une fois qu’une proposition est approuvée par le client.',
+    'no_proposal' => 'L’énoncé des travaux est rédigé à partir de la proposition approuvée par le client. Aucune proposition n’est encore approuvée.',
+    'open_proposals' => 'Ouvrir les propositions',
+    'closed' => "Cette opportunité est close\u{00A0}: son énoncé des travaux ne peut plus changer.",
+    'read_only' => "Vous pouvez lire ce brouillon. Les personnes qui gèrent l’opportunité le modifient\u{202F}; le dirigeant ou le responsable l’approuve.",
+    'heading' => 'Énoncé des travaux :ref, version :n',
+    'version' => 'Version :n',
+
+    'statuses' => [
+        'draft' => 'Brouillon',
+        'approved' => 'Approuvé, non envoyé',
+        'sent' => 'Chez le client',
+        'changes_requested' => 'Modifications demandées',
+        'signed' => 'Signé',
+        'superseded' => 'Remplacé',
+    ],
+
+    'sections' => [
+        'purpose' => 'Parties et objet',
+        'scope' => 'Périmètre',
+        'deliverables' => 'Livrables et réception',
+        'assumptions' => 'Hypothèses et dépendances',
+        'timeline' => 'Jalons et calendrier',
+        'governance' => 'Rôles et gouvernance',
+        'change_control' => 'Gestion des changements',
+    ],
+
+    'legal_name' => [
+        'missing' => "La raison sociale de JBS Praxis n’est pas renseignée\u{202F}: l’énoncé des travaux ne peut pas nommer la partie contractante. Le dirigeant la renseigne dans Paramètres du site › Raison sociale\u{202F}; d’ici là, il ne peut pas être approuvé.",
+    ],
+
+    'start' => [
+        'title' => 'Rédiger l’énoncé des travaux',
+        'intro' => "Il part de la proposition :ref, version :n, approuvée par :name, et devient le contrat que vous signez tous les deux. Les honoraires viennent de cette proposition\u{202F}; vous fixez le périmètre, les livrables et les jalons dans lesquels le travail est réceptionné et payé.",
+        'no_transcripts' => "Seule une personne autorisée à lire les transcriptions des réunions peut demander à l’IA de le rédiger. Vous pouvez en commencer un vierge.",
+        'instructions_help' => "Facultatif\u{00A0}: ce sur quoi insister, ce qu’il faut laisser de côté, comment découper les jalons.",
+        'transcripts' => 'Lire aussi les transcriptions complètes',
+        'transcripts_help' => "Par défaut, l’IA lit les notes des réunions, ce qui coûte moins cher. Cochez quand le détail compte.",
+        'language' => "L’IA le rédige en :language, la langue de l’opportunité.",
+        'cost' => 'Un brouillon coûte environ 0,15 à 0,30 $ du budget IA.',
+        'ai' => 'Rédiger avec l’IA',
+        'blank' => 'Commencer un énoncé vierge',
+    ],
+
+    'bar' => [
+        'draft' => 'Brouillon, modifié le :date',
+        'approved' => 'Approuvé et signé pour JBS Praxis par :name le :date, pas encore envoyé',
+        'sent' => 'Envoyé le :date, à signer avant le :until',
+        'signed' => 'Signé par :name le :date',
+        'parties' => 'Entre :party et :client',
+        'pdf' => 'PDF',
+        'preview' => 'Aperçu du PDF',
+    ],
+
+    'drafting' => [
+        'title' => "L’IA rédige la version :n",
+        'text' => "Elle lit la proposition approuvée, les notes des réunions et les réponses au questionnaire. Cela prend quelques minutes\u{202F}; vous pouvez quitter cette page et revenir.",
+        'progress' => 'Avancement de la rédaction',
+        'failed' => "L’IA n’a pas pu rédiger l’énoncé des travaux\u{00A0}: :message",
+    ],
+
+    'redraft' => [
+        'button' => 'Rédiger à nouveau avec l’IA',
+        'title' => 'Rédiger à nouveau cette version avec l’IA',
+        'intro' => 'Son brouillon remplace le titre, chaque partie et les jalons.',
+        'intro_version' => 'Elle réécrit cette version à partir de la version :n et des modifications demandées par le client. Son brouillon remplace le titre, chaque partie et les jalons.',
+        'submit' => 'Rédiger à nouveau',
+    ],
+
+    'editor' => [
+        'title' => 'Modifier le brouillon',
+        'doc_title' => 'Titre',
+        'sections' => 'Parties',
+        'new_section' => 'Nouvelle partie',
+    ],
+
+    'changes' => [
+        'label' => 'Ce qui a changé depuis la version :n',
+        'help' => "Le client lit ceci en premier, dans l’e-mail et sur la page de signature. Obligatoire avant d’approuver cette version.",
+        'asked' => "Ce que le client a demandé de changer dans la version :n\u{00A0}:",
+    ],
+
+    'milestones' => [
+        'title' => 'Jalons',
+        'intro' => "Les étapes dans lesquelles le travail est livré, réceptionné et payé. Le poids de chacun est sa part du contrat\u{202F}; ensemble, ils doivent faire 100\u{202F}%. Ils deviennent les jalons du projet une fois l’énoncé signé.",
+        'milestone' => 'Jalon',
+        'code' => 'J:n',
+        'weeks' => 'Durée',
+        'weeks_count' => ':count semaine|:count semaines',
+        'weight' => 'Poids',
+        'weight_input' => "Poids (%)",
+        'amount' => 'Montant HT',
+        'deliverables' => 'Ce qu’il livre et comment il est réceptionné',
+        'none' => 'Pas encore de jalons.',
+        'add' => 'Ajouter un jalon',
+        'up' => 'Monter le jalon :n',
+        'down' => 'Descendre le jalon :n',
+        'remove' => 'Retirer le jalon :n',
+        'remove_confirm' => "Retirer ce jalon du brouillon\u{202F}?",
+        'weight_total' => "Poids\u{00A0}: :total sur 100\u{202F}%",
+        'weight_off' => "leur total doit faire 100\u{202F}%",
+        'amount_total' => "Montants\u{00A0}: :amount sur :total HT",
+    ],
+
+    'fees' => [
+        'title' => 'Honoraires et paiement',
+        'intro' => "Issus de la proposition approuvée :ref, version :n. Ils ne changent pas ici\u{202F}: un nouveau prix demande une nouvelle proposition.",
+        'deposit' => 'Acompte',
+        'deposit_text' => ":percent\u{202F}% à la signature\u{00A0}: :amount, facturé aussitôt",
+    ],
+
+    'terms' => [
+        'validity_input' => 'Jours laissés au client pour signer',
+        'sign_by' => 'À signer avant le',
+    ],
+
+    'approve' => [
+        'title' => 'Approuver et signer pour JBS Praxis',
+        'intro' => "En l’approuvant, vous le signez pour :party\u{00A0}: votre nom et votre signature figurent sur l’énoncé des travaux que reçoit le client. Vérifiez d’abord chaque partie, les jalons et les honoraires.",
+        'who' => "Le dirigeant ou le responsable de l’opportunité (:name) l’approuve et le signe pour JBS Praxis.",
+        'name' => 'Votre nom, tel qu’il figure au contrat',
+        'signature' => 'Votre signature',
+        'signature_help' => 'Dessinez-la à la souris, au doigt ou au stylet.',
+        'button' => 'Approuver et signer',
+        'done' => 'Approuvé et signé pour JBS Praxis. Envoyez-le au client ci-dessous.',
+        'reopen' => 'Remettre en brouillon',
+        'reopen_confirm' => "Le remettre en brouillon\u{202F}? Votre signature est retirée et vous signerez à nouveau après les modifications.",
+        'reopened' => "Remis en brouillon\u{202F}; la signature de JBS Praxis a été retirée.",
+        'errors' => [
+            'name' => 'Indiquez votre nom tel qu’il figure au contrat.',
+            'signature' => 'Dessinez votre signature dans le cadre.',
+            'signed' => "Le client a déjà signé une version\u{202F}: aucune autre ne peut être approuvée.",
+            'state' => 'Seul un brouillon que personne n’a approuvé peut être approuvé.',
+            'running' => "L’IA rédige encore cette version. Approuvez-la une fois le brouillon arrivé.",
+            'empty' => 'Donnez-lui d’abord un titre et rédigez au moins une partie.',
+            'milestones' => "Le total des poids des jalons doit faire exactement 100\u{202F}%.",
+            'changes' => 'Indiquez d’abord ce qui a changé depuis la version précédente.',
+            'legal_name' => "La raison sociale de JBS Praxis n’est pas renseignée. Demandez au dirigeant de la saisir dans Paramètres du site › Raison sociale.",
+            'proposal' => "La proposition dont il est issu n’est plus celle que le client a approuvée.",
+        ],
+    ],
+
+    'send' => [
+        'title' => 'L’envoyer au client',
+        'intro' => "Il reçoit un e-mail aux couleurs de JBS Praxis, en :language, avec le PDF et un lien pour le signer en ligne avec un code à usage unique.",
+        'to_help' => "Seule une personne de l’organisation du client ayant une fiche de contact active peut le signer\u{202F}; les autres peuvent le lire.",
+        'submit' => 'Envoyer l’énoncé des travaux',
+        'done' => 'L’énoncé des travaux est en route.',
+        'link_intro' => 'Le même e-mail avec le lien et le PDF. Le lien fonctionne jusqu’au :date.',
+        'link_done' => 'Le lien est de nouveau en route.',
+        'errors' => [
+            'state' => "Seule une version approuvée et pas encore envoyée peut être envoyée. Rechargez l’onglet.",
+            'link_state' => "Seule une version chez le client et encore valable peut être renvoyée.",
+        ],
+    ],
+
+    'client' => [
+        'waiting' => 'En attente de la signature du client.',
+        'expired' => "Le délai de signature a pris fin le :date. Commencez une nouvelle version pour l’envoyer à nouveau.",
+        'signed' => ':name (:title, :email) l’a signé le :date.',
+        'deposit' => 'La facture d’acompte :number (:amount) a été émise.',
+        'open_project' => 'Ouvrir le brouillon du projet',
+        'changes' => ':who a demandé des modifications le :date.',
+        'superseded' => 'Une version plus récente a remplacé celle-ci.',
+        'set_aside' => "Mise de côté\u{00A0}: le client a signé la version :n.",
+    ],
+
+    'versions' => [
+        'label' => 'Version',
+        'new' => 'Commencer la version :n',
+        'new_help' => 'Copie la version que le client a reçue, pour que vous la modifiiez.',
+        'started' => 'Version :n commencée.',
+        'discard' => 'Abandonner ce brouillon',
+        'discard_confirm' => "Abandonner le brouillon de la version :n\u{202F}? Le client ne l’a pas reçu.",
+        'discarded' => 'Le brouillon de la version :n a été abandonné.',
+        'not_discarded' => 'Cette version ne peut pas être abandonnée pour le moment.',
+    ],
+
+    'errors' => [
+        'not_editable' => 'Cette version ne peut plus être modifiée.',
+        'not_saved' => "Votre dernière modification n’a pas été enregistrée\u{202F}: cette version a changé entre-temps. La voici telle qu’elle est maintenant.",
+        'note_long' => 'Limitez les consignes à :max caractères.',
+        'no_proposal' => 'Le client n’a pas encore approuvé de proposition.',
+    ],
+
+    'signature' => [
+        'clear' => 'Effacer',
+    ],
+
+    // Un énoncé importé par opportunities:import (signé sur papier avant le pipeline, par exemple MyCity)
+    'imported' => [
+        'signed' => 'Signé sur papier le :date et importé dans HQ.',
+        'by' => "Pour le client\u{00A0}: :name.",
+        'where' => "Ses honoraires et conditions de paiement figurent dans le document signé et les factures du projet\u{202F}; HQ n’en produit pas de PDF.",
+        'on_paper' => 'Signé sur papier le :date',
+    ],
+
+    'signatures' => [
+        'title' => 'Signatures',
+        'for' => 'Pour :party',
+        'on' => 'Signé le :date',
+        'waiting' => 'Pas encore signé.',
+        'waiting_you' => 'En attente de votre signature.',
+        'image' => 'Signature de :name',
+    ],
+
+    'notify' => [
+        'ready_title' => "Énoncé des travaux rédigé\u{00A0}: :title",
+        'ready' => 'La version :n est prête pour votre relecture.',
+        'failed_title' => "Énoncé des travaux non rédigé\u{00A0}: :title",
+        'failed' => "L’IA n’a pas pu le rédiger\u{00A0}: :message",
+        'changes_title' => 'Modifications demandées sur l’énoncé des travaux',
+        'changes' => ":name a demandé des modifications à la version :version de l’énoncé des travaux pour «\u{202F}:title\u{202F}».",
+        'signed_title' => "Énoncé des travaux signé\u{00A0}: :title",
+        'signed' => ":name, de :company, a signé la version :version. La facture d’acompte :invoice est émise\u{202F}; le brouillon du projet est en préparation.",
+    ],
+
+    'pdf' => [
+        'kicker' => 'Énoncé des travaux',
+        'footer' => 'JBS Praxis · Énoncé des travaux :ref, version :version · Confidentiel',
+        'between' => 'Entre',
+        'and' => 'Et',
+        'reference' => 'Référence',
+        'proposal' => 'Proposition approuvée',
+        'date' => 'Date',
+        'valid_until' => 'À signer avant le',
+        'changes' => 'Ce qui a changé depuis la version :n',
+        'milestones' => 'Jalons',
+        'fees' => 'Honoraires et paiement',
+        'signatures' => 'Signatures',
+        'for' => 'Pour :party',
+        'signed_on' => 'Signé électroniquement le :date',
+        'not_signed' => 'Pas encore signé',
+        'sign_online' => 'À signer en ligne avec un code à usage unique',
+    ],
+
+    'portal' => [
+        'kicker' => 'Énoncé des travaux',
+        'page_title' => "Énoncé des travaux\u{00A0}: :title",
+        'subtitle' => 'Entre :party et :company.',
+        'sent' => 'Envoyé le :date',
+        'sign_by' => 'À signer avant le :date',
+        'sign' => 'Le signer',
+        'sign_help' => 'Avec votre nom, votre fonction et votre signature, puis un code envoyé par e-mail.',
+        'sign_intro' => "Signez pour :company\u{00A0}: utilisez l’adresse e-mail sous laquelle nous vous connaissons. Nous vous envoyons un code à 6\u{202F}chiffres pour confirmer qu’il s’agit bien de vous.",
+        'signature' => 'Votre signature',
+        'signature_help' => 'Dessinez-la à la souris, au doigt ou au stylet.',
+        'send_code' => 'M’envoyer le code',
+        'code_intro' => "Nous avons envoyé un code à 6\u{202F}chiffres à :email. Il est valable 10\u{202F}minutes.",
+        'code_intro_reload' => "Nous avons envoyé un code à 6\u{202F}chiffres à l’adresse du signataire. Il est valable 10\u{202F}minutes. Vous signez pour une autre personne\u{202F}? Demandez un nouveau code avec vos propres coordonnées.",
+        'signing_as' => 'Vous signez en tant que :name, :title.',
+        'sign_submit' => 'Signer l’énoncé des travaux',
+        'new_code' => 'Demander un nouveau code',
+        'changes' => 'Demander des modifications',
+        'changes_help' => "Dites-nous ce qu’il faut changer\u{202F}; nous vous envoyons une nouvelle version.",
+        'changes_intro' => "Que faut-il changer\u{202F}? Nous le lisons et vous envoyons une nouvelle version à signer.",
+        'message' => 'Ce qu’il faut changer',
+        'pdf_help' => 'Le même énoncé des travaux, à enregistrer ou à partager dans votre organisation.',
+        'done_signed' => "Merci\u{00A0}: l’énoncé des travaux est signé. La facture d’acompte est dans votre portail client, et nous vous écrivons pour créer votre accès si vous n’en avez pas encore.",
+        'done_changes' => "Merci\u{00A0}: nous revenons vers vous avec une nouvelle version.",
+        'signed' => ':name a signé cet énoncé des travaux le :date.',
+        'changes_requested' => 'Des modifications ont été demandées sur cette version. Nous vous en enverrons une nouvelle.',
+        'superseded' => 'Une version plus récente de cet énoncé des travaux vous a été envoyée.',
+        'expired' => "Le délai de signature de cette version a pris fin le :date. Répondez à notre e-mail et nous vous en enverrons une à jour.",
+        'errors' => [
+            'not_contact' => "Seule une personne de :company ayant une fiche de contact active chez nous peut le signer. Demandez à votre contact principal, ou répondez à notre e-mail.",
+            'signature' => 'Dessinez votre signature dans le cadre.',
+            'note' => 'Dites-nous ce qu’il faut changer.',
+            'too_many_codes' => "Nous avons envoyé 3\u{202F}codes de signature pour cet énoncé des travaux au cours des 15\u{202F}dernières minutes. Patientez :wait, puis demandez un nouveau code.",
+            'too_many_codes_email' => "Nous avons envoyé 3\u{202F}codes de signature à cette adresse e-mail au cours des 15\u{202F}dernières minutes. Patientez :wait, puis demandez un nouveau code.",
+            'too_many_attempts' => "Trop de codes erronés\u{202F}: ce code ne fonctionne plus. Patientez :wait, puis demandez un nouveau code.",
+            'code_format' => "Saisissez le code à 6\u{202F}chiffres reçu par e-mail.",
+            'code_invalid' => "Ce code n’est pas le bon ou a expiré. Vérifiez le dernier e-mail, ou demandez un nouveau code.",
+            'email_failed' => "Nous n’avons pas pu vous envoyer le code de signature pour le moment. Réessayez dans quelques minutes.",
+            'closed' => "Cette version ne peut plus être signée ni modifiée. Rechargez la page pour voir où elle en est.",
+            'expired' => 'Le délai de signature de cette version a pris fin.',
+            'link_expired' => "Ce lien a expiré. Répondez à notre e-mail et nous vous en enverrons un nouveau.",
+        ],
+    ],
+];

@@ -8,14 +8,18 @@ use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 use Carbon\Carbon;
-use App\Support\Access;
+use App\Models\Opportunity;
+use App\Support\Opportunities\OpportunityAccess;
+use App\Support\Opportunities\OpportunityContext;
+use App\Support\Projects\PlanWriter;
 
 /**
  * Plan milestones: the assistant drafts a project's milestones and their tasks from the scope of work; the lead checks
  * them and saves them to the project page. Milestones are the unit of work (sprints were folded into milestones on
- * 1 Nov 2026, docs/PROJECTS.md); PR 5 replaces this with the project draft from the signed SOW.
+ * 1 Nov 2026, docs/PROJECTS.md). A project from an opportunity starts from that opportunity's context (the signed SOW
+ * and its milestones); a new project gets its first plan from the project draft on its opportunity (PR 5), so this
+ * screen adds milestones to a running project.
  */
 #[Layout('components.layouts.hq')]
 class ScrumMaster extends Component
@@ -31,6 +35,18 @@ class ScrumMaster extends Component
     public $generatedBacklog = []; // Holds the AI JSON before commit: [{milestone_title, goal, tasks: [{title, description}]}]
     public $isGenerating = false;
 
+    /**
+     * Why the assistant won't plan this project (the lead's audit of PR 5, until per-milestone planning, PR 5b):
+     * has_plan (it has milestones: a second whole plan would stack on them, client-visible tasks and all), or
+     * draft_pending (its plan is in the project draft from its signed SOW). '' when it may.
+     */
+    #[Locked]
+    public string $blocked = '';
+
+    /** The opportunity holding the pending project draft, for the link */
+    #[Locked]
+    public ?string $draftOpportunityId = null;
+
     public function mount($id)
     {
         // Strict Access Control: this screen only builds plans (milestones and their tasks), so projects.create
@@ -43,12 +59,42 @@ class ScrumMaster extends Component
 
         if (!$this->project) abort(404);
 
+        $this->blocked = $this->whyBlocked();
         $this->extractProposalContext();
+    }
+
+    private function whyBlocked(): string
+    {
+        $draft = DB::table('project_drafts')->join('statements_of_work', 'statements_of_work.id', '=', 'project_drafts.sow_id')
+            ->where('statements_of_work.project_id', $this->projectId)->where('project_drafts.status', '!=', 'created')->whereNull('project_drafts.deleted_at')
+            ->first(['project_drafts.opportunity_id']);
+        $this->draftOpportunityId = $draft?->opportunity_id;
+
+        return match (true) {
+            $draft !== null => 'draft_pending',
+            DB::table('project_phases')->where('project_id', $this->projectId)->whereNull('deleted_at')->exists() => 'has_plan',
+            default => '',
+        };
     }
 
     private function extractProposalContext()
     {
-        // Find the winning proposal linked to this project or organization
+        // A project from an opportunity (PR 5) reads that opportunity: the organisation, the approved proposal and the
+        // signed SOW with its milestones (OpportunityContext). Meeting notes only for someone who may open the
+        // opportunity, so the assistant never reads more than the screens would show this person.
+        $opportunity = Opportunity::query()
+            ->where(fn ($q) => $q->where('project_id', $this->projectId)->when($this->project->opportunity_id ?? null, fn ($q) => $q->orWhere('id', $this->project->opportunity_id)))
+            ->orderByDesc('updated_at')->first();
+        if ($opportunity) {
+            $parts = OpportunityAccess::canView(Auth::user(), $opportunity)
+                ? ['profile', 'meetings', 'notes', 'questionnaire', 'proposal', 'sow']
+                : ['profile', 'proposal', 'sow'];
+            $this->sowContext = OpportunityContext::for($opportunity, include: $parts);
+
+            return;
+        }
+
+        // Else the organisation's latest signed proposal (projects from before the pipeline)
         $proposal = DB::table('proposals')
             ->where('organization_id', $this->project->organization_id)
             ->whereIn('status', ['Authorized', 'Pending Auth'])
@@ -70,6 +116,10 @@ class ScrumMaster extends Component
     public function generateScrumBacklog()
     {
         abort_unless(Auth::user()->can('projects.create'), 403);
+        // Checked again on each request: a plan may have been created since the page opened
+        if ($this->blocked = $this->whyBlocked()) {
+            return;
+        }
 
         $this->validate([
             'sowContext' => 'required|string|min:50'
@@ -151,80 +201,41 @@ class ScrumMaster extends Component
     public function commitBacklogToDatabase()
     {
         abort_unless(Auth::user()->can('projects.create'), 403);
+        if ($this->blocked = $this->whyBlocked()) {
+            $this->generatedBacklog = [];
+
+            return;
+        }
 
         if (empty($this->generatedBacklog)) {
             session()->flash('error', 'There is no draft to save. Draft the plan first.');
             return;
         }
 
+        // Written through App\Support\Projects\PlanWriter, as PR 5's Create project does
         DB::transaction(function () {
             $existing = fn () => DB::table('project_phases')->where('project_id', $this->projectId)->whereNull('deleted_at');
             $hadMilestones = $existing()->exists();
-            $number = (int) $existing()->max('phase_number') + 1;
             $lastDue = $existing()->max('due_date');
             $start = $lastDue ? Carbon::parse($lastDue)->addDay() : Carbon::now();
             $weight = $hadMilestones ? 0 : round(100 / max(1, count($this->generatedBacklog)), 2);
 
+            $plan = [];
             foreach ($this->generatedBacklog as $milestone) {
-                $phaseId = (string) Str::uuid();
                 $due = $start->copy()->addDays(13);
-                DB::table('project_phases')->insert([
-                    'id' => $phaseId,
-                    'project_id' => $this->projectId,
-                    'phase_number' => $number++,
-                    'title' => Str::limit(trim($milestone['milestone_title'] ?? '') ?: 'Milestone', 140),
-                    'goal' => trim($milestone['goal'] ?? '') ?: null,
+                $plan[] = [
+                    'title' => $milestone['milestone_title'] ?? '',
+                    'goal' => $milestone['goal'] ?? '',
                     'weight_percentage' => $weight,
                     'amount' => round((float) $this->project->total_budget * $weight / 100, 2),
-                    'status' => 'Pending',
                     'start_date' => $start->format('Y-m-d'),
                     'due_date' => $due->format('Y-m-d'),
-                    'created_by' => Auth::id(),
-                    'created_at' => now(),
-                    'updated_at' => now()
-                ]);
-
-                foreach ($milestone['tasks'] ?? [] as $taskData) {
-                    if (trim($taskData['title'] ?? '') === '') {
-                        continue;
-                    }
-                    DB::table('tasks')->insert([
-                        'id' => (string) Str::uuid(),
-                        'phase_id' => $phaseId,
-                        'title' => Str::limit($taskData['title'], 255),
-                        'description' => $taskData['description'] ?? '',
-                        'status' => 'To-Do',
-                        'is_client_visible' => 1,
-                        'created_by' => Auth::id(),
-                        'created_at' => now(),
-                        'updated_at' => now()
-                    ]);
-                }
-
+                    'tasks' => array_map(fn ($t) => ['title' => $t['title'] ?? '', 'description' => $t['description'] ?? ''], (array) ($milestone['tasks'] ?? [])),
+                ];
                 $start = $due->copy()->addDay();
             }
-
-            // System Audit Log
-            DB::table('system_audit_logs')->insert([
-                'user_id' => Auth::id(),
-                'action' => 'BACKLOG_ENGINEERED',
-                'description' => "Milestones and tasks saved for project: {$this->project->title}",
-                'target_table' => 'projects',
-                'target_id' => $this->projectId,
-                'ip_address' => request()->ip(),
-                'created_at' => now()
-            ]);
-
-            // Notify the delivery team that the plan is ready
-            foreach(Access::staffWith('projects.edit') as $memberId) {
-                DB::table('notifications')->insert([
-                    'id' => (string) Str::uuid(), 'user_id' => $memberId,
-                    'title' => 'Project plan ready',
-                    'message' => "The milestones for ‘{$this->project->title}’ are saved. Tasks can now be assigned on their boards.",
-                    'link_url' => route('hq.ops.project', ['project' => $this->projectId, 'tab' => 'milestones']),
-                    'type' => 'Project', 'created_at' => now()
-                ]);
-            }
+            PlanWriter::write($this->projectId, $plan);
+            PlanWriter::announce($this->projectId, $this->project->title);
         });
 
         session()->flash('success', 'Plan saved. The milestones and their tasks are on the project page.');

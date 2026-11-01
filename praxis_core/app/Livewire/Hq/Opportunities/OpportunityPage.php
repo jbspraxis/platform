@@ -17,8 +17,8 @@ use Livewire\Component;
 
 /**
  * One opportunity (docs/OPPORTUNITIES.md section 2): Overview (details, stage, organisation, cost of poor quality,
- * history) and a tab for each later step. Meetings, Questionnaire, Proposals, SOW and Project list what exists
- * today (meetings from free audits, legacy proposals, the project) until PRs 2–5 build them out.
+ * history) and a tab for each later step, each its own component (PRs 2–5): Meetings, Questionnaire, Proposals, SOW,
+ * and Project (the project draft until Create project, then the project).
  * opportunities.view opens it; opportunities.manage edits it; the opportunity's own team (lead and members) can do
  * both whatever their roles say. Every change is in the audit log.
  */
@@ -179,6 +179,10 @@ class OpportunityPage extends Component
     #[On('proposals-changed')]
     public function proposalsChanged(): void {}
 
+    /** The SOW tab started, sent or discarded a version (PR 5): redraw the tab count and the history */
+    #[On('sow-changed')]
+    public function sowChanged(): void {}
+
     public function render()
     {
         $o = $this->opportunity();
@@ -201,6 +205,8 @@ class OpportunityPage extends Component
             'proposals' => $proposals,
             'sows' => $o->statementsOfWork()->get(['id', 'opportunity_id', 'reference', 'version', 'status', 'signed_at', 'created_at']),
             'project' => $o->project_id ? DB::table('projects')->where('id', $o->project_id)->first(['id', 'title', 'status', 'start_date', 'target_end_date']) : null,
+            // The project draft (PR 5) shows until Create project
+            'draftOpen' => $o->projectDrafts()->where('status', '!=', 'created')->exists(),
             'copq' => $copq,
             'contact' => $contact,
             'history' => $history,

@@ -19,6 +19,15 @@ return [
     'no' => 'No',
     'history_system' => 'HQ',
     'invoice_line' => ':milestone, on written acceptance',
+    'invoice_line_less' => ':milestone, on written acceptance, less the :percent deposit',
+
+    // Plan milestones (ScrumMaster) until per-milestone planning comes (PR 5b)
+    'planner' => [
+        'has_plan' => 'This project already has its milestones, so the assistant doesn’t plan it again. Planning inside a milestone is coming; meanwhile add tasks on the milestone board.',
+        'draft_pending' => 'This project’s plan is in the project draft made from its signed statement of work. Review it and click Create project there.',
+        'open_draft' => 'Open the project draft',
+        'open_board' => 'Open the milestone board',
+    ],
 
     'formats' => [
         'date' => 'j F Y',
@@ -184,6 +193,9 @@ return [
         'sow' => 'Statement of work :ref, version :version, signed :date.',
         'sow_no_ref' => '(no reference)',
         'no_opportunity' => 'This project has no opportunity, so no meetings or statement of work are linked to it.',
+        'transcripts' => 'Transcripts and minutes',
+        'plan_pending' => 'The client signed the statement of work. This project’s milestones and tasks are still in the project draft: its lead reviews it and clicks Create project.',
+        'open_draft' => 'Open the project draft',
         'invoices' => 'Invoices',
         'open_finance' => 'Open Finance',
         'no_invoices' => 'No invoices for this project yet.',
@@ -348,6 +360,7 @@ return [
         'invoice_total' => 'Total',
         'no_invoice' => 'Not invoiced yet.',
         'invoice_amount' => 'Its share of the contract is :amount.',
+        'invoice_less' => 'Its invoice: :code · :amount less :percent deposit = :due, before VAT.',
         'tasks' => 'Tasks (:count)',
         'delete_title' => 'Delete',
         'delete' => 'Delete :code',
@@ -461,6 +474,10 @@ return [
         'lead' => 'You now lead “:task”.',
         'review_title' => 'Task ready for client review',
         'review' => '“:task” is waiting for the client’s review. If the client doesn’t respond within 5 hours, it’s approved automatically.',
+        'plan_title' => 'Project plan ready',
+        'plan' => 'The milestones for “:project” are saved. Tasks can now be assigned on their boards.',
+        'tasks_title' => 'You lead tasks on a new plan',
+        'tasks' => 'You lead :count task on “:project”.|You lead :count tasks on “:project”.',
     ],
 
     'errors' => [
