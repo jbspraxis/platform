@@ -22,6 +22,9 @@
                             <div class="mtg-block">
                                 <h4>{{ __('meetings.notes.title') }}</h4>
                                 @include('livewire.hq.opportunities.partials.meeting-notes', ['notes' => $t->notes])
+                                <div style="margin-top: 8px">
+                                    @include('livewire.hq.opportunities.partials.meeting-notes-download', ['where' => 'all'])
+                                </div>
                             </div>
                         @else
                             <p class="help" style="margin: 0">{{ __('meetings.notes.none') }}</p>

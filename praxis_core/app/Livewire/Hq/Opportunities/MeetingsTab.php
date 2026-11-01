@@ -615,6 +615,9 @@ class MeetingsTab extends Component
         // The AI's notes and minutes retell the transcript, so drafting them needs the right to read it
         abort_unless(OpportunityAccess::canReadTranscripts(Auth::user(), $this->opportunity()), 403);
         $t = $this->transcript($transcriptId);
+        if ($purpose === 'meeting_notes' && filled($t->notes)) {
+            return; // notes are written once and kept as the AI wrote them, to keep the AI spend down (owner, 1 Nov 2026)
+        }
         $running = Transcripts::latestRuns([$t->id])[$t->id][$purpose] ?? null;
         if ($running && ! $running->isFinished()) {
             return; // one draft per click: this one is still being written

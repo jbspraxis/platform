@@ -82,7 +82,23 @@ return [
         'failed' => 'The notes couldn’t be written: :reason',
         'draft' => 'Write the notes',
         'retry' => 'Try again',
-        'redraft' => 'Write them again',
+        'download' => 'Download',
+        'download_label' => 'Download the notes of :title',
+        'download_notes' => 'Notes and meeting details',
+        'download_transcript' => 'Notes and full transcript',
+    ],
+
+    // The notes as a Markdown file (App\Support\Opportunities\MeetingNotesFile), in the opportunity's language
+    'file' => [
+        'field' => ':label:',
+        'opportunity' => 'Opportunity',
+        'meeting' => 'Meeting',
+        'milestone' => 'Milestone',
+        'attendees' => 'Attendees',
+        'transcript' => 'Full transcript',
+        'footer' => 'Notes written by the AI from the meeting’s transcript. Downloaded from JBS Praxis HQ on :date.',
+        'name_notes' => 'notes',
+        'name_transcript' => 'notes-and-transcript',
     ],
 
     'minutes' => [

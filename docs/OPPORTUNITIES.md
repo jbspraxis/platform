@@ -355,3 +355,13 @@ Permissions seeded by PR 1 and granted to existing roles as the owner's roles al
   - The migration's backfill.
   - The screen's permissions and audit line, French, and matching EN/FR keys.
   - `ProposalsTest`, `SowsTest` and `PortalProposalTest` now expect no VAT. They had assumed Nigeria's 7.5% was always on.
+
+### Meeting notes download (1 Nov 2026)
+
+- **The owner's request**: a button to download a meeting's notes, as Markdown (plain text, so as easy as .txt).
+  - **Download** is a small menu under the notes, in the Meetings tab and in the list of every transcript (also on the project page).
+  - **Notes and meeting details** (title, opportunity, kind, date and time, milestone, attendees, agenda, then the notes) goes to anyone who can open the opportunity, the same people who see the notes on screen.
+  - **Notes and full transcript** adds the whole transcript at the end, only for those who may read transcripts (`OpportunityAccess::canReadTranscripts`).
+  - Every download is in the opportunity's history (`NOTES_DOWNLOADED`, `TRANSCRIPT_DOWNLOADED`).
+  - The file is in the opportunity's language, the language the AI wrote the notes in: `App\Support\Opportunities\MeetingNotesFile`, served by `MeetingNotesController` at `hq/opportunities/{opportunity}/transcripts/{transcript}/{notes|transcript}.md`.
+- **No rewrite of the notes** (owner: "We take what AI gives"): *Write them again* is gone and `MeetingsTab::draftNotes` does nothing once a transcript has notes. *Write the notes* and *Try again* stay for a transcript without notes or whose run failed. The client minutes keep *Draft again*.

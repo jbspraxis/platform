@@ -217,6 +217,8 @@ return [
         'TRANSCRIPT_COLLECTED' => 'Collected a meeting transcript from Google.',
         'TRANSCRIPT_ADDED' => 'Added a meeting transcript.',
         'TRANSCRIPT_NOT_FOUND' => 'No transcript was found in Google for a meeting.',
+        'NOTES_DOWNLOADED' => 'Downloaded the notes of a meeting.',
+        'TRANSCRIPT_DOWNLOADED' => 'Downloaded the notes and full transcript of a meeting.',
         'MINUTES_SENT' => 'Sent the minutes of a meeting to the client.',
         'HANDOVER_POINT_CONFIRMED' => 'Confirmed a point from a milestone handover as a QA ticket.',
         'HANDOVER_POINT_DISMISSED' => 'Left a point from a milestone handover out of the QA tickets.',

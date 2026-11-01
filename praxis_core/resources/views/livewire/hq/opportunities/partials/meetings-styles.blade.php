@@ -35,6 +35,11 @@
     .mtg-status { display: flex; align-items: flex-start; gap: 8px; font-size: 0.875rem; line-height: 1.375rem; color: var(--color-slate); }
     .mtg-status svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 3px; }
     .mtg-text { max-height: 420px; overflow-y: auto; margin-top: 8px; padding: 12px; background: var(--color-mist); border-radius: var(--radius-control); white-space: pre-wrap; font-size: 0.8125rem; line-height: 1.25rem; color: var(--color-ink); overflow-wrap: anywhere; }
+    .mtg-download { position: relative; display: inline-block; }
+    .mtg-download-menu { position: absolute; left: 0; top: calc(100% + 4px); z-index: 20; min-width: 240px; max-width: calc(100vw - 32px); margin: 0; padding: 4px; list-style: none; background: var(--color-surface-card); border: 1px solid var(--color-line); border-radius: var(--radius-control); box-shadow: var(--shadow-float); }
+    .mtg-download-menu a { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 12px; border-radius: var(--radius-control); font-size: 0.875rem; line-height: 1.25rem; color: var(--color-ink); text-decoration: none; }
+    .mtg-download-menu a:hover, .mtg-download-menu a:focus-visible { background: var(--color-mist); }
+    .mtg-download-menu svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--color-muted); }
     .mtg-details summary { cursor: pointer; font-size: 0.875rem; font-weight: 500; color: var(--color-deep-teal); min-height: 32px; display: flex; align-items: center; }
     .mtg-form { display: flex; flex-direction: column; gap: 16px; }
     .mtg-row { display: grid; gap: 12px; grid-template-columns: 1.4fr 1fr 1fr; }

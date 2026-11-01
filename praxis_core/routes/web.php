@@ -120,6 +120,8 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
             Route::get('/{opportunity}', \App\Livewire\Hq\Opportunities\OpportunityPage::class)->whereUuid('opportunity')->name('hq.crm.opportunity');
             Route::get('/{opportunity}/proposals/{proposal}/pdf', [\App\Http\Controllers\ProposalPdfController::class, 'hq'])->whereUuid(['opportunity', 'proposal'])->name('hq.crm.proposal-pdf');
             Route::get('/{opportunity}/sow/{sow}/pdf', [\App\Http\Controllers\SowPdfController::class, 'hq'])->whereUuid(['opportunity', 'sow'])->name('hq.crm.sow-pdf');
+            Route::get('/{opportunity}/transcripts/{transcript}/{what}.md', [\App\Http\Controllers\MeetingNotesController::class, 'download'])
+                ->whereUuid(['opportunity', 'transcript'])->whereIn('what', ['notes', 'transcript'])->name('hq.crm.meeting-notes');
         });
 
         // 5. MARKETING & ROAS

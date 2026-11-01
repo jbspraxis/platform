@@ -293,6 +293,61 @@ class TranscriptsTest extends TestCase
         }
     }
 
+    public function test_the_notes_download_as_markdown_with_the_meeting_or_the_full_transcript(): void
+    {
+        [$o, $lead, $m] = $this->meetingThatEnded(minutesAgo: 60);
+        $t = Transcripts::fromText($m, "Ada: we pay 300 people by hand\n\n\nTolu: and the rest on spreadsheets", 'paste');
+        $notes = fn (string $what) => route('hq.crm.meeting-notes', ['opportunity' => $o->id, 'transcript' => $t->id, 'what' => $what]);
+
+        // The lead picks either from the Download menu under the notes; the notes are no longer rewritten from there
+        $this->actingAs($lead);
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $o->id])->set('open', $m->id)
+            ->assertSee('Notes and meeting details')->assertSee('Notes and full transcript')->assertSeeHtml('href="' . $notes('transcript') . '"')
+            ->assertDontSee('Write them again');
+
+        // In the opportunity's language (French here), the language the AI wrote the notes in
+        $file = $this->get($notes('notes'))->assertOk()->assertHeader('Content-Type', 'text/markdown; charset=UTF-8')
+            ->assertHeader('Content-Disposition', 'attachment; filename="2026-11-05-discovery-notes.md"')->getContent();
+        $this->assertStringStartsWith("# Discovery\n\n- **Opportunité\u{00A0}:** ", $file);
+        $this->assertStringContainsString("- **Réunion\u{00A0}:** Client, 5 novembre 2026, 11 h 00 WAT\n", $file);
+        $this->assertStringContainsString('(Société Kribi)', $file);
+        $this->assertStringContainsString('Guest (Invité)', $file);
+        $this->assertStringContainsString("## Notes pour l’équipe\n\nPayroll runs on spreadsheets.\n\n### Décisions\n\n- Start with the Lagos office\n", $file);
+        $this->assertStringContainsString("### Prochaines étapes\n\n- Send last month’s payslips (Client HR, Friday)\n", $file);
+        $this->assertStringNotContainsString('we pay 300 people', $file);
+
+        $file = $this->get($notes('transcript'))->assertOk()
+            ->assertHeader('Content-Disposition', 'attachment; filename="2026-11-05-discovery-notes-et-transcription.md"')->getContent();
+        $this->assertStringContainsString("## Transcription complète\n\nAda: we pay 300 people by hand\n\nTolu: and the rest on spreadsheets\n", $file);
+        $this->assertSame(['NOTES_DOWNLOADED', 'TRANSCRIPT_DOWNLOADED'], DB::table('system_audit_logs')->where('target_id', $o->id)
+            ->whereIn('action', ['NOTES_DOWNLOADED', 'TRANSCRIPT_DOWNLOADED'])->orderBy('created_at')->orderBy('action')->pluck('action')->all());
+
+        // Someone who sees the notes but may not read transcripts gets the notes only
+        $this->actingAs($this->staff('finance', ['finance']));
+        Livewire::test(TranscriptList::class, ['opportunityId' => $o->id])->assertSee('Notes and meeting details')->assertDontSee('Notes and full transcript');
+        $this->get($notes('notes'))->assertOk();
+        $this->get($notes('transcript'))->assertForbidden();
+
+        // Someone who can't open the opportunity gets nothing; nor does a transcript of another opportunity
+        $this->actingAs($this->staff('engineer', ['engineer']));
+        $this->get($notes('notes'))->assertForbidden();
+        $this->actingAs($lead);
+        $other = $this->opportunityFor($o->organization_id, ['lead_user_id' => $lead->id]);
+        $this->get(route('hq.crm.meeting-notes', ['opportunity' => $other->id, 'transcript' => $t->id, 'what' => 'notes']))->assertNotFound();
+    }
+
+    public function test_notes_once_written_are_not_rewritten(): void
+    {
+        [$o, $lead, $m] = $this->meetingThatEnded(minutesAgo: 60);
+        $t = Transcripts::fromText($m, 'Ada: hello', 'paste');
+        $this->assertCount(1, $this->ai->requestsFor('meeting_notes'));
+
+        $this->actingAs($lead);
+        Livewire::test(MeetingsTab::class, ['opportunityId' => $o->id])->set('open', $m->id)->call('draftNotes', $t->id)->assertSee('Payroll runs on spreadsheets.');
+        $this->assertCount(1, $this->ai->requestsFor('meeting_notes'));
+        $this->assertEquals(self::NOTES, $t->fresh()->notes);
+    }
+
     /** A client meeting created through Google that ended $minutesAgo, in a French opportunity led by a sales person */
     private function meetingThatEnded(int $minutesAgo): array
     {
