@@ -6,11 +6,26 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
-/** The SOW drafted from the approved proposal (PR 5), signed by the client with the one-time code */
+/**
+ * The SOW drafted from the approved proposal (PR 5), signed by the client with the one-time code. One row per
+ * version: draft (approved once HQ has signed it: approved_at and the HQ signature), sent, changes_requested,
+ * signed, or superseded (a later version was sent or signed). App\Support\Opportunities\Sows holds the rules.
+ */
 class StatementOfWork extends Model
 {
     use HasUuids, SoftDeletes;
+
+    public const DRAFT = 'draft';
+
+    public const SENT = 'sent';
+
+    public const CHANGES_REQUESTED = 'changes_requested';
+
+    public const SIGNED = 'signed';
+
+    public const SUPERSEDED = 'superseded';
 
     protected $table = 'statements_of_work';
 
@@ -20,12 +35,17 @@ class StatementOfWork extends Model
 
     protected $casts = [
         'sections' => 'array',
+        'milestones' => 'array',
+        'recipients' => 'array',
+        'recipients_unsent' => 'array',
         'version' => 'integer',
+        'validity_days' => 'integer',
         'approved_at' => 'datetime',
         'sent_at' => 'datetime',
         'otp_expires_at' => 'datetime',
         'hq_signed_at' => 'datetime',
         'signed_at' => 'datetime',
+        'changes_requested_at' => 'datetime',
     ];
 
     public function opportunity(): BelongsTo
@@ -36,5 +56,37 @@ class StatementOfWork extends Model
     public function proposal(): BelongsTo
     {
         return $this->belongsTo(Proposal::class);
+    }
+
+    public function previousVersion(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'previous_version_id');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function aiRun(): BelongsTo
+    {
+        return $this->belongsTo(AiRun::class);
+    }
+
+    /** A draft nobody has approved (signed for HQ) yet: the only state in which it can be changed */
+    public function isEditable(): bool
+    {
+        return $this->status === self::DRAFT && $this->approved_at === null;
+    }
+
+    /** The day its validity ends (validity_days from when it was sent), or null before it is sent */
+    public function validUntil(): ?Carbon
+    {
+        return $this->sent_at?->copy()->addDays(max(1, (int) $this->validity_days));
+    }
+
+    public function hasExpired(): bool
+    {
+        return $this->status === self::SENT && $this->validUntil()?->isPast() === true;
     }
 }

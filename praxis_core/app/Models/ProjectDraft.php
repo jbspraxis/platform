@@ -22,4 +22,14 @@ class ProjectDraft extends Model
     {
         return $this->belongsTo(Opportunity::class);
     }
+
+    public function sow(): BelongsTo
+    {
+        return $this->belongsTo(StatementOfWork::class, 'sow_id');
+    }
+
+    public function aiRun(): BelongsTo
+    {
+        return $this->belongsTo(AiRun::class);
+    }
 }

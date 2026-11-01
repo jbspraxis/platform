@@ -4,6 +4,7 @@ namespace App\Support\Opportunities;
 
 use App\Models\Opportunity;
 use App\Models\Proposal;
+use App\Models\StatementOfWork;
 use Illuminate\Support\Facades\URL;
 
 /**
@@ -49,10 +50,30 @@ final class PortalLinks
         return $proposal->validUntil() ?? now()->addDays(self::DAYS);
     }
 
+    /**
+     * One version of the SOW in the portal (PR 5): read it, sign it with the one-time code or ask for changes, and its
+     * PDF. Signed until the version's validity ends, as proposals are; before it is sent, DAYS.
+     */
+    public static function sow(StatementOfWork $sow, ?string $clientUserId = null): string
+    {
+        return self::signed('portal.sow', array_filter(['sow' => $sow->id, 'c' => $clientUserId]), self::sowExpiry($sow));
+    }
+
+    public static function sowPdf(StatementOfWork $sow): string
+    {
+        return self::signed('portal.sow.pdf', ['sow' => $sow->id], self::sowExpiry($sow));
+    }
+
+    private static function sowExpiry(StatementOfWork $sow): \DateTimeInterface
+    {
+        return $sow->validUntil() ?? now()->addDays(self::DAYS);
+    }
+
     private static function signed(string $route, array $parameters, \DateTimeInterface $expires): string
     {
         $relative = URL::temporarySignedRoute($route, $expires, $parameters, absolute: false);
-        $origin = preg_replace('~^(https?://[^/]+).*$~', '$1', route($route, ['proposal' => $parameters['proposal']]));
+        $key = array_key_first($parameters);
+        $origin = preg_replace('~^(https?://[^/]+).*$~', '$1', route($route, [$key => $parameters[$key]]));
 
         return $origin . $relative;
     }

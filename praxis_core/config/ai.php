@@ -189,40 +189,48 @@ return [
             ], 'required' => ['summary', 'changes'], 'additionalProperties' => false],
         ],
 
+        // PR 5: one version of the statement of work, from the approved proposal, the meetings' notes (their full
+        // transcripts only when the lead ticks them: cost rule 4) and the questionnaire. MATERIAL names the parties and the
+        // fees' terms; HQ adds the fees from the approved proposal, so the text never states a price. Milestones carry
+        // their weeks and weight (their share of the contract, adding up to 100); App\Support\Opportunities\Sows keeps
+        // sections with a title and text and the milestones with a title.
         'sow' => [
             'provider' => 'claude', 'model' => 'claude-sonnet-5-5', 'effort' => 'high', 'max_tokens' => 32000,
             'stream' => true, 'sync' => false, 'expected_chars' => 20000,
-            'task' => 'Draft the statement of work from the approved proposal and the lead\'s answers: scope, deliverables and acceptance, exclusions, assumptions and dependencies, milestones and timeline, roles and governance, change control. Precise and contractual; do not promise outcomes.',
+            'task' => 'Draft the statement of work for this opportunity from the proposal the client approved, the meetings’ notes and the lead’s answers to the questionnaire. It is the contract JBS Praxis and the client sign: precise, plain, complete, and never more than the approved proposal covers. Sections in this order, with these keys: purpose (the parties as MATERIAL names them, and what the work is for), scope (what is in and what is out), deliverables (each deliverable and how the client accepts it), assumptions (assumptions, dependencies and what the client provides), timeline (the milestones in weeks from the start, never calendar dates that weren’t agreed), governance (the roles on each side, how decisions are made, meetings and reporting; never a staff member’s name), change_control (how a change is asked for, priced in a change report, approved and added to the plan). Each title is a short plain heading. Never write a price, rate, total or payment percentage: HQ adds the fees from the approved proposal. Never promise an outcome. Milestones: the units the work is delivered and accepted in, in order; each has a title, deliverables (what it delivers and how it is accepted, a few lines), weeks (its length) and weight (its share of the contract in percent, by the value it delivers; all weights add up to exactly 100). For a later version, keep what the client didn’t question and the keys of the version they have, and answer what they asked to change.',
             'schema' => ['type' => 'object', 'properties' => [
-                'title' => ['type' => 'string'], 'sections' => $sections,
-            ], 'required' => ['title', 'sections'], 'additionalProperties' => false],
+                'title' => ['type' => 'string', 'description' => '4 to 8 words, sentence case, naming the work'],
+                'sections' => $sections,
+                'milestones' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
+                    'key' => ['type' => 'string', 'description' => 'snake_case, stable between versions'],
+                    'title' => ['type' => 'string'],
+                    'deliverables' => ['type' => 'string', 'description' => 'What it delivers and how the client accepts it; "- " starts a list item'],
+                    'weeks' => ['type' => 'integer', 'description' => 'Its length in weeks, at least 1'],
+                    'weight' => ['type' => 'number', 'description' => 'Its share of the contract in percent; all add up to 100'],
+                ], 'required' => ['key', 'title', 'deliverables', 'weeks', 'weight'], 'additionalProperties' => false]],
+            ], 'required' => ['title', 'sections', 'milestones'], 'additionalProperties' => false],
         ],
 
+        // PR 5, as the owner changed it on 1 Nov 2026 (docs/PROJECTS.md decision 9): milestones are the unit of work and
+        // there are no sprints. HQ makes the milestones from the signed SOW (their dates, weights and amounts are fixed);
+        // the AI gives each its goal and tasks, by milestone_number in MATERIAL, and the roles the work needs.
+        // App\Support\Opportunities\ProjectDrafts files them into the draft the lead edits before Create project.
         'project_draft' => [
             'provider' => 'claude', 'model' => 'claude-sonnet-5-5', 'effort' => 'high', 'max_tokens' => 32000,
             'stream' => true, 'sync' => false, 'expected_chars' => 16000,
-            'task' => 'Draft the project from the signed statement of work: phases, milestones, two-week sprints, tasks with the role that does each and an estimate in hours, and the roles needed.',
+            'task' => 'Plan the project from the signed statement of work. MATERIAL numbers its milestones; HQ fixes their dates, weights and amounts. For every milestone (milestone_number as in MATERIAL) give its goal in one sentence and the tasks that deliver it, in the order they are done: a specific title (under 12 words, starting with a verb), a description with its acceptance criteria as "- " lines, the role that does it (role_key, one of your roles) and an estimate in hours. Keep each task small enough for one person in a few days. List the roles the work needs (key in snake_case, a plain title, what they are responsible for), never a person’s name. Only work the statement of work covers: never add scope, a figure or a date.',
             'schema' => ['type' => 'object', 'properties' => [
-                'project' => ['type' => 'object', 'properties' => ['title' => ['type' => 'string'], 'description' => ['type' => 'string']],
-                    'required' => ['title', 'description'], 'additionalProperties' => false],
-                'phases' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
-                    'key' => ['type' => 'string'], 'title' => ['type' => 'string'], 'description' => ['type' => 'string'],
-                    'start_week' => ['type' => 'integer'], 'weeks' => ['type' => 'integer'],
-                ], 'required' => ['key', 'title', 'description', 'start_week', 'weeks'], 'additionalProperties' => false]],
                 'milestones' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
-                    'phase_key' => ['type' => 'string'], 'title' => ['type' => 'string'], 'due_week' => ['type' => 'integer'],
-                ], 'required' => ['phase_key', 'title', 'due_week'], 'additionalProperties' => false]],
-                'sprints' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
-                    'number' => ['type' => 'integer'], 'goal' => ['type' => 'string'],
-                ], 'required' => ['number', 'goal'], 'additionalProperties' => false]],
-                'tasks' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
-                    'phase_key' => ['type' => 'string'], 'sprint_number' => ['type' => 'integer'], 'title' => ['type' => 'string'],
-                    'description' => ['type' => 'string'], 'role_key' => ['type' => 'string'], 'estimate_hours' => ['type' => 'number'],
-                ], 'required' => ['phase_key', 'sprint_number', 'title', 'description', 'role_key', 'estimate_hours'], 'additionalProperties' => false]],
+                    'milestone_number' => ['type' => 'integer', 'description' => 'As numbered in MATERIAL, from 1'],
+                    'goal' => ['type' => 'string'],
+                    'tasks' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
+                        'title' => ['type' => 'string'], 'description' => ['type' => 'string'], 'role_key' => ['type' => 'string'], 'estimate_hours' => ['type' => 'number'],
+                    ], 'required' => ['title', 'description', 'role_key', 'estimate_hours'], 'additionalProperties' => false]],
+                ], 'required' => ['milestone_number', 'goal', 'tasks'], 'additionalProperties' => false]],
                 'roles' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
                     'key' => ['type' => 'string'], 'title' => ['type' => 'string'], 'responsibilities' => ['type' => 'string'],
                 ], 'required' => ['key', 'title', 'responsibilities'], 'additionalProperties' => false]],
-            ], 'required' => ['project', 'phases', 'milestones', 'sprints', 'tasks', 'roles'], 'additionalProperties' => false],
+            ], 'required' => ['milestones', 'roles'], 'additionalProperties' => false],
         ],
 
         // System › Integrations › Test the Claude key: one tiny Haiku request (a fraction of a cent)

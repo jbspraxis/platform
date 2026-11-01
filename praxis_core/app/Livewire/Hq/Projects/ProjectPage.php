@@ -161,6 +161,9 @@ class ProjectPage extends Component
             'opportunity' => $opportunity,
             // The opportunity's team opens it too (OpportunityAccess, PR #14)
             'canOpenOpportunity' => $opportunity && OpportunityAccess::canView(Auth::user(), $opportunity),
+            // Made when the SOW was signed (PR 5), its plan still in the project draft on the opportunity
+            'planPending' => DB::table('project_drafts')->join('statements_of_work', 'statements_of_work.id', '=', 'project_drafts.sow_id')
+                ->where('statements_of_work.project_id', $this->projectId)->where('project_drafts.status', '!=', 'created')->whereNull('project_drafts.deleted_at')->exists(),
         ];
 
         $data += match ($this->tab) {

@@ -255,6 +255,15 @@ final class OpportunityContext
             $out[] = strtoupper((string) ($section['title'] ?? $section['key'] ?? ''));
             $out[] = trim((string) ($section['body'] ?? ''));
         }
+        // Its milestones (PR 5): what the project is planned in
+        if (is_array($sow->milestones) && $sow->milestones) {
+            $out[] = '';
+            $out[] = 'MILESTONES';
+            foreach (array_values($sow->milestones) as $i => $m) {
+                $out[] = sprintf('%d. %s (%d weeks, %s%% of the contract): %s', $i + 1, $m['title'] ?? '', (int) ($m['weeks'] ?? 0),
+                    rtrim(rtrim(number_format((float) ($m['weight'] ?? 0), 2, '.', ''), '0'), '.'), trim((string) ($m['description'] ?? '')));
+            }
+        }
 
         return implode("\n", $out);
     }
