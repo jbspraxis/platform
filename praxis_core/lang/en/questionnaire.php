@@ -114,6 +114,14 @@ return [
         'done' => 'The questionnaire was set aside. Draft a new one below.',
     ],
 
+    // The lead's bell when a draft finishes in the background
+    'notify' => [
+        'ready_title' => 'Questions ready: :title',
+        'ready' => '{1} 1 question is ready for your answer.|[2,*] :count questions are ready for your answers.',
+        'failed_title' => 'Questionnaire not drafted: :title',
+        'failed' => 'The AI couldn’t draft the questions. :message',
+    ],
+
     'errors' => [
         'count' => 'Choose between :min and :max questions.',
         'focus' => 'Choose focus areas from the list.',
