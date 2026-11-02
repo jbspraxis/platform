@@ -791,6 +791,12 @@ final class Sows
         $opportunity = $result['opportunity'];
 
         SignerOnboarding::welcome($result['organization'], (string) $sow->signed_by_email, (string) ($sow->title ?: $sow->reference), $timestamp);
+        // The deposit invoice and its PDF to the client's billing contacts (docs/QA-PORTAL.md D11); never undoes the signing
+        try {
+            \App\Support\Finance\InvoiceMailer::send($result['invoice']['id']);
+        } catch (Throwable $e) {
+            Log::error('Deposit invoice email not prepared', ['sow_id' => $sow->id, 'message' => $e->getMessage()]);
+        }
         self::tellHq($opportunity, $sow, $result['invoice']['number']);
         SowSigned::dispatch($sow->id, $opportunity->id, $result['project_id']);
         ProjectDrafts::queue($sow);
