@@ -112,7 +112,8 @@
                                 <label for="client-role" class="label">Client Portal role</label>
                                 <select id="client-role" wire:model="client_role_id" class="select" aria-describedby="client-role-help">
                                     <option value="">{{ $roleLabel('Client Member') }} (default)</option>
-                                    @foreach($clientRoles as $role)
+                                    {{-- The default above is the Team member role: it isn't listed twice --}}
+                                    @foreach(collect($clientRoles)->reject(fn ($role) => data_get($role, 'slug') === 'client-member') as $role)
                                         <option value="{{ $role->id }}">{{ $roleLabel($role->name) }}</option>
                                     @endforeach
                                 </select>

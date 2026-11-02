@@ -96,7 +96,10 @@ class RoleManagement extends Component
         if (!in_array($tab, ['CREATE', 'INTERNAL', 'CLIENTS'], true)) return;
         if ($tab === 'CREATE' && !Auth::user()->can('access.create')) return;
         $this->activeTab = $tab;
-        $this->resetForm();
+        // A half-filled new account survives a look at the lists; an edit doesn't follow you out
+        if ($this->editMode) {
+            $this->resetForm();
+        }
         $this->loadLedger();
     }
 
@@ -193,6 +196,9 @@ class RoleManagement extends Component
                         'industry' => $this->new_org_industry,
                         'country' => $this->new_org_country,
                         'status' => 'Lead',
+                        'assigned_to' => Auth::id(),
+                        'created_by' => Auth::id(),
+                        'updated_by' => Auth::id(),
                         'created_at' => now(),
                         'updated_at' => now()
                     ]);
