@@ -110,6 +110,9 @@ class Dashboard extends Component
     public $inviteProjectId = ''; 
     public $inviteRoleId = '';
 
+    // Portal accounts an organisation's admins may have in all (owner, 2 Nov 2026: 10; HQ › Accounts has no limit)
+    public const MAX_PORTAL_ACCOUNTS = 10;
+
     // Portal permissions of this account, e.g. $can['billing.create'] (role-based, set on the server)
     #[Locked]
     public $can = [];
@@ -710,8 +713,8 @@ class Dashboard extends Component
 
             $portalAccounts = DB::table('client_users')->where('organization_id', $this->organization->id)
                 ->whereIn('lifecycle_stage', ['Onboarding', 'Active'])->whereNull('deleted_at')->count();
-            if ($portalAccounts >= 3) {
-                session()->flash('team_error', __('portal.team.limit_reached')); return;
+            if ($portalAccounts >= self::MAX_PORTAL_ACCOUNTS) {
+                session()->flash('team_error', __('portal.team.limit_reached', ['max' => self::MAX_PORTAL_ACCOUNTS])); return;
             }
 
             $primaryDomain = substr(strrchr($this->user->email, "@"), 1);

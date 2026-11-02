@@ -279,7 +279,7 @@ return [
         'invited' => "Invitation envoyée à :email.",
         'role_forbidden' => "Vous n’avez pas l’autorisation d’attribuer ce rôle. Choisissez un autre rôle.",
         'project_unknown' => "Nous n’avons pas trouvé ce projet. Choisissez un projet dans la liste.",
-        'limit_reached' => "Vous ne pouvez inviter personne d’autre\u{00A0}: votre organisation dispose déjà du maximum de 3\u{00A0}comptes sur le portail client.",
+        'limit_reached' => "Vous ne pouvez inviter personne d’autre\u{00A0}: votre organisation dispose déjà du maximum de :max\u{00A0}comptes sur le portail client.",
         'wrong_domain' => "Utilisez une adresse e-mail se terminant par @:domain. Les membres de l’équipe doivent utiliser le domaine de messagerie de votre organisation.",
         'invite_failed' => "Nous n’avons pas pu finaliser l’invitation. Réessayez ou contactez JBS Praxis pour obtenir de l’aide.",
         'role_updated' => "Rôle mis à jour.",

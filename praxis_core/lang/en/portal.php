@@ -283,7 +283,7 @@ return [
         'invited' => 'Invitation sent to :email.',
         'role_forbidden' => 'You don’t have permission to give that role. Choose another role.',
         'project_unknown' => 'We couldn’t find that project. Choose a project from the list.',
-        'limit_reached' => 'You can’t invite anyone else: your organisation already has the maximum of 3 Client Portal accounts.',
+        'limit_reached' => 'You can’t invite anyone else: your organisation already has the maximum of :max Client Portal accounts.',
         'wrong_domain' => 'Use an email address ending in @:domain. Team members must use your organisation’s email domain.',
         'invite_failed' => 'We couldn’t complete the invitation. Try again, or contact JBS Praxis for help.',
         'role_updated' => 'Role updated.',
