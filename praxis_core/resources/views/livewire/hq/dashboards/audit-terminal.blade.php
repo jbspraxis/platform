@@ -134,7 +134,7 @@
                         @forelse($escrowLogs as $tx)
                         @php [$txText, $txPill] = $paymentStatus($tx->status); @endphp
                         <tr>
-                            <td style="font-variant-numeric: tabular-nums; white-space: nowrap;">{{ \Carbon\Carbon::parse($tx->created_at)->format('j M Y, H:i') }}</td>
+                            <td style="font-variant-numeric: tabular-nums; white-space: nowrap;">{{ \Carbon\Carbon::parse($tx->created_at)->setTimezone('Africa/Lagos')->format('j M Y, H:i') }}</td>
                             <td class="num">
                                 <div class="text-ink font-semibold">{{ $money($tx->currency ?? 'USD', $tx->amount_claimed) }}</div>
                                 <div class="text-caption text-muted">{{ $methodLabel($tx->method) }}</div>

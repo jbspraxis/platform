@@ -53,7 +53,7 @@
                     <tr>
                         <td>
                             <div class="num text-left font-semibold text-ink">{{ $req->reference }}</div>
-                            <div class="help num text-left">{{ \Carbon\Carbon::parse($req->created_at)->format('j M Y, H:i') }}</div>
+                            <div class="help num text-left">{{ \Carbon\Carbon::parse($req->created_at)->setTimezone('Africa/Lagos')->format('j M Y, H:i') }}</div>
                         </td>
                         <td>
                             <div class="font-medium text-ink">{{ $req->first_name }} {{ $req->last_name }}</div>

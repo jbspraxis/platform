@@ -219,7 +219,7 @@
                                 <td class="num">{{ number_format($social['total_followers']) }}</td>
                                 <td class="num">{{ number_format($social['weekly_reach']) }}</td>
                                 <td class="num">{{ $social['engagement_rate'] }}%</td>
-                                <td class="text-small" style="font-variant-numeric: tabular-nums;">{{ !empty($social['last_synced_at']) ? \Carbon\Carbon::parse($social['last_synced_at'])->format('j M Y, H:i') : 'Never' }}</td>
+                                <td class="text-small" style="font-variant-numeric: tabular-nums;">{{ !empty($social['last_synced_at']) ? \Carbon\Carbon::parse($social['last_synced_at'])->setTimezone('Africa/Lagos')->format('j M Y, H:i') : 'Never' }}</td>
                             </tr>
                         @empty
                             <tr>
@@ -394,7 +394,7 @@
                         <h3 class="card-title" style="margin-bottom: 8px;">Password changes</h3>
                         <ul class="flex flex-col gap-2 text-small" style="list-style: none; margin: 0; padding: 0;">
                             @foreach($credentialHistory as $log)
-                                <li><span class="text-ink" style="font-variant-numeric: tabular-nums;">{{ \Carbon\Carbon::parse($log['created_at'])->format('j M Y, H:i') }}</span> · changed by {{ $log['user_name'] }}</li>
+                                <li><span class="text-ink" style="font-variant-numeric: tabular-nums;">{{ \Carbon\Carbon::parse($log['created_at'])->setTimezone('Africa/Lagos')->format('j M Y, H:i') }}</span> · changed by {{ $log['user_name'] }}</li>
                             @endforeach
                         </ul>
                     </div>

@@ -108,7 +108,7 @@
             <nav class="rail-nav">
                 @foreach ($tabs as $tab => [$permission, $icon])
                     @if ($can[$permission] ?? false)
-                        @php $locked = $financialLockout && $tab !== 'financials'; @endphp
+                        @php $locked = $financialLockout && in_array($tab, \App\Livewire\ClientOs\Dashboard::LOCKED_TABS, true); @endphp
                         <button type="button" wire:click="switchTab('{{ $tab }}')" @click="mobileMenuOpen = false"
                                 class="rail-link {{ $activeTab === $tab ? 'is-active' : '' }} {{ $locked ? 'is-locked' : '' }}"
                                 @if ($activeTab === $tab) aria-current="page" @endif
@@ -209,8 +209,26 @@
                     @endif
                 </div>
 
+                {{-- ===================== ON HOLD, with nowhere else this account may go ===================== --}}
+                @if ($financialLockout && in_array($activeTab, \App\Livewire\ClientOs\Dashboard::LOCKED_TABS, true))
+                    <section class="card"><div class="empty-state"><strong>{{ __('portal.lockout.tab_closed') }}</strong> {{ $lockoutReason }}</div></section>
+
+                {{-- ===================== NO PROJECT YET (until the statement of work is signed) ===================== --}}
+                @elseif (! $activeProject && in_array($activeTab, \App\Livewire\ClientOs\Dashboard::PROJECT_TABS, true))
+                    <section class="card">
+                        <div class="empty-state">
+                            <strong>{{ __('portal.no_project.title') }}</strong>
+                            {{ __('portal.no_project.body') }}
+                            @if ($can['documents.view'] ?? false)
+                                <div class="mt-4">
+                                    <button type="button" wire:click="switchTab('vault')" class="btn btn-secondary btn-sm"><i data-lucide="file-text"></i> {{ __('portal.no_project.documents') }}</button>
+                                </div>
+                            @endif
+                        </div>
+                    </section>
+
                 {{-- ===================== OVERVIEW ===================== --}}
-                @if ($activeTab === 'overview' && $activeProject)
+                @elseif ($activeTab === 'overview' && $activeProject)
                     <section class="card mb-6" aria-label="{{ __('portal.overview.project') }}">
                         <dl class="m-0 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-5">
                             <div class="min-w-0">
@@ -565,6 +583,52 @@
                         <section class="card lg:col-span-2">
                             <div class="card-header"><h2 class="card-title">{{ __('portal.documents.signed') }}</h2></div>
 
+                            {{-- Statements of work and proposals: the version the client has now, with links made as the page is drawn --}}
+                            @foreach (['contracts' => $vaultContracts, 'proposals' => $vaultProposals] as $kind => $documents)
+                                <h3 class="section-title text-base">{{ __('portal.documents.' . $kind) }}</h3>
+                                <div class="mb-6">
+                                    @forelse ($documents as $doc)
+                                        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-line py-3 last:border-b-0" wire:key="doc-{{ $doc['id'] }}">
+                                            <div class="min-w-0">
+                                                <div class="font-semibold text-ink break-words">{{ $doc['title'] }}</div>
+                                                <div class="text-xs text-muted tabular-nums">{{ __('portal.documents.version_meta', ['ref' => $doc['reference'], 'version' => $doc['version']]) }}</div>
+                                                <div class="text-sm text-slate">{{ __('portal.documents.state.' . $doc['state'], ['date' => $doc['date']]) }}</div>
+                                            </div>
+                                            <div class="flex flex-wrap gap-2">
+                                                @if ($doc['open'])
+                                                    <a href="{{ $doc['open'] }}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm"><i data-lucide="external-link"></i> {{ __('portal.documents.open') }}</a>
+                                                @endif
+                                                @if ($doc['pdf'])
+                                                    <a href="{{ $doc['pdf'] }}" class="btn btn-ghost btn-sm"><i data-lucide="download"></i> {{ __('portal.documents.pdf') }}</a>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @empty
+                                        <div class="empty-state" style="padding: 24px;">
+                                            <strong>{{ __('portal.documents.no_' . $kind) }}</strong>
+                                            {{ __('portal.documents.no_' . $kind . '_help') }}
+                                        </div>
+                                    @endforelse
+                                </div>
+                            @endforeach
+
+                            @if (count($vaultMeetings))
+                                <h3 class="section-title text-base">{{ __('portal.documents.meetings') }}</h3>
+                                <div class="mb-6">
+                                    @foreach ($vaultMeetings as $work)
+                                        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-line py-3 last:border-b-0" wire:key="meetings-{{ $work['id'] }}">
+                                            <div class="min-w-0">
+                                                <div class="font-semibold text-ink break-words">{{ $work['title'] }}</div>
+                                                <div class="text-sm text-slate">{{ __('portal.documents.meetings_help') }}</div>
+                                            </div>
+                                            <a href="{{ $work['link'] }}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm"><i data-lucide="calendar"></i> {{ __('portal.documents.meetings_open') }}</a>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+
+                            {{-- Proposals signed before the opportunity pipeline (shown only where there are some) --}}
+                            @if (count($vaultSows))
                             <h3 class="section-title text-base">{{ __('portal.documents.sows') }}</h3>
                             <div class="mb-6">
                                 @forelse ($vaultSows as $sow)
@@ -584,6 +648,7 @@
                                     </div>
                                 @endforelse
                             </div>
+                            @endif
 
                             <h3 class="section-title text-base">{{ __('portal.documents.handovers') }}</h3>
                             <div>
@@ -796,7 +861,7 @@
     </div>
 
     {{-- Message the delivery team from any section --}}
-    @if ($can['qa.view'] ?? false)
+    @if (($can['qa.view'] ?? false) && $activeProject)
         <button type="button" wire:click="switchTab('qa_hub')" class="btn btn-primary portal-fab {{ $activeTab === 'qa_hub' ? 'hidden' : '' }}"
                 aria-label="{{ __('portal.nav.message') }}" title="{{ __('portal.nav.message') }}">
             <i data-lucide="message-square"></i> <span class="hidden sm:inline">{{ __('portal.nav.message') }}</span>

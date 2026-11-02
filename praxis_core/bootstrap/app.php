@@ -78,6 +78,11 @@ return Application::configure(basePath: dirname(__DIR__))
             return false;
         });
 
+        // An email link that expired or was altered (signed routes): say so, in the visitor's language, with the way back
+        $exceptions->render(function (\Illuminate\Routing\Exceptions\InvalidSignatureException $e, Request $request) {
+            return $request->expectsJson() ? null : response()->view('errors.link', ['exception' => $e], 403);
+        });
+
         // Site API: errors in its JSON envelope (docs/SITE_API.md section 2), never a stack trace
         $exceptions->render(fn (\Throwable $e, Request $request) => \App\Http\Controllers\SiteApi\ApiErrors::render($e, $request));
     })->create();

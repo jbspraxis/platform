@@ -201,6 +201,19 @@ class PortalMeetingsTest extends TestCase
             ->assertSee('Vos réunions avec JBS Praxis')->assertSee('Réserver une réunion de suivi')->assertSee('Proposer des créneaux');
     }
 
+    public function test_a_french_clients_request_reaches_the_lead_in_hqs_language(): void
+    {
+        [$o, $lead] = $this->opportunity(['language' => 'fr']);
+
+        Livewire::test(MeetingsGateway::class, ['opportunity' => $o->id])
+            ->call('choose', 'propose')->set('name', 'Ada Client')->set('email', 'ada@kribi.test')
+            ->set('proposed.0.date', '2026-11-10')->set('proposed.0.time', '15:00')
+            ->call('propose')->assertHasNoErrors();
+
+        // The page spoke French to the client; HQ's bell is in HQ's language (docs/QA-PORTAL.md)
+        $this->assertSame('The client proposed meeting times', DB::table('notifications')->where('user_id', $lead->id)->value('title'));
+    }
+
     private function opportunity(array $values = []): array
     {
         $lead = $this->staff('lead', ['sales']);

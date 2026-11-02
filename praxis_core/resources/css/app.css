@@ -273,6 +273,7 @@
     .tabs { display: flex; gap: 4px; box-shadow: inset 0 -1px 0 var(--color-line); margin-bottom: 20px; overflow-x: auto; overflow-y: hidden; }
     .tab { padding: 10px 14px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--color-muted); font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none; }
     .tab:hover { color: var(--color-ink); }
+    .tab:focus-visible { outline-offset: -2px; } /* inside the tab: the strip clips anything outside it */
     .tab.is-active { color: var(--color-ink); border-bottom-color: var(--color-deep-teal); font-weight: 600; }
     /* Segmented control: a few views of one list inside a page (keeps btn-primary for the page's one main action) */
     .segmented { display: inline-flex; flex-wrap: wrap; gap: 8px; }

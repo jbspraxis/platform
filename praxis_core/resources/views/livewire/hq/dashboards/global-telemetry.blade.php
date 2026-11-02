@@ -105,7 +105,7 @@
                         <td class="font-semibold text-ink">{{ $lead->name }}</td>
                         <td>{{ $lead->industry ?? 'Not given' }}</td>
                         <td>{{ $lead->source ?? 'Direct' }}</td>
-                        <td style="text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap;">{{ \Carbon\Carbon::parse($lead->created_at)->format('j M Y, H:i') }}</td>
+                        <td style="text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap;">{{ \Carbon\Carbon::parse($lead->created_at)->setTimezone('Africa/Lagos')->format('j M Y, H:i') }}</td>
                     </tr>
                     @empty
                     <tr>
