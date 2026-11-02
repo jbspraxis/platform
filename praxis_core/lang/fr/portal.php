@@ -125,7 +125,7 @@ return [
         'qa_hub' => "Signalez une anomalie sur un livrable ou envoyez un message à votre équipe projet.",
         'financials' => "Vos factures pour ce projet, nos coordonnées de paiement et vos justificatifs de paiement.",
         'vault' => "Vos propositions signées et vos livraisons de projet validées, et l’apparence de votre portail.",
-        'team' => "Invitez des collègues de votre organisation et choisissez ce que chaque personne peut voir. Votre organisation peut disposer de 3\u{00A0}comptes au maximum sur le portail client.",
+        'team' => "Invitez des collègues de votre organisation et choisissez ce que chaque personne peut voir. Votre organisation peut disposer de :max\u{00A0}comptes au maximum sur le portail client.",
     ],
 
     'lockout' => [
@@ -285,7 +285,7 @@ return [
     ],
 
     'team' => [
-        'members' => "Membres de l’équipe (:count sur 3)",
+        'members' => "Membres de l’équipe (:count sur :max)",
         'role' => "Rôle",
         'access' => "Accès aux projets",
         'all_projects' => "Tous les projets",
@@ -339,7 +339,7 @@ return [
         'qa_hub' => "Signalez une anomalie sur une tâche, indiquez sa priorité et joignez des captures d’écran ou des documents. Vous pouvez aussi envoyer un message général à votre équipe projet. Chaque anomalie conserve l’historique complet des échanges.",
         'financials' => "Vos factures pour ce projet et nos coordonnées de paiement. Après votre paiement, déposez votre justificatif\u{00A0}: nous le vérifions et mettons à jour la facture.",
         'vault' => "Vos propositions signées et vos livraisons de projet validées, chacune avec une empreinte de signature (SHA-256). Vous pouvez aussi ajouter votre logo et vos couleurs au portail.",
-        'team' => "Invitez jusqu’à 2\u{00A0}collègues qui utilisent le domaine de messagerie de votre organisation, choisissez leur rôle et limitez leur accès à un seul projet si vous le souhaitez. Vous pouvez suspendre ou rétablir leur accès à tout moment.",
+        'team' => "Invitez des collègues qui utilisent le domaine de messagerie de votre organisation (jusqu’à :max\u{00A0}comptes sur le portail client au total), choisissez leur rôle et limitez leur accès à un seul projet si vous le souhaitez. Vous pouvez suspendre ou rétablir leur accès à tout moment.",
         'questions' => "Questions fréquentes",
         'q_locked' => "Pourquoi certaines rubriques sont-elles fermées\u{202F}?",
         'a_locked' => "Les rubriques se ferment lorsqu’un premier paiement est attendu ou qu’une facture est en retard. Déposez votre justificatif de paiement dans Factures et paiements\u{00A0}: les rubriques rouvrent dès que nous avons vérifié le paiement.",

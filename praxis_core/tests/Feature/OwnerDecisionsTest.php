@@ -154,6 +154,9 @@ class OwnerDecisionsTest extends TestCase
 
         // Four accounts, as MyCity has: the admin invites a fifth (before, 3 was the most)
         $portal = Livewire::actingAs($admin, 'client')->test(Dashboard::class)->call('switchTab', 'team')
+            // The page says the limit it applies (seen live with "up to 3" after D1), and lists Team member once in the invite
+            ->assertSee('Your organisation can have up to 10 Client Portal accounts.')->assertSee('Team members (4 of 10)')
+            ->assertDontSeeHtml('of 3)')
             ->set('inviteFirstName', 'Fifth')->set('inviteLastName', 'Person')->set('inviteEmail', 'fifth@city.test')
             ->call('inviteTeamMember')->assertHasNoErrors();
         Mail::assertSent(TeamMemberInvitation::class, fn ($m) => $m->hasTo('fifth@city.test'));

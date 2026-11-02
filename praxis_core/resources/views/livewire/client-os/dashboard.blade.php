@@ -190,7 +190,7 @@
                 <div class="page-header">
                     <div class="min-w-0">
                         <h1 class="page-title">{{ __('portal.nav.' . $activeTab) }}</h1>
-                        <p class="page-subtitle">{{ __('portal.subtitles.' . $activeTab) }}</p>
+                        <p class="page-subtitle">{{ __('portal.subtitles.' . $activeTab, ['max' => \App\Livewire\ClientOs\Dashboard::MAX_PORTAL_ACCOUNTS]) }}</p>
                     </div>
                     @if (count($allProjects) > 1)
                         <div class="field w-full sm:w-72">
@@ -717,7 +717,7 @@
                 @elseif ($activeTab === 'team' && ($can['team.view'] ?? false))
                     <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
                         <section class="card lg:col-span-2">
-                            <div class="card-header"><h2 class="card-title">{{ __('portal.team.members', ['count' => count($teamMembers ?? [])]) }}</h2></div>
+                            <div class="card-header"><h2 class="card-title">{{ __('portal.team.members', ['count' => count($teamMembers ?? []), 'max' => \App\Livewire\ClientOs\Dashboard::MAX_PORTAL_ACCOUNTS]) }}</h2></div>
 
                             <x-flash :keys="['team_success']" class="mb-4" />
 
@@ -843,6 +843,8 @@
                                         <select id="invite-role" wire:model="inviteRoleId" class="select">
                                             <option value="">{{ __('portal.team.role_default') }}</option>
                                             @foreach ($clientRoles as $role)
+                                                {{-- The default above is the Team member role: listed once --}}
+                                                @continue(($role->slug ?? '') === 'client-member')
                                                 <option value="{{ $role->id }}">{{ $roleLabel($role->name) }}</option>
                                             @endforeach
                                         </select>
@@ -1033,7 +1035,7 @@
                 @foreach (['overview', 'sprints', 'qa_hub', 'financials', 'vault', 'team'] as $section)
                     <div class="border-l-2 border-line pl-4">
                         <dt class="font-semibold text-ink">{{ __('portal.nav.' . $section) }}</dt>
-                        <dd class="m-0 mt-1">{{ __('portal.guide.' . $section) }}</dd>
+                        <dd class="m-0 mt-1">{{ __('portal.guide.' . $section, ['max' => \App\Livewire\ClientOs\Dashboard::MAX_PORTAL_ACCOUNTS]) }}</dd>
                     </div>
                 @endforeach
             </dl>

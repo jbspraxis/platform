@@ -422,7 +422,7 @@ class Dashboard extends Component
                      'client_users.last_login_at', 'client_users.created_at', 'projects.title as restricted_project_title',
                      'client_users.role_id', DB::raw("CASE WHEN client_users.is_primary_client = 1 THEN 'Client Admin' ELSE COALESCE(roles.name, 'No role') END as role_name"))
             ->get()->toArray();
-        $this->clientRoles = DB::table('roles')->where('audience', 'client')->whereNull('deleted_at')->orderBy('id')->get(['id', 'name'])->toArray();
+        $this->clientRoles = DB::table('roles')->where('audience', 'client')->whereNull('deleted_at')->orderBy('id')->get(['id', 'name', 'slug'])->toArray();
     }
 
     public function switchTab($tab)
