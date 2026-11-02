@@ -130,6 +130,27 @@ class ProposalsTest extends TestCase
             DB::table('system_audit_logs')->where('target_id', $o->id)->orderBy('id')->pluck('action')->all());
     }
 
+    public function test_a_budget_in_the_leads_instructions_gives_the_ai_the_prices_to_fit_it(): void
+    {
+        $lead = $this->staff('sales', ['sales']);
+        $this->actingAs($lead);
+        $o = $this->opportunity($lead);
+        $ai = FakeAi::install()->respond('proposal', self::DRAFT);
+
+        // Owner, 2 Nov 2026 (docs/QA-PORTAL.md D7): a budget caps the draft; the AI sees the prices only then
+        Livewire::test(ProposalsTab::class, ['opportunityId' => $o->id])
+            ->set('currency', 'EUR')->set('instructions', 'Phase one only, around EUR 2,000 in total.')
+            ->call('start', true)->assertHasNoErrors();
+
+        $ai->assertRan('proposal', function (AiRequest $r) {
+            return str_contains($r->prompt, '#1292P | Diagnostic & Audit') && str_contains($r->prompt, 'unit price: EUR 890.90')
+                && str_contains($r->prompt, 'the lead gave a budget, so the line items must fit within it')
+                && str_contains($r->prompt, 'choose the items and quantities so their total stays within that budget');
+        });
+        $this->assertTrue(Proposals::budgetGiven('Budget de 12 millions de nairas.'));
+        $this->assertFalse(Proposals::budgetGiven('Deliver in 3 months, in 2 milestones.'));
+    }
+
     public function test_a_background_draft_is_filed_when_its_job_ends_and_rings_the_lead(): void
     {
         $lead = $this->staff('sales', ['sales']);
