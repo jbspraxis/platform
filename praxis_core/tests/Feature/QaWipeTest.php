@@ -57,7 +57,8 @@ class QaWipeTest extends TestCase
         $this->insertRow('opportunity_members', ['opportunity_id' => $ids['opportunity'], 'user_id' => $this->staffId]);
 
         $ids['run'] = $id();
-        $this->insertRow('ai_runs', ['id' => $ids['run'], 'purpose' => 'questionnaire', 'subject_type' => 'opportunity', 'subject_id' => $ids['opportunity'], 'status' => 'done']);
+        $this->insertRow('ai_runs', ['id' => $ids['run'], 'purpose' => 'questionnaire', 'subject_type' => 'opportunity', 'subject_id' => $ids['opportunity'], 'status' => 'done',
+            'input' => json_encode(['context' => "{$name}: dispatch on Excel"]), 'output' => json_encode(['questions' => ['Which fleet?']]), 'cost_usd' => 0.05, 'created_at' => now()]);
         $ids['questionnaire'] = $id();
         $this->insertRow('questionnaires', ['id' => $ids['questionnaire'], 'opportunity_id' => $ids['opportunity'], 'ai_run_id' => $ids['run']]);
         $this->insertRow('questionnaire_questions', ['id' => $id(), 'questionnaire_id' => $ids['questionnaire'], 'question' => 'Which fleet?']);
@@ -157,6 +158,9 @@ class QaWipeTest extends TestCase
             if ($col->t === 'system_audit_logs') {
                 $query->where('action', '!=', 'QA_WIPE');
             }
+            if ($col->t === 'ai_runs' && $col->c === 'id') {
+                continue; // kept on purpose, emptied: their cost counts towards the month's AI budget
+            }
             if ($n = $query->count()) {
                 $found[] = "{$col->t}.{$col->c}: {$n}";
             }
@@ -217,9 +221,17 @@ class QaWipeTest extends TestCase
         $realRows = collect(DB::select("SELECT TABLE_NAME t FROM information_schema.tables WHERE table_schema = DATABASE()"))
             ->mapWithKeys(fn ($r) => [$r->t => DB::table($r->t)->count()]);
 
+        $spent = \App\Support\Ai\Budget::spent();
         $this->artisan('qa:wipe', ['organisation' => 'QA Test Client (delete)', '--force' => true])
+            ->expectsQuestion('Type the organisation\'s exact name to delete it', 'QA Test Client (delete)')
             ->expectsOutputToContain('Backed up to')
             ->assertSuccessful();
+
+        // Its AI runs stay with their cost, emptied of what they were about: the month's AI budget is unchanged
+        $this->assertSame($spent, \App\Support\Ai\Budget::spent());
+        $run = DB::table('ai_runs')->where('id', $test['run'])->sole();
+        $this->assertSame([null, null, null, null, 0.05], [$run->subject_type, $run->subject_id, $run->input, $run->output, round((float) $run->cost_usd, 2)]);
+        $this->assertSame('questionnaire', $run->purpose);
 
         // Nothing of the test client is left anywhere, and its Google event is cancelled
         $this->assertSame([], $this->leftovers($this->uuids($test)));
@@ -246,7 +258,11 @@ class QaWipeTest extends TestCase
         // One history line says the wipe ran; the backup holds the rows
         $line = DB::table('system_audit_logs')->where('action', 'QA_WIPE')->sole();
         $this->assertSame($test['org'], $line->target_id);
-        $folder = json_decode($line->new_values, true)['backup'];
+        $values = json_decode($line->new_values, true);
+        $this->assertSame(get_current_user(), $values['run_by']);
+        $this->assertArrayHasKey('flagged_by', $values);
+        $this->assertSame(2, $values['ai_runs_kept']); // the questionnaire's and the notes'
+        $folder = $values['backup'];
         $rows = json_decode(File::get($folder . '/rows.json'), true);
         $this->assertSame($test['org'], $rows['organizations'][0]['id']);
         $this->assertCount(2, $rows['client_users']);
@@ -259,6 +275,7 @@ class QaWipeTest extends TestCase
         $this->assertSame(2, $gone['client_users']);
         $this->assertSame(2, $gone['invoices']);
         $this->assertArrayNotHasKey('system_audit_logs', $gone->all());
+        $this->assertArrayNotHasKey('ai_runs', $gone->all());
     }
 
     public function test_only_the_owner_flags_an_organisation_as_a_test_client(): void
@@ -278,7 +295,46 @@ class QaWipeTest extends TestCase
         $this->assertSame(1, (int) DB::table('organizations')->where('id', $org['org'])->value('is_test'));
         $this->assertDatabaseHas('system_audit_logs', ['action' => 'ORGANISATION_TEST_FLAG_CHANGED', 'target_id' => $org['opportunity']]);
 
-        $this->artisan('qa:wipe', ['organisation' => 'QA Test Client (delete)'])->expectsOutputToContain('Would delete')->assertSuccessful();
+        // The preview says who flagged it and how old its rows are; the wipe's line keeps who flagged it
+        $this->artisan('qa:wipe', ['organisation' => 'QA Test Client (delete)'])->expectsOutputToContain('Would delete')
+            ->expectsOutputToContain('Flagged as a test by Owner Test on')->expectsOutputToContain('its rows are dated')->assertSuccessful();
+        $this->artisan('qa:wipe', ['organisation' => 'QA Test Client (delete)', '--force' => true, '--confirm' => 'QA Test Client (delete)', '--skip-google' => true])->assertSuccessful();
+        $values = json_decode(DB::table('system_audit_logs')->where('action', 'QA_WIPE')->value('new_values'), true);
+        $this->assertSame('Owner Test', $values['flagged_by']);
+        $this->assertNotNull($values['flagged_at']);
+    }
+
+    public function test_force_asks_for_the_exact_name_or_takes_it_as_confirm(): void
+    {
+        $test = $this->engagement(true, 'QA Test Client (delete)');
+
+        $this->artisan('qa:wipe', ['organisation' => $test['org'], '--force' => true, '--skip-google' => true])
+            ->expectsQuestion('Type the organisation\'s exact name to delete it', 'QA Test Client')
+            ->expectsOutputToContain('isn\'t the organisation\'s exact name')->assertFailed();
+        $this->artisan('qa:wipe', ['organisation' => $test['org'], '--force' => true, '--skip-google' => true, '--no-interaction' => true])
+            ->expectsOutputToContain('--confirm="QA Test Client (delete)"')->assertFailed();
+        $this->artisan('qa:wipe', ['organisation' => $test['org'], '--force' => true, '--skip-google' => true, '--no-interaction' => true, '--confirm' => 'Real Client Ltd'])
+            ->assertFailed();
+        $this->assertDatabaseHas('organizations', ['id' => $test['org']]);
+
+        $this->artisan('qa:wipe', ['organisation' => $test['org'], '--force' => true, '--skip-google' => true, '--no-interaction' => true, '--confirm' => 'QA Test Client (delete)'])
+            ->assertSuccessful();
+        $this->assertDatabaseMissing('organizations', ['id' => $test['org']]);
+    }
+
+    public function test_an_organisation_added_more_than_30_days_ago_needs_allow_old_organisation(): void
+    {
+        $test = $this->engagement(true, 'QA Test Client (delete)');
+        DB::table('organizations')->where('id', $test['org'])->update(['created_at' => now()->subDays(31)]);
+
+        $this->artisan('qa:wipe', ['organisation' => $test['org']])->expectsOutputToContain('more than 30 days ago')->assertFailed();
+        $this->artisan('qa:wipe', ['organisation' => $test['org'], '--force' => true, '--confirm' => 'QA Test Client (delete)', '--skip-google' => true])->assertFailed();
+        $this->assertDatabaseHas('organizations', ['id' => $test['org']]);
+
+        $this->artisan('qa:wipe', ['organisation' => $test['org'], '--force' => true, '--confirm' => 'QA Test Client (delete)', '--skip-google' => true, '--allow-old-organisation' => true])
+            ->assertSuccessful();
+        $this->assertDatabaseMissing('organizations', ['id' => $test['org']]);
+        $this->assertTrue(json_decode(DB::table('system_audit_logs')->where('action', 'QA_WIPE')->value('new_values'), true)['allowed_old']);
     }
 
     public function test_force_waits_for_running_ai_and_needs_google_or_skip_google(): void
@@ -286,19 +342,19 @@ class QaWipeTest extends TestCase
         FakeGoogle::install()->disconnected();
         $test = $this->engagement(true, 'QA Test Client (delete)');
 
-        $this->artisan('qa:wipe', ['organisation' => $test['org'], '--force' => true])
+        $this->artisan('qa:wipe', ['organisation' => $test['org'], '--force' => true, '--confirm' => 'QA Test Client (delete)'])
             ->expectsOutputToContain("Google isn't connected")
             ->assertFailed();
         $this->assertDatabaseHas('organizations', ['id' => $test['org']]);
 
         DB::table('ai_runs')->where('id', $test['run'])->update(['status' => 'running']);
-        $this->artisan('qa:wipe', ['organisation' => $test['org'], '--force' => true, '--skip-google' => true])
+        $this->artisan('qa:wipe', ['organisation' => $test['org'], '--force' => true, '--skip-google' => true, '--confirm' => 'QA Test Client (delete)'])
             ->expectsOutputToContain('still queued or running')
             ->assertFailed();
         $this->assertDatabaseHas('organizations', ['id' => $test['org']]);
 
         DB::table('ai_runs')->where('id', $test['run'])->update(['status' => 'done']);
-        $this->artisan('qa:wipe', ['organisation' => $test['org'], '--force' => true, '--skip-google' => true])->assertSuccessful();
+        $this->artisan('qa:wipe', ['organisation' => $test['org'], '--force' => true, '--skip-google' => true, '--confirm' => 'QA Test Client (delete)'])->assertSuccessful();
         $this->assertDatabaseMissing('organizations', ['id' => $test['org']]);
     }
 }

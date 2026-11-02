@@ -17,25 +17,37 @@ use Throwable;
  * Deletes a test organisation and everything tied to it, after a QA run on the live site (docs/QA-PORTAL.md):
  * its portal accounts and their sessions, sign-in methods and bells; its opportunities with their meetings,
  * transcripts, questionnaires, proposals, statements of work and project drafts; its projects with their
- * milestones, tasks, QA tickets, plans, change reports, invoices, payments and ledger postings; the AI runs about
- * any of these; the staff bells that link to them; their history lines; and the files clients or staff uploaded.
+ * milestones, tasks, QA tickets, plans, change reports, invoices, payments and ledger postings; the content of the
+ * AI runs about any of these; the staff bells that link to them; their history lines; and the files uploaded for it.
  *
  * Without --force it only shows what it would delete, table by table. It refuses any organisation that the owner
- * hasn't flagged as a test (organizations.is_test, set on the opportunity page's Edit details).
+ * hasn't flagged as a test (organizations.is_test, set on the opportunity's Edit details), and one added more than
+ * MAX_AGE_DAYS ago (a test client is added on the day of its QA) unless --allow-old-organisation says so. The preview
+ * shows who flagged it and when, and how old the rows are.
  *
- * With --force: the rows (and files) are first copied to storage/app/private/qa-wipes/<time>-<name>/, readable by
- * the owner's account only; the organisation's Google Calendar events are cancelled (guests of upcoming meetings
- * are told; past ones go quietly); then everything is deleted in one transaction, and one history line records
- * that the wipe ran (QA_WIPE, with the counts and the backup folder). Invoice numbers the test used stay as gaps.
+ * With --force the person types the organisation's exact name (or gives it as --confirm="…" without questions). The
+ * rows (and files) are then copied to storage/app/private/qa-wipes/<time>-<name>/, readable by the owner's account
+ * only; the organisation's Google Calendar events are cancelled (guests of upcoming meetings are told; past ones go
+ * quietly); then everything is deleted in one transaction, and one history line records that the wipe ran (QA_WIPE,
+ * with the counts, the backup folder, who flagged it and who ran it). Its AI runs stay, emptied of their content:
+ * their cost was really spent and counts towards the month's AI budget. Invoice numbers the test used stay as gaps.
  */
 class QaWipe extends Command
 {
     protected $signature = 'qa:wipe
         {organisation : The test organisation, by its exact name or its id}
         {--force : Back up, cancel its Google events and delete; without it nothing changes}
+        {--confirm= : The organisation\'s exact name, to delete without being asked for it (with --no-interaction)}
+        {--allow-old-organisation : Also wipe an organisation added more than 30 days ago}
         {--skip-google : Delete even when its Google events can\'t be cancelled (they stay in the calendar)}';
 
     protected $description = 'Delete a test organisation and everything tied to it (only organisations flagged as a test)';
+
+    /** A test client is added on the day of its QA: anything older is refused unless --allow-old-organisation */
+    private const MAX_AGE_DAYS = 30;
+
+    /** AI runs stay for the budget (Budget::spent sums their cost); what they were about and their content go */
+    private const RUN_SCRUB = ['subject_type' => null, 'subject_id' => null, 'input' => null, 'output' => null, 'error' => null];
 
     /** AI run subjects (morph aliases, AppServiceProvider) => the id set they point to */
     private const SUBJECTS = [
@@ -61,6 +73,14 @@ class QaWipe extends Command
 
             return self::FAILURE;
         }
+        $added = $org->created_at ? \Carbon\Carbon::parse($org->created_at) : null;
+        if ((! $added || $added->lt(now()->subDays(self::MAX_AGE_DAYS))) && ! $this->option('allow-old-organisation')) {
+            $this->error(sprintf('%s was added %s, more than %d days ago: a test client is added on the day of its QA. Nothing was deleted.',
+                $org->name, $added ? 'on ' . $added->format('j F Y') : 'on an unknown date', self::MAX_AGE_DAYS));
+            $this->line('Only if you are sure every row of it is test data, run it again with --allow-old-organisation.');
+
+            return self::FAILURE;
+        }
 
         $ids = $this->ids($org);
         $steps = $this->steps($org, $ids);
@@ -69,17 +89,42 @@ class QaWipe extends Command
             ->where('status', '!=', 'cancelled')->get(['id', 'title', 'google_event_id', 'starts_at']);
 
         $counts = [];
+        $dates = [];
         foreach ($steps as [$table, $query]) {
             $counts[$table] = ($counts[$table] ?? 0) + (clone $query)->count();
+            if (Schema::hasColumn($table, 'created_at')) {
+                $dates[] = (clone $query)->min('created_at');
+                $dates[] = (clone $query)->max('created_at');
+            }
         }
+        $dates = array_filter($dates);
+        $flag = $this->flaggedBy($ids['opportunities']);
         $this->info(($this->option('force') ? 'Deleting' : 'Would delete') . " {$org->name} ({$org->id}):");
-        $this->table(['Table', 'Rows'], collect($counts)->filter()->map(fn ($n, $t) => [$t, $n])->values()->all());
+        $this->table(['Table', 'Rows', ''], collect($counts)->filter()->map(fn ($n, $t) => [$t, $n, $t === 'ai_runs' ? 'kept for the AI budget, content emptied' : 'deleted'])->values()->all());
         $this->line(sprintf('%d uploaded file(s), %d Google Calendar event(s) to cancel.', count($files), $events->count()));
+        $this->line('Added on ' . ($added ? $added->format('j F Y, H:i') : 'an unknown date') . ($dates ? sprintf('; its rows are dated %s to %s.', \Carbon\Carbon::parse(min($dates))->format('j F Y'), \Carbon\Carbon::parse(max($dates))->format('j F Y')) : '.'));
+        $this->line($flag ? "Flagged as a test by {$flag['by']} on " . \Carbon\Carbon::parse($flag['at'])->format('j F Y, H:i') . '.' : 'No history line says who flagged it as a test.');
 
         if (! $this->option('force')) {
             $this->line('Nothing was changed. Run it again with --force to back up and delete.');
 
             return self::SUCCESS;
+        }
+
+        // The person types the exact name: a wrong tick on a real organisation's opportunity can't wipe it alone
+        $typed = $this->option('confirm');
+        if ($typed === null) {
+            if (! $this->input->isInteractive()) {
+                $this->error('Without questions, give the organisation\'s exact name: --confirm="' . $org->name . '". Nothing was deleted.');
+
+                return self::FAILURE;
+            }
+            $typed = $this->ask('Type the organisation\'s exact name to delete it');
+        }
+        if (trim((string) $typed) !== trim((string) $org->name)) {
+            $this->error('That isn\'t the organisation\'s exact name. Nothing was deleted.');
+
+            return self::FAILURE;
         }
 
         if ($busy = DB::table('ai_runs')->whereIn('id', $ids['runs'] ?: [''])->whereIn('status', ['queued', 'running'])->count()) {
@@ -113,8 +158,9 @@ class QaWipe extends Command
 
         $deleted = [];
         DB::transaction(function () use ($steps, &$deleted) {
-            foreach ($steps as [$table, $query]) {
-                $deleted[$table] = ($deleted[$table] ?? 0) + (clone $query)->delete();
+            foreach ($steps as $step) {
+                [$table, $query] = $step;
+                $deleted[$table] = ($deleted[$table] ?? 0) + (isset($step[2]) ? (clone $query)->update($step[2]) : (clone $query)->delete());
             }
         });
 
@@ -126,7 +172,7 @@ class QaWipe extends Command
             Storage::disk('local')->deleteDirectory('task_files/' . $taskId);
         }
 
-        $total = array_sum($deleted);
+        $total = array_sum(array_diff_key($deleted, ['ai_runs' => 1]));
         DB::table('system_audit_logs')->insert([
             'user_id' => null,
             'action' => 'QA_WIPE',
@@ -134,7 +180,10 @@ class QaWipe extends Command
             'target_table' => 'organizations',
             'target_id' => $org->id,
             'old_values' => null,
-            'new_values' => json_encode(['rows' => array_filter($deleted), 'files' => $removed, 'google_events' => $cancelled, 'backup' => $folder], JSON_UNESCAPED_UNICODE),
+            'new_values' => json_encode(['rows' => array_filter(array_diff_key($deleted, ['ai_runs' => 1])), 'ai_runs_kept' => $deleted['ai_runs'] ?? 0,
+                'files' => $removed, 'google_events' => $cancelled, 'backup' => $folder,
+                'flagged_by' => $flag['by'] ?? null, 'flagged_by_id' => $flag['id'] ?? null, 'flagged_at' => $flag['at'] ?? null,
+                'run_by' => get_current_user(), 'allowed_old' => (bool) $this->option('allow-old-organisation')], JSON_UNESCAPED_UNICODE),
             'ip_address' => null,
             'created_at' => now(),
         ]);
@@ -142,6 +191,20 @@ class QaWipe extends Command
         $this->info("Deleted {$total} rows, {$removed} file(s) and cancelled {$cancelled} Google event(s).");
 
         return self::SUCCESS;
+    }
+
+    /** Who last flagged one of these opportunities' organisation as a test, and when (its history line) */
+    private function flaggedBy(array $opportunityIds): ?array
+    {
+        $line = DB::table('system_audit_logs')->leftJoin('users', 'users.id', '=', 'system_audit_logs.user_id')
+            ->where('system_audit_logs.action', 'ORGANISATION_TEST_FLAG_CHANGED')->whereIn('system_audit_logs.target_id', $opportunityIds ?: [''])
+            ->orderByDesc('system_audit_logs.created_at')->orderByDesc('system_audit_logs.id')
+            ->first(['system_audit_logs.user_id', 'system_audit_logs.new_values', 'system_audit_logs.created_at', 'users.first_name', 'users.last_name']);
+        if (! $line || ! (json_decode((string) $line->new_values, true)['is_test'] ?? false)) {
+            return null;
+        }
+
+        return ['id' => $line->user_id, 'by' => trim($line->first_name . ' ' . $line->last_name) ?: 'an unknown account', 'at' => (string) $line->created_at];
     }
 
     /** By id, or by exact name (case and spacing aside); several with that name must be told apart by id */
@@ -294,7 +357,7 @@ class QaWipe extends Command
             ['questionnaire_questions', $this->any('questionnaire_questions', ['questionnaire_id' => $ids['questionnaires']])],
             ['questionnaires', $this->any('questionnaires', ['id' => $ids['questionnaires']])],
             ['opportunity_members', $this->any('opportunity_members', ['opportunity_id' => $ids['opportunities']])],
-            ['ai_runs', $this->any('ai_runs', ['id' => $ids['runs']])],
+            ['ai_runs', $this->any('ai_runs', ['id' => $ids['runs']]), self::RUN_SCRUB],
             ['projects', $this->any('projects', ['id' => $ids['projects']])],
             ['opportunities', $this->any('opportunities', ['id' => $ids['opportunities']])],
             ['broadcast_logs', $this->any('broadcast_logs', ['user_id' => $ids['clients']])],
