@@ -107,17 +107,17 @@
                 <div class="ws-grid">
                     <div class="field">
                         <label class="label" for="ws-legal-name">Legal name</label>
-                        <input id="ws-legal-name" type="text" class="input" maxlength="120" wire:model.blur="settings.company.legal_name" {!! $invalid('settings.company.legal_name') !!}>
+                        <input id="ws-legal-name" type="text" class="input" maxlength="120" wire:model.live.blur="settings.company.legal_name" {!! $invalid('settings.company.legal_name') !!}>
                         @error('settings.company.legal_name') <span class="field-error" id="settings-company-legal_name-error">{{ $message }}</span> @enderror
                     </div>
                     <div class="field">
                         <label class="label" for="ws-trading-name">Trading name</label>
-                        <input id="ws-trading-name" type="text" class="input" maxlength="80" wire:model.blur="settings.company.trading_name" {!! $invalid('settings.company.trading_name') !!}>
+                        <input id="ws-trading-name" type="text" class="input" maxlength="80" wire:model.live.blur="settings.company.trading_name" {!! $invalid('settings.company.trading_name') !!}>
                         @error('settings.company.trading_name') <span class="field-error" id="settings-company-trading_name-error">{{ $message }}</span> @enderror
                     </div>
                     <div class="field">
                         <label class="label" for="ws-founded">Year founded (optional)</label>
-                        <input id="ws-founded" type="text" inputmode="numeric" class="input num" style="text-align: left;" maxlength="4" wire:model.blur="settings.company.founded" {!! $invalid('settings.company.founded') !!}>
+                        <input id="ws-founded" type="text" inputmode="numeric" class="input num" style="text-align: left;" maxlength="4" wire:model.live.blur="settings.company.founded" {!! $invalid('settings.company.founded') !!}>
                         @error('settings.company.founded') <span class="field-error" id="settings-company-founded-error">{{ $message }}</span> @enderror
                     </div>
                 </div>
@@ -137,12 +137,12 @@
                             </div>
                             <div class="field">
                                 <label class="label" for="ws-reg-{{ $i }}-label">Registry</label>
-                                <input id="ws-reg-{{ $i }}-label" type="text" class="input" maxlength="40" placeholder="CAC" wire:model.blur="{{ $k }}.label" {!! $invalid("{$k}.label") !!}>
+                                <input id="ws-reg-{{ $i }}-label" type="text" class="input" maxlength="40" placeholder="CAC" wire:model.live.blur="{{ $k }}.label" {!! $invalid("{$k}.label") !!}>
                                 @error("{$k}.label") <span class="field-error" id="{{ str_replace('.', '-', $k) }}-label-error">{{ $message }}</span> @enderror
                             </div>
                             <div class="field">
                                 <label class="label" for="ws-reg-{{ $i }}-number">Number</label>
-                                <input id="ws-reg-{{ $i }}-number" type="text" class="input" maxlength="60" wire:model.blur="{{ $k }}.number" {!! $invalid("{$k}.number") !!}>
+                                <input id="ws-reg-{{ $i }}-number" type="text" class="input" maxlength="60" wire:model.live.blur="{{ $k }}.number" {!! $invalid("{$k}.number") !!}>
                                 @error("{$k}.number") <span class="field-error" id="{{ str_replace('.', '-', $k) }}-number-error">{{ $message }}</span> @enderror
                             </div>
                             <div class="field">
@@ -175,7 +175,7 @@
                         <div class="ws-row ws-row-3" wire:key="office-{{ $i }}">
                             <div class="field">
                                 <label class="label" for="ws-office-{{ $i }}-city">City</label>
-                                <input id="ws-office-{{ $i }}-city" type="text" class="input" maxlength="80" wire:model.blur="{{ $k }}.city" {!! $invalid("{$k}.city") !!}>
+                                <input id="ws-office-{{ $i }}-city" type="text" class="input" maxlength="80" wire:model.live.blur="{{ $k }}.city" {!! $invalid("{$k}.city") !!}>
                                 @error("{$k}.city") <span class="field-error" id="{{ str_replace('.', '-', $k) }}-city-error">{{ $message }}</span> @enderror
                             </div>
                             <div class="field">
@@ -187,7 +187,7 @@
                             </div>
                             <div class="field ws-wide">
                                 <label class="label" for="ws-office-{{ $i }}-address">Address (optional)</label>
-                                <input id="ws-office-{{ $i }}-address" type="text" class="input" maxlength="200" wire:model.blur="{{ $k }}.address" {!! $invalid("{$k}.address") !!}>
+                                <input id="ws-office-{{ $i }}-address" type="text" class="input" maxlength="200" wire:model.live.blur="{{ $k }}.address" {!! $invalid("{$k}.address") !!}>
                                 @error("{$k}.address") <span class="field-error" id="{{ str_replace('.', '-', $k) }}-address-error">{{ $message }}</span> @enderror
                             </div>
                             <button type="button" class="btn btn-ghost btn-sm ws-remove" wire:click="removeRow('company.offices', {{ $i }})" aria-label="Remove office {{ $i + 1 }}">
@@ -214,12 +214,12 @@
                 <div class="ws-grid">
                     <div class="field">
                         <label class="label" for="ws-email">General email</label>
-                        <input id="ws-email" type="email" class="input" maxlength="120" autocomplete="off" wire:model.blur="settings.contact.email" {!! $invalid('settings.contact.email') !!}>
+                        <input id="ws-email" type="email" class="input" maxlength="120" autocomplete="off" wire:model.live.blur="settings.contact.email" {!! $invalid('settings.contact.email') !!}>
                         @error('settings.contact.email') <span class="field-error" id="settings-contact-email-error">{{ $message }}</span> @enderror
                     </div>
                     <div class="field">
                         <label class="label" for="ws-hours">Opening hours (optional)</label>
-                        <input id="ws-hours" type="text" class="input" maxlength="120" placeholder="Monday to Friday, 09:00 to 17:00 (WAT)" wire:model.blur="settings.contact.hours" {!! $invalid('settings.contact.hours') !!}>
+                        <input id="ws-hours" type="text" class="input" maxlength="120" placeholder="Monday to Friday, 09:00 to 17:00 (WAT)" wire:model.live.blur="settings.contact.hours" {!! $invalid('settings.contact.hours') !!}>
                         @error('settings.contact.hours') <span class="field-error" id="settings-contact-hours-error">{{ $message }}</span> @enderror
                     </div>
                 </div>
@@ -234,12 +234,12 @@
                             <div class="ws-row ws-row-2" wire:key="{{ $list }}-{{ $i }}">
                                 <div class="field">
                                     <label class="label" for="ws-{{ $list }}-{{ $i }}-label">Label</label>
-                                    <input id="ws-{{ $list }}-{{ $i }}-label" type="text" class="input" maxlength="40" placeholder="Nigeria" wire:model.blur="{{ $k }}.label" {!! $invalid("{$k}.label") !!}>
+                                    <input id="ws-{{ $list }}-{{ $i }}-label" type="text" class="input" maxlength="40" placeholder="Nigeria" wire:model.live.blur="{{ $k }}.label" {!! $invalid("{$k}.label") !!}>
                                     @error("{$k}.label") <span class="field-error" id="{{ str_replace('.', '-', $k) }}-label-error">{{ $message }}</span> @enderror
                                 </div>
                                 <div class="field">
                                     <label class="label" for="ws-{{ $list }}-{{ $i }}-number">Number</label>
-                                    <input id="ws-{{ $list }}-{{ $i }}-number" type="tel" class="input" maxlength="24" placeholder="+234 800 000 0000" wire:model.blur="{{ $k }}.number" {!! $invalid("{$k}.number") !!}>
+                                    <input id="ws-{{ $list }}-{{ $i }}-number" type="tel" class="input" maxlength="24" placeholder="+234 800 000 0000" wire:model.live.blur="{{ $k }}.number" {!! $invalid("{$k}.number") !!}>
                                     @error("{$k}.number") <span class="field-error" id="{{ str_replace('.', '-', $k) }}-number-error">{{ $message }}</span> @enderror
                                 </div>
                                 <button type="button" class="btn btn-ghost btn-sm ws-remove" wire:click="removeRow('contact.{{ $list }}', {{ $i }})" aria-label="Remove {{ $noun }} {{ $i + 1 }}">
@@ -268,7 +268,7 @@
                     @foreach (['linkedin' => ['LinkedIn', 'https://www.linkedin.com/company/…'], 'x' => ['X', 'https://x.com/…'], 'youtube' => ['YouTube', 'https://www.youtube.com/@…']] as $network => [$label, $hint])
                         <div class="field">
                             <label class="label" for="ws-social-{{ $network }}">{{ $label }}</label>
-                            <input id="ws-social-{{ $network }}" type="url" class="input" maxlength="255" placeholder="{{ $hint }}" wire:model.blur="settings.social.{{ $network }}" {!! $invalid("settings.social.{$network}") !!}>
+                            <input id="ws-social-{{ $network }}" type="url" class="input" maxlength="255" placeholder="{{ $hint }}" wire:model.live.blur="settings.social.{{ $network }}" {!! $invalid("settings.social.{$network}") !!}>
                             @error("settings.social.{$network}") <span class="field-error" id="settings-social-{{ $network }}-error">{{ $message }}</span> @enderror
                         </div>
                     @endforeach
@@ -316,34 +316,34 @@
                             <div class="ws-grid ws-grid-2">
                                 <div class="field">
                                     <label class="label" for="ws-person-{{ $i }}-name">Name</label>
-                                    <input id="ws-person-{{ $i }}-name" type="text" class="input" maxlength="80" autocomplete="off" wire:model.blur="{{ $k }}.name" {!! $invalid("{$k}.name") !!}>
+                                    <input id="ws-person-{{ $i }}-name" type="text" class="input" maxlength="80" autocomplete="off" wire:model.live.blur="{{ $k }}.name" {!! $invalid("{$k}.name") !!}>
                                     @error("{$k}.name") <span class="field-error" id="{{ str_replace('.', '-', $k) }}-name-error">{{ $message }}</span> @enderror
                                 </div>
                                 <div class="field">
                                     <label class="label" for="ws-person-{{ $i }}-title">Job title</label>
-                                    <input id="ws-person-{{ $i }}-title" type="text" class="input" maxlength="80" wire:model.blur="{{ $k }}.title" {!! $invalid("{$k}.title") !!}>
+                                    <input id="ws-person-{{ $i }}-title" type="text" class="input" maxlength="80" wire:model.live.blur="{{ $k }}.title" {!! $invalid("{$k}.title") !!}>
                                     @error("{$k}.title") <span class="field-error" id="{{ str_replace('.', '-', $k) }}-title-error">{{ $message }}</span> @enderror
                                 </div>
                                 <div class="field">
                                     <label class="label" for="ws-person-{{ $i }}-linkedin">LinkedIn link (optional)</label>
-                                    <input id="ws-person-{{ $i }}-linkedin" type="url" class="input" maxlength="255" placeholder="https://www.linkedin.com/in/…" wire:model.blur="{{ $k }}.linkedin" {!! $invalid("{$k}.linkedin") !!}>
+                                    <input id="ws-person-{{ $i }}-linkedin" type="url" class="input" maxlength="255" placeholder="https://www.linkedin.com/in/…" wire:model.live.blur="{{ $k }}.linkedin" {!! $invalid("{$k}.linkedin") !!}>
                                     @error("{$k}.linkedin") <span class="field-error" id="{{ str_replace('.', '-', $k) }}-linkedin-error">{{ $message }}</span> @enderror
                                 </div>
                                 <div class="field">
                                     <label class="label" for="ws-person-{{ $i }}-photo">Photo link (optional)</label>
-                                    <input id="ws-person-{{ $i }}-photo" type="url" class="input" maxlength="255" placeholder="https://…" wire:model.blur="{{ $k }}.photo_url" {!! $invalid("{$k}.photo_url") !!}>
+                                    <input id="ws-person-{{ $i }}-photo" type="url" class="input" maxlength="255" placeholder="https://…" wire:model.live.blur="{{ $k }}.photo_url" {!! $invalid("{$k}.photo_url") !!}>
                                     @error("{$k}.photo_url") <span class="field-error" id="{{ str_replace('.', '-', $k) }}-photo_url-error">{{ $message }}</span> @enderror
                                 </div>
                             </div>
                             <div class="ws-grid ws-grid-2" style="margin-top: 16px;">
                                 <div class="field">
                                     <label class="label" for="ws-person-{{ $i }}-bio-en">Short bio in English (optional)</label>
-                                    <textarea id="ws-person-{{ $i }}-bio-en" class="textarea" rows="3" maxlength="400" wire:model.blur="{{ $k }}.bio_en" {!! $invalid("{$k}.bio_en") !!}></textarea>
+                                    <textarea id="ws-person-{{ $i }}-bio-en" class="textarea" rows="3" maxlength="400" wire:model.live.blur="{{ $k }}.bio_en" {!! $invalid("{$k}.bio_en") !!}></textarea>
                                     @error("{$k}.bio_en") <span class="field-error" id="{{ str_replace('.', '-', $k) }}-bio_en-error">{{ $message }}</span> @enderror
                                 </div>
                                 <div class="field">
                                     <label class="label" for="ws-person-{{ $i }}-bio-fr">Short bio in French (optional)</label>
-                                    <textarea id="ws-person-{{ $i }}-bio-fr" class="textarea" rows="3" maxlength="400" lang="fr" wire:model.blur="{{ $k }}.bio_fr" {!! $invalid("{$k}.bio_fr") !!}></textarea>
+                                    <textarea id="ws-person-{{ $i }}-bio-fr" class="textarea" rows="3" maxlength="400" lang="fr" wire:model.live.blur="{{ $k }}.bio_fr" {!! $invalid("{$k}.bio_fr") !!}></textarea>
                                     @error("{$k}.bio_fr") <span class="field-error" id="{{ str_replace('.', '-', $k) }}-bio_fr-error">{{ $message }}</span> @enderror
                                 </div>
                             </div>

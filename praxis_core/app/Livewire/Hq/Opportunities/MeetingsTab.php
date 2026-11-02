@@ -662,7 +662,7 @@ class MeetingsTab extends Component
         }
     }
 
-    /** A draft point's field, saved as soon as it is left (wire:model.blur) */
+    /** A draft point's field, saved as soon as it is left (wire:model.live.blur) */
     public function updatedPoints(mixed $value, string $key): void
     {
         [$id, $field] = array_pad(explode('.', $key, 2), 2, '');

@@ -87,13 +87,13 @@
                         <div class="mtg-point-grid">
                             <div class="field mtg-point-wide">
                                 <label for="pt-title-{{ $p->id }}" class="label">{{ __('handover.fields.title') }}</label>
-                                <input id="pt-title-{{ $p->id }}" type="text" class="input" maxlength="{{ \App\Support\Opportunities\Handovers::MAX_TITLE }}" wire:model.blur="points.{{ $p->id }}.title"
+                                <input id="pt-title-{{ $p->id }}" type="text" class="input" maxlength="{{ \App\Support\Opportunities\Handovers::MAX_TITLE }}" wire:model.live.blur="points.{{ $p->id }}.title"
                                        @error('points.' . $p->id . '.title') aria-invalid="true" aria-describedby="pt-title-{{ $p->id }}-error" @enderror>
                                 @error('points.' . $p->id . '.title') <span class="field-error" id="pt-title-{{ $p->id }}-error">{{ $message }}</span> @enderror
                             </div>
                             <div class="field">
                                 <label for="pt-sev-{{ $p->id }}" class="label">{{ __('handover.fields.severity') }}</label>
-                                <select id="pt-sev-{{ $p->id }}" class="select" wire:model.blur="points.{{ $p->id }}.severity" @error('points.' . $p->id . '.severity') aria-invalid="true" @enderror>
+                                <select id="pt-sev-{{ $p->id }}" class="select" wire:model.live.blur="points.{{ $p->id }}.severity" @error('points.' . $p->id . '.severity') aria-invalid="true" @enderror>
                                     @foreach (\App\Support\Opportunities\Handovers::SEVERITIES as $s)
                                         <option value="{{ $s }}">{{ __('handover.severity.' . $s) }}</option>
                                     @endforeach
@@ -102,13 +102,13 @@
                             </div>
                             <div class="field">
                                 <label for="pt-by-{{ $p->id }}" class="label">{{ __('handover.fields.raised_by') }}</label>
-                                <input id="pt-by-{{ $p->id }}" type="text" class="input" maxlength="{{ \App\Support\Opportunities\Handovers::MAX_RAISED_BY }}" wire:model.blur="points.{{ $p->id }}.raised_by"
+                                <input id="pt-by-{{ $p->id }}" type="text" class="input" maxlength="{{ \App\Support\Opportunities\Handovers::MAX_RAISED_BY }}" wire:model.live.blur="points.{{ $p->id }}.raised_by"
                                        @error('points.' . $p->id . '.raised_by') aria-invalid="true" @enderror>
                                 @error('points.' . $p->id . '.raised_by') <span class="field-error">{{ $message }}</span> @enderror
                             </div>
                             <div class="field mtg-point-wide">
                                 <label for="pt-task-{{ $p->id }}" class="label">{{ __('handover.fields.task') }}</label>
-                                <select id="pt-task-{{ $p->id }}" class="select" wire:model.blur="points.{{ $p->id }}.task_id" @error('points.' . $p->id . '.task_id') aria-invalid="true" @enderror>
+                                <select id="pt-task-{{ $p->id }}" class="select" wire:model.live.blur="points.{{ $p->id }}.task_id" @error('points.' . $p->id . '.task_id') aria-invalid="true" @enderror>
                                     <option value="">{{ __('handover.fields.no_task') }}</option>
                                     @if ($p->task_id && ! in_array($p->task_id, $taskIds, true))
                                         <option value="{{ $p->task_id }}">{{ $p->task_title }}</option>
@@ -121,7 +121,7 @@
                             </div>
                             <div class="field mtg-point-wide">
                                 <label for="pt-detail-{{ $p->id }}" class="label">{{ __('handover.fields.detail') }}</label>
-                                <textarea id="pt-detail-{{ $p->id }}" class="textarea" rows="3" maxlength="{{ \App\Support\Opportunities\Handovers::MAX_DETAIL }}" wire:model.blur="points.{{ $p->id }}.detail"
+                                <textarea id="pt-detail-{{ $p->id }}" class="textarea" rows="3" maxlength="{{ \App\Support\Opportunities\Handovers::MAX_DETAIL }}" wire:model.live.blur="points.{{ $p->id }}.detail"
                                           @error('points.' . $p->id . '.detail') aria-invalid="true" @enderror></textarea>
                                 @error('points.' . $p->id . '.detail') <span class="field-error">{{ $message }}</span> @enderror
                             </div>

@@ -204,7 +204,7 @@ class ProposalsTab extends Component
         }
     }
 
-    /** Saves the draft whenever a field is left (wire:model.blur) or a select changes */
+    /** Saves the draft whenever a field is left (wire:model.live.blur) or a select changes */
     public function updated(string $name): void
     {
         $field = explode('.', $name, 2)[0];
