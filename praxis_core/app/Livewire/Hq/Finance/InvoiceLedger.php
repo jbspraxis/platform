@@ -217,13 +217,52 @@ class InvoiceLedger extends Component
             // Accrue the receivable in the general ledger, as the proposal gateway does for deposits
             \App\Livewire\Hq\Finance\GeneralLedgerManager::recordInvoiceIssued($invoiceId);
         });
-        // The client's billing people hear about it in their portal and on their devices (docs/PWA.md)
+        // The client's billing people hear about it in their portal and on their devices (docs/PWA.md), and get it by
+        // email with its PDF (docs/QA-PORTAL.md D11)
         \App\Support\Pwa\ClientNotify::invoice($invoiceId, 'invoice_issued');
+        $reached = $this->emailToClient($invoiceId);
 
         $this->showCreateModal = false;
         $this->reset(['new_project_id', 'new_phase_id', 'new_amount_due', 'new_description']);
         $this->loadInvoices();
-        session()->flash('success', "Invoice {$invNumber} created for " . ($org->name ?? 'the client') . '.');
+        session()->flash('success', "Invoice {$invNumber} created for " . ($org->name ?? 'the client') . '. ' . $this->emailedLine($reached));
+    }
+
+    /** Finance › Invoices › Email again: the invoice and its PDF to the client's billing contacts */
+    public function emailInvoice($invoiceId)
+    {
+        abort_unless(Auth::user()->can('finance.create'), 403);
+
+        $invoice = DB::table('invoices')->where('id', $invoiceId)->whereNull('deleted_at')->first();
+        if (! $invoice || $invoice->status === 'Cancelled') {
+            session()->flash('error', 'Only an invoice that isn’t cancelled can be emailed. Refresh the page and try again.');
+            $this->loadInvoices();
+            return;
+        }
+        $reached = $this->emailToClient($invoiceId);
+        $this->loadInvoices();
+        session()->flash($reached ? 'success' : 'error', "Invoice {$invoice->invoice_number}: " . $this->emailedLine($reached));
+    }
+
+    /** @return list<string>|null the addresses reached; null when the email couldn't be prepared */
+    private function emailToClient(string $invoiceId): ?array
+    {
+        try {
+            return \App\Support\Finance\InvoiceMailer::send($invoiceId);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Invoice email not prepared', ['invoice_id' => $invoiceId, 'message' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    private function emailedLine(?array $reached): string
+    {
+        return match (true) {
+            $reached === null => 'We couldn’t prepare its email. Try Email again; if it keeps failing, check the server log.',
+            $reached === [] => 'Nobody at the client was emailed: no active portal account there sees invoices. Invite their finance contact, then use Email again.',
+            default => 'Emailed with its PDF to ' . implode(', ', $reached) . '.',
+        };
     }
 
     public function cancelInvoice($invoiceId)

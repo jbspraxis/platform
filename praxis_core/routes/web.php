@@ -83,6 +83,7 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
 
                 // Invoicing & Escrow
                 Route::get('/invoice-ledger', \App\Livewire\Hq\Finance\InvoiceLedger::class)->name('hq.finance.invoices');
+                Route::get('/invoice-ledger/{invoice}/pdf', [\App\Http\Controllers\InvoicePdfController::class, 'hq'])->whereUuid('invoice')->name('hq.finance.invoice-pdf');
                 Route::get('/escrow-verification', \App\Livewire\Hq\Finance\EscrowVerification::class)->name('hq.finance.escrow');
 
                 // Core IFRS Accounting
@@ -254,6 +255,8 @@ Route::domain(Hosts::portal())->group(function () use ($notOwnRoute, $legacy) {
     // Client accounts only (guard 'client', table client_users)
     Route::middleware(['auth:client', 'client.active'])->group(function () {
         Route::get('/', \App\Livewire\ClientOs\Dashboard::class)->name('client.dashboard');
+        // An invoice's PDF, for an account that sees invoices on that project (docs/QA-PORTAL.md D11)
+        Route::get('/invoices/{invoice}/pdf', [\App\Http\Controllers\InvoicePdfController::class, 'portal'])->whereUuid('invoice')->name('portal.invoice.pdf');
 
         // QA evidence on the client's own projects, checked per file
         Route::get('/files/{path}', [\App\Http\Controllers\SecureFileController::class, 'show'])->where('path', '.*')->name('portal.file');

@@ -85,9 +85,16 @@
                             </td>
                             <td>
                                 <div class="flex justify-end gap-2">
-                                    <button type="button" class="btn btn-ghost btn-sm" onclick="alert('Invoice PDFs are not available yet.')">
+                                    <a href="{{ route('hq.finance.invoice-pdf', $inv->id) }}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">
                                         <i data-lucide="file-text"></i> Download PDF
-                                    </button>
+                                    </a>
+
+                                    @if($inv->status !== 'Cancelled' && auth()->user()->can('finance.create'))
+                                        <button type="button" wire:click="emailInvoice('{{ $inv->id }}')" wire:loading.attr="disabled" wire:target="emailInvoice('{{ $inv->id }}')" class="btn btn-ghost btn-sm"
+                                                title="{{ $inv->emailed_at ? 'Emailed ' . \Carbon\Carbon::parse($inv->emailed_at)->setTimezone('Africa/Lagos')->format('j M Y, H:i') : 'Not emailed yet' }}">
+                                            <i data-lucide="mail"></i> {{ $inv->emailed_at ? 'Email again' : 'Email to client' }}
+                                        </button>
+                                    @endif
 
                                     @if($inv->status === 'Pending' && auth()->user()->can('finance.delete'))
                                         <div x-data="{ open: false }" @keydown.escape.window="open = false">
