@@ -175,4 +175,19 @@ class PortalQaFixesTest extends TestCase
             ->set('brandPrimary', '#123ABC')->call('saveBrandSettings')->assertHasNoErrors();
         $this->assertSame('#123ABC', DB::table('client_portal_settings')->where('organization_id', $org)->value('primary_color'));
     }
+
+    public function test_an_expired_or_altered_link_and_other_errors_get_a_page_that_explains_in_the_visitors_language(): void
+    {
+        $portal = 'http://' . config('app.domains.portal');
+        $proposal = (string) Str::uuid();
+
+        $this->get($portal . '/proposals/' . $proposal . '?expires=' . now()->subDay()->timestamp . '&signature=altered')
+            ->assertForbidden()->assertSee('This link has expired')->assertSee('Sign in to the Client Portal')->assertDontSee('INVALID SIGNATURE');
+        $this->withHeader('Accept-Language', 'fr-FR,fr;q=0.9')->get($portal . '/sow/' . $proposal . '?signature=altered')
+            ->assertForbidden()->assertSee('Ce lien a expiré');
+
+        // A missing page, and a message the app wrote for people (an invitation already used)
+        $this->withHeader('Accept-Language', 'en')->get($portal . '/no-such-page')->assertNotFound()->assertSee('We couldn’t find this page', false);
+        $this->get($portal . '/setup/' . Str::random(60))->assertNotFound()->assertSee(__('portal.errors.setup_link'), false);
+    }
 }
