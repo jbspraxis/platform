@@ -80,6 +80,11 @@ class ProposalsTab extends Component
         $opportunity = Opportunity::findOrFail($opportunityId);
         abort_unless(OpportunityAccess::canView(Auth::user(), $opportunity), 403);
         $this->opportunityId = $opportunity->id;
+        // A first proposal is priced in the client's own currency where JBS Praxis bills it (USD elsewhere)
+        $local = ['nigeria' => 'NGN', 'cameroon' => 'XAF', 'cameroun' => 'XAF'][mb_strtolower(trim((string) $opportunity->organization?->country))] ?? null;
+        if ($local && Proposals::currencies()->contains($local)) {
+            $this->currency = $local;
+        }
     }
 
     /** Every later request (each action, and the poll while the AI works): still allowed to open this opportunity */
@@ -204,7 +209,7 @@ class ProposalsTab extends Component
         }
     }
 
-    /** Saves the draft whenever a field is left (wire:model.blur) or a select changes */
+    /** Saves the draft whenever a field is left (wire:model.live.blur) or a select changes */
     public function updated(string $name): void
     {
         $field = explode('.', $name, 2)[0];

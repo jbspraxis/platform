@@ -193,7 +193,7 @@ class SowTab extends Component
         }
     }
 
-    /** Saves the draft whenever a field is left (wire:model.blur) */
+    /** Saves the draft whenever a field is left (wire:model.live.blur) */
     public function updated(string $name): void
     {
         $field = explode('.', $name, 2)[0];

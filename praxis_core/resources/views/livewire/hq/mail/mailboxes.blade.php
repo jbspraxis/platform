@@ -98,7 +98,7 @@
                     <div class="mb-form-2">
                         <div class="field">
                             <label class="label" for="connect-email">Address</label>
-                            <input id="connect-email" type="email" class="input" wire:model.blur="connectEmail" autocomplete="email" spellcheck="false"
+                            <input id="connect-email" type="email" class="input" wire:model.live.blur="connectEmail" autocomplete="email" spellcheck="false"
                                    @error('connectEmail') aria-invalid="true" aria-describedby="connect-email-error" @enderror>
                             @error('connectEmail') <p class="field-error" id="connect-email-error">{{ $message }}</p> @enderror
                         </div>
@@ -166,7 +166,7 @@
                 <form wire:submit="addShared" class="mb-form" novalidate>
                     <div class="field">
                         <label class="label" for="shared-email">Address</label>
-                        <input id="shared-email" type="email" class="input" wire:model.blur="sharedEmail" placeholder="intelligence@jbspraxis.com" autocomplete="off" spellcheck="false"
+                        <input id="shared-email" type="email" class="input" wire:model.live.blur="sharedEmail" placeholder="intelligence@jbspraxis.com" autocomplete="off" spellcheck="false"
                                @error('sharedEmail') aria-invalid="true" aria-describedby="shared-email-error" @enderror>
                         @error('sharedEmail') <p class="field-error" id="shared-email-error">{{ $message }}</p> @enderror
                     </div>

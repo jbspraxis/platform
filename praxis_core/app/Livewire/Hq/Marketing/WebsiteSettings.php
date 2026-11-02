@@ -55,7 +55,7 @@ class WebsiteSettings extends Component
         return Settings::attributes('settings.');
     }
 
-    /** Check a field when the person leaves it (wire:model.blur), so mistakes show before saving. */
+    /** Check a field when the person leaves it (wire:model.live.blur), so mistakes show before saving. */
     public function updated(string $property): void
     {
         if (! $this->canEdit || ! str_starts_with($property, 'settings.')) {

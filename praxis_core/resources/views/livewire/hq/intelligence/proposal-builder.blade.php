@@ -167,7 +167,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="field md:col-span-2">
                     <label class="label" for="pb-title">Title</label>
-                    <input id="pb-title" type="text" wire:model.blur="title" class="input" {{ $isLocked ? 'disabled' : '' }}>
+                    <input id="pb-title" type="text" wire:model.live.blur="title" class="input" {{ $isLocked ? 'disabled' : '' }}>
                 </div>
                 <div class="field">
                     <label class="label" for="pb-client">Prepared for</label>
@@ -175,7 +175,7 @@
                 </div>
                 <div class="field">
                     <label class="label" for="pb-validity">Valid for (days)</label>
-                    <input id="pb-validity" type="number" wire:model.blur="validityDays" class="input" {{ $isLocked ? 'disabled' : '' }}>
+                    <input id="pb-validity" type="number" wire:model.live.blur="validityDays" class="input" {{ $isLocked ? 'disabled' : '' }}>
                     <span class="help">The client’s signing link stops working after this.</span>
                 </div>
             </div>
@@ -207,7 +207,7 @@
                 @if($paymentSchedule === 'custom')
                     <div class="field">
                         <label class="label" for="pb-deposit">Deposit (%)</label>
-                        <input id="pb-deposit" type="number" step="0.01" wire:model.blur="customDepositPercent" class="input" {{ $isLocked ? 'disabled' : '' }}>
+                        <input id="pb-deposit" type="number" step="0.01" wire:model.live.blur="customDepositPercent" class="input" {{ $isLocked ? 'disabled' : '' }}>
                     </div>
                 @endif
             </div>
@@ -236,10 +236,10 @@
                     <tbody>
                         @forelse($lineItems as $index => $item)
                             <tr>
-                                <td><input type="text" wire:model.blur="lineItems.{{ $index }}.code" class="input" aria-label="Code" {{ $isLocked ? 'disabled' : '' }}></td>
-                                <td><input type="text" wire:model.blur="lineItems.{{ $index }}.description" class="input" aria-label="Description" {{ $isLocked ? 'disabled' : '' }}></td>
-                                <td><input type="text" wire:model.blur="lineItems.{{ $index }}.quantity" class="input" aria-label="Quantity" {{ $isLocked ? 'disabled' : '' }}></td>
-                                <td><input type="number" step="0.01" wire:model.blur="lineItems.{{ $index }}.unit_price" wire:change="updateLine({{ $index }}, 'unit_price', $event.target.value)" class="input" style="text-align: right; font-variant-numeric: tabular-nums;" aria-label="Unit price" {{ $isLocked ? 'disabled' : '' }}></td>
+                                <td><input type="text" wire:model.live.blur="lineItems.{{ $index }}.code" class="input" aria-label="Code" {{ $isLocked ? 'disabled' : '' }}></td>
+                                <td><input type="text" wire:model.live.blur="lineItems.{{ $index }}.description" class="input" aria-label="Description" {{ $isLocked ? 'disabled' : '' }}></td>
+                                <td><input type="text" wire:model.live.blur="lineItems.{{ $index }}.quantity" class="input" aria-label="Quantity" {{ $isLocked ? 'disabled' : '' }}></td>
+                                <td><input type="number" step="0.01" wire:model.live.blur="lineItems.{{ $index }}.unit_price" wire:change="updateLine({{ $index }}, 'unit_price', $event.target.value)" class="input" style="text-align: right; font-variant-numeric: tabular-nums;" aria-label="Unit price" {{ $isLocked ? 'disabled' : '' }}></td>
                                 <td>
                                     <button type="button" wire:click="removeLineItem({{ $index }})" class="btn btn-ghost btn-sm" aria-label="Remove line" title="Remove line" {{ $isLocked ? 'disabled' : '' }}><i data-lucide="trash-2"></i></button>
                                 </td>
@@ -295,7 +295,7 @@
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-4" style="margin-bottom: 20px;">
                 <div class="field">
                     <label class="label" for="pb-archetype">Services in scope</label>
-                    <select id="pb-archetype" wire:model.blur="archetype" class="select" multiple style="height: 196px;" {{ $isLocked ? 'disabled' : '' }}>
+                    <select id="pb-archetype" wire:model.live.blur="archetype" class="select" multiple style="height: 196px;" {{ $isLocked ? 'disabled' : '' }}>
                         @foreach($serviceOptions as $value => $label)
                             <option value="{{ $value }}">{{ $label }}</option>
                         @endforeach
@@ -329,15 +329,15 @@
             <div class="flex flex-col gap-4">
                 <div class="field">
                     <label class="label" for="pb-summary">Executive summary</label>
-                    <textarea id="pb-summary" wire:model.blur="aiExecutiveSummary" class="textarea" style="min-height: 140px;" {{ $isLocked ? 'disabled' : '' }}></textarea>
+                    <textarea id="pb-summary" wire:model.live.blur="aiExecutiveSummary" class="textarea" style="min-height: 140px;" {{ $isLocked ? 'disabled' : '' }}></textarea>
                 </div>
                 <div class="field">
                     <label class="label" for="pb-strategy">How we will do the work</label>
-                    <textarea id="pb-strategy" wire:model.blur="aiOperationalStrategy" class="textarea" style="min-height: 180px;" {{ $isLocked ? 'disabled' : '' }}></textarea>
+                    <textarea id="pb-strategy" wire:model.live.blur="aiOperationalStrategy" class="textarea" style="min-height: 180px;" {{ $isLocked ? 'disabled' : '' }}></textarea>
                 </div>
                 <div class="field">
                     <label class="label" for="pb-exclusions">What is not included</label>
-                    <textarea id="pb-exclusions" wire:model.blur="exclusions" class="textarea" style="min-height: 96px;" placeholder="e.g. Data entry of old records; cloud hosting fees" {{ $isLocked ? 'disabled' : '' }}></textarea>
+                    <textarea id="pb-exclusions" wire:model.live.blur="exclusions" class="textarea" style="min-height: 96px;" placeholder="e.g. Data entry of old records; cloud hosting fees" {{ $isLocked ? 'disabled' : '' }}></textarea>
                 </div>
             </div>
         </section>
@@ -350,11 +350,11 @@
                 <div class="grid gap-4" style="grid-template-columns: 96px 1fr; align-items: start; margin-bottom: 16px;">
                     <div class="field">
                         <label class="label" for="pb-w{{ $n }}">Weight</label>
-                        <input id="pb-w{{ $n }}" type="number" step="0.5" wire:model.blur="w{{ $n }}" class="input" style="text-align: center; font-variant-numeric: tabular-nums;" {{ $isLocked ? 'disabled' : '' }}>
+                        <input id="pb-w{{ $n }}" type="number" step="0.5" wire:model.live.blur="w{{ $n }}" class="input" style="text-align: center; font-variant-numeric: tabular-nums;" {{ $isLocked ? 'disabled' : '' }}>
                     </div>
                     <div class="field">
                         <label class="label" for="pb-p{{ $n }}">{{ $phaseTitles[$n - 1] }}</label>
-                        <textarea id="pb-p{{ $n }}" wire:model.blur="p{{ $n }}Content" class="textarea" style="min-height: 80px;" {{ $isLocked ? 'disabled' : '' }}></textarea>
+                        <textarea id="pb-p{{ $n }}" wire:model.live.blur="p{{ $n }}Content" class="textarea" style="min-height: 80px;" {{ $isLocked ? 'disabled' : '' }}></textarea>
                     </div>
                 </div>
             @endforeach

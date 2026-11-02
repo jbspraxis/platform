@@ -196,7 +196,7 @@
                                 @foreach ($people as $email => $p)
                                     <label class="pp-check" wire:key="again-{{ md5($email) }}">
                                         <input type="checkbox" class="checkbox" value="{{ $email }}" wire:model="linkTo">
-                                        <span>{{ $p['name'] }} <small>{{ $email }}</small></span>
+                                        <span>{{ $p['name'] }}@if ($p['name'] !== $email) <small>{{ $email }}</small>@endif</span>
                                     </label>
                                 @endforeach
                             </div>
@@ -229,7 +229,7 @@
                                     @foreach ($people as $email => $p)
                                         <label class="pp-check" wire:key="to-{{ md5($email) }}">
                                             <input type="checkbox" class="checkbox" value="{{ $email }}" wire:model="sendTo">
-                                            <span>{{ $p['name'] }} <small>{{ $email }}</small></span>
+                                            <span>{{ $p['name'] }}@if ($p['name'] !== $email) <small>{{ $email }}</small>@endif</span>
                                         </label>
                                     @endforeach
                                 </div>
@@ -291,12 +291,12 @@
                 <div class="pp-form">
                     <div class="field">
                         <label for="pp-proposal-title" class="label">{{ __('proposals.editor.proposal_title') }}</label>
-                        <input id="pp-proposal-title" type="text" class="input" maxlength="{{ \App\Support\Opportunities\Proposals::MAX_TITLE }}" wire:model.blur="title">
+                        <input id="pp-proposal-title" type="text" class="input" maxlength="{{ \App\Support\Opportunities\Proposals::MAX_TITLE }}" wire:model.live.blur="title">
                     </div>
                     @if ($proposal->version > 1)
                         <div class="field">
                             <label for="pp-changes" class="label">{{ __('proposals.changes.label', ['n' => $proposal->version - 1]) }}</label>
-                            <textarea id="pp-changes" class="textarea" rows="4" maxlength="{{ \App\Support\Opportunities\Proposals::MAX_NOTE }}" wire:model.blur="changesSummary" aria-describedby="pp-changes-help"
+                            <textarea id="pp-changes" class="textarea" rows="4" maxlength="{{ \App\Support\Opportunities\Proposals::MAX_NOTE }}" wire:model.live.blur="changesSummary" aria-describedby="pp-changes-help"
                                       @if ($summarising) disabled @endif></textarea>
                             <span class="help" id="pp-changes-help">{{ __('proposals.changes.help') }}</span>
                             @if ($changesError)
@@ -334,11 +334,11 @@
                         <div class="pp-form">
                             <div class="field">
                                 <label for="pp-s-{{ $i }}-title" class="label">{{ __('proposals.editor.section_title') }}</label>
-                                <input id="pp-s-{{ $i }}-title" type="text" class="input" maxlength="{{ \App\Support\Opportunities\Proposals::MAX_TITLE }}" wire:model.blur="sections.{{ $i }}.title">
+                                <input id="pp-s-{{ $i }}-title" type="text" class="input" maxlength="{{ \App\Support\Opportunities\Proposals::MAX_TITLE }}" wire:model.live.blur="sections.{{ $i }}.title">
                             </div>
                             <div class="field">
                                 <label for="pp-s-{{ $i }}-body" class="label">{{ __('proposals.editor.section_body') }}</label>
-                                <textarea id="pp-s-{{ $i }}-body" class="textarea" rows="8" maxlength="{{ \App\Support\Opportunities\Proposals::MAX_BODY }}" wire:model.blur="sections.{{ $i }}.body" aria-describedby="pp-body-help-{{ $i }}"></textarea>
+                                <textarea id="pp-s-{{ $i }}-body" class="textarea" rows="8" maxlength="{{ \App\Support\Opportunities\Proposals::MAX_BODY }}" wire:model.live.blur="sections.{{ $i }}.body" aria-describedby="pp-body-help-{{ $i }}"></textarea>
                                 <span class="help" id="pp-body-help-{{ $i }}">{{ __('proposals.editor.body_help') }}</span>
                             </div>
                         </div>
@@ -361,15 +361,15 @@
                         <div class="pp-line" wire:key="l-{{ $i }}-{{ $line['code'] ?? '' }}">
                             <div class="field pp-desc">
                                 <label for="pp-l-{{ $i }}-desc" class="label">{{ __('proposals.lines.item') }}@if (($line['code'] ?? 'CUSTOM') !== 'CUSTOM') · {{ $line['code'] }}@endif</label>
-                                <input id="pp-l-{{ $i }}-desc" type="text" class="input" maxlength="255" wire:model.blur="lines.{{ $i }}.description">
+                                <input id="pp-l-{{ $i }}-desc" type="text" class="input" maxlength="255" wire:model.live.blur="lines.{{ $i }}.description">
                             </div>
                             <div class="field">
                                 <label for="pp-l-{{ $i }}-qty" class="label">{{ __('proposals.lines.quantity') }}</label>
-                                <input id="pp-l-{{ $i }}-qty" type="text" class="input" maxlength="50" wire:model.blur="lines.{{ $i }}.quantity">
+                                <input id="pp-l-{{ $i }}-qty" type="text" class="input" maxlength="50" wire:model.live.blur="lines.{{ $i }}.quantity">
                             </div>
                             <div class="field">
                                 <label for="pp-l-{{ $i }}-price" class="label">{{ __('proposals.lines.unit_price') }} ({{ $currency }})</label>
-                                <input id="pp-l-{{ $i }}-price" type="number" inputmode="decimal" min="0" step="0.01" class="input" wire:model.blur="lines.{{ $i }}.unit_price">
+                                <input id="pp-l-{{ $i }}-price" type="number" inputmode="decimal" min="0" step="0.01" class="input" wire:model.live.blur="lines.{{ $i }}.unit_price">
                             </div>
                             <div class="pp-amount" aria-label="{{ __('proposals.lines.amount') }}">{{ $money(\App\Support\Opportunities\Proposals::units((string) ($line['quantity'] ?? '')) * (float) ($line['unit_price'] ?? 0), $currency) }}</div>
                             <div class="pp-tools">
@@ -426,7 +426,7 @@
                     </div>
                     <div class="field">
                         <label for="pp-terms-validity" class="label">{{ __('proposals.terms.validity_input') }}</label>
-                        <input id="pp-terms-validity" type="number" inputmode="numeric" min="7" max="90" step="1" class="input" wire:model.blur="validityDays">
+                        <input id="pp-terms-validity" type="number" inputmode="numeric" min="7" max="90" step="1" class="input" wire:model.live.blur="validityDays">
                     </div>
                 </div>
                 @include('livewire.hq.opportunities.partials.proposal-totals')

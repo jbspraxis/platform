@@ -96,7 +96,10 @@ class RoleManagement extends Component
         if (!in_array($tab, ['CREATE', 'INTERNAL', 'CLIENTS'], true)) return;
         if ($tab === 'CREATE' && !Auth::user()->can('access.create')) return;
         $this->activeTab = $tab;
-        $this->resetForm();
+        // A half-filled new account survives a look at the lists; an edit doesn't follow you out
+        if ($this->editMode) {
+            $this->resetForm();
+        }
         $this->loadLedger();
     }
 
@@ -120,7 +123,7 @@ class RoleManagement extends Component
                 ->whereIn('u.lifecycle_stage', ['Onboarding', 'Active'])
                 ->whereNull('u.deleted_at')
                 ->select(
-                    'u.id', 'u.first_name', 'u.last_name', 'u.email', 'u.lifecycle_stage', 'u.status',
+                    'u.id', 'u.first_name', 'u.last_name', 'u.email', 'u.lifecycle_stage', 'u.status', 'u.is_primary_client',
                     'org.name as org_name', 'org.id as org_id',
                     DB::raw("CASE WHEN u.is_primary_client = 1 THEN 'Client Admin (primary)' ELSE COALESCE(r.name, 'No role') END as role_name")
                 )
@@ -193,6 +196,9 @@ class RoleManagement extends Component
                         'industry' => $this->new_org_industry,
                         'country' => $this->new_org_country,
                         'status' => 'Lead',
+                        'assigned_to' => Auth::id(),
+                        'created_by' => Auth::id(),
+                        'updated_by' => Auth::id(),
                         'created_at' => now(),
                         'updated_at' => now()
                     ]);
@@ -439,6 +445,40 @@ class RoleManagement extends Component
             $this->showSuccessModal = true;
             $this->loadLedger();
         }
+    }
+
+    /**
+     * The organisation's primary contact (its Client Admin, who invites colleagues in the portal) moves to this account:
+     * the first account invited becomes primary, so this puts it right when the wrong person was invited first.
+     * The previous primary contact keeps the Administrator role.
+     */
+    public function makePrimary($id)
+    {
+        abort_unless(Auth::user()->can('access.edit'), 403);
+
+        [$user, $isClient] = $this->findAccount($id);
+        if (!$user || !$isClient || $user->is_primary_client || $user->status !== 'Active') {
+            return;
+        }
+        $before = DB::table('client_users')->where('organization_id', $user->organization_id)->where('is_primary_client', 1)->whereNull('deleted_at')->value('id');
+        DB::transaction(function () use ($user) {
+            DB::table('client_users')->where('organization_id', $user->organization_id)->where('is_primary_client', 1)
+                ->update(['is_primary_client' => 0, 'updated_at' => now()]);
+            DB::table('client_users')->where('id', $user->id)
+                ->update(['is_primary_client' => 1, 'role_id' => Access::clientAdminRoleId(), 'updated_at' => now()]);
+        });
+        DB::table('system_audit_logs')->insert([
+            'user_id' => Auth::id(), 'action' => 'CLIENT_PRIMARY_CHANGED',
+            'description' => "Made {$user->first_name} {$user->last_name} the primary contact of their organisation.",
+            'target_table' => 'client_users', 'target_id' => $user->id,
+            'old_values' => json_encode(['primary' => $before]), 'new_values' => json_encode(['primary' => $user->id]),
+            'ip_address' => request()?->ip(), 'created_at' => now(),
+        ]);
+
+        Access::flush();
+        $this->successMessage = "{$user->first_name} {$user->last_name} is now the primary contact. The previous one keeps the Administrator role.";
+        $this->showSuccessModal = true;
+        $this->loadLedger();
     }
 
     public function toggleUserStatus($id, $currentStatus)

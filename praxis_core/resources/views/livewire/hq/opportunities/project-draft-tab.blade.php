@@ -87,15 +87,15 @@
                 <div class="pp-form">
                     <div class="field">
                         <label for="pd-name" class="label">{{ __('project_draft.project.name') }}</label>
-                        <input id="pd-name" type="text" class="input" maxlength="255" wire:model.blur="payload.project.title" @disabled(! $canEdit)>
+                        <input id="pd-name" type="text" class="input" maxlength="255" wire:model.live.blur="payload.project.title" @disabled(! $canEdit)>
                     </div>
                     <div class="field">
                         <label for="pd-description" class="label">{{ __('project_draft.project.description') }}</label>
-                        <textarea id="pd-description" class="textarea" rows="3" maxlength="5000" wire:model.blur="payload.project.description" @disabled(! $canEdit)></textarea>
+                        <textarea id="pd-description" class="textarea" rows="3" maxlength="5000" wire:model.live.blur="payload.project.description" @disabled(! $canEdit)></textarea>
                     </div>
                     <div class="field" style="max-width: 240px">
                         <label for="pd-start" class="label">{{ __('project_draft.project.start') }}</label>
-                        <input id="pd-start" type="date" class="input" wire:model.blur="payload.project.start_date" aria-describedby="pd-start-help" @disabled(! $canEdit)>
+                        <input id="pd-start" type="date" class="input" wire:model.live.blur="payload.project.start_date" aria-describedby="pd-start-help" @disabled(! $canEdit)>
                         <span class="help" id="pd-start-help">{{ __('project_draft.project.start_help') }}</span>
                     </div>
                 </div>
@@ -110,7 +110,7 @@
                         <div class="pd-task" wire:key="pr-{{ $role['key'] }}">
                             <div class="field">
                                 <label for="pd-r-{{ $r }}-title" class="label">{{ __('project_draft.roles.role') }}</label>
-                                <input id="pd-r-{{ $r }}-title" type="text" class="input" maxlength="100" wire:model.blur="payload.roles.{{ $r }}.title" @disabled(! $canEdit)>
+                                <input id="pd-r-{{ $r }}-title" type="text" class="input" maxlength="100" wire:model.live.blur="payload.roles.{{ $r }}.title" @disabled(! $canEdit)>
                             </div>
                             <div class="field" style="grid-column: span 3">
                                 <label for="pd-r-{{ $r }}-user" class="label">{{ __('project_draft.roles.person') }}</label>
@@ -156,21 +156,21 @@
                         <div class="pp-form">
                             <div class="field">
                                 <label for="pd-m-{{ $m }}-title" class="label">{{ __('project_draft.milestones.name') }}</label>
-                                <input id="pd-m-{{ $m }}-title" type="text" class="input" maxlength="140" wire:model.blur="payload.milestones.{{ $m }}.title" @disabled(! $canEdit)>
+                                <input id="pd-m-{{ $m }}-title" type="text" class="input" maxlength="140" wire:model.live.blur="payload.milestones.{{ $m }}.title" @disabled(! $canEdit)>
                             </div>
                             <div class="pd-dates">
                                 <div class="field">
                                     <label for="pd-m-{{ $m }}-start" class="label">{{ __('project_draft.milestones.start') }}</label>
-                                    <input id="pd-m-{{ $m }}-start" type="date" class="input" wire:model.blur="payload.milestones.{{ $m }}.start_date" @disabled(! $canEdit)>
+                                    <input id="pd-m-{{ $m }}-start" type="date" class="input" wire:model.live.blur="payload.milestones.{{ $m }}.start_date" @disabled(! $canEdit)>
                                 </div>
                                 <div class="field">
                                     <label for="pd-m-{{ $m }}-due" class="label">{{ __('project_draft.milestones.due') }}</label>
-                                    <input id="pd-m-{{ $m }}-due" type="date" class="input" wire:model.blur="payload.milestones.{{ $m }}.due_date" @disabled(! $canEdit)>
+                                    <input id="pd-m-{{ $m }}-due" type="date" class="input" wire:model.live.blur="payload.milestones.{{ $m }}.due_date" @disabled(! $canEdit)>
                                 </div>
                             </div>
                             <div class="field">
                                 <label for="pd-m-{{ $m }}-goal" class="label">{{ __('project_draft.milestones.goal') }}</label>
-                                <input id="pd-m-{{ $m }}-goal" type="text" class="input" maxlength="500" wire:model.blur="payload.milestones.{{ $m }}.goal" @disabled(! $canEdit)>
+                                <input id="pd-m-{{ $m }}-goal" type="text" class="input" maxlength="500" wire:model.live.blur="payload.milestones.{{ $m }}.goal" @disabled(! $canEdit)>
                             </div>
                             @if (filled($ms['description'] ?? ''))
                                 <div class="pp-text"><strong>{{ __('sow.milestones.deliverables') }}</strong>@include('livewire.hq.opportunities.partials.proposal-blocks', ['text' => $ms['description']])</div>
@@ -182,7 +182,7 @@
                             <div class="pd-task" wire:key="pt-{{ $ms['key'] }}-{{ $t }}">
                                 <div class="field">
                                     <label for="pd-t-{{ $m }}-{{ $t }}-title" class="label">{{ __('project_draft.tasks.task', ['n' => $t + 1]) }}</label>
-                                    <input id="pd-t-{{ $m }}-{{ $t }}-title" type="text" class="input" maxlength="255" wire:model.blur="payload.milestones.{{ $m }}.tasks.{{ $t }}.title" @disabled(! $canEdit)>
+                                    <input id="pd-t-{{ $m }}-{{ $t }}-title" type="text" class="input" maxlength="255" wire:model.live.blur="payload.milestones.{{ $m }}.tasks.{{ $t }}.title" @disabled(! $canEdit)>
                                 </div>
                                 <div class="field">
                                     <label for="pd-t-{{ $m }}-{{ $t }}-role" class="label">{{ __('project_draft.tasks.role') }}</label>
@@ -195,7 +195,7 @@
                                 </div>
                                 <div class="field">
                                     <label for="pd-t-{{ $m }}-{{ $t }}-hours" class="label">{{ __('project_draft.tasks.hours') }}</label>
-                                    <input id="pd-t-{{ $m }}-{{ $t }}-hours" type="number" inputmode="decimal" min="0" max="999" step="0.5" class="input" wire:model.blur="payload.milestones.{{ $m }}.tasks.{{ $t }}.estimate_hours" @disabled(! $canEdit)>
+                                    <input id="pd-t-{{ $m }}-{{ $t }}-hours" type="number" inputmode="decimal" min="0" max="999" step="0.5" class="input" wire:model.live.blur="payload.milestones.{{ $m }}.tasks.{{ $t }}.estimate_hours" @disabled(! $canEdit)>
                                 </div>
                                 <div class="field">
                                     <label for="pd-t-{{ $m }}-{{ $t }}-move" class="label">{{ __('project_draft.tasks.milestone') }}</label>
@@ -212,7 +212,7 @@
                                 </div>
                                 <div class="field pp-wide">
                                     <label for="pd-t-{{ $m }}-{{ $t }}-desc" class="label">{{ __('project_draft.tasks.description') }}</label>
-                                    <textarea id="pd-t-{{ $m }}-{{ $t }}-desc" class="textarea" rows="2" maxlength="5000" wire:model.blur="payload.milestones.{{ $m }}.tasks.{{ $t }}.description" @disabled(! $canEdit)></textarea>
+                                    <textarea id="pd-t-{{ $m }}-{{ $t }}-desc" class="textarea" rows="2" maxlength="5000" wire:model.live.blur="payload.milestones.{{ $m }}.tasks.{{ $t }}.description" @disabled(! $canEdit)></textarea>
                                 </div>
                             </div>
                         @endforeach

@@ -194,7 +194,7 @@
                                 @foreach ($people as $email => $p)
                                     <label class="pp-check" wire:key="sagain-{{ md5($email) }}">
                                         <input type="checkbox" class="checkbox" value="{{ $email }}" wire:model="linkTo">
-                                        <span>{{ $p['name'] }} <small>{{ $email }}</small></span>
+                                        <span>{{ $p['name'] }}@if ($p['name'] !== $email) <small>{{ $email }}</small>@endif</span>
                                     </label>
                                 @endforeach
                             </div>
@@ -227,7 +227,7 @@
                                     @foreach ($people as $email => $p)
                                         <label class="pp-check" wire:key="sto-{{ md5($email) }}">
                                             <input type="checkbox" class="checkbox" value="{{ $email }}" wire:model="sendTo">
-                                            <span>{{ $p['name'] }} <small>{{ $email }}</small></span>
+                                            <span>{{ $p['name'] }}@if ($p['name'] !== $email) <small>{{ $email }}</small>@endif</span>
                                         </label>
                                     @endforeach
                                 </div>
@@ -282,12 +282,12 @@
                 <div class="pp-form">
                     <div class="field">
                         <label for="sw-doc-title" class="label">{{ __('sow.editor.doc_title') }}</label>
-                        <input id="sw-doc-title" type="text" class="input" maxlength="{{ \App\Support\Opportunities\Sows::MAX_TITLE }}" wire:model.blur="title">
+                        <input id="sw-doc-title" type="text" class="input" maxlength="{{ \App\Support\Opportunities\Sows::MAX_TITLE }}" wire:model.live.blur="title">
                     </div>
                     @if ($sow->version > 1)
                         <div class="field">
                             <label for="sw-changes" class="label">{{ __('sow.changes.label', ['n' => $sow->version - 1]) }}</label>
-                            <textarea id="sw-changes" class="textarea" rows="4" maxlength="{{ \App\Support\Opportunities\Sows::MAX_NOTE }}" wire:model.blur="changesSummary" aria-describedby="sw-changes-help"></textarea>
+                            <textarea id="sw-changes" class="textarea" rows="4" maxlength="{{ \App\Support\Opportunities\Sows::MAX_NOTE }}" wire:model.live.blur="changesSummary" aria-describedby="sw-changes-help"></textarea>
                             <span class="help" id="sw-changes-help">{{ __('sow.changes.help') }}</span>
                         </div>
                         @if ($sow->previousVersion && filled($sow->previousVersion->changes_request))
@@ -296,7 +296,7 @@
                     @endif
                     <div class="field" style="max-width: 240px">
                         <label for="sw-validity" class="label">{{ __('sow.terms.validity_input') }}</label>
-                        <input id="sw-validity" type="number" inputmode="numeric" min="7" max="90" step="1" class="input" wire:model.blur="validityDays">
+                        <input id="sw-validity" type="number" inputmode="numeric" min="7" max="90" step="1" class="input" wire:model.live.blur="validityDays">
                     </div>
                 </div>
             </section>
@@ -315,11 +315,11 @@
                         <div class="pp-form">
                             <div class="field">
                                 <label for="sw-s-{{ $i }}-title" class="label">{{ __('proposals.editor.section_title') }}</label>
-                                <input id="sw-s-{{ $i }}-title" type="text" class="input" maxlength="{{ \App\Support\Opportunities\Sows::MAX_TITLE }}" wire:model.blur="sections.{{ $i }}.title">
+                                <input id="sw-s-{{ $i }}-title" type="text" class="input" maxlength="{{ \App\Support\Opportunities\Sows::MAX_TITLE }}" wire:model.live.blur="sections.{{ $i }}.title">
                             </div>
                             <div class="field">
                                 <label for="sw-s-{{ $i }}-body" class="label">{{ __('proposals.editor.section_body') }}</label>
-                                <textarea id="sw-s-{{ $i }}-body" class="textarea" rows="8" maxlength="{{ \App\Support\Opportunities\Sows::MAX_BODY }}" wire:model.blur="sections.{{ $i }}.body" aria-describedby="sw-body-help-{{ $i }}"></textarea>
+                                <textarea id="sw-s-{{ $i }}-body" class="textarea" rows="8" maxlength="{{ \App\Support\Opportunities\Sows::MAX_BODY }}" wire:model.live.blur="sections.{{ $i }}.body" aria-describedby="sw-body-help-{{ $i }}"></textarea>
                                 <span class="help" id="sw-body-help-{{ $i }}">{{ __('proposals.editor.body_help') }}</span>
                             </div>
                         </div>
@@ -338,15 +338,15 @@
                         <div class="pp-ms" wire:key="sm-{{ $i }}-{{ $m['key'] ?? $i }}">
                             <div class="field">
                                 <label for="sw-m-{{ $i }}-title" class="label">{{ __('sow.milestones.code', ['n' => $i + 1]) }} · {{ __('sow.milestones.milestone') }}</label>
-                                <input id="sw-m-{{ $i }}-title" type="text" class="input" maxlength="140" wire:model.blur="milestones.{{ $i }}.title">
+                                <input id="sw-m-{{ $i }}-title" type="text" class="input" maxlength="140" wire:model.live.blur="milestones.{{ $i }}.title">
                             </div>
                             <div class="field">
                                 <label for="sw-m-{{ $i }}-weeks" class="label">{{ __('sow.milestones.weeks') }}</label>
-                                <input id="sw-m-{{ $i }}-weeks" type="number" inputmode="numeric" min="1" max="104" step="1" class="input" wire:model.blur="milestones.{{ $i }}.weeks">
+                                <input id="sw-m-{{ $i }}-weeks" type="number" inputmode="numeric" min="1" max="104" step="1" class="input" wire:model.live.blur="milestones.{{ $i }}.weeks">
                             </div>
                             <div class="field">
                                 <label for="sw-m-{{ $i }}-weight" class="label">{{ __('sow.milestones.weight_input') }}</label>
-                                <input id="sw-m-{{ $i }}-weight" type="number" inputmode="decimal" min="0" max="100" step="0.01" class="input" wire:model.blur="milestones.{{ $i }}.weight">
+                                <input id="sw-m-{{ $i }}-weight" type="number" inputmode="decimal" min="0" max="100" step="0.01" class="input" wire:model.live.blur="milestones.{{ $i }}.weight">
                             </div>
                             <div class="pp-amount" aria-label="{{ __('sow.milestones.amount') }}">{{ $money($amounts[$i] ?? 0, $currency) }}</div>
                             <div class="pp-tools">
@@ -356,7 +356,7 @@
                             </div>
                             <div class="field pp-wide">
                                 <label for="sw-m-{{ $i }}-desc" class="label">{{ __('sow.milestones.deliverables') }}</label>
-                                <textarea id="sw-m-{{ $i }}-desc" class="textarea" rows="3" maxlength="{{ \App\Support\Opportunities\Sows::MAX_NOTE }}" wire:model.blur="milestones.{{ $i }}.description"></textarea>
+                                <textarea id="sw-m-{{ $i }}-desc" class="textarea" rows="3" maxlength="{{ \App\Support\Opportunities\Sows::MAX_NOTE }}" wire:model.live.blur="milestones.{{ $i }}.description"></textarea>
                             </div>
                         </div>
                     @endforeach
