@@ -6,8 +6,10 @@ use App\Models\User;
 use App\Support\Access;
 use Database\Seeders\CoreSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -43,7 +45,19 @@ trait UsesThrowawayDatabase
             $this->markTestSkipped("Refusing to rebuild the database '{$name}': use a throwaway database named praxis_test… or praxis_pr….");
         }
 
+        // A class with plain RefreshDatabase (the PWA tests) may have built this database earlier in the run, without
+        // the seed: rebuild it with the seed instead of running on empty tables, so the order of the classes doesn't matter
+        if (RefreshDatabaseState::$migrated && ! $this->seeded()) {
+            RefreshDatabaseState::$migrated = false;
+        }
+
         $this->rebuildThrowawayDatabase();
+    }
+
+    /** The seed is in: JBS Praxis's own organisation, which every staff fixture belongs to */
+    private function seeded(): bool
+    {
+        return Schema::hasTable('organizations') && DB::table('organizations')->where('id', CoreSeeder::INTERNAL_ORG_ID)->exists();
     }
 
     /** Fills the NOT NULL columns a test doesn't care about, so the fixtures follow the real schema */
