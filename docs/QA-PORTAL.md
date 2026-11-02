@@ -4,7 +4,7 @@ A full engagement was played on the live site (hq.jbspraxis.com and portal.jbspr
 
 ## 1. The test client
 
-- **Organisation**: "QA Test Client (delete)", Lagos, Nigeria, English. Opened from *Open an opportunity* (new organisation inline), so it is a normal organisation; the owner then ticks **Test client** on the opportunity's *Edit details* (section 3).
+- **Organisation**: "QA Test Client (delete)", Lagos, Nigeria, English. Opened from *Open an opportunity* (new organisation inline), so it is a normal organisation; **Test client** is ticked on the opportunity's *Edit details* (section 3), on live since 2 Nov once #23 was deployed.
 - **Opportunity**: "Fleet tracking and dispatch portal (QA test)", led by the owner, billed by Nigeria's company.
 - **People**: two portal accounts on the owner's own test addresses, invited from System › Accounts: "Chidi Nwosu (QA)" is the Client Admin (primary contact) and "Adaeze Okafor (QA)" a Team member. (The member was meant to be invited second; the other order made Chidi primary, which HQ couldn't change: finding 10.) The owner set the passwords and does every sign-in. Nobody outside JBS Praxis is emailed.
 - **A French spot check** uses a second opportunity of the same organisation in French.
@@ -45,6 +45,8 @@ php artisan qa:wipe "QA Test Client (delete)" --force    # asks for the exact na
 
 Severity: **High** blocks a client or shows wrong money or data; **Medium** misleads or breaks a step that has a work-around; **Low** a rough edge.
 
+PRs: **A** = #24, **B** = #25, **C** = #23, all merged and live on 2 Nov (release 508e5ec); the owner's decisions are **D** = #26 and **E** = #27 (section 5), merged and live the same day; **F** is this report's PR (findings 23 and 24).
+
 | # | Severity | Where | What happened (steps) | Fix | PR |
 |---|---|---|---|---|---|
 | 1 | High | HQ › every "saved when you leave the field" editor | Livewire 4's `wire:model.blur` only syncs in the browser and sends nothing. Proposal, SOW, project draft, handover points, website settings and mailbox fields (66) were saved only if another click followed. On live: a proposal line's price, typed and tabbed out of, was back at the dictionary price after a reload, and the total never moved. | `wire:model.live.blur` everywhere; a unit test refuses a bare `.blur`, `.change` or `.enter`. | A |
@@ -69,39 +71,61 @@ Severity: **High** blocks a client or shows wrong money or data; **Medium** misl
 | 20 | Medium | HQ › QA hub, payment verification, cash requests, leads, audit, broadcasts, mail sync | 19 times of day were shown in UTC as if Lagos time, an hour early (a reply sent at 12:57 read 11:57). | Shown in Africa/Lagos; a unit test refuses a `*_at` time without it. Appointment and timer times, saved as Lagos wall-clock, are unchanged. | B |
 | 21 | Medium | Portal › 404 page (review of B) | A missing record's 404 would have shown Laravel's "No query results for model [App\Models\…] <id>". | Framework messages are never shown. | B |
 | 22 | Low | Portal › Overview, Project progress | "Phases" / "Phase 1" where HQ, the SOW and the emails say milestones (M1); tasks listed M2 before M1. | "Milestones" / "M1" (FR "Jalons"); tasks by milestone. | B |
+| 23 | Medium | Portal › Team (re-test after D) | With the limit raised to 10, the page still said "Your organisation can have up to 3 Client Portal accounts" and "Team members (2 of 3)", and the guide "Invite up to 2 colleagues" (seen live). | The three lines use the limit the portal applies (EN, FR). | F |
+| 24 | Low | Portal › Team › Invite a team member | "Team member" was listed twice in the role list: the default and the role itself. | Listed once. | F |
 
 ## 5. Decisions for the owner
 
 | # | Where | Question | Today |
 |---|---|---|---|
-| D1 | Portal › Team | A portal admin can't invite anyone once the organisation has 3 portal accounts. MyCity already has 4 (made from HQ), so its admins can't add a colleague from the portal. Keep 3, raise it, or remove the limit? | **Decided 2 Nov: 10 accounts** (PR D). |
-| D2 | Portal › Team | A portal admin may only invite addresses on their own email domain (e.g. @mycityapp.io). Keep? | Kept. |
-| D3 | Portal › Documents › appearance | "Second colour" and "Accent colour" are saved but nothing uses them; only the main colour shows. Remove the two fields, or use them? | Saved, unused. |
-| D4 | Portal invitations | An invitation link never expires until it's used. Expire it after, say, 14 days (HQ can resend)? | Never expires. |
-| D5 | Proposal and SOW pages | Anyone the proposal or SOW was sent to who is an active contact of the organisation can approve it or sign it, whatever their portal role (a Team member too). Should approving and signing need the portal's Approve permission (Administrator)? | **Decided 2 Nov, confirmed twice: any active contact** (as today; "Bode, Ifeoma and Etudor can sign"). |
+| D1 | Portal › Team | A portal admin can't invite anyone once the organisation has 3 portal accounts. MyCity already has 4 (made from HQ), so its admins can't add a colleague from the portal. Keep 3, raise it, or remove the limit? | **Decided 2 Nov: 10 accounts** (#26). |
+| D2 | Portal › Team | A portal admin may only invite addresses on their own email domain (e.g. @mycityapp.io). Keep? | Open: kept as is. |
+| D3 | Portal › Documents › appearance | "Second colour" and "Accent colour" are saved but nothing uses them; only the main colour shows. Remove the two fields, or use them? | Open: saved, unused. |
+| D4 | Portal invitations | An invitation link never expires until it's used (or HQ resends it, or the person signs a SOW, which issues a new one). Expire it after, say, 14 days (HQ can resend)? | Open: never expires. |
+| D5 | Proposal and SOW pages | Anyone the proposal or SOW was sent to who is an active contact of the organisation could approve it or sign it, whatever their portal role (a Team member too). Should approving and signing need the portal's Approve permission? | **Decided 2 Nov: approvers only** (#26). Approving a proposal, and asking for or using a SOW signing code, need the portal's Approve permission: Client Admin (the primary contact always is) or the new **Client Approver** role (projects, QA and messages, documents; no team or branding). Others read, comment and ask for changes; a plain line stands where the button was. A link sent to a contact approves as that contact; a link without one first emails a code to the approver. At the first client, three contacts approve (one moves from Team member to Client Approver) and one reads and comments. |
 | D5b | SOW signing | How a SOW is signed: a drawn signature, the signer's 6-digit code by email, and a SHA-256 fingerprint of the text, milestones, fees and signature, with time and IP; no certificate on the PDF. Keep, seal the PDF with a certificate, or move to an e-signature service? | **Decided 2 Nov: keep drawn + email code.** |
-| D6 | Master data › Legal entities | Only the Cameroon company (JBS Praxis SARL) exists. "Nigeria's company (default)" has no record, so proposals say "No VAT: no active JBS Praxis company… bills this client" and SOWs name the provider from Website settings ("JBS Praxis LLC"). Add the Nigerian company (JBS Praxis Limited, being registered) once its details are known. | **Decided 2 Nov: add it now as "JBS Praxis LLC", VAT off**, renamed JBS Praxis Limited once CAC registers it (PR D lets the numbers wait). |
-| D7 | HQ › Proposals | The AI prices from the financial dictionary and doesn't fit a budget given in its instructions (asked "around NGN 12M", it drafted about NGN 120M with a year of retained support). Keep it so (the lead edits), or let the instructions cap the total? | **Decided 2 Nov: a budget in the instructions caps the draft** (PR D). |
-| D8 | Portal › Invoices and payments | Every client sees every active receiving account: Kuda (JBS Praxis LLC), UBA (JBS PRAXIS LTD) and MTN Mobile Money Cameroon in the owner's personal name, whatever their country or currency. Show only the accounts of the invoice's billing company or currency? | All three to everyone. |
-| D9 | Portal › Project progress | A task moved to Client review is approved automatically after 5 hours, nights and weekends included, and the client is told changes after approval are paid work. MyCity's people may find work approved that they never saw. Keep 5 hours, or e.g. 2 working days? | 5 hours. |
-| D10 | Payment hold | The portal's deposit hold lasts only while the project is *Scoping*: *Create project* makes it Active and lifts the hold even if the deposit isn't paid. Keep (HQ decides when work starts), or hold until the deposit is paid? | Lifted at Create project. |
-| D11 | Invoices | Clients get no email and no PDF for an invoice: it appears in the portal with a bell. HQ's *Download PDF* only says "Invoice PDFs are not available yet". Finance teams usually need a PDF (with our and their tax numbers) to pay. Build an invoice PDF and email? (The ledger also types them "Tax Invoice" although no VAT is charged.) | Portal only. |
+| D6 | Master data › Legal entities | Only the Cameroon company (JBS Praxis SARL) existed. "Nigeria's company (default)" had no record, so proposals said "No VAT: no active JBS Praxis company… bills this client" and SOWs named the provider from Website settings ("JBS Praxis LLC"). | **Decided 2 Nov: add it now as "JBS Praxis LLC", VAT off**, renamed JBS Praxis Limited once CAC registers it; #26 lets its numbers wait. |
+| D7 | HQ › Proposals | The AI priced from the financial dictionary and didn't fit a budget given in its instructions (asked "around NGN 12M", it drafted about NGN 120M with a year of retained support). | **Decided 2 Nov: a budget for our fees in the instructions caps the draft** (#26); figures about the client's business don't count as one. |
+| D8 | Portal › Invoices and payments | Every client saw every active receiving account: Kuda (JBS Praxis LLC), UBA (JBS PRAXIS LTD) and MTN Mobile Money Cameroon in the owner's personal name, whatever their country or currency. | **Decided 2 Nov: only the accounts in the invoice's currency held by its billing company** (#26). Each account now has a currency and a company (an account without them is shown to no client); the three test accounts were deactivated; the owner adds the UBA account with NGN and JBS Praxis LLC. |
+| D9 | Portal › Project progress | A task moved to Client review was approved automatically after 5 hours, nights and weekends included. | **Decided 2 Nov: 2 working days** (Monday to Friday, Lagos time) **with one reminder the day before** (#26). |
+| D10 | Payment hold | The portal's deposit hold lasts only while the project is *Scoping*: *Create project* makes it Active and lifts the hold even if the deposit isn't paid. Keep (HQ decides when work starts), or hold until the deposit is paid? | **Decided 2 Nov: no change** (lifted at Create project). |
+| D11 | Invoices | Clients got no email and no PDF for an invoice: it appeared in the portal with a bell, and HQ's *Download PDF* said "Invoice PDFs are not available yet". | **Decided 2 Nov: build it** (#27). A PDF titled "Invoice" ("Tax invoice" only with VAT) with the billing company and the client and their tax numbers, the lines and the accounts to pay into (D8); emailed to the client's billing contacts (Client Admin, Client Finance) when HQ creates an invoice or a signed SOW raises the deposit; downloadable in HQ (with *Email to client*) and in the portal. Older invoices are emailed only if HQ clicks *Email to client*. |
 
 ## 6. AI spend
 
-| Step | Purpose | Model | Cost (USD) |
-|---|---|---|---|
-| Meeting notes | meeting_notes | Haiku 5.5 | about 0.005 |
-| Client minutes | client_minutes | Haiku 5.5 | about 0.001 |
-| Questionnaire (5 questions) | questionnaire | Sonnet 5.5 | 0.030 |
-| Proposal, version 1 | proposal | Sonnet 5.5 | 0.117 |
-| Statement of work | sow | Sonnet 5.5 | 0.069 |
-| Project draft (at signing) | project_draft | Sonnet 5.5 | see Integrations |
-| Planner, M2 (3 suggestions) | plan_milestone | Sonnet 5.5 | see Integrations |
-| Handover notes, minutes, points | Haiku 5.5 | Haiku 5.5 | under 0.02 |
+From HQ › System › Integrations, 2 Nov, after the run (Claude through HQ's own key):
 
-The month stood at $0.0045 before the QA; HQ's budget is $5.
+| Purpose | Runs | Model | Cost (USD) |
+|---|---|---|---|
+| Proposal, version 1 | 1 | Sonnet 5.5 | 0.1170 |
+| Project draft (at signing) | 1 | Sonnet 5.5 | 0.0936 |
+| Statement of work | 1 | Sonnet 5.5 | 0.0694 |
+| Milestone plan (M2) | 1 | Sonnet 5.5 | 0.0494 |
+| Questionnaire (5 questions) | 1 | Sonnet 5.5 | 0.0300 |
+| Meeting notes | 4 | Haiku 5.5 | 0.0115 |
+| Client minutes | 3 | Haiku 5.5 | 0.0033 |
+| Milestone handover points | 1 | Haiku 5.5 | 0.0009 |
+
+About **$0.37** for the whole run; the month stands at **$0.38 of $5** (it was $0.0045 before). `qa:wipe` keeps these runs (emptied), so the month's figure doesn't drop after the wipe.
 
 ## 7. Server logs
 
 Read after each step from `~/deploy/logs/` and `~/praxis_core/storage/logs/` (cPanel's file API). Live release during the run: da80c92 (#22). No Laravel log was written on 2 November (warning level and above) through the meeting, transcript, notes, minutes, questionnaire, proposal versions and SOW; System › Health showed no errors and no email failures.
+After the merges: release 508e5ec (#23, #24, #25) went live at 14:02 server time with its migration (`add_is_test_to_organizations`); still no Laravel log since 31 October. #26 and #27 were released at about 14:55 UTC; their code was live within a minute (the deploy log couldn't be read then: cPanel had signed out).
+
+## 8. Re-tests on live after the merges (2 Nov)
+
+| Fix or decision | What was checked on live | Result |
+|---|---|---|
+| Findings 2–5 (B) | Portal › Documents as the test client | Lists the SOW, both proposals (one waiting, one approved) and the meetings page, each with a working link. |
+| Finding 4 (B) | An expired or altered SOW link; a used setup link | Branded "This link has expired" page; branded 404 that says the setup link expired or was used. |
+| Section 3 (C) | Test client flag | Ticked on the opportunity's *Edit details*; the header shows the *Test client* tag. |
+| D5 (D) | The French proposal, opened from Documents by the test admin | *Approuver la proposition* is offered; the address is read-only with "Ce lien vous a été envoyé à cette adresse…". A member's view is covered by the tests. |
+| D6 (D) | Master data › Legal entities | JBS Praxis LLC added (Nigeria, 21B Bode Ajakaiye Street, Lekki, Lagos; representative the owner, Managing Partner); shown as "Being registered", tax ID "Not yet", no VAT. |
+| D8 (D) | Portal payment details; Remittance accounts | No account has a currency and company yet, so the portal says payment details aren't available; the form asks for both. The owner's UBA account is pre-filled with NGN and JBS Praxis LLC for him to save. |
+| D9 (D) | Portal › Project progress and the guide | "Approve it or report an issue within 2 working days" and "…approved automatically 2 working days (Monday to Friday) after it's ready; we remind you the day before." |
+| D11 (E) | HQ › Finance › Invoices; portal › Invoices and payments; the test inbox | HQ's *Download PDF* returns both test invoices as PDFs; *Email to client* reached only the test admin ("Emailed with its PDF to …"), not the member; the email says "From JBS Praxis LLC", with `INV-202611-6971.pdf` attached; the portal downloads the same PDF. |
+| Roles (D) | HQ › Accounts, portal › Team | The *Approver* role is offered in both; the client contact who moves to it is pre-filled for the owner to save. |
+| 375 px | Portal › Team, Invoices and payments | No sideways scrolling. |
+
+Not re-checked on live: a payment proof upload, a branding change and an urgent support request as the admin (unchanged since the first run).

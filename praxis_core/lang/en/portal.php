@@ -125,7 +125,7 @@ return [
         'qa_hub' => 'Report an issue on a deliverable, or send a message to your delivery team.',
         'financials' => 'Your invoices for this project, our payment details and your proofs of payment.',
         'vault' => 'Your signed proposals and project handovers, and how your portal looks.',
-        'team' => 'Invite colleagues from your organisation and choose what they can see. Your organisation can have up to 3 Client Portal accounts.',
+        'team' => 'Invite colleagues from your organisation and choose what they can see. Your organisation can have up to :max Client Portal accounts.',
     ],
 
     // Sections close while a payment is due (the reason is shown in a banner)
@@ -289,7 +289,7 @@ return [
     ],
 
     'team' => [
-        'members' => 'Team members (:count of 3)',
+        'members' => 'Team members (:count of :max)',
         'role' => 'Role',
         'access' => 'Project access',
         'all_projects' => 'All projects',
@@ -344,7 +344,7 @@ return [
         'qa_hub' => 'Report an issue on a task, set its priority and add screenshots or documents. You can also send a general message to your delivery team. Each issue keeps its full conversation.',
         'financials' => 'Your invoices for this project and our payment details. After you pay, upload your proof of payment. We verify it and update the invoice.',
         'vault' => 'Your signed proposals and project handovers, each with a signature fingerprint (SHA-256). You can also add your logo and colours to the portal.',
-        'team' => 'Invite up to 2 colleagues who use your organisation’s email domain, choose their role, and limit them to one project if you wish. You can suspend or restore their access at any time.',
+        'team' => 'Invite colleagues who use your organisation’s email domain (up to :max Client Portal accounts in all), choose their role, and limit them to one project if you wish. You can suspend or restore their access at any time.',
         'questions' => 'Questions',
         'q_locked' => 'Why are some sections closed?',
         'a_locked' => 'Sections close when a first payment is due or an invoice is overdue. Upload your proof of payment in Invoices and payments. The sections open again once we verify the payment.',
