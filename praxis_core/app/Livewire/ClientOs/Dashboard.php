@@ -327,7 +327,7 @@ class Dashboard extends Component
             return ['time' => PortalFormat::date($log->created_at, 'datetime'), 'author' => trim(mb_substr((string) $log->first_name, 0, 1) . '. ' . $log->last_name), 'text' => $log->comment_text];
         })->toArray();
 
-        $this->activeTasks = $this->clientTasks()->select('tasks.*', 'project_phases.title as phase_title')->orderByRaw("FIELD(tasks.status, 'QA_Review', 'In-Progress', 'To-Do', 'Done')")->orderBy('tasks.updated_at', 'desc')->get()->toArray();
+        $this->activeTasks = $this->clientTasks()->select('tasks.*', 'project_phases.title as phase_title')->orderBy('project_phases.phase_number')->orderByRaw("FIELD(tasks.status, 'QA_Review', 'In-Progress', 'To-Do', 'Done')")->orderBy('tasks.updated_at', 'desc')->get()->toArray();
     }
 
     public function loadQaHub()

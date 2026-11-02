@@ -120,7 +120,7 @@ return [
     ],
 
     'subtitles' => [
-        'overview' => "Où en est votre projet\u{00A0}: avancement par phase, budget et dernières nouvelles de votre équipe projet.",
+        'overview' => "Où en est votre projet\u{00A0}: avancement par jalon, budget et dernières nouvelles de votre équipe projet.",
         'sprints' => "Toutes les tâches de ce projet et leur état. Lorsqu’une tâche est prête pour votre validation, approuvez-la ou signalez une anomalie.",
         'qa_hub' => "Signalez une anomalie sur un livrable ou envoyez un message à votre équipe projet.",
         'financials' => "Vos factures pour ce projet, nos coordonnées de paiement et vos justificatifs de paiement.",
@@ -146,10 +146,10 @@ return [
         'budget' => "Budget",
         'lead' => "Responsable de projet",
         'lead_fallback' => "Équipe JBS Praxis",
-        'phases' => "Phases",
-        'phase_number' => "Phase :number",
-        'no_phases' => "Aucune phase pour l’instant",
-        'no_phases_help' => "Les phases de votre projet s’afficheront ici une fois le plan validé.",
+        'phases' => "Jalons",
+        'phase_number' => "M:number",
+        'no_phases' => "Aucun jalon pour l’instant",
+        'no_phases_help' => "Les jalons de votre projet s’afficheront ici une fois le plan validé.",
         'activity' => "Activité récente",
         'no_activity' => "Aucune activité pour l’instant",
         'no_activity_help' => "Les nouvelles de votre équipe projet s’afficheront ici au fil de l’avancement.",
@@ -162,7 +162,7 @@ return [
         'approved' => "Tâche approuvée.",
         'report' => "Signaler une anomalie",
         'empty' => "Aucune tâche pour l’instant",
-        'empty_help' => "Les tâches s’afficheront ici dès que votre équipe projet aura planifié la première phase.",
+        'empty_help' => "Les tâches s’afficheront ici dès que votre équipe projet aura planifié le premier jalon.",
     ],
 
     'qa' => [
@@ -333,7 +333,7 @@ return [
         'title' => "Fonctionnement du portail client",
         'intro' => "Votre portail client vous permet de suivre votre projet avec JBS Praxis\u{00A0}: avancement, anomalies, factures, documents et équipe.",
         'sections' => "Rubriques",
-        'overview' => "Votre projet en un coup d’œil\u{00A0}: statut, avancement par phase, budget, responsable de projet et dernières nouvelles de votre équipe projet.",
+        'overview' => "Votre projet en un coup d’œil\u{00A0}: statut, avancement par jalon, budget, responsable de projet et dernières nouvelles de votre équipe projet.",
         'sprints' => "Toutes les tâches et leur état\u{00A0}: à faire, en cours, en attente de votre validation ou terminée. Lorsqu’une tâche est prête pour votre validation, approuvez-la ou signalez une anomalie.",
         'qa_hub' => "Signalez une anomalie sur une tâche, indiquez sa priorité et joignez des captures d’écran ou des documents. Vous pouvez aussi envoyer un message général à votre équipe projet. Chaque anomalie conserve l’historique complet des échanges.",
         'financials' => "Vos factures pour ce projet et nos coordonnées de paiement. Après votre paiement, déposez votre justificatif\u{00A0}: nous le vérifions et mettons à jour la facture.",

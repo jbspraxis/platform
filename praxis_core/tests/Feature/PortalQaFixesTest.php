@@ -157,14 +157,17 @@ class PortalQaFixesTest extends TestCase
         $m2 = $this->phase($project, 2, 60);
         $this->task($m1, ['status' => 'Done']);
         $this->task($m1, ['status' => 'To-Do']);
+        $this->task($m2, ['status' => 'QA_Review', 'title' => 'Later milestone task']);
         $this->insertRow('qa_tickets', ['id' => (string) Str::uuid(), 'project_id' => $project, 'title' => 'Shown ticket', 'status' => 'Open']);
         $this->insertRow('qa_tickets', ['id' => (string) Str::uuid(), 'project_id' => $project, 'title' => 'Deleted ticket', 'status' => 'Open', 'deleted_at' => now()]);
         $client = $this->client($org);
 
         // M1 half done (40% × 50%) = 20%, as HQ's project page says; before, no milestone accepted meant 0%
         $portal = Livewire::actingAs($client, 'client')->test(Dashboard::class)->call('switchTab', 'overview')
-            ->assertSet('overallProgress', 20);
+            ->assertSet('overallProgress', 20)->assertSee('Milestones')->assertDontSee('Phase 1');
         $this->assertStringStartsWith($lead->first_name, $portal->get('leadArchitect'));
+        // Tasks run milestone by milestone, M1 first, even when a later one waits for review
+        $this->assertSame('M1 · Milestone 1', $portal->call('switchTab', 'sprints')->get('activeTasks')[0]->phase_title);
 
         $titles = collect($portal->call('switchTab', 'qa_hub')->get('qaTickets'))->pluck('title')->all();
         $this->assertSame(['Shown ticket'], $titles);
