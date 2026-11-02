@@ -46,9 +46,11 @@ class SetupAccount extends Component
 
     private function invitedUser()
     {
+        // A suspended or removed account's old invitation no longer opens anything
         return DB::table('client_users')
             ->where('invitation_token', $this->token)
             ->where('lifecycle_stage', 'Onboarding')
+            ->where('status', 'Active')->whereNull('deleted_at')
             ->first();
     }
 

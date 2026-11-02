@@ -150,6 +150,19 @@ class PortalQaFixesTest extends TestCase
         $this->assertStringContainsString('/operations/projects/' . $project, $bell->link_url);
     }
 
+    public function test_a_suspended_or_removed_accounts_invitation_opens_nothing(): void
+    {
+        $org = $this->organisation();
+        foreach ([['status' => 'Suspended'], ['deleted_at' => now()]] as $i => $state) {
+            $token = Str::random(60);
+            $this->client($org, $state + ['password' => null, 'invitation_token' => $token, 'lifecycle_stage' => 'Onboarding', 'is_primary_client' => 0]);
+            $this->get('http://' . config('app.domains.portal') . '/setup/' . $token)->assertNotFound();
+        }
+        $token = Str::random(60);
+        $this->client($org, ['password' => null, 'invitation_token' => $token, 'lifecycle_stage' => 'Onboarding']);
+        $this->get('http://' . config('app.domains.portal') . '/setup/' . $token)->assertOk();
+    }
+
     public function test_portal_colours_must_be_hex_colours(): void
     {
         $org = $this->organisation();
