@@ -110,7 +110,7 @@ return [
         'client_minutes' => [
             'provider' => 'claude', 'model' => 'claude-haiku-5-5', 'effort' => 'low', 'max_tokens' => 4000,
             'stream' => false, 'sync' => true, 'expected_chars' => 2000,
-            'task' => 'Write short minutes of the meeting below for the client: decisions and next steps only, warm and brief. Leave out anything internal to JBS Praxis, prices not yet agreed and anything said in confidence.',
+            'task' => 'Write short minutes of the meeting below for the client: decisions and next steps only, warm and brief. Leave out anything internal to JBS Praxis, prices not yet agreed and anything said in confidence. The email around the minutes already thanks them and names the meeting and its date, so open the summary with what was agreed, not with thanks or the date.',
             'schema' => ['type' => 'object', 'properties' => [
                 'subject' => ['type' => 'string'], 'summary' => ['type' => 'string'], 'decisions' => $line, 'next_steps' => $nextSteps,
             ], 'required' => ['subject', 'summary', 'decisions', 'next_steps'], 'additionalProperties' => false],

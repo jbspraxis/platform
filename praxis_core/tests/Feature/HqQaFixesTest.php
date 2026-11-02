@@ -31,6 +31,28 @@ class HqQaFixesTest extends TestCase
         $screen->set('editMode', true)->call('setTab', 'CLIENTS')->assertSet('first_name', '');
     }
 
+    public function test_the_primary_contact_can_move_to_another_account_of_the_organisation(): void
+    {
+        $this->actingAs($this->staff('owner', ['owner']));
+        $org = (string) \Illuminate\Support\Str::uuid();
+        $this->insertRow('organizations', ['id' => $org, 'name' => 'QA Test Client (delete)', 'status' => 'Lead']);
+        $member = DB::table('roles')->where('audience', 'client')->where('slug', 'client-member')->value('id');
+        $first = (string) \Illuminate\Support\Str::uuid();
+        $second = (string) \Illuminate\Support\Str::uuid();
+        $this->insertRow('client_users', ['id' => $first, 'organization_id' => $org, 'first_name' => 'Chidi', 'last_name' => 'Client', 'email' => 'chidi@client.test',
+            'is_primary_client' => 1, 'role_id' => \App\Support\Access::clientAdminRoleId(), 'status' => 'Active', 'lifecycle_stage' => 'Onboarding']);
+        $this->insertRow('client_users', ['id' => $second, 'organization_id' => $org, 'first_name' => 'Adaeze', 'last_name' => 'Client', 'email' => 'adaeze@client.test',
+            'is_primary_client' => 0, 'role_id' => $member, 'status' => 'Active', 'lifecycle_stage' => 'Onboarding']);
+
+        Livewire::test(RoleManagement::class)->call('setTab', 'CLIENTS')->assertSee('Make primary contact')
+            ->call('makePrimary', $second)->assertSet('showSuccessModal', true);
+
+        $this->assertEquals([$first => 0, $second => 1], DB::table('client_users')->where('organization_id', $org)->pluck('is_primary_client', 'id')->map(fn ($v) => (int) $v)->all());
+        $this->assertSame(\App\Support\Access::clientAdminRoleId(), (int) DB::table('client_users')->where('id', $second)->value('role_id'));
+        $this->assertSame(\App\Support\Access::clientAdminRoleId(), (int) DB::table('client_users')->where('id', $first)->value('role_id'));
+        $this->assertDatabaseHas('system_audit_logs', ['action' => 'CLIENT_PRIMARY_CHANGED', 'target_id' => $second]);
+    }
+
     public function test_an_organisation_added_from_accounts_records_who_added_it(): void
     {
         $owner = $this->staff('owner', ['owner']);
