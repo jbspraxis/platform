@@ -5,12 +5,14 @@ namespace Tests\Feature\Opportunities;
 use App\Events\ProposalApprovedByClient;
 use App\Events\ProposalChangesRequested;
 use App\Livewire\Portal\ProposalReview;
+use App\Mail\SigningCode;
 use App\Models\Opportunity;
 use App\Models\Proposal;
 use App\Models\ProposalComment;
 use App\Models\User;
 use App\Support\Opportunities\PortalLinks;
 use App\Support\Opportunities\Proposals;
+use App\Support\Signing\SigningCodes;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -204,6 +206,39 @@ class PortalProposalTest extends TestCase
         $this->assertSame([Proposal::CLIENT_APPROVED, 'cyn@kilo.test'], [$p->fresh()->status, $p->fresh()->client_approved_email]);
         $this->assertEqualsCanonicalizing(['portal.projects.view', 'portal.projects.approve', 'portal.qa.view', 'portal.qa.create', 'portal.documents.view',
             'portal.documents.export', 'portal.support.create'], \App\Support\Access::permissionsFor(\App\Models\ClientUser::find($member)));
+    }
+
+    public function test_d5_a_contacts_link_approves_only_as_them_and_a_link_without_one_needs_the_code_emailed_to_the_approver(): void
+    {
+        $role = fn (string $slug) => DB::table('roles')->where('slug', $slug)->value('id');
+        $member = $this->clientContact($this->o->organization_id, ['first_name' => 'Cyn', 'last_name' => 'Okafor', 'email' => 'cyn@kilo.test', 'is_primary_client' => 0, 'role_id' => $role('client-member')]);
+        $this->clientContact($this->o->organization_id, ['first_name' => 'Ade', 'last_name' => 'Bello', 'email' => 'ade@kilo.test', 'is_primary_client' => 0, 'role_id' => $role('client-approver')]);
+        $p = $this->sent();
+
+        // A team member's link with an approver's address typed: the link's own address counts, so it is refused
+        Livewire::withQueryParams(['c' => $member])->test(ProposalReview::class, ['proposal' => $p->id])
+            ->set('email', 'ngozi@kilo.test')->set('jobTitle', 'CFO')->call('approve')->assertHasErrors(['email'])->assertSet('email', 'cyn@kilo.test');
+        $this->assertSame(Proposal::SENT, $p->fresh()->status);
+        // An approver's own link shows their address read-only and approves at once (test_the_client_approves_with_one_click…)
+        $this->page($p)->call('choose', 'approve')->assertSee('Ce lien vous a été envoyé à cette adresse')->assertSeeHtml('value="ngozi@kilo.test" readonly');
+
+        // A link without a contact: typing an approver's address approves nothing; the code goes to that address
+        $page = $this->page($p, [])->call('choose', 'approve')->assertSee('Nous vous envoyons ensuite un code')
+            ->set('name', 'Someone Else')->set('email', 'ngozi@kilo.test')->set('jobTitle', 'CFO')->call('approve')
+            ->assertHasNoErrors()->assertSet('step', 'code')->assertSet('done', '');
+        $this->assertSame(Proposal::SENT, $p->fresh()->status);
+        Mail::assertSent(SigningCode::class, fn (SigningCode $m) => $m->hasTo('ngozi@kilo.test') && $m->purpose === SigningCode::APPROVAL);
+        $code = Mail::sent(SigningCode::class)->last()->code;
+        $this->assertSame(SigningCodes::hash($code . '|ngozi@kilo.test'), $p->fresh()->auth_otp, 'Kept as an HMAC, with the address it was sent to');
+        $page->set('code', $code === '000000' ? '111111' : '000000')->call('verifyApproval')->assertHasErrors('code');
+        $this->assertSame(Proposal::SENT, $p->fresh()->status);
+
+        // Another approver asks for a code: Ngozi's no longer approves; Ade's does, as Ade
+        $other = $this->page($p, [])->call('choose', 'approve')->set('name', 'Ade Bello')->set('email', 'ade@kilo.test')->set('jobTitle', 'COO')->call('approve')->assertSet('step', 'code');
+        $page->set('code', $code)->call('verifyApproval')->assertHasErrors('code');
+        $other->set('code', Mail::sent(SigningCode::class)->last()->code)->call('verifyApproval')->assertHasNoErrors()->assertSet('done', 'approved');
+        $p->refresh();
+        $this->assertSame([Proposal::CLIENT_APPROVED, 'ade@kilo.test', 'Ade Bello', 'COO', null], [$p->status, $p->client_approved_email, $p->client_approved_name, $p->client_approved_title, $p->auth_otp]);
     }
 
     public function test_the_link_lasts_as_long_as_the_proposal_and_every_action_checks_it(): void
