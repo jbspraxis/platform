@@ -465,7 +465,7 @@ return [
         'lead_title' => 'You lead a task',
         'lead' => 'You now lead “:task”.',
         'review_title' => 'Task ready for client review',
-        'review' => '“:task” is waiting for the client’s review. If the client doesn’t respond within 5 hours, it’s approved automatically.',
+        'review' => '“:task” is waiting for the client’s review. If the client doesn’t respond within 2 working days, it’s approved automatically.',
         'plan_title' => 'Project plan ready',
         'plan' => 'The milestones for “:project” are saved. Tasks can now be assigned on their boards.',
         'tasks_title' => 'You lead tasks on a new plan',

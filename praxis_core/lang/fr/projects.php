@@ -464,7 +464,7 @@ return [
         'lead_title' => "Vous êtes responsable d’une tâche",
         'lead' => "Vous êtes maintenant responsable de « :task ».",
         'review_title' => "Tâche prête pour la revue client",
-        'review' => "« :task » attend la revue du client. Sans réponse du client sous 5\u{00A0}heures, elle est approuvée automatiquement.",
+        'review' => "« :task » attend la revue du client. Sans réponse du client sous 2\u{00A0}jours ouvrés, elle est approuvée automatiquement.",
         'plan_title' => "Plan du projet prêt",
         'plan' => "Les jalons de « :project » sont enregistrés. Les tâches peuvent maintenant être attribuées sur leurs tableaux.",
         'tasks_title' => "Vous êtes responsable de tâches d’un nouveau plan",

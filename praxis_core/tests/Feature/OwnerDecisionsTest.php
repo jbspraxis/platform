@@ -46,6 +46,32 @@ class OwnerDecisionsTest extends TestCase
         $this->assertSame(['off', 'JBS Praxis LLC'], [$vat['why'], $vat['company']]);
     }
 
+    public function test_d9_client_review_closes_after_2_working_days_with_one_reminder_the_day_before(): void
+    {
+        $org = (string) Str::uuid();
+        $this->insertRow('organizations', ['id' => $org, 'name' => 'City Client', 'status' => 'Active Client', 'preferred_language' => 'EN']);
+        $project = $this->project(['organization_id' => $org]);
+        $task = $this->task($this->phase($project, 1, 100), ['title' => 'Map view']);
+        $this->member($org, 1, ['role_id' => Access::clientAdminRoleId(), 'is_primary_client' => 1]);
+
+        // Friday 6 November, 15:00 in Lagos: the window skips the weekend and closes Tuesday at 15:00
+        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-11-06 15:00', 'Africa/Lagos'));
+        \App\Support\Projects\Tasks::move($project, DB::table('tasks')->where('id', $task)->first(), 'QA_Review');
+        $this->assertSame('2026-11-10 14:00:00', (string) DB::table('tasks')->where('id', $task)->value('qa_sla_expires_at'));
+
+        // Monday afternoon: one reminder, once
+        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-11-09 16:00', 'Africa/Lagos'));
+        $this->artisan('ops:qa-auto-approve')->assertSuccessful();
+        $this->artisan('ops:qa-auto-approve')->assertSuccessful();
+        $this->assertSame(1, DB::table('client_notifications')->where('kind', 'task_review_reminder')->count());
+        $this->assertSame('QA_Review', DB::table('tasks')->where('id', $task)->value('status'));
+
+        // Tuesday after 15:00: approved automatically
+        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-11-10 15:01', 'Africa/Lagos'));
+        $this->artisan('ops:qa-auto-approve')->assertSuccessful();
+        $this->assertSame(['Done', 1], [DB::table('tasks')->where('id', $task)->value('status'), (int) DB::table('tasks')->where('id', $task)->value('qa_auto_approved')]);
+    }
+
     public function test_d1_an_organisation_has_up_to_10_portal_accounts(): void
     {
         Mail::fake();
