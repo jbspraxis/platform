@@ -108,7 +108,18 @@ class SowReview extends Component
         $this->resetErrorBag();
         $this->done = '';
         $this->mode = in_array($mode, ['sign', 'changes'], true) ? $mode : '';
+        if ($this->mode === 'sign' && ! $this->contactMaySign($this->sow())) {
+            $this->mode = '';
+        }
         $this->step = 'details';
+    }
+
+    /** Whoever the link was sent to signs for the organisation (D5); a link without a contact can't tell yet */
+    private function contactMaySign(StatementOfWork $s): bool
+    {
+        $email = $this->contactId ? DB::table('client_users')->where('id', $this->contactId)->value('email') : null;
+
+        return ! $email || Proposals::isApprover($s->opportunity, (string) $email);
     }
 
     /** Name, title, address and signature checked, then a code is emailed to that address */
@@ -125,9 +136,10 @@ class SowReview extends Component
         if (! ($person = $this->known($s))) {
             return;
         }
-        // Only the organisation's own active contacts sign; meeting guests read
-        if (! Proposals::isActiveContact($s->opportunity, $person['email'])) {
-            $this->addError('email', __('sow.portal.errors.not_contact', ['company' => $s->opportunity->organization?->name]));
+        // Only the organisation's approvers sign (D5), and only they are sent a code; others read and ask for changes
+        if (! Proposals::isApprover($s->opportunity, $person['email'])) {
+            $error = Proposals::isActiveContact($s->opportunity, $person['email']) ? 'not_approver' : 'not_contact';
+            $this->addError('email', __('sow.portal.errors.' . $error, ['company' => $s->opportunity->organization?->name]));
 
             return;
         }
@@ -309,6 +321,7 @@ class SowReview extends Component
             'newerUrl' => $newer ? PortalLinks::sow($newer, $this->contactId) : null,
             'meetingsUrl' => $o->stage !== 'lost' ? PortalLinks::meetings($o, $this->contactId) : null,
             'signing' => Sows::awaitsSignature($s),
+            'maySign' => $this->contactMaySign($s),
         ])->title(__('sow.portal.page_title', ['title' => $s->title]));
     }
 }

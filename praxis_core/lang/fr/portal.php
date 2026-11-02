@@ -288,6 +288,7 @@ return [
 
     'roles' => [
         'Client Admin' => "Administration",
+        'Client Approver' => "Approbation",
         'Client Finance' => "Finance",
         'Client Member' => "Membre de l’équipe",
         'No role' => "Aucun rôle",

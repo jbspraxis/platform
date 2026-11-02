@@ -178,6 +178,34 @@ class PortalProposalTest extends TestCase
         $this->assertArrayNotHasKey('ngozi@kilo.test', Proposals::people($this->o));
     }
 
+    public function test_d5_only_the_organisations_approvers_approve_the_others_comment_and_ask_for_changes(): void
+    {
+        $member = $this->clientContact($this->o->organization_id, ['first_name' => 'Cyn', 'last_name' => 'Okafor', 'email' => 'cyn@kilo.test', 'is_primary_client' => 0,
+            'role_id' => DB::table('roles')->where('slug', 'client-member')->value('id')]);
+        $p = $this->sent();
+        $page = fn () => Livewire::withQueryParams(['c' => $member])->test(ProposalReview::class, ['proposal' => $p->id]);
+
+        // A team member comments; a plain line stands where Approve would be, and the server refuses
+        $page()->assertDontSee('Approuver la proposition')->assertSee('L’approbation revient aux personnes qui approuvent pour Kilo Pharma')
+            ->call('choose', 'approve')->assertSet('mode', '')
+            ->set('jobTitle', 'Ops')->call('approve')->assertHasErrors(['email']);
+        $page()->call('openComment', 'general')->set('body', 'Can we start in January?')->call('comment')->assertSet('done', 'commented');
+        $this->assertFalse(Proposals::approveForClient($p, ['name' => 'Cyn Okafor', 'email' => 'cyn@kilo.test'], 'Ops'));
+        $this->assertSame(Proposal::SENT, $p->fresh()->status);
+
+        // A link without a contact offers it; whoever acts must approve for the organisation
+        $this->page($p, [])->assertSee('Approuver la proposition')->call('choose', 'approve')->set('name', 'Cyn Okafor')->set('email', 'cyn@kilo.test')
+            ->set('jobTitle', 'Ops')->call('approve')->assertHasErrors(['email'])->assertSee('Seules les personnes qui approuvent pour Kilo Pharma');
+
+        // Made a Client Approver (no team or branding), the same link approves
+        DB::table('client_users')->where('id', $member)->update(['role_id' => DB::table('roles')->where('slug', 'client-approver')->value('id')]);
+        \App\Support\Access::flush();
+        $page()->assertSee('Approuver la proposition')->call('choose', 'approve')->set('jobTitle', 'Ops')->call('approve')->assertSet('done', 'approved');
+        $this->assertSame([Proposal::CLIENT_APPROVED, 'cyn@kilo.test'], [$p->fresh()->status, $p->fresh()->client_approved_email]);
+        $this->assertEqualsCanonicalizing(['portal.projects.view', 'portal.projects.approve', 'portal.qa.view', 'portal.qa.create', 'portal.documents.view',
+            'portal.documents.export', 'portal.support.create'], \App\Support\Access::permissionsFor(\App\Models\ClientUser::find($member)));
+    }
+
     public function test_the_link_lasts_as_long_as_the_proposal_and_every_action_checks_it(): void
     {
         $p = $this->sent(['validity_days' => 90]);

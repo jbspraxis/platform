@@ -10,7 +10,9 @@ use App\Models\AiRun;
 use App\Models\Opportunity;
 use App\Models\Proposal;
 use App\Models\ProposalComment;
+use App\Models\ClientUser;
 use App\Models\User;
+use App\Support\Access;
 use App\Support\Ai\Ai;
 use App\Support\Finance\Vat;
 use Illuminate\Support\Collection;
@@ -466,6 +468,19 @@ final class Proposals
             ->whereRaw('LOWER(email) = ?', [mb_strtolower(trim($email))])->exists();
     }
 
+    /**
+     * Approves a proposal and signs a statement of work for the organisation (owner, 2 Nov 2026; docs/QA-PORTAL.md D5):
+     * an active contact whose portal role has projects.approve (Client Admin, which the primary contact always has, or
+     * Client Approver). The other contacts and meeting guests read, comment and ask for changes.
+     */
+    public static function isApprover(Opportunity $opportunity, string $email): bool
+    {
+        $contact = ClientUser::where('organization_id', $opportunity->organization_id)->where('status', 'Active')
+            ->whereRaw('LOWER(email) = ?', [mb_strtolower(trim($email))])->first();
+
+        return $contact !== null && Access::allows($contact, Access::CLIENT_PREFIX . 'projects.approve');
+    }
+
     /** The version of this opportunity the client approved, if any: then nothing more is approved, sent or started */
     public static function clientApproved(string $opportunityId): ?Proposal
     {
@@ -643,13 +658,13 @@ final class Proposals
 
     /**
      * The client approves the version in the portal with one click (decision 9): name, title and email recorded,
-     * and only by an active contact of the organisation (isActiveContact). Claimed under the opportunity's lock, so it
+     * and only by one of the organisation's approvers (isApprover). Claimed under the opportunity's lock, so it
      * happens once and for one version only: every other open version (a draft, or one with the client) is set aside
      * (Superseded). The opportunity moves to Proposal approved; the lead is told.
      */
     public static function approveForClient(Proposal $proposal, array $person, string $jobTitle): bool
     {
-        if (! self::isActiveContact($proposal->opportunity, (string) $person['email'])) {
+        if (! self::isApprover($proposal->opportunity, (string) $person['email'])) {
             return false;
         }
         $done = DB::transaction(function () use ($proposal, $person, $jobTitle) {

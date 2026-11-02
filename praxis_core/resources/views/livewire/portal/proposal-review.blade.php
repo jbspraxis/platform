@@ -37,6 +37,8 @@
         .pr-totals .is-total { padding-top: 6px; border-top: 1px solid var(--color-ink); font-weight: 600; color: var(--color-ink); }
         .pr-choices { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
         .pr-choice { display: flex; gap: 12px; align-items: flex-start; text-align: left; padding: 16px; border: 1px solid var(--color-line-strong); border-radius: var(--radius-card); background: var(--color-paper); color: var(--color-ink); font: inherit; cursor: pointer; text-decoration: none; }
+        .pr-note { display: flex; gap: 12px; align-items: flex-start; margin: 0; padding: 16px; border: 1px dashed var(--color-line-strong); border-radius: var(--radius-card); font-size: 0.875rem; line-height: 1.375rem; color: var(--color-muted); }
+        .pr-note svg { width: 20px; height: 20px; flex-shrink: 0; margin-top: 1px; }
         .pr-choice:hover { background: var(--color-mist); }
         .pr-choice[aria-pressed="true"] { border-color: var(--color-deep-teal); background: var(--color-teal-tint); }
         .pr-choice svg { width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px; color: var(--color-deep-teal); }
@@ -156,10 +158,12 @@
                     <div class="alert alert-danger" role="alert" style="margin-bottom: 12px"><i data-lucide="circle-alert"></i><span>{{ $message }}</span></div>
                 @enderror
                 <div class="pr-choices">
-                    @if ($reviewing && ! $p->hasExpired())
+                    @if ($reviewing && ! $p->hasExpired() && $mayApprove)
                         <button type="button" class="pr-choice" wire:click="choose('approve')" aria-pressed="{{ $mode === 'approve' ? 'true' : 'false' }}">
                             <i data-lucide="badge-check"></i><span><strong>{{ __('proposals.portal.approve') }}</strong><span>{{ __('proposals.portal.approve_help') }}</span></span>
                         </button>
+                    @elseif ($reviewing && ! $p->hasExpired())
+                        <p class="pr-note"><i data-lucide="lock"></i><span>{{ __('proposals.portal.approvers_only', ['company' => $o->organization?->name]) }}</span></p>
                     @endif
                     @if ($reviewing)
                         <button type="button" class="pr-choice" wire:click="choose('changes')" aria-pressed="{{ $mode === 'changes' ? 'true' : 'false' }}">

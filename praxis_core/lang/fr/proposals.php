@@ -268,6 +268,7 @@ return [
         'next' => "Que souhaitez-vous faire\u{202F}?",
         'approve' => 'Approuver la proposition',
         'approve_help' => "Un clic\u{00A0}: votre nom et votre fonction sont enregistrés. L’énoncé des travaux suit pour signature.",
+        'approvers_only' => "L’approbation revient aux personnes qui approuvent pour :company sur le portail client. Vous pouvez commenter ou demander des modifications\u{00A0}; elles approuvent depuis leur propre e-mail ou le portail.",
         'approve_intro' => "L’approbation enregistre votre nom, votre fonction et votre e-mail à la date du jour. Rien n’est encore signé\u{00A0}: c’est l’énoncé des travaux qui suivra que nous signerons ensemble.",
         'approve_submit' => 'Approuver cette proposition',
         'changes' => 'Demander des modifications',
@@ -314,6 +315,7 @@ return [
             'expired' => "Cette proposition n’est plus valable. Réservez plutôt une réunion ou répondez à notre e-mail.",
             'link_expired' => "Ce lien a expiré. Répondez à notre e-mail et nous vous en enverrons un nouveau.",
             'not_contact' => "Seul un contact de :company peut approuver la proposition. Demandez à un collègue qui a reçu notre e-mail, ou répondez-y.",
+            'not_approver' => "Seules les personnes qui approuvent pour :company peuvent approuver la proposition. Vous pouvez plutôt commenter ou demander des modifications.",
         ],
     ],
 ];

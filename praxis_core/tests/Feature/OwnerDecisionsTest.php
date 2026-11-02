@@ -46,6 +46,25 @@ class OwnerDecisionsTest extends TestCase
         $this->assertSame(['off', 'JBS Praxis LLC'], [$vat['why'], $vat['company']]);
     }
 
+    public function test_d5_the_client_approver_role_reaches_a_database_that_already_has_its_roles(): void
+    {
+        // Live has its permissions and the three older client roles; the migration adds the fourth, once
+        $old = DB::table('roles')->where('audience', 'client')->where('slug', 'client-approver')->value('id');
+        DB::table('role_permissions')->where('role_id', $old)->delete();
+        DB::table('roles')->where('id', $old)->delete();
+        $migration = require database_path('migrations/2026_11_02_400000_add_client_approver_role.php');
+        $migration->up();
+        $migration->up();
+
+        $role = DB::table('roles')->where('audience', 'client')->where('slug', 'client-approver')->sole();
+        $granted = DB::table('role_permissions')->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
+            ->where('role_id', $role->id)->pluck('permissions.slug')->all();
+        $this->assertSame('Client Approver', $role->name);
+        $this->assertEqualsCanonicalizing(Access::expandGrant(config('access.starter_roles.client.client-approver.grant'), 'client'), $granted);
+        $this->assertNotContains('portal.team.create', $granted);
+        $this->assertNotContains('portal.settings.edit', $granted);
+    }
+
     public function test_d9_client_review_closes_after_2_working_days_with_one_reminder_the_day_before(): void
     {
         $org = (string) Str::uuid();

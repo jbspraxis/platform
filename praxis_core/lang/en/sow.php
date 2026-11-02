@@ -249,6 +249,7 @@ return [
         'sign_by' => 'To be signed by :date',
         'sign' => 'Sign it',
         'sign_help' => 'With your name, title and signature, then a code we email you.',
+        'signers_only' => 'Signing is for the people who approve for :company in the Client Portal. You can ask for changes; they sign from their own email or the portal.',
         'sign_intro' => 'Sign for :company: use the email address we know you by. We email you a 6-digit code to confirm it is you.',
         'signature' => 'Your signature',
         'signature_help' => 'Draw it with your mouse, finger or pen.',
@@ -271,6 +272,7 @@ return [
         'expired' => 'The time to sign this version ended on :date. Reply to our email and we will send you an up-to-date one.',
         'errors' => [
             'not_contact' => 'Only someone from :company with an active contact record with us can sign it. Ask your primary contact, or reply to our email.',
+            'not_approver' => 'Only the people who approve for :company can sign it. You can ask for changes instead.',
             'signature' => 'Draw your signature in the box.',
             'note' => 'Tell us what to change.',
             'too_many_codes' => 'We’ve sent 3 signing codes for this statement of work in the last 15 minutes. Wait :wait, then ask for a new code.',

@@ -110,6 +110,17 @@ class ProposalReview extends Component
         $this->done = '';
         $this->commenting = '';
         $this->mode = in_array($mode, ['approve', 'changes'], true) ? $mode : '';
+        if ($this->mode === 'approve' && ! $this->contactMayApprove($this->proposal())) {
+            $this->mode = '';
+        }
+    }
+
+    /** Whoever the link was sent to approves for the organisation (D5); a link without a contact can't tell yet */
+    private function contactMayApprove(Proposal $p): bool
+    {
+        $email = $this->contactId ? DB::table('client_users')->where('id', $this->contactId)->value('email') : null;
+
+        return ! $email || Proposals::isApprover($p->opportunity, (string) $email);
     }
 
     public function comment(): void
@@ -152,9 +163,10 @@ class ProposalReview extends Component
         if (! ($person = $this->known($p))) {
             return;
         }
-        // Only the organisation's own active contacts approve; meeting guests read and comment
-        if (! Proposals::isActiveContact($p->opportunity, $person['email'])) {
-            $this->addError('email', __('proposals.portal.errors.not_contact', ['company' => $p->opportunity->organization?->name]));
+        // Only the organisation's approvers approve (D5); other contacts and meeting guests read, comment and ask for changes
+        if (! Proposals::isApprover($p->opportunity, $person['email'])) {
+            $error = Proposals::isActiveContact($p->opportunity, $person['email']) ? 'not_approver' : 'not_contact';
+            $this->addError('email', __('proposals.portal.errors.' . $error, ['company' => $p->opportunity->organization?->name]));
 
             return;
         }
@@ -290,6 +302,7 @@ class ProposalReview extends Component
             'pdfUrl' => PortalLinks::proposalPdf($p),
             'meetingsUrl' => $o->stage !== 'lost' ? PortalLinks::meetings($o, $this->contactId) : null,
             'reviewing' => $p->status === Proposal::SENT && $o->stage !== 'lost' && ! $p->hasExpired(),
+            'mayApprove' => $this->contactMayApprove($p),
         ])->title(__('proposals.portal.page_title', ['title' => $p->title]));
     }
 }

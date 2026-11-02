@@ -293,6 +293,7 @@ return [
     // Role names stored in HQ, shown in the client's words
     'roles' => [
         'Client Admin' => 'Administrator',
+        'Client Approver' => 'Approver',
         'Client Finance' => 'Finance',
         'Client Member' => 'Team member',
         'No role' => 'No role',

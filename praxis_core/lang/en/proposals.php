@@ -271,6 +271,7 @@ return [
         'next' => 'What would you like to do?',
         'approve' => 'Approve the proposal',
         'approve_help' => 'One click: your name and title are recorded. The statement of work follows for signature.',
+        'approvers_only' => 'Approving is for the people who approve for :company in the Client Portal. You can comment or ask for changes; they approve from their own email or the portal.',
         'approve_intro' => 'Approving records your name, title and email with today’s date. Nothing is signed yet: the statement of work that follows is what we both sign.',
         'approve_submit' => 'Approve this proposal',
         'changes' => 'Ask for changes',
@@ -317,6 +318,7 @@ return [
             'expired' => 'This proposal is no longer valid. Book a meeting or reply to our email instead.',
             'link_expired' => 'This link has expired. Reply to our email and we will send you a new one.',
             'not_contact' => 'Only a contact of :company can approve the proposal. Ask a colleague who received our email, or reply to it.',
+            'not_approver' => 'Only the people who approve for :company can approve the proposal. You can comment or ask for changes instead.',
         ],
     ],
 ];
