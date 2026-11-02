@@ -169,8 +169,8 @@ return [
     ],
 
     'qa' => [
-        'sla_title' => 'Tasks waiting for your review are approved automatically after 5 hours',
-        'sla_body' => 'If something isn’t right, report an issue within 5 hours of the task being ready for review. Changes asked for after approval are charged as additional work.',
+        'sla_title' => 'Tasks waiting for your review are approved automatically after 2 working days',
+        'sla_body' => 'If something isn’t right, report an issue within 2 working days (Monday to Friday) of the task being ready for review. We remind you the day before. Changes asked for after approval are charged as additional work.',
         'form_title' => 'Report an issue or send a message',
         'about_task' => 'About this task',
         'unknown_task' => 'A task in this project',
@@ -310,7 +310,7 @@ return [
         'invited' => 'Invitation sent to :email.',
         'role_forbidden' => 'You don’t have permission to give that role. Choose another role.',
         'project_unknown' => 'We couldn’t find that project. Choose a project from the list.',
-        'limit_reached' => 'You can’t invite anyone else: your organisation already has the maximum of 3 Client Portal accounts.',
+        'limit_reached' => 'You can’t invite anyone else: your organisation already has the maximum of :max Client Portal accounts.',
         'wrong_domain' => 'Use an email address ending in @:domain. Team members must use your organisation’s email domain.',
         'invite_failed' => 'We couldn’t complete the invitation. Try again, or contact JBS Praxis for help.',
         'role_updated' => 'Role updated.',
@@ -320,6 +320,7 @@ return [
     // Role names stored in HQ, shown in the client's words
     'roles' => [
         'Client Admin' => 'Administrator',
+        'Client Approver' => 'Approver',
         'Client Finance' => 'Finance',
         'Client Member' => 'Team member',
         'No role' => 'No role',
@@ -348,7 +349,7 @@ return [
         'q_locked' => 'Why are some sections closed?',
         'a_locked' => 'Sections close when a first payment is due or an invoice is overdue. Upload your proof of payment in Invoices and payments. The sections open again once we verify the payment.',
         'q_review' => 'What happens if I don’t review a task?',
-        'a_review' => 'A task waiting for your review is approved automatically 5 hours after it’s ready. Changes asked for after approval are charged as additional work.',
+        'a_review' => 'A task waiting for your review is approved automatically 2 working days (Monday to Friday) after it’s ready; we remind you the day before. Changes asked for after approval are charged as additional work.',
         'q_urgent' => 'When should I request urgent support?',
         'a_urgent' => 'When a problem stops your organisation from working, for example a system that is down. Urgent requests go to our senior team ahead of the normal queue. Emergency support fees may apply under your agreement.',
     ],
@@ -524,7 +525,8 @@ return [
             'payment_rejected' => ['label' => 'Payment', 'title' => 'Payment not confirmed', 'body' => 'We couldn’t confirm your payment for invoice :ref. See why in Invoices and payments, then upload a new proof of payment.'],
             'proposal_ready' => ['label' => 'Proposal', 'title' => 'Your proposal is ready', 'body' => 'Proposal :ref is ready for you to review and sign.'],
             'signoff_ready' => ['label' => 'Handover', 'title' => 'Handover ready to sign', 'body' => 'The handover of :project is ready for your review and signature.'],
-            'task_review' => ['label' => 'Project', 'title' => 'Ready for your review', 'body' => '“:task” (:project) is ready for your review. Approve it or report an issue within 5 hours.'],
+            'task_review' => ['label' => 'Project', 'title' => 'Ready for your review', 'body' => '“:task” (:project) is ready for your review. Approve it or report an issue within 2 working days.'],
+            'task_review_reminder' => ['label' => 'Project', 'title' => 'Review closes tomorrow', 'body' => '“:task” (:project) is approved automatically on :date unless you approve it or report an issue first.'],
             'ticket_investigating' => ['label' => 'Issue', 'title' => 'We’re looking into your issue', 'body' => 'We’re looking into the issue you reported: “:ticket”.'],
             'ticket_reply' => ['label' => 'Issue', 'title' => 'New reply about your issue', 'body' => 'Your delivery team replied about “:ticket”.'],
             'ticket_resolved' => ['label' => 'Issue', 'title' => 'Issue resolved', 'body' => 'The issue you reported, “:ticket”, is resolved.'],

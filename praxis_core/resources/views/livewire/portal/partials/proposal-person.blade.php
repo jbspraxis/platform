@@ -7,8 +7,14 @@
     </div>
     <div class="field">
         <label for="pr-email" class="label">{{ __('proposals.portal.email') }}</label>
-        <input id="pr-email" type="email" class="input" maxlength="150" autocomplete="email" wire:model="email" aria-describedby="pr-email-help @error('email') pr-email-error @enderror" @error('email') aria-invalid="true" @enderror>
-        <span class="help" id="pr-email-help">{{ __('proposals.portal.email_help') }}</span>
+        {{-- Approving from a link sent to one contact: their address, not editable (D5) --}}
+        @if ($lockEmail ?? false)
+            <input id="pr-email" type="email" class="input" value="{{ $lockEmail }}" readonly aria-describedby="pr-email-help @error('email') pr-email-error @enderror" @error('email') aria-invalid="true" @enderror>
+            <span class="help" id="pr-email-help">{{ __('proposals.portal.email_locked') }}</span>
+        @else
+            <input id="pr-email" type="email" class="input" maxlength="150" autocomplete="email" wire:model="email" aria-describedby="pr-email-help @error('email') pr-email-error @enderror" @error('email') aria-invalid="true" @enderror>
+            <span class="help" id="pr-email-help">{{ __('proposals.portal.email_help') }}</span>
+        @endif
         @error('email') <span class="field-error" id="pr-email-error">{{ $message }}</span> @enderror
     </div>
 </div>

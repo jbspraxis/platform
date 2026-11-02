@@ -66,6 +66,30 @@
                     <input id="ra-routing" type="text" wire:model="routing_code" @if($type === 'Crypto') placeholder="e.g. TRC20, ERC20" @endif class="input">
                 </div>
 
+                <div class="grid gap-4 sm:grid-cols-[120px_minmax(0,1fr)]">
+                    <div class="field">
+                        <label class="label" for="ra-currency">Currency</label>
+                        <select id="ra-currency" wire:model="currency" class="select" required>
+                            <option value="">Choose</option>
+                            @foreach($currencies as $code)
+                                <option value="{{ $code }}">{{ $code }}</option>
+                            @endforeach
+                        </select>
+                        @error('currency') <span class="field-error">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="field">
+                        <label class="label" for="ra-company">Company that holds it</label>
+                        <select id="ra-company" wire:model="legal_entity_id" class="select" required aria-describedby="ra-company-help">
+                            <option value="">Choose a company</option>
+                            @foreach($companies as $company)
+                                <option value="{{ $company->id }}">{{ $company->legal_name }}</option>
+                            @endforeach
+                        </select>
+                        @error('legal_entity_id') <span class="field-error">{{ $message }}</span> @enderror
+                    </div>
+                </div>
+                <p id="ra-company-help" class="help" style="margin: -8px 0 0;">Clients see this account only on invoices in this currency billed by this company.</p>
+
                 <div class="flex flex-wrap gap-3" style="margin-top: 8px;">
                     <button type="submit" class="btn btn-primary" style="flex: 2;">
                         {{ $editMode ? 'Save changes' : 'Add account' }}
@@ -101,6 +125,11 @@
                                 <div class="help" style="margin-top: 2px;">
                                     {{ $acc->account_name }}@if($acc->routing_code)<span style="font-variant-numeric: tabular-nums;"> · {{ $acc->routing_code }}</span>@endif
                                 </div>
+                                @if($acc->currency && $acc->company_name)
+                                    <div class="help" style="margin-top: 2px;">{{ $acc->currency }} · {{ $acc->company_name }}</div>
+                                @else
+                                    <span class="pill pill-warning" style="margin-top: 4px;">Not shown to clients: set its currency and company</span>
+                                @endif
                             </td>
                             <td>
                                 @if($acc->ledger_code)

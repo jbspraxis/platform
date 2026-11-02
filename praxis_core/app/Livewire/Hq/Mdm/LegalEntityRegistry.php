@@ -90,9 +90,10 @@ class LegalEntityRegistry extends Component
         $this->validate([
             'region_code' => 'required|string|max:10',
             'legal_name' => 'required|string|max:150',
-            'registration_number' => 'required|string|max:100',
-            'tax_identification_number' => 'required|string|max:100',
-            'employer_social_security_code' => 'required|string|max:100',
+            // Blank while the company is being registered; filled in once it is
+            'registration_number' => 'nullable|string|max:100',
+            'tax_identification_number' => 'nullable|string|max:100',
+            'employer_social_security_code' => 'nullable|string|max:100',
             'registered_address' => 'required|string',
             'legal_representative_name' => 'required|string|max:100',
             'legal_representative_title' => 'required|string|max:100',
@@ -113,9 +114,9 @@ class LegalEntityRegistry extends Component
             $data = [
                 'region_code' => strtoupper($this->region_code),
                 'legal_name' => $this->legal_name,
-                'registration_number' => $this->registration_number,
-                'tax_identification_number' => $this->tax_identification_number,
-                'employer_social_security_code' => $this->employer_social_security_code,
+                'registration_number' => trim((string) $this->registration_number) ?: null,
+                'tax_identification_number' => trim((string) $this->tax_identification_number) ?: null,
+                'employer_social_security_code' => trim((string) $this->employer_social_security_code) ?: null,
                 'registered_address' => $this->registered_address,
                 'contact_email' => $this->contact_email,
                 'contact_phone' => $this->contact_phone,

@@ -112,6 +112,10 @@ return [
         ],
         'client' => [
             'client-admin' => ['name' => 'Client Admin', 'description' => 'Everything in the portal, including the team.', 'grant' => ['*']],
+            // Approves proposals and signs statements of work (docs/QA-PORTAL.md D5) without running the team or branding
+            'client-approver' => ['name' => 'Client Approver', 'description' => 'Approves proposals, signs statements of work and approves delivered work; follows projects, QA and documents. No team or branding.', 'grant' => [
+                'projects.*', 'qa.*', 'documents.*', 'support.create',
+            ]],
             'client-finance' => ['name' => 'Client Finance', 'description' => 'Invoices, payments and documents.', 'grant' => [
                 'projects.view', 'qa.view', 'billing.*', 'documents.*',
             ]],

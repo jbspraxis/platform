@@ -166,8 +166,8 @@ return [
     ],
 
     'qa' => [
-        'sla_title' => "Les tâches en attente de votre validation sont approuvées automatiquement au bout de 5\u{00A0}heures",
-        'sla_body' => "Si quelque chose ne convient pas, signalez une anomalie dans les 5\u{00A0}heures qui suivent la mise en validation de la tâche. Les modifications demandées après approbation sont facturées comme travaux supplémentaires.",
+        'sla_title' => "Les tâches en attente de votre validation sont approuvées automatiquement au bout de 2\u{00A0}jours ouvrés",
+        'sla_body' => "Si quelque chose ne convient pas, signalez une anomalie dans les 2\u{00A0}jours ouvrés (du lundi au vendredi) qui suivent la mise en validation de la tâche. Nous vous le rappelons la veille. Les modifications demandées après approbation sont facturées comme travaux supplémentaires.",
         'form_title' => "Signaler une anomalie ou envoyer un message",
         'about_task' => "Tâche concernée",
         'unknown_task' => "Une tâche de ce projet",
@@ -306,7 +306,7 @@ return [
         'invited' => "Invitation envoyée à :email.",
         'role_forbidden' => "Vous n’avez pas l’autorisation d’attribuer ce rôle. Choisissez un autre rôle.",
         'project_unknown' => "Nous n’avons pas trouvé ce projet. Choisissez un projet dans la liste.",
-        'limit_reached' => "Vous ne pouvez inviter personne d’autre\u{00A0}: votre organisation dispose déjà du maximum de 3\u{00A0}comptes sur le portail client.",
+        'limit_reached' => "Vous ne pouvez inviter personne d’autre\u{00A0}: votre organisation dispose déjà du maximum de :max\u{00A0}comptes sur le portail client.",
         'wrong_domain' => "Utilisez une adresse e-mail se terminant par @:domain. Les membres de l’équipe doivent utiliser le domaine de messagerie de votre organisation.",
         'invite_failed' => "Nous n’avons pas pu finaliser l’invitation. Réessayez ou contactez JBS Praxis pour obtenir de l’aide.",
         'role_updated' => "Rôle mis à jour.",
@@ -315,6 +315,7 @@ return [
 
     'roles' => [
         'Client Admin' => "Administration",
+        'Client Approver' => "Approbation",
         'Client Finance' => "Finance",
         'Client Member' => "Membre de l’équipe",
         'No role' => "Aucun rôle",
@@ -343,7 +344,7 @@ return [
         'q_locked' => "Pourquoi certaines rubriques sont-elles fermées\u{202F}?",
         'a_locked' => "Les rubriques se ferment lorsqu’un premier paiement est attendu ou qu’une facture est en retard. Déposez votre justificatif de paiement dans Factures et paiements\u{00A0}: les rubriques rouvrent dès que nous avons vérifié le paiement.",
         'q_review' => "Que se passe-t-il si je ne valide pas une tâche\u{202F}?",
-        'a_review' => "Une tâche en attente de votre validation est approuvée automatiquement 5\u{00A0}heures après sa mise en validation. Les modifications demandées après approbation sont facturées comme travaux supplémentaires.",
+        'a_review' => "Une tâche en attente de votre validation est approuvée automatiquement 2\u{00A0}jours ouvrés (du lundi au vendredi) après sa mise en validation\u{00A0}; nous vous le rappelons la veille. Les modifications demandées après approbation sont facturées comme travaux supplémentaires.",
         'q_urgent' => "Quand demander une assistance urgente\u{202F}?",
         'a_urgent' => "Lorsqu’un problème empêche votre organisation de fonctionner, par exemple un système à l’arrêt. Les demandes urgentes parviennent à notre équipe senior en priorité. Des frais d’intervention d’urgence peuvent s’appliquer selon votre contrat.",
     ],
@@ -567,7 +568,8 @@ return [
             'payment_rejected' => ['label' => "Paiement", 'title' => "Paiement non confirmé", 'body' => "Nous n’avons pas pu confirmer votre paiement pour la facture :ref. Consultez le motif dans Factures et paiements, puis déposez un nouveau justificatif."],
             'proposal_ready' => ['label' => "Proposition", 'title' => "Votre proposition est prête", 'body' => "La proposition :ref est prête. Relisez-la et signez-la."],
             'signoff_ready' => ['label' => "Livraison", 'title' => "Livraison prête à signer", 'body' => "La livraison de :project attend votre relecture et votre signature."],
-            'task_review' => ['label' => "Projet", 'title' => "Prête pour votre validation", 'body' => "«\u{00A0}:task\u{00A0}» (:project) est prête pour votre validation. Approuvez-la ou signalez une anomalie dans les 5\u{00A0}heures."],
+            'task_review' => ['label' => "Projet", 'title' => "Prête pour votre validation", 'body' => "«\u{00A0}:task\u{00A0}» (:project) est prête pour votre validation. Approuvez-la ou signalez une anomalie dans les 2\u{00A0}jours ouvrés."],
+            'task_review_reminder' => ['label' => "Projet", 'title' => "Validation close demain", 'body' => "«\u{00A0}:task\u{00A0}» (:project) sera approuvée automatiquement le :date, sauf si vous l’approuvez ou signalez une anomalie d’ici là."],
             'ticket_investigating' => ['label' => "Anomalie", 'title' => "Nous examinons votre anomalie", 'body' => "Nous examinons l’anomalie que vous avez signalée\u{00A0}: «\u{00A0}:ticket\u{00A0}»."],
             'ticket_reply' => ['label' => "Anomalie", 'title' => "Nouvelle réponse sur votre anomalie", 'body' => "Votre équipe projet a répondu au sujet de «\u{00A0}:ticket\u{00A0}»."],
             'ticket_resolved' => ['label' => "Anomalie", 'title' => "Anomalie résolue", 'body' => "L’anomalie que vous avez signalée, «\u{00A0}:ticket\u{00A0}», est résolue."],

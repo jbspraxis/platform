@@ -10,10 +10,19 @@ use Illuminate\Support\Str;
 class QAAutoApprove extends Command
 {
     protected $signature = 'ops:qa-auto-approve';
-    protected $description = 'Enforces the 5-Hour QA SLA by auto-approving stalled client tickets.';
+    protected $description = 'Reminds the client the day before, then auto-approves tasks left in client review for 2 working days.';
 
     public function handle()
     {
+        // The day before: one reminder to the client's portal
+        $due = DB::table('tasks')->where('status', 'QA_Review')->whereNull('deleted_at')->whereNull('qa_reminded_at')
+            ->whereNotNull('qa_sla_expires_at')->whereBetween('qa_sla_expires_at', [now(), now()->addDay()])->get();
+        foreach ($due as $task) {
+            if (DB::table('tasks')->where('id', $task->id)->whereNull('qa_reminded_at')->update(['qa_reminded_at' => now()])) {
+                \App\Support\Pwa\ClientNotify::reviewReminder($task);
+            }
+        }
+
         $expiredTasks = DB::table('tasks')
             ->where('status', 'QA_Review')
             ->whereNotNull('qa_sla_expires_at')
@@ -42,7 +51,7 @@ class QAAutoApprove extends Command
                         'id' => (string) Str::uuid(),
                         'user_id' => $adminId,
                         'title' => 'Task approved automatically',
-                        'message' => "The client didn’t review ‘{$task->title}’ within 5 hours, so it was approved automatically and moved to Done.",
+                        'message' => "The client didn’t review ‘{$task->title}’ within 2 working days, so it was approved automatically and moved to Done.",
                         'type' => 'Project',
                         'created_at' => now()
                     ];

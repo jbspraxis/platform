@@ -3,10 +3,15 @@
 namespace App\Livewire\Portal;
 
 use App\Livewire\Portal\Concerns\WithGatewayLanguage;
+use App\Mail\SigningCode;
 use App\Models\Proposal;
+use App\Support\MailLocale;
 use App\Support\Opportunities\PortalLinks;
 use App\Support\Opportunities\Proposals;
+use App\Support\Signing\SigningCodes;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
@@ -21,6 +26,8 @@ use Livewire\Component;
  *
  * Whoever acts must use an address HQ already knows for this work (Proposals::knows), so a forwarded link can't act
  * for anyone; comments are capped in size and number and limited per hour, and unknown addresses are limited too.
+ * Approving (D5) is for the organisation's approvers only: a link sent to a contact approves as that contact (the
+ * address typed is ignored), and a link without one asks for a code emailed to the approver's address first.
  */
 #[Layout('components.layouts.portal')]
 class ProposalReview extends Component
@@ -57,6 +64,16 @@ class ProposalReview extends Component
     /** commented | approved | changes, once done */
     #[Locked]
     public string $done = '';
+
+    /** Approving from a link without a contact: details (name, title, address), then code (the one emailed) */
+    #[Locked]
+    public string $step = 'details';
+
+    public string $code = '';
+
+    /** Who the emailed code approves as: name, title and address, kept from the request (D5) */
+    #[Locked]
+    public array $pending = [];
 
     /** When the signed link stops working (its expires parameter, a Unix time); 0 when it has none */
     #[Locked]
@@ -109,7 +126,27 @@ class ProposalReview extends Component
         $this->resetErrorBag();
         $this->done = '';
         $this->commenting = '';
+        $this->step = 'details';
+        $this->code = '';
+        $this->pending = [];
         $this->mode = in_array($mode, ['approve', 'changes'], true) ? $mode : '';
+        if ($this->mode === 'approve' && ! $this->contactMayApprove($this->proposal())) {
+            $this->mode = '';
+        }
+    }
+
+    /** The address of the contact the link was sent to, if it has one: it approves as them, whatever is typed (D5) */
+    private function linkEmail(): ?string
+    {
+        return $this->contactId ? (DB::table('client_users')->where('id', $this->contactId)->whereNull('deleted_at')->value('email') ?: null) : null;
+    }
+
+    /** Whoever the link was sent to approves for the organisation (D5); a link without a contact can't tell yet */
+    private function contactMayApprove(Proposal $p): bool
+    {
+        $email = $this->linkEmail();
+
+        return ! $email || Proposals::isApprover($p->opportunity, (string) $email);
     }
 
     public function comment(): void
@@ -148,23 +185,109 @@ class ProposalReview extends Component
             return;
         }
         $this->jobTitle = trim($this->jobTitle);
+        // A link sent to a contact approves as that contact: the address typed doesn't count (D5)
+        $linkEmail = $this->linkEmail();
+        if ($linkEmail !== null) {
+            $this->email = $linkEmail;
+        }
         $this->person(['jobTitle' => ['required', 'string', 'max:150']]);
         if (! ($person = $this->known($p))) {
             return;
         }
-        // Only the organisation's own active contacts approve; meeting guests read and comment
-        if (! Proposals::isActiveContact($p->opportunity, $person['email'])) {
-            $this->addError('email', __('proposals.portal.errors.not_contact', ['company' => $p->opportunity->organization?->name]));
+        // Only the organisation's approvers approve (D5); other contacts and meeting guests read, comment and ask for changes
+        if (! Proposals::isApprover($p->opportunity, $person['email'])) {
+            $error = Proposals::isActiveContact($p->opportunity, $person['email']) ? 'not_approver' : 'not_contact';
+            $this->addError('email', __('proposals.portal.errors.' . $error, ['company' => $p->opportunity->organization?->name]));
 
             return;
         }
-        if (! Proposals::approveForClient($p, ['name' => $this->name, 'email' => $person['email']], $this->jobTitle)) {
+        if ($linkEmail !== null) {
+            $this->finishApproval($p, ['name' => $this->name, 'title' => $this->jobTitle, 'email' => $person['email']]);
+
+            return;
+        }
+
+        // A link without a contact: the approver confirms with a code emailed to their address, so nobody approves under
+        // someone else's (SigningCodes: 3 codes per version and per address, 5 wrong codes, every 15 minutes)
+        if ($refused = SigningCodes::claimSend('approval', $p->id, $person['email'])) {
+            $this->addError('code', __('proposals.portal.errors.' . $refused[0], ['wait' => $this->minutes($refused[1])]));
+
+            return;
+        }
+        $email = mb_strtolower(trim((string) $person['email']));
+        $code = SigningCodes::newCode();
+        // The code is kept with the address it was sent to, so it approves for that address only
+        if (! Proposal::whereKey($p->id)->where('status', Proposal::SENT)
+            ->update(['auth_otp' => SigningCodes::hash($code . '|' . $email), 'otp_expires_at' => now()->addMinutes(SigningCodes::MINUTES)])) {
+            $this->addError('mode', __('proposals.portal.errors.closed'));
+
+            return;
+        }
+        try {
+            $locale = session()->has('locale') ? MailLocale::forVisitor() : MailLocale::forRecipient($p->opportunity->language);
+            Mail::to($email)->locale($locale)->send(new SigningCode($code, SigningCode::APPROVAL, $p->title, explode(' ', $this->name)[0] ?: null,
+                signer: $this->name . ', ' . $this->jobTitle));
+        } catch (\Throwable $e) {
+            // Never log the code itself; the unsent code is cancelled
+            Log::error('Proposal approval code email failed', ['proposal_id' => $p->id, 'message' => $e->getMessage()]);
+            Proposal::whereKey($p->id)->update(['auth_otp' => null, 'otp_expires_at' => null]);
+            $this->addError('email', __('proposals.portal.errors.email_failed'));
+
+            return;
+        }
+        $this->pending = ['name' => $this->name, 'title' => $this->jobTitle, 'email' => $email];
+        $this->code = '';
+        $this->step = 'code';
+    }
+
+    /** The emailed code: the right one approves, as the person it was sent for */
+    public function verifyApproval(): void
+    {
+        $p = $this->proposal();
+        if (! $this->open($p) || ! $this->valid($p) || ! $this->pending) {
+            return;
+        }
+        $this->code = trim($this->code);
+        $this->validate(['code' => ['required', 'digits:6']], ['code.*' => __('proposals.portal.errors.code_format')]);
+        $refused = SigningCodes::check('approval', $p->id, $p->auth_otp ? (string) $p->auth_otp : null, $p->otp_expires_at, $this->code . '|' . $this->pending['email']);
+        if ($refused) {
+            if ($refused[0] === 'cancel') {
+                Proposal::whereKey($p->id)->update(['auth_otp' => null, 'otp_expires_at' => null]);
+            }
+            $this->addError('code', $refused[0] === 'wrong' ? __('proposals.portal.errors.code_invalid') : __('proposals.portal.errors.too_many_attempts', ['wait' => $this->minutes($refused[1])]));
+
+            return;
+        }
+        Proposal::whereKey($p->id)->update(['auth_otp' => null, 'otp_expires_at' => null]);
+        $this->finishApproval($p, $this->pending);
+    }
+
+    /** Back to the details: a new code, or another approver */
+    public function startAgain(): void
+    {
+        $this->resetErrorBag();
+        $this->step = 'details';
+        $this->code = '';
+        $this->pending = [];
+    }
+
+    private function finishApproval(Proposal $p, array $person): void
+    {
+        if (! Proposals::approveForClient($p, ['name' => $person['name'], 'email' => $person['email']], $person['title'])) {
             $this->addError('mode', __('proposals.portal.errors.closed'));
 
             return;
         }
         $this->mode = '';
+        $this->step = 'details';
+        $this->code = '';
+        $this->pending = [];
         $this->done = 'approved';
+    }
+
+    private function minutes(int $minutes): string
+    {
+        return trans_choice('gateway.proposal.wait_minutes', $minutes, ['count' => $minutes]);
     }
 
     public function requestChanges(): void
@@ -290,6 +413,8 @@ class ProposalReview extends Component
             'pdfUrl' => PortalLinks::proposalPdf($p),
             'meetingsUrl' => $o->stage !== 'lost' ? PortalLinks::meetings($o, $this->contactId) : null,
             'reviewing' => $p->status === Proposal::SENT && $o->stage !== 'lost' && ! $p->hasExpired(),
+            'mayApprove' => $this->contactMayApprove($p),
+            'linkEmail' => $this->linkEmail(),
         ])->title(__('proposals.portal.page_title', ['title' => $p->title]));
     }
 }

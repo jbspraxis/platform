@@ -720,7 +720,7 @@ final class Sows
             $locked = StatementOfWork::whereKey($sow->id)->lockForUpdate()->first();
             if (! $locked || ! self::awaitsSignature($locked) || ! $locked->signed_by_email
                 || ! SigningCodes::matches($locked->auth_otp, $locked->otp_expires_at, $code)
-                || ! Proposals::isActiveContact($locked->opportunity, (string) $locked->signed_by_email)) {
+                || ! Proposals::isApprover($locked->opportunity, (string) $locked->signed_by_email)) {
                 return null;
             }
             $opportunity = Opportunity::with('organization')->find($locked->opportunity_id);

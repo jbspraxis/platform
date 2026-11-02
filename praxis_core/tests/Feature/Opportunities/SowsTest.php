@@ -567,7 +567,8 @@ class SowsTest extends TestCase
         $lead = $this->staff('lead', ['sales']);
         $this->actingAs($lead);
         $o = $this->approvedOpportunity($lead);
-        $this->clientContact($o->organization_id, ['first_name' => 'Tunde', 'last_name' => 'Bello', 'email' => 'tunde@kilo.test', 'is_primary_client' => 0]);
+        $this->clientContact($o->organization_id, ['first_name' => 'Tunde', 'last_name' => 'Bello', 'email' => 'tunde@kilo.test', 'is_primary_client' => 0,
+            'role_id' => DB::table('roles')->where('slug', 'client-approver')->value('id')]);
         $sow = $this->approvedSow($o, $lead);
         Sows::send($sow, ['ngozi@kilo.test'], $lead);
         $ask = fn (string $name, string $email) => Livewire::test(SowReview::class, ['sow' => $sow->id])->call('choose', 'sign')
@@ -593,6 +594,39 @@ class SowsTest extends TestCase
         DB::table('client_users')->where('email', 'tunde@kilo.test')->update(['status' => 'Active']);
         $this->assertTrue(Sows::sign($sow->fresh(), Mail::sent(SigningCode::class)->last()->code, null));
         $this->assertSame(['Tunde Bello', 'tunde@kilo.test'], [$sow->fresh()->signed_by_name, $sow->fresh()->signed_by_email]);
+    }
+
+    public function test_d5_only_the_organisations_approvers_sign_and_are_sent_a_code(): void
+    {
+        $lead = $this->staff('lead', ['sales']);
+        $this->actingAs($lead);
+        $o = $this->approvedOpportunity($lead);
+        $member = $this->clientContact($o->organization_id, ['first_name' => 'Cyn', 'last_name' => 'Okafor', 'email' => 'cyn@kilo.test', 'is_primary_client' => 0,
+            'role_id' => DB::table('roles')->where('slug', 'client-member')->value('id')]);
+        $sow = $this->approvedSow($o, $lead);
+        Sows::send($sow, ['ngozi@kilo.test', 'cyn@kilo.test'], $lead);
+        $page = fn () => Livewire::withQueryParams(['c' => $member])->test(SowReview::class, ['sow' => $sow->id]);
+
+        // A team member reads it and may ask for changes; a plain line stands where Sign would be, and the server refuses
+        $page()->assertDontSee('With your name, title and signature')->assertSee('Signing is for the people who approve for')
+            ->call('choose', 'sign')->assertSet('mode', '')
+            ->set('jobTitle', 'Ops')->set('signature', self::PNG)->call('requestCode')->assertHasErrors(['email']);
+        // A link without a contact offers Sign; whoever asks for the code must approve for the organisation
+        Livewire::withQueryParams([])->test(SowReview::class, ['sow' => $sow->id])->call('choose', 'sign')->set('name', 'Cyn Okafor')->set('email', 'cyn@kilo.test')
+            ->set('jobTitle', 'Ops')->set('signature', self::PNG)->call('requestCode')->assertHasErrors(['email'])->assertSee('Only the people who approve for Kilo Pharma can sign it.');
+        Mail::assertNotSent(SigningCode::class);
+        // Nor does a code asked for in their name sign
+        Sows::holdSignature($sow, ['name' => 'Cyn Okafor', 'title' => 'Ops', 'email' => 'cyn@kilo.test'], self::PNG, '123456');
+        $this->assertFalse(Sows::sign($sow->fresh(), '123456', null));
+        $this->assertSame(StatementOfWork::SENT, $sow->fresh()->status);
+
+        // Made a Client Approver (no team or branding), the same link signs
+        DB::table('client_users')->where('id', $member)->update(['role_id' => DB::table('roles')->where('slug', 'client-approver')->value('id')]);
+        \App\Support\Access::flush();
+        $page()->assertSee('With your name, title and signature')->call('choose', 'sign')->assertSet('mode', 'sign')
+            ->set('jobTitle', 'Ops')->set('signature', self::PNG)->call('requestCode')->assertHasNoErrors()->assertSet('step', 'code');
+        $this->assertTrue(Sows::sign($sow->fresh(), Mail::sent(SigningCode::class)->last()->code, null));
+        $this->assertSame('cyn@kilo.test', $sow->fresh()->signed_by_email);
     }
 
     public function test_signing_copies_the_budget_lines_honours_a_custom_deposit_and_fingerprints_the_text(): void

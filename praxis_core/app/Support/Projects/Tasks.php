@@ -100,24 +100,35 @@ final class Tasks
 
     /**
      * Move a task to another status, with the board's rules unchanged (moved here from SprintBoard): entering
-     * Client review starts the 5-hour client window and tells the QA approvers and the client's portal; leaving it
+     * Client review starts the client's window (reviewDeadline) and tells the QA approvers and the client's portal; leaving it
      * clears the window; entering In progress starts the mover's timer and leaving it stops the timer and books the hours.
      */
+    /** Working days the client has to review a task, Monday to Friday in Lagos time (owner, 2 Nov 2026; was 5 hours) */
+    public const REVIEW_WORKING_DAYS = 2;
+
+    /** When a task entering client review now is approved automatically, unless the client acts first (UTC) */
+    public static function reviewDeadline(?\DateTimeInterface $from = null): Carbon
+    {
+        return Carbon::instance($from ?? now())->setTimezone('Africa/Lagos')->addWeekdays(self::REVIEW_WORKING_DAYS)->utc();
+    }
+
     public static function move(string $projectId, object $task, string $newStatus): void
     {
         DB::transaction(function () use ($task, $newStatus) {
             $oldStatus = $task->status;
             $updateData = ['status' => $newStatus, 'updated_at' => now()];
 
-            // The 5-hour client QA window (Rule 6)
+            // The client's review window: 2 working days (owner, 2 Nov 2026), reminded the day before
             if ($newStatus === 'QA_Review') {
-                $updateData['qa_sla_expires_at'] = now()->addHours(5);
+                $updateData['qa_sla_expires_at'] = self::reviewDeadline();
+                $updateData['qa_reminded_at'] = null;
                 self::notifyQaApprovers($task);
             }
 
             // Cleared when pulled out of client review
             if ($oldStatus === 'QA_Review' && $newStatus !== 'QA_Review' && $newStatus !== 'Done') {
                 $updateData['qa_sla_expires_at'] = null;
+                $updateData['qa_reminded_at'] = null;
             }
 
             DB::table('tasks')->where('id', $task->id)->update($updateData);

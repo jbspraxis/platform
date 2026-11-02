@@ -7,6 +7,9 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use App\Support\Finance\Vat;
+use App\Support\Opportunities\Proposals;
 use Exception;
 
 #[Layout('components.layouts.hq')]
@@ -24,6 +27,9 @@ class RemittanceAccounts extends Component
     public $account_name = '';
     public $account_reference = '';
     public $routing_code = '';
+    // Clients see the account only on invoices in this currency billed by this company (docs/QA-PORTAL.md D8)
+    public $currency = '';
+    public $legal_entity_id = '';
 
     // UX State
     public $showSuccessModal = false;
@@ -39,7 +45,8 @@ class RemittanceAccounts extends Component
         // Join with COA to pull the dynamically assigned ledger code for the UI
         $this->accounts = DB::table('mdm_remittance_accounts as ra')
             ->leftJoin('chart_of_accounts as coa', 'ra.ledger_account_id', '=', 'coa.id')
-            ->select('ra.*', 'coa.account_code as ledger_code')
+            ->leftJoin('mdm_legal_entities as le', 'ra.legal_entity_id', '=', 'le.id')
+            ->select('ra.*', 'coa.account_code as ledger_code', 'le.legal_name as company_name')
             ->orderBy('ra.type')
             ->orderBy('ra.provider_name')
             ->get();
@@ -56,6 +63,8 @@ class RemittanceAccounts extends Component
             'account_name' => 'required|string|max:150',
             'account_reference' => 'required|string|max:255',
             'routing_code' => 'nullable|string|max:50',
+            'currency' => ['required', Rule::in(Proposals::currencies()->all())],
+            'legal_entity_id' => ['required', Rule::exists('mdm_legal_entities', 'id')->where('is_active', 1)],
         ]);
 
         $data = [
@@ -64,6 +73,8 @@ class RemittanceAccounts extends Component
             'account_name' => $this->account_name,
             'account_reference' => $this->account_reference,
             'routing_code' => $this->routing_code,
+            'currency' => $this->currency,
+            'legal_entity_id' => $this->legal_entity_id,
             'updated_at' => now()
         ];
 
@@ -155,6 +166,8 @@ class RemittanceAccounts extends Component
             $this->account_name = $record->account_name;
             $this->account_reference = $record->account_reference;
             $this->routing_code = $record->routing_code;
+            $this->currency = (string) $record->currency;
+            $this->legal_entity_id = (string) $record->legal_entity_id;
         }
     }
 
@@ -185,7 +198,7 @@ class RemittanceAccounts extends Component
 
     public function resetForm()
     {
-        $this->reset(['editMode', 'recordId', 'provider_name', 'account_name', 'account_reference', 'routing_code']);
+        $this->reset(['editMode', 'recordId', 'provider_name', 'account_name', 'account_reference', 'routing_code', 'currency', 'legal_entity_id']);
         $this->type = 'Bank';
     }
 
@@ -203,11 +216,16 @@ class RemittanceAccounts extends Component
             'account_name' => 'account name',
             'account_reference' => 'account number, IBAN or wallet address',
             'routing_code' => 'SWIFT, routing or short code',
+            'currency' => 'currency',
+            'legal_entity_id' => 'company that holds it',
         ];
     }
 
     public function render()
     {
-        return view('livewire.hq.mdm.remittance-accounts');
+        return view('livewire.hq.mdm.remittance-accounts', [
+            'currencies' => Proposals::currencies(),
+            'companies' => Vat::companies(),
+        ]);
     }
 }

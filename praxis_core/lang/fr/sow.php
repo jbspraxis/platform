@@ -248,6 +248,7 @@ return [
         'sign_by' => 'À signer avant le :date',
         'sign' => 'Le signer',
         'sign_help' => 'Avec votre nom, votre fonction et votre signature, puis un code envoyé par e-mail.',
+        'signers_only' => "La signature revient aux personnes qui approuvent pour :company sur le portail client. Vous pouvez demander des modifications\u{00A0}; elles signent depuis leur propre e-mail ou le portail.",
         'sign_intro' => "Signez pour :company\u{00A0}: utilisez l’adresse e-mail sous laquelle nous vous connaissons. Nous vous envoyons un code à 6\u{202F}chiffres pour confirmer qu’il s’agit bien de vous.",
         'signature' => 'Votre signature',
         'signature_help' => 'Dessinez-la à la souris, au doigt ou au stylet.',
@@ -270,6 +271,7 @@ return [
         'expired' => "Le délai de signature de cette version a pris fin le :date. Répondez à notre e-mail et nous vous en enverrons une à jour.",
         'errors' => [
             'not_contact' => "Seule une personne de :company ayant une fiche de contact active chez nous peut le signer. Demandez à votre contact principal, ou répondez à notre e-mail.",
+            'not_approver' => "Seules les personnes qui approuvent pour :company peuvent le signer. Vous pouvez plutôt demander des modifications.",
             'signature' => 'Dessinez votre signature dans le cadre.',
             'note' => 'Dites-nous ce qu’il faut changer.',
             'too_many_codes' => "Nous avons envoyé 3\u{202F}codes de signature pour cet énoncé des travaux au cours des 15\u{202F}dernières minutes. Patientez :wait, puis demandez un nouveau code.",

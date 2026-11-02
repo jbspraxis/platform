@@ -49,7 +49,8 @@ final class DepositInvoice
             $fxRate = DB::table('mdm_exchange_rates')->where('currency_code', $terms['currency'])->value('rate_to_usd') ?? 1.000000;
         }
 
-        $remittanceId = DB::table('mdm_remittance_accounts')->where('is_active', 1)->value('id');
+        // An account in the deposit's currency held by the company that bills it (D8); none yet: HQ chooses it later
+        $remittanceId = ReceivingAccounts::for($terms['currency'], $vat['entity_id'])->first()?->id;
 
         // SHA-256 fingerprint of the invoice
         $invoiceHash = 'SHA256-INV-' . strtoupper(hash('sha256', $invoiceId . $depositTotal . $timestamp));

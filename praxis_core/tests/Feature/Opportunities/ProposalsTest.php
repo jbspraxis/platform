@@ -130,6 +130,35 @@ class ProposalsTest extends TestCase
             DB::table('system_audit_logs')->where('target_id', $o->id)->orderBy('id')->pluck('action')->all());
     }
 
+    public function test_a_budget_in_the_leads_instructions_gives_the_ai_the_prices_to_fit_it(): void
+    {
+        $lead = $this->staff('sales', ['sales']);
+        $this->actingAs($lead);
+        $o = $this->opportunity($lead);
+        $ai = FakeAi::install()->respond('proposal', self::DRAFT);
+
+        // Owner, 2 Nov 2026 (docs/QA-PORTAL.md D7): a budget caps the draft; the AI sees the prices only then
+        Livewire::test(ProposalsTab::class, ['opportunityId' => $o->id])
+            ->set('currency', 'EUR')->set('instructions', 'Phase one only, around EUR 2,000 in total.')
+            ->call('start', true)->assertHasNoErrors();
+
+        $ai->assertRan('proposal', function (AiRequest $r) {
+            return str_contains($r->prompt, '#1292P | Diagnostic & Audit') && str_contains($r->prompt, 'unit price: EUR 890.90')
+                && str_contains($r->prompt, 'set a budget or ceiling for JBS Praxis’s fees, fit the line items within it')
+                && str_contains($r->prompt, 'Amounts that describe the client’s business (their prices, volumes, users) are not a budget');
+        });
+
+        // A budget for our fees, not figures about the client's business (the lead chat's audit of D7)
+        foreach (['Budget around NGN 12M', 'Keep it under $40,000', 'Budget de 12 millions de nairas.', 'fixed price around NGN 12,000,000 before VAT',
+                  'Plafond : 10 M FCFA'] as $budget) {
+            $this->assertTrue(Proposals::budgetGiven($budget), $budget);
+        }
+        foreach (['Tickets sell at NGN 5,000 each; fix how they are bought on mycityapp.io.', 'The app has 2 million users and 300k downloads.',
+                  'They sell about 10k tickets a month through Paystack.', 'Deliver in 3 months, in 2 milestones.', 'Keep it to two phases.'] as $notBudget) {
+            $this->assertFalse(Proposals::budgetGiven($notBudget), $notBudget);
+        }
+    }
+
     public function test_a_background_draft_is_filed_when_its_job_ends_and_rings_the_lead(): void
     {
         $lead = $this->staff('sales', ['sales']);

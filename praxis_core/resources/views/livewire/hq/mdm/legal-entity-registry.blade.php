@@ -69,19 +69,20 @@
 
                 <hr class="divider" style="margin: 4px 0;">
                 <h3 class="label" style="font-weight: 600; margin: 0;">Registration and tax numbers</h3>
+                <p class="help" style="margin: 0;">Leave them blank while the company is being registered, and fill them in once it is.</p>
 
                 <div class="field">
                     <label class="label" for="le-rc">Company registration number (RC)</label>
-                    <input id="le-rc" type="text" wire:model="registration_number" required class="input" style="font-variant-numeric: tabular-nums;">
+                    <input id="le-rc" type="text" wire:model="registration_number" class="input" style="font-variant-numeric: tabular-nums;">
                 </div>
                 <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
                     <div class="field">
                         <label class="label" for="le-tax">Tax ID (NIU or TIN)</label>
-                        <input id="le-tax" type="text" wire:model="tax_identification_number" required class="input" style="font-variant-numeric: tabular-nums;">
+                        <input id="le-tax" type="text" wire:model="tax_identification_number" class="input" style="font-variant-numeric: tabular-nums;">
                     </div>
                     <div class="field">
                         <label class="label" for="le-social">Employer social security number</label>
-                        <input id="le-social" type="text" wire:model="employer_social_security_code" required class="input" style="font-variant-numeric: tabular-nums;" aria-describedby="le-social-help">
+                        <input id="le-social" type="text" wire:model="employer_social_security_code" class="input" style="font-variant-numeric: tabular-nums;" aria-describedby="le-social-help">
                         <span id="le-social-help" class="help">CNPS in Cameroon, NSITF in Nigeria.</span>
                     </div>
                 </div>
@@ -196,9 +197,9 @@
                                 </td>
 
                                 <td style="font-variant-numeric: tabular-nums;">
-                                    <div><span class="muted">RC</span> <span class="text-ink">{{ $entity->registration_number }}</span></div>
-                                    <div style="margin-top: 2px;"><span class="muted">Tax ID</span> <span class="text-ink">{{ $entity->tax_identification_number }}</span></div>
-                                    <div style="margin-top: 2px;"><span class="muted" style="white-space: nowrap;">Employer no.</span> <span class="text-ink">{{ $entity->employer_social_security_code }}</span></div>
+                                    <div><span class="muted">RC</span> <span class="text-ink">{{ $entity->registration_number ?: 'Being registered' }}</span></div>
+                                    <div style="margin-top: 2px;"><span class="muted">Tax ID</span> <span class="text-ink">{{ $entity->tax_identification_number ?: 'Not yet' }}</span></div>
+                                    <div style="margin-top: 2px;"><span class="muted" style="white-space: nowrap;">Employer no.</span> <span class="text-ink">{{ $entity->employer_social_security_code ?: 'Not yet' }}</span></div>
                                     {{-- VAT: on from its start date, with its number; off until the company is registered --}}
                                     <div style="margin-top: 6px;">
                                         @if ($entity->charges_vat && $entity->vat_starts_on)

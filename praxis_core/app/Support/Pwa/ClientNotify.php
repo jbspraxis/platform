@@ -27,6 +27,7 @@ class ClientNotify
         'proposal_ready' => ['portal.projects.approve', 'file-signature'],
         'signoff_ready' => ['portal.projects.approve', 'clipboard-check'],
         'task_review' => ['portal.projects.view', 'list-checks'],
+        'task_review_reminder' => ['portal.projects.view', 'clock'],
         'ticket_investigating' => ['portal.qa.view', 'search'],
         'ticket_reply' => ['portal.qa.view', 'message-square'],
         'ticket_resolved' => ['portal.qa.view', 'circle-check'],
@@ -36,7 +37,7 @@ class ClientNotify
     private const TABS = [
         'invoice_issued' => 'financials', 'invoice_overdue' => 'financials', 'invoice_cancelled' => 'financials',
         'payment_verified' => 'financials', 'payment_rejected' => 'financials',
-        'task_review' => 'sprints', 'ticket_investigating' => 'qa_hub', 'ticket_reply' => 'qa_hub', 'ticket_resolved' => 'qa_hub',
+        'task_review' => 'sprints', 'task_review_reminder' => 'sprints', 'ticket_investigating' => 'qa_hub', 'ticket_reply' => 'qa_hub', 'ticket_resolved' => 'qa_hub',
     ];
 
     private static bool $pushQueued = false;
@@ -149,6 +150,21 @@ class ClientNotify
             $project = $projectId ? DB::table('projects')->where('id', $projectId)->first() : null;
 
             return $project ? self::organization($project->organization_id, 'task_review', ['task' => $task->title, 'project' => $project->title ?? ''], null, $project->id) : 0;
+        });
+    }
+
+    /** A task still waiting for the client's review the day before it is approved automatically (D9) */
+    public static function reviewReminder(object $task): int
+    {
+        return self::quietly(function () use ($task) {
+            $project = DB::table('projects')->where('id', DB::table('project_phases')->where('id', $task->phase_id)->value('project_id'))->first();
+            if (! $project || ! $task->is_client_visible) {
+                return 0;
+            }
+            $when = Carbon::parse($task->qa_sla_expires_at)->setTimezone('Africa/Lagos');
+
+            return self::organization($project->organization_id, 'task_review_reminder',
+                ['task' => $task->title, 'project' => $project->title ?? '', 'date' => $when->format('d/m/Y H:i') . ' WAT'], null, $project->id);
         });
     }
 

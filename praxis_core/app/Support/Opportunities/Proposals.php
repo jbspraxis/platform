@@ -10,7 +10,9 @@ use App\Models\AiRun;
 use App\Models\Opportunity;
 use App\Models\Proposal;
 use App\Models\ProposalComment;
+use App\Models\ClientUser;
 use App\Models\User;
+use App\Support\Access;
 use App\Support\Ai\Ai;
 use App\Support\Finance\Vat;
 use Illuminate\Support\Collection;
@@ -157,7 +159,7 @@ final class Proposals
             // Full transcripts once, here (6.2, cost rule 4); later documents read the notes and this proposal
             'context' => OpportunityContext::for($opportunity, include: [...OpportunityContext::DEFAULT, 'transcripts']),
             'instructions' => Str::limit(trim($instructions), self::MAX_NOTE, ''),
-            'material' => self::draftMaterial($proposal),
+            'material' => self::draftMaterial($proposal, self::budgetGiven($instructions)),
             'language' => $opportunity->language,
         ]);
         $proposal->forceFill(['ai_run_id' => $run->id, 'updated_by' => $by->id])->save();
@@ -466,6 +468,19 @@ final class Proposals
             ->whereRaw('LOWER(email) = ?', [mb_strtolower(trim($email))])->exists();
     }
 
+    /**
+     * Approves a proposal and signs a statement of work for the organisation (owner, 2 Nov 2026; docs/QA-PORTAL.md D5):
+     * an active contact whose portal role has projects.approve (Client Admin, which the primary contact always has, or
+     * Client Approver). The other contacts and meeting guests read, comment and ask for changes.
+     */
+    public static function isApprover(Opportunity $opportunity, string $email): bool
+    {
+        $contact = ClientUser::where('organization_id', $opportunity->organization_id)->where('status', 'Active')
+            ->whereRaw('LOWER(email) = ?', [mb_strtolower(trim($email))])->first();
+
+        return $contact !== null && Access::allows($contact, Access::CLIENT_PREFIX . 'projects.approve');
+    }
+
     /** The version of this opportunity the client approved, if any: then nothing more is approved, sent or started */
     public static function clientApproved(string $opportunityId): ?Proposal
     {
@@ -643,13 +658,13 @@ final class Proposals
 
     /**
      * The client approves the version in the portal with one click (decision 9): name, title and email recorded,
-     * and only by an active contact of the organisation (isActiveContact). Claimed under the opportunity's lock, so it
+     * and only by one of the organisation's approvers (isApprover). Claimed under the opportunity's lock, so it
      * happens once and for one version only: every other open version (a draft, or one with the client) is set aside
      * (Superseded). The opportunity moves to Proposal approved; the lead is told.
      */
     public static function approveForClient(Proposal $proposal, array $person, string $jobTitle): bool
     {
-        if (! self::isActiveContact($proposal->opportunity, (string) $person['email'])) {
+        if (! self::isApprover($proposal->opportunity, (string) $person['email'])) {
             return false;
         }
         $done = DB::transaction(function () use ($proposal, $person, $jobTitle) {
@@ -899,12 +914,34 @@ final class Proposals
         return $changed;
     }
 
-    /** The financial dictionary for the AI (codes, no prices), then, for a later version, the one the client had and their comments */
-    private static function draftMaterial(Proposal $proposal): string
+    /**
+     * The lead's instructions set a budget or ceiling for our fees (owner, 2 Nov 2026): the draft must fit it, so the AI
+     * is given the dictionary's prices. A budget word with any figure ("budget 15 million", "plafond 10 M"), or a
+     * softer cue close to an amount in a currency ("around NGN 12M", "under $40,000"). Amounts about the client's
+     * business ("tickets sell at NGN 5,000", "2 million users", "about 10k tickets") are not a budget.
+     */
+    public static function budgetGiven(string $instructions): bool
     {
-        $out = ['FINANCIAL DICTIONARY (suggest line items by these codes only; HQ sets the prices):'];
+        $currency = 'NGN|XAF|XOF|FCFA|USD|EUR|GBP|KES|ZAR|AED|INR|CAD|AUD|nairas?|dollars?|euros?';
+        $amount = '(?:[₦$€£]\s*\d|\b(?:' . $currency . ')\s*\d|\d[\d,.\s]*(?:\s*(?:k|m|bn|thousands?|millions?|billions?)\b)?\s*(?:de\s+)?(?:' . $currency . ')\b)';
+        $strong = '\b(?:budget|ceiling|cap|plafond|maximum|at most|no more than|not exceed|ne pas dépasser)\b[^.\n]{0,40}\d';
+        $soft = '\b(?:around|about|under|up to|within|below|roughly|approximately|less than|environ|moins de|jusqu[\'’]à)\b[^.\n]{0,25}?' . $amount;
+
+        return (bool) preg_match('/' . $strong . '|' . $soft . '/iu', $instructions);
+    }
+
+    /**
+     * The financial dictionary for the AI (codes; with unit prices in the proposal's currency when the lead gave a
+     * budget), then, for a later version, the one the client had and their comments
+     */
+    private static function draftMaterial(Proposal $proposal, bool $withPrices = false): string
+    {
+        $out = [$withPrices
+            ? "FINANCIAL DICTIONARY (suggest line items by these codes only; unit prices in {$proposal->currency}, before VAT, are HQ’s and can’t change. If the lead’s instructions set a budget or ceiling for JBS Praxis’s fees, fit the line items within it; amounts about the client’s business are not a budget):"
+            : 'FINANCIAL DICTIONARY (suggest line items by these codes only; HQ sets the prices):'];
         foreach (self::dictionary() as $item) {
-            $out[] = "- {$item->item_code} | {$item->description} | {$item->category} | default quantity: {$item->default_quantity}";
+            $price = $withPrices ? ' | unit price: ' . $proposal->currency . ' ' . number_format(self::lineFor($item, (string) $proposal->currency)['unit_price'], 2, '.', '') : '';
+            $out[] = "- {$item->item_code} | {$item->description} | {$item->category} | default quantity: {$item->default_quantity}{$price}";
         }
 
         $previous = $proposal->previousVersion;
