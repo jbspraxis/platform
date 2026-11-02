@@ -65,6 +65,10 @@ Severity: **High** blocks a client or shows wrong money or data; **Medium** misl
 | 16 | Low | HQ › System › Accounts | Opening the account lists cleared a half-filled form; "Team member" listed twice; an organisation added there had no "added by"; a stray scrollbar beside the tabs. | Fixed. | A |
 | 17 | Low | Portal invitation link, portal colours | A suspended or removed account's unused invitation could still set a password; colours were checked for length only. | Refused; #RRGGBB only. | B |
 | 18 | Low | HQ › Opportunity › history | The billing-company and tax-number lines had no label (English on a French HQ). | Labels in EN and FR. | C |
+| 19 | High | Portal, payment hold | After signing, the deposit hold put a Team member (no billing access) on *Invoices and payments*, which her role can't read ("No invoices yet", "payment details aren't available"), told her to upload a proof of payment, and locked every section she may open (seen live). | Only the project's sections close; a member without billing lands on Documents and is told her administrator or finance contact pays. | B |
+| 20 | Medium | HQ › QA hub, payment verification, cash requests, leads, audit, broadcasts, mail sync | 19 times of day were shown in UTC as if Lagos time, an hour early (a reply sent at 12:57 read 11:57). | Shown in Africa/Lagos; a unit test refuses a `*_at` time without it. Appointment and timer times, saved as Lagos wall-clock, are unchanged. | B |
+| 21 | Medium | Portal › 404 page (review of B) | A missing record's 404 would have shown Laravel's "No query results for model [App\Models\…] <id>". | Framework messages are never shown. | B |
+| 22 | Low | Portal › Overview, Project progress | "Phases" / "Phase 1" where HQ, the SOW and the emails say milestones (M1); tasks listed M2 before M1. | "Milestones" / "M1" (FR "Jalons"); tasks by milestone. | B |
 
 ## 5. Decisions for the owner
 
@@ -74,9 +78,14 @@ Severity: **High** blocks a client or shows wrong money or data; **Medium** misl
 | D2 | Portal › Team | A portal admin may only invite addresses on their own email domain (e.g. @mycityapp.io). Keep? | Kept. |
 | D3 | Portal › Documents › appearance | "Second colour" and "Accent colour" are saved but nothing uses them; only the main colour shows. Remove the two fields, or use them? | Saved, unused. |
 | D4 | Portal invitations | An invitation link never expires until it's used. Expire it after, say, 14 days (HQ can resend)? | Never expires. |
-| D5 | Proposal and SOW pages | Anyone the proposal or SOW was sent to who is an active contact of the organisation can approve it or sign it, whatever their portal role (a Team member too). Should approving and signing need the portal's Approve permission (Administrator)? | Any active contact. |
+| D5 | Proposal and SOW pages | Anyone the proposal or SOW was sent to who is an active contact of the organisation can approve it or sign it, whatever their portal role (a Team member too). Should approving and signing need the portal's Approve permission (Administrator)? | **Decided 2 Nov: any active contact** (as today). |
+| D5b | SOW signing | How a SOW is signed: a drawn signature, the signer's 6-digit code by email, and a SHA-256 fingerprint of the text, milestones, fees and signature, with time and IP; no certificate on the PDF. Keep, seal the PDF with a certificate, or move to an e-signature service? | **Decided 2 Nov: keep drawn + email code.** |
 | D6 | Master data › Legal entities | Only the Cameroon company (JBS Praxis SARL) exists. "Nigeria's company (default)" has no record, so proposals say "No VAT: no active JBS Praxis company… bills this client" and SOWs name the provider from Website settings ("JBS Praxis LLC"). Add the Nigerian company (JBS Praxis Limited, being registered) once its details are known. | No Nigerian entity. |
 | D7 | HQ › Proposals | The AI prices from the financial dictionary and doesn't fit a budget given in its instructions (asked "around NGN 12M", it drafted about NGN 120M with a year of retained support). Keep it so (the lead edits), or let the instructions cap the total? | Dictionary prices. |
+| D8 | Portal › Invoices and payments | Every client sees every active receiving account: Kuda (JBS Praxis LLC), UBA (JBS PRAXIS LTD) and MTN Mobile Money Cameroon in the owner's personal name, whatever their country or currency. Show only the accounts of the invoice's billing company or currency? | All three to everyone. |
+| D9 | Portal › Project progress | A task moved to Client review is approved automatically after 5 hours, nights and weekends included, and the client is told changes after approval are paid work. MyCity's people may find work approved that they never saw. Keep 5 hours, or e.g. 2 working days? | 5 hours. |
+| D10 | Payment hold | The portal's deposit hold lasts only while the project is *Scoping*: *Create project* makes it Active and lifts the hold even if the deposit isn't paid. Keep (HQ decides when work starts), or hold until the deposit is paid? | Lifted at Create project. |
+| D11 | Invoices | Clients get no email and no PDF for an invoice: it appears in the portal with a bell. HQ's *Download PDF* only says "Invoice PDFs are not available yet". Finance teams usually need a PDF (with our and their tax numbers) to pay. Build an invoice PDF and email? (The ledger also types them "Tax Invoice" although no VAT is charged.) | Portal only. |
 
 ## 6. AI spend
 
@@ -87,6 +96,9 @@ Severity: **High** blocks a client or shows wrong money or data; **Medium** misl
 | Questionnaire (5 questions) | questionnaire | Sonnet 5.5 | 0.030 |
 | Proposal, version 1 | proposal | Sonnet 5.5 | 0.117 |
 | Statement of work | sow | Sonnet 5.5 | 0.069 |
+| Project draft (at signing) | project_draft | Sonnet 5.5 | see Integrations |
+| Planner, M2 (3 suggestions) | plan_milestone | Sonnet 5.5 | see Integrations |
+| Handover notes, minutes, points | Haiku 5.5 | Haiku 5.5 | under 0.02 |
 
 The month stood at $0.0045 before the QA; HQ's budget is $5.
 
