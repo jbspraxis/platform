@@ -167,6 +167,21 @@ class PortalQaFixesTest extends TestCase
         $this->get('http://' . config('app.domains.portal') . '/setup/' . $token)->assertOk();
     }
 
+    public function test_the_meeting_email_speaks_to_the_client_about_a_meeting_between_them_and_us(): void
+    {
+        $org = $this->organisation();
+        $lead = $this->staff('sales', ['sales']);
+        $opportunity = \App\Models\Opportunity::findOrFail($this->opportunity($org, $lead->id));
+        $meeting = \App\Models\Meeting::create(['opportunity_id' => $opportunity->id, 'organization_id' => $org, 'kind' => 'client', 'title' => 'Discovery',
+            'starts_at' => now()->addDay(), 'ends_at' => now()->addDay()->addHour(), 'status' => 'scheduled', 'transcript_status' => 'manual', 'created_by' => $lead->id]);
+
+        foreach (['invite', 'moved', 'cancelled'] as $variant) {
+            $html = (new \App\Mail\MeetingInvitationMail($meeting, $variant, 'Chidi'))->render();
+            $this->assertStringContainsString('between QA Test Client (delete) and JBS Praxis', $html, $variant);
+            $this->assertStringNotContainsString('meeting with QA Test Client', $html, $variant);
+        }
+    }
+
     public function test_portal_colours_must_be_hex_colours(): void
     {
         $org = $this->organisation();
