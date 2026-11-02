@@ -111,7 +111,7 @@ About **$0.37** for the whole run; the month stands at **$0.38 of $5** (it was $
 ## 7. Server logs
 
 Read after each step from `~/deploy/logs/` and `~/praxis_core/storage/logs/` (cPanel's file API). Live release during the run: da80c92 (#22). No Laravel log was written on 2 November (warning level and above) through the meeting, transcript, notes, minutes, questionnaire, proposal versions and SOW; System › Health showed no errors and no email failures.
-After the merges: release 508e5ec (#23, #24, #25) went live at 14:02 server time with its migration (`add_is_test_to_organizations`); still no Laravel log since 31 October. #26 and #27 were released at about 14:55 UTC; their code was live within a minute (the deploy log couldn't be read then: cPanel had signed out).
+After the merges: release 508e5ec (#23, #24, #25) went live at 14:02 server time with its migration (`add_is_test_to_organizations`); still no Laravel log since 31 October. #26 and #27 went live together as release 1adee2a at 15:49 Lagos time (51 files, migrations `2026_11_02_300000` to `600000` done); no Laravel log on 2 November.
 
 ## 8. Re-tests on live after the merges (2 Nov)
 
