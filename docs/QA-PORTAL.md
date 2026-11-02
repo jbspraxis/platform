@@ -6,7 +6,7 @@ A full engagement was played on the live site (hq.jbspraxis.com and portal.jbspr
 
 - **Organisation**: "QA Test Client (delete)", Lagos, Nigeria, English. Opened from *Open an opportunity* (new organisation inline), so it is a normal organisation; the owner then ticks **Test client** on the opportunity's *Edit details* (section 3).
 - **Opportunity**: "Fleet tracking and dispatch portal (QA test)", led by the owner, billed by Nigeria's company.
-- **People**: two portal accounts on the owner's own test Gmail addresses, invited from System › Accounts (the first one is the Client Admin, the second a Team member). The admin adds and limits a third member from the portal's Team page, on a `+` alias of one of those addresses. Nobody outside JBS Praxis is ever emailed.
+- **People**: two portal accounts on the owner's own test addresses, invited from System › Accounts: "Chidi Nwosu (QA)" is the Client Admin (primary contact) and "Adaeze Okafor (QA)" a Team member. (The member was meant to be invited second; the other order made Chidi primary, which HQ couldn't change: finding 10.) The owner set the passwords and does every sign-in. Nobody outside JBS Praxis is emailed.
 - **A French spot check** uses a second opportunity of the same organisation in French.
 
 ## 2. What was played
@@ -40,16 +40,49 @@ Severity: **High** blocks a client or shows wrong money or data; **Medium** misl
 
 | # | Severity | Where | What happened (steps) | Fix | PR |
 |---|---|---|---|---|---|
-| 1 | Low | HQ › System › Accounts | Fill *Add an account*, open *Client Portal accounts* to check a name, come back: the form is empty again. | | |
-| 2 | Low | HQ › System › Accounts | The staff role checkboxes are announced as "1", "2", "3" by screen readers (no name). | | |
-| 3 | Low | HQ › System › Accounts | The client role list shows both "Team member (default)" and "Team member". | | |
-| 4 | Low | HQ › Opportunity › history | The billing-company and tax-number history lines had no label, so a French HQ showed them in English. | Labels added in EN and FR. | C |
+| 1 | High | HQ › every "saved when you leave the field" editor | Livewire 4's `wire:model.blur` only syncs in the browser and sends nothing. Proposal, SOW, project draft, handover points, website settings and mailbox fields (66) were saved only if another click followed. On live: a proposal line's price, typed and tabbed out of, was back at the dictionary price after a reload, and the total never moved. | `wire:model.live.blur` everywhere; a unit test refuses a bare `.blur`, `.change` or `.enter`. | A |
+| 2 | High | Portal, first sign-in | A client invited before their project exists (proposal or SOW stage) sets a password and lands on Laravel's bare "403 THERE ARE NO PROJECTS…" page, with no way to sign out (seen live). | The portal opens on Documents and Team; project sections say the space opens once the SOW is signed. | B |
+| 3 | High | Portal › Documents | Lists only proposals from the old builder. SOWs and proposals sent through the opportunity pipeline never appear, so a client can't find a signed SOW once its email link has expired (30 days). | Documents lists the SOWs and proposals the client was sent, with links made when the page is drawn; an imported SOW shows as signed on paper. | B |
+| 4 | High | Portal, any expired or altered email link | Laravel's bare "403 INVALID SIGNATURE." (seen live). | Branded error pages (403, 404, 419, 429, 500, 503) in English and French; an expired link explains itself and leads to the portal sign-in. | B |
+| 5 | Medium | Portal, signed in | No way to reach the meetings page or book a follow-up: only the links in emails. | Documents › Meetings links each piece of work's meetings page. | B |
+| 6 | Medium | Emails › meeting invitation, change, cancellation | Told the client "We've arranged a meeting with QA Test Client (delete)", i.e. with their own organisation (MyCity would read "with MyCity App Ltd"). | "a meeting between <client> and JBS Praxis", EN and FR. | B |
+| 7 | Medium | Portal › Overview | Overall progress counted only accepted milestones, so it disagreed with HQ's project page; "Lead" was whoever created the project. | Same figure and lead as HQ. | B |
+| 8 | Medium | Portal › Quality and issues | Deleted QA tickets still showed. | Hidden. | B |
+| 9 | Medium | Portal › Project progress | *Approve* could mark any visible task Done, and HQ wasn't told. | Only a task in client review; the project lead gets a bell. | B |
+| 10 | Medium | HQ › System › Accounts | The first account invited always becomes the primary contact (Client Admin), and HQ couldn't change it. On live the member was invited first by mistake. | *Make primary contact* on a client account (history line). | A |
+| 11 | Low | Emails › minutes | "Thank you for your time on Monday 2 November 2026" twice: the email's intro, then the AI's first line. | The minutes prompt no longer opens with thanks or the date. | A |
+| 12 | Low | Portal → HQ bells | A client's issue, reply or payment proof gave bells with no link; the meetings page wrote the lead's bells in the client's page language (a French client gave HQ a French bell). | Bells link to the QA hub or Payment verification; HQ's language. | B |
+| 13 | Low | HQ › Proposals | A first proposal for a Lagos client defaulted to USD. | The client's currency where JBS Praxis bills it (NGN, XAF), else USD. | A |
+| 14 | Low | HQ › Proposal and SOW send lists | A meeting guest was shown as "blakeasaah@gmail.com blakeasaah@gmail.com". | Shown once. | A |
+| 15 | Low | Emails › SOW | The AI titled the SOW "Statement of work: …", so the subject read "Statement of work to sign: Statement of work: …". | The SOW prompt keeps the label out of the title. | A |
+| 16 | Low | HQ › System › Accounts | Opening the account lists cleared a half-filled form; "Team member" listed twice; an organisation added there had no "added by"; a stray scrollbar beside the tabs. | Fixed. | A |
+| 17 | Low | Portal invitation link, portal colours | A suspended or removed account's unused invitation could still set a password; colours were checked for length only. | Refused; #RRGGBB only. | B |
+| 18 | Low | HQ › Opportunity › history | The billing-company and tax-number lines had no label (English on a French HQ). | Labels in EN and FR. | C |
 
-## 5. AI spend
+## 5. Decisions for the owner
+
+| # | Where | Question | Today |
+|---|---|---|---|
+| D1 | Portal › Team | A portal admin can't invite anyone once the organisation has 3 portal accounts. MyCity already has 4 (made from HQ), so its admins can't add a colleague from the portal. Keep 3, raise it, or remove the limit? | 3; HQ › System › Accounts has no limit. |
+| D2 | Portal › Team | A portal admin may only invite addresses on their own email domain (e.g. @mycityapp.io). Keep? | Kept. |
+| D3 | Portal › Documents › appearance | "Second colour" and "Accent colour" are saved but nothing uses them; only the main colour shows. Remove the two fields, or use them? | Saved, unused. |
+| D4 | Portal invitations | An invitation link never expires until it's used. Expire it after, say, 14 days (HQ can resend)? | Never expires. |
+| D5 | Proposal and SOW pages | Anyone the proposal or SOW was sent to who is an active contact of the organisation can approve it or sign it, whatever their portal role (a Team member too). Should approving and signing need the portal's Approve permission (Administrator)? | Any active contact. |
+| D6 | Master data › Legal entities | Only the Cameroon company (JBS Praxis SARL) exists. "Nigeria's company (default)" has no record, so proposals say "No VAT: no active JBS Praxis company… bills this client" and SOWs name the provider from Website settings ("JBS Praxis LLC"). Add the Nigerian company (JBS Praxis Limited, being registered) once its details are known. | No Nigerian entity. |
+| D7 | HQ › Proposals | The AI prices from the financial dictionary and doesn't fit a budget given in its instructions (asked "around NGN 12M", it drafted about NGN 120M with a year of retained support). Keep it so (the lead edits), or let the instructions cap the total? | Dictionary prices. |
+
+## 6. AI spend
 
 | Step | Purpose | Model | Cost (USD) |
 |---|---|---|---|
+| Meeting notes | meeting_notes | Haiku 5.5 | about 0.005 |
+| Client minutes | client_minutes | Haiku 5.5 | about 0.001 |
+| Questionnaire (5 questions) | questionnaire | Sonnet 5.5 | 0.030 |
+| Proposal, version 1 | proposal | Sonnet 5.5 | 0.117 |
+| Statement of work | sow | Sonnet 5.5 | 0.069 |
 
-## 6. Server logs
+The month stood at $0.0045 before the QA; HQ's budget is $5.
 
-Read after each step from `~/deploy/logs/` and `~/praxis_core/storage/logs/`.
+## 7. Server logs
+
+Read after each step from `~/deploy/logs/` and `~/praxis_core/storage/logs/` (cPanel's file API). Live release during the run: da80c92 (#22). No Laravel log was written on 2 November (warning level and above) through the meeting, transcript, notes, minutes, questionnaire, proposal versions and SOW; System › Health showed no errors and no email failures.
