@@ -15,6 +15,9 @@ class SigningCode extends BrandedMail
     public const SOW = 'sow';
     public const HANDOVER = 'handover';
 
+    /** Approving a proposal from a link that wasn't sent to a contact (docs/QA-PORTAL.md D5) */
+    public const APPROVAL = 'approval';
+
     public $code;
     public $purpose;
     public $project;
@@ -29,7 +32,7 @@ class SigningCode extends BrandedMail
     public function __construct($code, string $purpose = self::PROPOSAL, $project = null, $firstName = null, int $minutes = 10, ?string $signer = null)
     {
         $this->code = (string) $code;
-        $this->purpose = in_array($purpose, [self::HANDOVER, self::SOW], true) ? $purpose : self::PROPOSAL;
+        $this->purpose = in_array($purpose, [self::HANDOVER, self::SOW, self::APPROVAL], true) ? $purpose : self::PROPOSAL;
         $this->project = trim((string) $project);
         $this->firstName = $firstName;
         $this->minutes = $minutes;
@@ -52,6 +55,7 @@ class SigningCode extends BrandedMail
             'proposal' => new static('482913', self::PROPOSAL, 'Month-end close redesign (demo)', 'Ada'),
             'sow' => new static('316540', self::SOW, 'A faster month-end close (demo)', 'Ada', signer: 'Ada Obi, Finance director'),
             'handover' => new static('705218', self::HANDOVER, 'Payroll system go-live (demo)'),
+            'approval' => new static('640271', self::APPROVAL, 'A faster month-end close (demo)', 'Ada', signer: 'Ada Obi, Finance director'),
         ];
     }
 }
