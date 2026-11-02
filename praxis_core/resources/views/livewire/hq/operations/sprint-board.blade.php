@@ -120,11 +120,19 @@
                             @endif
 
                             @if(!$task['assigned_to'])
-                                @if($canMoveOwn)
-                                    <button type="button" wire:click="assignToMe('{{ $task['id'] }}')" class="btn btn-secondary btn-sm w-full">
-                                        <i data-lucide="user-plus"></i> {{ __('projects.task.assign_to_me') }}
-                                    </button>
-                                @endif
+                                {{-- "Unassigned" where the lead's name goes, and the board's picker (owner, 2 Nov 2026; was a full-width Assign to me button) --}}
+                                <div class="flex items-center border-t border-line pt-2">
+                                    @if($canAssign || $canMoveOwn)
+                                        <button type="button" class="inline-flex min-w-0 cursor-pointer items-center gap-1 rounded border-0 bg-transparent p-0 text-caption text-slate hover:text-deep-teal"
+                                                @click.stop="openAssign($event, '{{ $task['id'] }}')" aria-haspopup="menu" aria-controls="board-assign-menu"
+                                                aria-expanded="false" :aria-expanded="(assignTask === '{{ $task['id'] }}').toString()"
+                                                title="{{ __('projects.task.assign_menu') }}">
+                                            <i data-lucide="user-plus" class="h-3.5 w-3.5"></i> {{ __('projects.task.unassigned') }} <i data-lucide="chevron-down" class="h-3.5 w-3.5"></i>
+                                        </button>
+                                    @else
+                                        <span class="inline-flex min-w-0 items-center gap-1 text-caption text-muted"><i data-lucide="user" class="h-3.5 w-3.5"></i> {{ __('projects.task.unassigned') }}</span>
+                                    @endif
+                                </div>
                             @else
                                 {{-- Story points stay in the database for the timers but are no longer shown (decision 3) --}}
                                 <div class="flex items-center justify-between gap-2 border-t border-line pt-2">
@@ -162,6 +170,25 @@
                 </div>
             </div>
         @endforeach
+
+        {{-- One picker for the board, placed under the card's "Unassigned" (fixed, so the board's sideways scroll can't cut it off):
+             Me first, then the project team for its lead and managers (SprintBoard::assignTo checks both again) --}}
+        @if($canAssign || $canMoveOwn)
+            @php $me = auth()->user(); @endphp
+            <div id="board-assign-menu" x-ref="assignMenu" x-show="assignTask" role="menu" aria-label="{{ __('projects.task.assign_menu') }}"
+                 class="fixed z-50 max-h-64 w-60 overflow-y-auto rounded-lg border border-line bg-paper py-1"
+                 :style="{ top: assignAt.top + 'px', left: assignAt.left + 'px' }" style="display: none; box-shadow: var(--shadow-float);"
+                 @click.outside="closeAssign()" @keydown.escape.window="if (assignTask) closeAssign(true)" @resize.window="closeAssign()"
+                 @scroll.window.capture="if (assignTask && ! $refs.assignMenu.contains($event.target)) closeAssign()">
+                <button type="button" role="menuitem" class="block w-full cursor-pointer border-0 bg-transparent px-3 py-2 text-left text-small font-semibold text-ink hover:bg-mist focus:bg-mist"
+                        @click="assign('{{ $me->id }}')">{{ __('projects.task.assign_me', ['name' => trim($me->first_name . ' ' . $me->last_name)]) }}</button>
+                @foreach($team as $person)
+                    @continue($person->id === $me->id)
+                    <button type="button" role="menuitem" class="block w-full cursor-pointer border-0 bg-transparent px-3 py-2 text-left text-small text-ink hover:bg-mist focus:bg-mist"
+                            wire:key="assign-{{ $person->id }}" @click="assign('{{ $person->id }}')">{{ trim($person->first_name . ' ' . $person->last_name) }}</button>
+                @endforeach
+            </div>
+        @endif
     </div>
 
     <script>
@@ -189,6 +216,38 @@
                     if (this.draggedTaskId && this.sourceColumn !== targetColumn) {
                         @this.call('updateTaskStatus', this.draggedTaskId, targetColumn);
                     }
+                },
+
+                // The card's "Unassigned" picker: one menu, under the button that opened it (above it near the bottom of the screen)
+                assignTask: null,
+                assignButton: null,
+                assignAt: { top: 0, left: 0 },
+
+                openAssign(event, taskId) {
+                    if (this.assignTask === taskId) { this.closeAssign(true); return; }
+                    const r = event.currentTarget.getBoundingClientRect();
+                    this.assignButton = event.currentTarget;
+                    this.assignTask = taskId;
+                    this.assignAt = { top: r.bottom + 4, left: Math.max(8, Math.min(r.left, window.innerWidth - 248)) };
+                    this.$nextTick(() => {
+                        const menu = this.$refs.assignMenu;
+                        if (!menu) return;
+                        if (r.bottom + 4 + menu.offsetHeight > window.innerHeight - 8) {
+                            this.assignAt = { top: Math.max(8, r.top - 4 - menu.offsetHeight), left: this.assignAt.left };
+                        }
+                        menu.querySelector('button')?.focus();
+                    });
+                },
+
+                closeAssign(refocus = false) {
+                    if (refocus && this.assignButton) this.assignButton.focus();
+                    this.assignTask = null;
+                },
+
+                assign(userId) {
+                    const taskId = this.assignTask;
+                    this.closeAssign();
+                    @this.call('assignTo', taskId, userId);
                 }
             }
         }
