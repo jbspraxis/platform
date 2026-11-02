@@ -308,7 +308,7 @@
                         <dt class="text-muted">Organisation ID</dt>
                         <dd style="margin: 0; font-variant-numeric: tabular-nums; word-break: break-all;">{{ $selectedLead->org_id }}</dd>
                         <dt class="text-muted">Added</dt>
-                        <dd style="margin: 0; font-variant-numeric: tabular-nums;">{{ \Carbon\Carbon::parse($selectedLead->created_at)->format('j M Y, H:i') }}</dd>
+                        <dd style="margin: 0; font-variant-numeric: tabular-nums;">{{ \Carbon\Carbon::parse($selectedLead->created_at)->setTimezone('Africa/Lagos')->format('j M Y, H:i') }}</dd>
                         <dt class="text-muted">Owner</dt>
                         <dd style="margin: 0;">{{ $selectedLead->owner_id ? $selectedLead->owner_first . ' ' . $selectedLead->owner_last : 'Not assigned' }}</dd>
                         @if (!empty($selectedLead->start_timing))
@@ -335,8 +335,8 @@
 
                 <div class="lr-merge-row text-small font-semibold text-ink" style="margin: 20px 0 8px;">
                     <div>Field</div>
-                    <div>Earlier record <span class="block font-normal text-muted" style="font-variant-numeric: tabular-nums;">{{ \Carbon\Carbon::parse($diffOld->created_at)->format('j M Y, H:i') }}</span></div>
-                    <div>Newest record <span class="block font-normal text-muted" style="font-variant-numeric: tabular-nums;">{{ \Carbon\Carbon::parse($diffNew->created_at)->format('j M Y, H:i') }}</span></div>
+                    <div>Earlier record <span class="block font-normal text-muted" style="font-variant-numeric: tabular-nums;">{{ \Carbon\Carbon::parse($diffOld->created_at)->setTimezone('Africa/Lagos')->format('j M Y, H:i') }}</span></div>
+                    <div>Newest record <span class="block font-normal text-muted" style="font-variant-numeric: tabular-nums;">{{ \Carbon\Carbon::parse($diffNew->created_at)->setTimezone('Africa/Lagos')->format('j M Y, H:i') }}</span></div>
                 </div>
 
                 <div class="flex flex-col gap-2">

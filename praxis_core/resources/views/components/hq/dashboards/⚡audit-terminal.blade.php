@@ -94,7 +94,7 @@
                 <tbody>
                     @forelse($escrowLogs as $tx)
                     <tr style="transition: background 0.2s;" onmouseover="this.style.background='rgba(0, 229, 255, 0.03)'" onmouseout="this.style.background='transparent'">
-                        <td style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.02); font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-muted);">{{ \Carbon\Carbon::parse($tx->created_at)->format('Y-m-d H:i') }}</td>
+                        <td style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.02); font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-muted);">{{ \Carbon\Carbon::parse($tx->created_at)->setTimezone('Africa/Lagos')->format('Y-m-d H:i') }}</td>
                         <td style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.02);">
                             <div style="font-size: 0.85rem; font-weight: bold; color: var(--erp-white); font-family: 'Roboto Mono', monospace;">{{ $tx->currency ?? 'USD' }} {{ number_format($tx->amount_claimed, 2) }}</div>
                             <div style="font-size: 0.7rem; color: var(--erp-teal); font-family: 'Roboto Mono', monospace; margin-top: 4px;">{{ $tx->method }}</div>
@@ -128,7 +128,7 @@
                 @forelse($systemLogs as $log)
                 <tr style="transition: background 0.2s;" onmouseover="this.style.background='rgba(0, 229, 255, 0.03)'" onmouseout="this.style.background='transparent'">
                     <td style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.02); font-family: 'Roboto Mono', monospace; font-size: 0.75rem; color: var(--erp-muted);">
-                        {{ \Carbon\Carbon::parse($log->created_at)->format('Y-m-d H:i:s') }}
+                        {{ \Carbon\Carbon::parse($log->created_at)->setTimezone('Africa/Lagos')->format('Y-m-d H:i:s') }}
                     </td>
                     <td style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.02); font-size: 0.8rem; color: var(--erp-white);">
                         {{ $log->user_email ?? 'SYSTEM_CRON / ANONYMOUS' }}

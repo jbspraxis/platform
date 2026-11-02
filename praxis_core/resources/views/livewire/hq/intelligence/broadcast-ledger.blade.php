@@ -247,7 +247,7 @@
                     <tbody>
                         @forelse($queuedLogs as $log)
                             <tr>
-                                <td style="font-variant-numeric: tabular-nums; white-space: nowrap;">{{ \Carbon\Carbon::parse($log->created_at)->format('j M Y, H:i') }}</td>
+                                <td style="font-variant-numeric: tabular-nums; white-space: nowrap;">{{ \Carbon\Carbon::parse($log->created_at)->setTimezone('Africa/Lagos')->format('j M Y, H:i') }}</td>
                                 <td>
                                     <div class="font-semibold text-ink">{{ $log->first_name }} {{ $log->last_name }}</div>
                                     <div class="text-caption text-muted">{{ $log->email }}</div>
@@ -293,7 +293,7 @@
                     <tbody>
                         @forelse($sentLogs as $log)
                             <tr>
-                                <td style="font-variant-numeric: tabular-nums; white-space: nowrap;">{{ \Carbon\Carbon::parse($log->updated_at)->format('j M Y, H:i') }}</td>
+                                <td style="font-variant-numeric: tabular-nums; white-space: nowrap;">{{ \Carbon\Carbon::parse($log->updated_at)->setTimezone('Africa/Lagos')->format('j M Y, H:i') }}</td>
                                 <td>
                                     <div class="font-semibold text-ink">{{ $log->first_name }}</div>
                                     <div class="text-caption text-muted">{{ $log->email }}</div>
@@ -350,7 +350,7 @@
                     <tbody>
                         @forelse($failedLogs as $log)
                             <tr>
-                                <td style="font-variant-numeric: tabular-nums; white-space: nowrap;">{{ \Carbon\Carbon::parse($log->updated_at)->format('j M Y, H:i') }}</td>
+                                <td style="font-variant-numeric: tabular-nums; white-space: nowrap;">{{ \Carbon\Carbon::parse($log->updated_at)->setTimezone('Africa/Lagos')->format('j M Y, H:i') }}</td>
                                 <td>
                                     <div class="font-semibold text-ink">{{ $log->first_name }} {{ $log->last_name }}</div>
                                     <div class="text-caption text-muted">{{ $log->email }}</div>

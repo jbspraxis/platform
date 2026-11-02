@@ -41,7 +41,7 @@
                     @forelse($transactions as $tx)
                         <tr>
                             <td>
-                                <div class="text-ink" style="font-variant-numeric: tabular-nums;">{{ \Carbon\Carbon::parse($tx->created_at)->format('j M, H:i') }}</div>
+                                <div class="text-ink" style="font-variant-numeric: tabular-nums;">{{ \Carbon\Carbon::parse($tx->created_at)->setTimezone('Africa/Lagos')->format('j M, H:i') }}</div>
                                 <div class="help break-all" style="font-variant-numeric: tabular-nums;">{{ $tx->method }} · {{ Str::limit($tx->tx_hash_or_ref, 15) }}</div>
                             </td>
                             <td>
@@ -172,7 +172,7 @@
                             <div class="rounded-lg border border-line p-5 text-center">
                                 <span class="pill {{ $statusPills[$selectedTx->status] ?? 'pill-neutral' }}">{{ $statusLabels[$selectedTx->status] ?? $selectedTx->status }}</span>
                                 <p class="help mt-3" style="font-variant-numeric: tabular-nums;">
-                                    Decided on {{ \Carbon\Carbon::parse($selectedTx->verified_at)->format('j M Y, H:i') }}
+                                    Decided on {{ \Carbon\Carbon::parse($selectedTx->verified_at)->setTimezone('Africa/Lagos')->format('j M Y, H:i') }}
                                 </p>
                             </div>
                         @endif

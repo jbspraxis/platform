@@ -585,7 +585,7 @@
                             </div>
                             <dl>
                                 <dt class="text-muted">Signed by</dt><dd>{{ $proposal->hq_signer_name }}</dd>
-                                <dt class="text-muted">Signed on</dt><dd>{{ \Carbon\Carbon::parse($proposal->hq_signed_at)->format('j M Y, H:i') }}</dd>
+                                <dt class="text-muted">Signed on</dt><dd>{{ \Carbon\Carbon::parse($proposal->hq_signed_at)->setTimezone('Africa/Lagos')->format('j M Y, H:i') }}</dd>
                                 <dt class="text-muted">IP address</dt><dd>{{ $proposal->hq_ip_address }}</dd>
                             </dl>
                             <div class="pb-hash">Document fingerprint (SHA-256): {{ $proposal->hq_signature_hash }}</div>
@@ -607,7 +607,7 @@
                             @endif
                             <dl>
                                 <dt class="text-muted">Signatory</dt><dd>{{ $proposal->signed_by_name }}</dd>
-                                <dt class="text-muted">Signed on</dt><dd>{{ \Carbon\Carbon::parse($proposal->signed_at)->format('j M Y, H:i') }}</dd>
+                                <dt class="text-muted">Signed on</dt><dd>{{ \Carbon\Carbon::parse($proposal->signed_at)->setTimezone('Africa/Lagos')->format('j M Y, H:i') }}</dd>
                             </dl>
                             <div class="pb-hash">Document fingerprint (SHA-256): {{ $proposal->client_signature_hash ?? 'Not recorded' }}</div>
                         @else

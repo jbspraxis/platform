@@ -199,7 +199,7 @@
                                 <strong class="text-ink">{{ $comment->first_name }} {{ $comment->last_name }}</strong>
                                 @if($comment->is_internal_only) · <span class="text-warning">Internal note</span> @endif
                             </span>
-                            <span class="num">{{ \Carbon\Carbon::parse($comment->created_at)->format('j M, H:i') }}</span>
+                            <span class="num">{{ \Carbon\Carbon::parse($comment->created_at)->setTimezone('Africa/Lagos')->format('j M, H:i') }}</span>
                         </div>
                         <div class="text-small text-slate">
                             {!! nl2br(e($comment->comment_text)) !!}
