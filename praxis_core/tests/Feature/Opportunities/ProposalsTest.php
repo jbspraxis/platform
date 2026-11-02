@@ -144,11 +144,19 @@ class ProposalsTest extends TestCase
 
         $ai->assertRan('proposal', function (AiRequest $r) {
             return str_contains($r->prompt, '#1292P | Diagnostic & Audit') && str_contains($r->prompt, 'unit price: EUR 890.90')
-                && str_contains($r->prompt, 'the lead gave a budget, so the line items must fit within it')
-                && str_contains($r->prompt, 'choose the items and quantities so their total stays within that budget');
+                && str_contains($r->prompt, 'set a budget or ceiling for JBS Praxis’s fees, fit the line items within it')
+                && str_contains($r->prompt, 'Amounts that describe the client’s business (their prices, volumes, users) are not a budget');
         });
-        $this->assertTrue(Proposals::budgetGiven('Budget de 12 millions de nairas.'));
-        $this->assertFalse(Proposals::budgetGiven('Deliver in 3 months, in 2 milestones.'));
+
+        // A budget for our fees, not figures about the client's business (the lead chat's audit of D7)
+        foreach (['Budget around NGN 12M', 'Keep it under $40,000', 'Budget de 12 millions de nairas.', 'fixed price around NGN 12,000,000 before VAT',
+                  'Plafond : 10 M FCFA'] as $budget) {
+            $this->assertTrue(Proposals::budgetGiven($budget), $budget);
+        }
+        foreach (['Tickets sell at NGN 5,000 each; fix how they are bought on mycityapp.io.', 'The app has 2 million users and 300k downloads.',
+                  'They sell about 10k tickets a month through Paystack.', 'Deliver in 3 months, in 2 milestones.', 'Keep it to two phases.'] as $notBudget) {
+            $this->assertFalse(Proposals::budgetGiven($notBudget), $notBudget);
+        }
     }
 
     public function test_a_background_draft_is_filed_when_its_job_ends_and_rings_the_lead(): void

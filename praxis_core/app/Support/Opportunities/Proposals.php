@@ -900,14 +900,19 @@ final class Proposals
     }
 
     /**
-     * The lead's instructions name a budget or a ceiling ("around NGN 12M", "under $40,000", "budget 15 million"): the
-     * draft must fit it (owner, 2 Nov 2026), so the AI is given the dictionary's prices. Without one it gets codes only.
+     * The lead's instructions set a budget or ceiling for our fees (owner, 2 Nov 2026): the draft must fit it, so the AI
+     * is given the dictionary's prices. A budget word with any figure ("budget 15 million", "plafond 10 M"), or a
+     * softer cue close to an amount in a currency ("around NGN 12M", "under $40,000"). Amounts about the client's
+     * business ("tickets sell at NGN 5,000", "2 million users", "about 10k tickets") are not a budget.
      */
     public static function budgetGiven(string $instructions): bool
     {
-        $amount = '(?:[₦$€£]|\b(?:NGN|XAF|XOF|USD|EUR|GBP|KES|ZAR|AED|INR|CAD|AUD|naira|dollars?|euros?)\b)\s*\d|\d[\d,.\s]*\s*(?:k|m|bn|thousands?|millions?|billions?|NGN|XAF|USD|EUR|naira)\b';
+        $currency = 'NGN|XAF|XOF|FCFA|USD|EUR|GBP|KES|ZAR|AED|INR|CAD|AUD|nairas?|dollars?|euros?';
+        $amount = '(?:[₦$€£]\s*\d|\b(?:' . $currency . ')\s*\d|\d[\d,.\s]*(?:\s*(?:k|m|bn|thousands?|millions?|billions?)\b)?\s*(?:de\s+)?(?:' . $currency . ')\b)';
+        $strong = '\b(?:budget|ceiling|cap|plafond|maximum|at most|no more than|not exceed|ne pas dépasser)\b[^.\n]{0,40}\d';
+        $soft = '\b(?:around|about|under|up to|within|below|roughly|approximately|less than|environ|moins de|jusqu[\'’]à)\b[^.\n]{0,25}?' . $amount;
 
-        return (bool) preg_match('/\b(?:budget|ceiling|cap|maximum|at most|no more than|plafond)\b[^.\n]*\d|' . $amount . '/iu', $instructions);
+        return (bool) preg_match('/' . $strong . '|' . $soft . '/iu', $instructions);
     }
 
     /**
@@ -917,7 +922,7 @@ final class Proposals
     private static function draftMaterial(Proposal $proposal, bool $withPrices = false): string
     {
         $out = [$withPrices
-            ? "FINANCIAL DICTIONARY (suggest line items by these codes only; unit prices in {$proposal->currency}, before VAT, are HQ's and can't change: the lead gave a budget, so the line items must fit within it):"
+            ? "FINANCIAL DICTIONARY (suggest line items by these codes only; unit prices in {$proposal->currency}, before VAT, are HQ’s and can’t change. If the lead’s instructions set a budget or ceiling for JBS Praxis’s fees, fit the line items within it; amounts about the client’s business are not a budget):"
             : 'FINANCIAL DICTIONARY (suggest line items by these codes only; HQ sets the prices):'];
         foreach (self::dictionary() as $item) {
             $price = $withPrices ? ' | unit price: ' . $proposal->currency . ' ' . number_format(self::lineFor($item, (string) $proposal->currency)['unit_price'], 2, '.', '') : '';
