@@ -528,7 +528,7 @@
                                     <div class="flex flex-col gap-4">
                                         @foreach ($remittanceAccounts as $acc)
                                             <div class="rounded-lg bg-mist p-4 text-sm">
-                                                <div class="mb-3 font-semibold text-ink">{{ $label('account_types', $acc->type) }}</div>
+                                                <div class="mb-3 font-semibold text-ink">{{ $label('account_types', $acc->type) }} · {{ $acc->currency }}</div>
                                                 <dl class="m-0 grid grid-cols-1 gap-2">
                                                     <div>
                                                         <dt class="text-xs text-muted">{{ __('portal.finance.pay_provider') }}</dt>

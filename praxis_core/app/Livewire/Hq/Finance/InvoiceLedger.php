@@ -9,7 +9,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Support\Access;
+use App\Support\Finance\ReceivingAccounts;
 use App\Support\Finance\Vat;
+use Illuminate\Validation\Rule;
 
 #[Layout('components.layouts.hq')]
 class InvoiceLedger extends Component
@@ -24,7 +26,6 @@ class InvoiceLedger extends Component
     public $showCreateModal = false;
     public $activeProjects = [];
     public $projectPhases = [];
-    public $remittanceAccounts = [];
     public $exchangeRates = [];
     
     // Form Inputs
@@ -88,7 +89,6 @@ class InvoiceLedger extends Component
             ->orderBy('projects.created_at', 'desc')
             ->get();
 
-        $this->remittanceAccounts = DB::table('mdm_remittance_accounts')->where('is_active', 1)->get();
         $this->exchangeRates = DB::table('mdm_exchange_rates')->get();
     }
 
@@ -108,6 +108,9 @@ class InvoiceLedger extends Component
             if ($project) {
                 $this->new_currency = $project->currency;
             }
+            // The only account that fits is chosen for you
+            $matching = $this->matchingAccounts();
+            $this->new_remittance_id = $matching->count() === 1 ? (string) $matching->first()->id : '';
         } else {
             $this->projectPhases = [];
         }
@@ -137,7 +140,7 @@ class InvoiceLedger extends Component
             'new_phase_id' => 'nullable|exists:project_phases,id',
             'new_amount_due' => 'required|numeric|min:1',
             'new_payment_terms' => 'required|string',
-            'new_remittance_id' => 'required|exists:mdm_remittance_accounts,id',
+            'new_remittance_id' => ['required', Rule::in($this->matchingAccounts()->pluck('id')->map(fn ($id) => (string) $id)->all())],
             'new_description' => 'required|string|max:255'
         ]);
 
@@ -341,6 +344,12 @@ class InvoiceLedger extends Component
         $this->loadInvoices();
         session()->flash('error', $count . ($count === 1 ? ' invoice was' : ' invoices were') . " marked overdue. Client Portal access for those projects is on hold until they’re paid.");
     }
+    /** Accounts the client may pay this project's invoice into: its currency, held by its billing company (D8) */
+    private function matchingAccounts(): \Illuminate\Support\Collection
+    {
+        return $this->new_project_id ? ReceivingAccounts::for($this->new_currency, Vat::projectEntity((string) $this->new_project_id)) : collect();
+    }
+
     /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
     protected function validationAttributes(): array
     {
@@ -359,6 +368,7 @@ class InvoiceLedger extends Component
     {
         return [
             'new_amount_due.min' => 'Enter an amount of 1 or more.',
+            'new_remittance_id.in' => 'Choose an account in the project’s currency held by the company that bills it.',
         ];
     }
 
@@ -368,7 +378,9 @@ class InvoiceLedger extends Component
         $project = $this->showCreateModal && $this->new_project_id ? DB::table('projects')->where('id', $this->new_project_id)->first(['id', 'organization_id']) : null;
 
         return view('livewire.hq.finance.invoice-ledger', [
-            'vat' => $project ? Vat::for((string) $project->organization_id, null, Vat::projectEntity($project->id)) : null,
+            'vat' => $vat = $project ? Vat::for((string) $project->organization_id, null, Vat::projectEntity($project->id)) : null,
+            'matchingAccounts' => $project ? $this->matchingAccounts() : collect(),
+            'billingCompany' => $vat['company'] ?? null,
         ]);
     }
 }

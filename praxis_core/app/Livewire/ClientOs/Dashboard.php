@@ -321,7 +321,8 @@ class Dashboard extends Component
             $invoice->has_pending_pop = DB::table('transactions')->where('invoice_id', $invoice->id)->where('status', 'Pending Verification')->exists();
             return $invoice;
         })->toArray();
-        $this->remittanceAccounts = DB::table('mdm_remittance_accounts')->where('is_active', 1)->get()->toArray();
+        // Only the accounts in the currency of the invoices held by the company that bills them (D8)
+        $this->remittanceAccounts = \App\Support\Finance\ReceivingAccounts::forProject($this->activeProject)->toArray();
     }
 
     public function loadVault()

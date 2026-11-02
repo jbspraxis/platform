@@ -184,12 +184,17 @@
 
                     <div class="field">
                         <label class="label" for="inv-remit">Pay into account</label>
-                        <select id="inv-remit" wire:model="new_remittance_id" class="select" required>
+                        <select id="inv-remit" wire:model="new_remittance_id" class="select" required aria-describedby="inv-remit-help">
                             <option value="">Choose the receiving account</option>
-                            @foreach($remittanceAccounts as $acc)
-                                <option value="{{ $acc->id }}">{{ $acc->provider_name }}: {{ $acc->account_name }} ({{ $acc->type }})</option>
+                            @foreach($matchingAccounts as $acc)
+                                <option value="{{ $acc->id }}">{{ $acc->provider_name }}: {{ $acc->account_name }} ({{ $acc->currency }})</option>
                             @endforeach
                         </select>
+                        @if($new_project_id && $matchingAccounts->isEmpty())
+                            <span id="inv-remit-help" class="help">No active account in {{ $new_currency }} held by {{ $billingCompany ?? 'the company that bills this project' }}. Add one in <a href="{{ route('hq.mdm.remittance') }}" wire:navigate>Remittance accounts</a>, with its currency and company.</span>
+                        @else
+                            <span id="inv-remit-help" class="help">The client sees only accounts in the invoice’s currency held by the company that bills it.</span>
+                        @endif
                         @error('new_remittance_id') <span class="field-error">{{ $message }}</span> @enderror
                     </div>
 

@@ -127,8 +127,12 @@ class VatSwitchTest extends TestCase
     /** Finance › Invoices › Create invoice for a project: the amount before VAT, the remittance account, as Finance fills it */
     private function financeInvoice(string $projectId, float $amount): object
     {
-        $account = DB::table('mdm_remittance_accounts')->value('id') ?? DB::table('mdm_remittance_accounts')->insertGetId([
-            'type' => 'Bank', 'provider_name' => 'Test bank', 'account_name' => 'JBS Praxis', 'account_reference' => '0001', 'is_active' => 1]);
+        // An account in the project's currency held by its billing company (D8)
+        $currency = DB::table('projects')->where('id', $projectId)->value('currency');
+        $company = Vat::issuer(Vat::projectEntity($projectId))->id;
+        $account = DB::table('mdm_remittance_accounts')->where('currency', $currency)->where('legal_entity_id', $company)->value('id')
+            ?? DB::table('mdm_remittance_accounts')->insertGetId(['type' => 'Bank', 'provider_name' => 'Test bank', 'account_name' => 'JBS Praxis',
+                'account_reference' => (string) random_int(1000, 99999), 'is_active' => 1, 'currency' => $currency, 'legal_entity_id' => $company]);
         Livewire::test(InvoiceLedger::class)->set('showCreateModal', true)->set('new_project_id', $projectId)
             ->set('new_amount_due', $amount)->set('new_remittance_id', $account)->set('new_description', 'M1')
             ->call('draftSubsequentInvoice')->assertHasNoErrors();

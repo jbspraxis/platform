@@ -91,6 +91,56 @@ class OwnerDecisionsTest extends TestCase
         $this->assertSame(['Done', 1], [DB::table('tasks')->where('id', $task)->value('status'), (int) DB::table('tasks')->where('id', $task)->value('qa_auto_approved')]);
     }
 
+    public function test_d8_a_client_sees_only_the_accounts_in_the_invoices_currency_held_by_the_company_that_bills_it(): void
+    {
+        $company = fn (string $region, string $name) => DB::table('mdm_legal_entities')->where('region_code', $region)->value('id')
+            ?? tap((string) Str::uuid(), fn ($id) => $this->insertRow('mdm_legal_entities', ['id' => $id, 'region_code' => $region, 'legal_name' => $name, 'is_active' => 1]));
+        $ng = $company('NG', 'JBS Praxis LLC');
+        $cm = $company('CM', 'JBS Praxis Cameroun SARL');
+        DB::table('mdm_legal_entities')->whereIn('id', [$ng, $cm])->update(['is_active' => 1]);
+        DB::table('mdm_remittance_accounts')->delete();
+        $account = fn (string $ref, ?string $currency, ?string $entity, int $active = 1) => DB::table('mdm_remittance_accounts')->insertGetId([
+            'type' => 'Bank', 'provider_name' => 'Bank ' . $ref, 'account_name' => 'JBS Praxis', 'account_reference' => $ref,
+            'currency' => $currency, 'legal_entity_id' => $entity, 'is_active' => $active]);
+        $naira = $account('NGN-NG-0001', 'NGN', $ng);
+        $account('USD-NG-0002', 'USD', $ng);
+        $account('NGN-CM-0003', 'NGN', $cm);
+        $account('NGN-NG-OFF-0004', 'NGN', $ng, 0);
+        $account('LEGACY-0005', null, null);
+        $cfa = $account('XAF-CM-0006', 'XAF', $cm);
+
+        $org = (string) Str::uuid();
+        $this->insertRow('organizations', ['id' => $org, 'name' => 'City Client', 'status' => 'Active Client', 'preferred_language' => 'EN', 'country' => 'Nigeria']);
+        $project = $this->project(['organization_id' => $org]); // NGN, no opportunity: Nigeria's company bills it
+        $admin = $this->member($org, 1, ['role_id' => Access::clientAdminRoleId(), 'is_primary_client' => 1]);
+
+        // No invoice yet: the project's currency and billing company
+        $portal = fn () => Livewire::actingAs($admin, 'client')->test(Dashboard::class)->call('switchTab', 'financials');
+        $portal()->assertSee('NGN-NG-0001')->assertSee('Bank transfer · NGN')
+            ->assertDontSee('USD-NG-0002')->assertDontSee('NGN-CM-0003')->assertDontSee('NGN-NG-OFF-0004')->assertDontSee('LEGACY-0005')->assertDontSee('XAF-CM-0006');
+        // Unpaid invoices: the accounts for each one's currency and company
+        $this->invoice($project, null, 'Pending');
+        $xaf = $this->invoice($project, null, 'Overdue');
+        DB::table('invoices')->where('id', $xaf)->update(['currency' => 'XAF', 'billing_entity_id' => $cm]);
+        $portal()->assertSee('NGN-NG-0001')->assertSee('XAF-CM-0006')->assertDontSee('USD-NG-0002')->assertDontSee('NGN-CM-0003');
+        $this->assertSame([$naira], \App\Support\Finance\ReceivingAccounts::for('ngn', null)->pluck('id')->all(), 'The deposit invoice takes this one');
+
+        // HQ › Create invoice offers only the matching account, chooses it when it is the only one, and refuses another
+        $this->actingAs($this->staff('finance', ['finance']));
+        Livewire::test(\App\Livewire\Hq\Finance\InvoiceLedger::class)->set('showCreateModal', true)->set('new_project_id', $project)
+            ->assertSet('new_remittance_id', (string) $naira)->assertSee('Bank NGN-NG-0001')->assertDontSee('Bank USD-NG-0002')
+            ->set('new_remittance_id', (string) $cfa)->set('new_amount_due', 1000)->set('new_description', 'M1')
+            ->call('draftSubsequentInvoice')->assertHasErrors(['new_remittance_id']);
+
+        // Master data › Remittance accounts asks for both, and says when an account is shown to no client
+        $this->actingAs($this->staff('owner', ['owner']));
+        Livewire::test(\App\Livewire\Hq\Mdm\RemittanceAccounts::class)->assertSee('Not shown to clients: set its currency and company')
+            ->set('provider_name', 'UBA')->set('account_name', 'JBS Praxis LLC')->set('account_reference', '1023456789')
+            ->call('saveAccount')->assertHasErrors(['currency', 'legal_entity_id'])
+            ->set('currency', 'NGN')->set('legal_entity_id', $ng)->call('saveAccount')->assertHasNoErrors();
+        $this->assertDatabaseHas('mdm_remittance_accounts', ['account_reference' => '1023456789', 'currency' => 'NGN', 'legal_entity_id' => $ng]);
+    }
+
     public function test_d1_an_organisation_has_up_to_10_portal_accounts(): void
     {
         Mail::fake();
