@@ -136,8 +136,8 @@ class MeetingsGateway extends Component
 
             return;
         }
-        Meetings::tellLead($o, __('meetings.notify.booked_title', [], config('app.locale')),
-            __('meetings.notify.booked', ['name' => $this->name, 'title' => $o->title, 'date' => $start->setTimezone(Meetings::TIME_ZONE)->format('j F Y, H:i')], config('app.locale')), $change->meeting->id);
+        Meetings::tellLead($o, __('meetings.notify.booked_title', [], config('app.staff_locale')),
+            __('meetings.notify.booked', ['name' => $this->name, 'title' => $o->title, 'date' => $start->setTimezone(Meetings::TIME_ZONE)->format('j F Y, H:i')], config('app.staff_locale')), $change->meeting->id);
         $this->done = 'booked';
     }
 
@@ -180,8 +180,8 @@ class MeetingsGateway extends Component
         $agenda = __('meetings.portal.proposed_agenda', ['name' => $this->name], $o->language) . "\n" . implode("\n", $lines)
             . (trim($this->note) !== '' ? "\n\n" . trim($this->note) : '');
         $meeting = Meetings::request($o, ['agenda' => $agenda] + $this->meetingData($o), $times);
-        Meetings::tellLead($o, __('meetings.notify.requested_title', [], config('app.locale')),
-            __('meetings.notify.requested', ['name' => $this->name, 'title' => $o->title], config('app.locale')), $meeting->id);
+        Meetings::tellLead($o, __('meetings.notify.requested_title', [], config('app.staff_locale')),
+            __('meetings.notify.requested', ['name' => $this->name, 'title' => $o->title], config('app.staff_locale')), $meeting->id);
         $this->done = 'requested';
     }
 
