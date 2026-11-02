@@ -64,6 +64,9 @@
                 @if ($billingCompany)
                     <span title="{{ __('vat.billing.label') }}"><i data-lucide="landmark"></i> <span class="sr-only">{{ __('vat.billing.label') }}: </span>{{ $billingCompany }}</span>
                 @endif
+                @if ($o->organization?->is_test)
+                    <span class="tag" title="{{ __('opportunities.page.test_client_help') }}">{{ __('opportunities.page.test_client_tag') }}</span>
+                @endif
                 @if ($o->source === 'backfill')
                     <span class="tag">{{ __('opportunities.sources.backfill') }}</span>
                 @elseif ($o->source === 'website_booking')
@@ -121,6 +124,12 @@
                             <span class="help" id="opp-client-tax-help">{{ __('vat.billing.client_tax_help') }}</span>
                             @error('clientTaxId') <span class="field-error">{{ $message }}</span> @enderror
                         </div>
+                        @if ($canFlagTest)
+                            <div class="field">
+                                <div class="opp-radios"><label><input type="checkbox" wire:model="testClient" aria-describedby="opp-test-client-help"> {{ __('opportunities.page.test_client') }}</label></div>
+                                <span class="help" id="opp-test-client-help">{{ __('opportunities.page.test_client_help') }}</span>
+                            </div>
+                        @endif
                         <div class="opp-actions">
                             <button type="submit" class="btn btn-primary" wire:loading.attr="disabled" wire:target="saveDetails"><i data-lucide="save"></i> {{ __('opportunities.page.save') }}</button>
                             <button type="button" class="btn btn-secondary" wire:click="cancelEdit">{{ __('opportunities.cancel') }}</button>

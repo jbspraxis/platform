@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Opportunities;
 
 use App\Livewire\Hq\Opportunities\Concerns\PicksStaff;
 use App\Models\Opportunity;
+use App\Support\Access;
 use App\Support\Finance\Vat;
 use App\Support\Opportunities\OpportunityAccess;
 use App\Support\Opportunities\Team;
@@ -51,6 +52,9 @@ class OpportunityPage extends Component
 
     public string $clientTaxId = '';
 
+    /** The organisation is QA data that qa:wipe may delete (organizations.is_test): only the owner sets it */
+    public bool $testClient = false;
+
     // Change the stage
     public string $stage = '';
 
@@ -90,6 +94,7 @@ class OpportunityPage extends Component
         $o = $this->opportunity();
         $this->fill(['title' => $o->title, 'leadUserId' => (string) $o->lead_user_id, 'language' => $o->language, 'editing' => true,
             'billingEntityId' => (string) $o->billing_entity_id, 'clientTaxId' => (string) $o->organization?->tax_identification_number,
+            'testClient' => (bool) $o->organization?->is_test,
             'leadSearch' => '', 'teamSearch' => '', 'teamUserIds' => Team::memberIds($o)]);
     }
 
@@ -138,6 +143,7 @@ class OpportunityPage extends Component
             return;
         }
         $this->saveBillingAndTaxId($o, $billing);
+        $this->saveTestFlag($o);
         $old = $o->only(['title', 'lead_user_id', 'language']);
         $o->fill(['title' => $this->title, 'lead_user_id' => $this->leadUserId, 'language' => $this->language, 'updated_by' => Auth::id()]);
         if ($o->isDirty()) {
@@ -172,6 +178,20 @@ class OpportunityPage extends Component
             OpportunityAccess::log('ORGANISATION_TAX_ID_CHANGED', "Changed the VAT or tax number of {$organisation->name}.", 'opportunities', $o->id,
                 ['tax_identification_number' => $before], ['tax_identification_number' => $taxId]);
         }
+    }
+
+    /** The owner flags (or unflags) the organisation as a test client; anyone else's checkbox is ignored */
+    private function saveTestFlag(Opportunity $o): void
+    {
+        $organisation = $o->organization;
+        if (! $organisation || ! Access::isOwner(Auth::user()) || $this->testClient === (bool) $organisation->is_test) {
+            return;
+        }
+        DB::table('organizations')->where('id', $organisation->id)->update(['is_test' => $this->testClient, 'updated_by' => Auth::id(), 'updated_at' => now()]);
+        OpportunityAccess::log('ORGANISATION_TEST_FLAG_CHANGED', $this->testClient
+            ? "Flagged {$organisation->name} as a test client: qa:wipe may delete it."
+            : "{$organisation->name} is no longer flagged as a test client.", 'opportunities', $o->id,
+            ['is_test' => (bool) $organisation->is_test], ['is_test' => $this->testClient]);
     }
 
     public function saveStage(): void
@@ -254,6 +274,7 @@ class OpportunityPage extends Component
             'billingCompany' => Vat::companyName($o->billing_entity_id ?? Vat::issuer(null)?->id),
             'billingCompanies' => $this->editing ? Vat::companies() : collect(),
             'canChooseBilling' => OpportunityAccess::canApprove($user, $o),
+            'canFlagTest' => $user && Access::isOwner($user),
             'canReadTranscripts' => OpportunityAccess::canReadTranscripts($user, $o),
             'canOpenProjects' => (bool) $user?->can('projects.view'),
         ] + ($this->editing ? $this->staffPickers() : []))->title($o->title . ' · ' . __('opportunities.title'));
