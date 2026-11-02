@@ -80,6 +80,11 @@ class ProposalsTab extends Component
         $opportunity = Opportunity::findOrFail($opportunityId);
         abort_unless(OpportunityAccess::canView(Auth::user(), $opportunity), 403);
         $this->opportunityId = $opportunity->id;
+        // A first proposal is priced in the client's own currency where JBS Praxis bills it (USD elsewhere)
+        $local = ['nigeria' => 'NGN', 'cameroon' => 'XAF', 'cameroun' => 'XAF'][mb_strtolower(trim((string) $opportunity->organization?->country))] ?? null;
+        if ($local && Proposals::currencies()->contains($local)) {
+            $this->currency = $local;
+        }
     }
 
     /** Every later request (each action, and the poll while the AI works): still allowed to open this opportunity */

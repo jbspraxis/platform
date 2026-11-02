@@ -12,6 +12,19 @@ class HqQaFixesTest extends TestCase
 {
     use UsesThrowawayDatabase;
 
+    public function test_a_first_proposal_is_priced_in_the_clients_currency_where_we_bill_it(): void
+    {
+        $lead = $this->staff('sales', ['sales']);
+        $this->actingAs($lead);
+        foreach (['Nigeria' => 'NGN', 'Cameroon' => 'XAF', 'United Kingdom' => 'USD'] as $country => $currency) {
+            $org = (string) \Illuminate\Support\Str::uuid();
+            $this->insertRow('organizations', ['id' => $org, 'name' => "Client in {$country}", 'status' => 'Lead', 'country' => $country]);
+            $o = \App\Models\Opportunity::create(['organization_id' => $org, 'title' => 'Work', 'stage' => 'discovery', 'language' => 'en', 'source' => 'manual', 'lead_user_id' => $lead->id]);
+
+            Livewire::test(\App\Livewire\Hq\Opportunities\ProposalsTab::class, ['opportunityId' => $o->id])->assertSet('currency', $currency);
+        }
+    }
+
     public function test_a_half_filled_account_survives_a_look_at_the_lists_and_the_member_role_is_listed_once(): void
     {
         $this->actingAs($this->staff('owner', ['owner']));

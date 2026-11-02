@@ -196,7 +196,7 @@
                                 @foreach ($people as $email => $p)
                                     <label class="pp-check" wire:key="again-{{ md5($email) }}">
                                         <input type="checkbox" class="checkbox" value="{{ $email }}" wire:model="linkTo">
-                                        <span>{{ $p['name'] }} <small>{{ $email }}</small></span>
+                                        <span>{{ $p['name'] }}@if ($p['name'] !== $email) <small>{{ $email }}</small>@endif</span>
                                     </label>
                                 @endforeach
                             </div>
@@ -229,7 +229,7 @@
                                     @foreach ($people as $email => $p)
                                         <label class="pp-check" wire:key="to-{{ md5($email) }}">
                                             <input type="checkbox" class="checkbox" value="{{ $email }}" wire:model="sendTo">
-                                            <span>{{ $p['name'] }} <small>{{ $email }}</small></span>
+                                            <span>{{ $p['name'] }}@if ($p['name'] !== $email) <small>{{ $email }}</small>@endif</span>
                                         </label>
                                     @endforeach
                                 </div>
