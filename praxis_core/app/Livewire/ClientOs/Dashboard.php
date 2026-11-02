@@ -392,7 +392,7 @@ class Dashboard extends Component
             ->whereHas('meetings', fn ($q) => $q->where('kind', 'client'))
             ->when($restricted, fn ($q) => $q->where('project_id', $restricted))
             ->orderByDesc('created_at')->get()
-            ->map(fn ($o) => ['id' => $o->id, 'title' => $o->title, 'link' => PortalLinks::meetings($o, $this->user->id)])->all();
+            ->map(fn ($o) => ['id' => $o->id, 'title' => $o->title, 'link' => PortalLinks::fromPortal('portal.meetings', $o->id, $this->user->id)])->all();
     }
 
     public function loadTeamCommand()
@@ -440,6 +440,7 @@ class Dashboard extends Component
     public function submitQaTicket()
     {
         abort_unless($this->allowed('qa.create'), 403);
+        if (!$this->activeProject) return;
         $this->validate([
             'qaTitle' => 'required|string|max:150', 
             'qaDescription' => 'required|string', 
@@ -496,6 +497,7 @@ class Dashboard extends Component
     public function approveTask($taskId)
     {
         abort_unless($this->allowed('projects.approve'), 403);
+        if (!$this->activeProject) return;
         // Only a task waiting for the client's review (the button shows on those alone)
         if (!$this->ownsTask($taskId) || !$this->clientTasks()->where('tasks.id', $taskId)->where('tasks.status', 'QA_Review')->exists()) return;
 
@@ -523,7 +525,7 @@ class Dashboard extends Component
     public function teleportToQa($taskId, $taskTitle)
     {
         abort_unless($this->allowed('qa.create'), 403);
-        if (!$this->ownsTask($taskId)) return;
+        if (!$this->activeProject || !$this->ownsTask($taskId)) return;
         $this->qaTaskId = $taskId;
         $this->qaTitle = __('portal.qa.prefill', ['task' => $taskTitle]);
         $this->switchTab('qa_hub');
@@ -584,7 +586,7 @@ class Dashboard extends Component
     public function postTicketComment()
     {
         abort_unless($this->allowed('qa.create'), 403);
-        if (!$this->selectedTicket) return;
+        if (!$this->activeProject || !$this->selectedTicket) return;
 
         $this->validate(['newCommentText' => 'required|string|min:2|max:5000']);
 
@@ -671,6 +673,7 @@ class Dashboard extends Component
     public function submitProofOfPayment()
     {
         abort_unless($this->allowed('billing.create'), 403);
+        if (!$this->activeProject) return;
         $this->validate([
             'uploadInvoiceId' => 'required|exists:invoices,id',
             'popMethod' => 'required|string', 

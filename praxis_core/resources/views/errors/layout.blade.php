@@ -9,7 +9,9 @@
     $onHq = \App\Support\Hosts::isHq($request);
     // A message the app gave in abort() is shown when it was written for people (never Laravel's own defaults)
     $detail = isset($exception) ? trim((string) $exception->getMessage()) : '';
-    if (in_array($detail, ['', 'Forbidden', 'Not Found', 'This action is unauthorized.', 'Invalid signature.', 'Page Expired', 'Too Many Attempts.', 'Server Error', 'Service Unavailable'], true) || ($code ?? 500) >= 500) {
+    // ... and never one of the framework's own (a missing record names its model and id: "No query results for model [App\\…]")
+    $internal = str_starts_with($detail, 'No query results') || str_contains($detail, '\\') || str_contains($detail, 'SQLSTATE');
+    if ($internal || in_array($detail, ['', 'Forbidden', 'Not Found', 'This action is unauthorized.', 'Invalid signature.', 'Page Expired', 'Too Many Attempts.', 'Server Error', 'Service Unavailable'], true) || ($code ?? 500) >= 500) {
         $detail = '';
     }
     [$back, $backLabel] = $onPortal ? [route('client.login'), $t('portal_sign_in')] : ($onHq ? [url('/'), $t('hq_home')] : [url('/'), $t('home')]);

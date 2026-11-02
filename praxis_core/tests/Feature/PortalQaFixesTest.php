@@ -68,12 +68,30 @@ class PortalQaFixesTest extends TestCase
         $this->assertStringContainsString('/proposals/' . $proposal, $link);
         $this->assertStringContainsString('signature=', $link);
         $this->assertStringContainsString('c=' . $client->id, $link);
-        $this->get($portal->get('vaultMeetings')[0]['link'])->assertOk();
+        $meetings = $portal->get('vaultMeetings')[0]['link'];
+        $this->get($meetings)->assertOk();
+        // Links made for the signed-in client last hours, not the email's weeks
+        parse_str((string) parse_url($meetings, PHP_URL_QUERY), $query);
+        $this->assertLessThanOrEqual(now()->addHours(\App\Support\Opportunities\PortalLinks::HOURS)->timestamp, (int) $query['expires']);
 
-        // The project sections say why they're empty; nothing breaks
+        // The project sections say why they're empty; nothing breaks, even when called directly
         $portal->call('switchTab', 'overview')->assertSee('Your project space opens when the work starts')
             ->call('switchTab', 'financials')->assertSee('Your project space opens when the work starts')
             ->call('switchTab', 'team')->assertSee('Adaeze');
+        $portal->set('qaTitle', 'Map blank')->set('qaDescription', 'Nothing shows')->call('submitQaTicket')
+            ->set('newCommentText', 'Any news?')->call('postTicketComment')
+            ->call('submitProofOfPayment')->call('approveTask', (string) Str::uuid())->call('teleportToQa', (string) Str::uuid(), 'Task')
+            ->assertOk();
+        $this->assertSame(0, DB::table('qa_tickets')->count());
+    }
+
+    public function test_a_missing_document_gives_a_404_without_internal_names(): void
+    {
+        $missing = (string) Str::uuid();
+
+        $this->get(\App\Support\Opportunities\PortalLinks::fromPortal('portal.sow.pdf', $missing))
+            ->assertNotFound()->assertSee('We couldn’t find this page', false)
+            ->assertDontSee('App\\Models', false)->assertDontSee('No query results', false)->assertDontSee($missing);
     }
 
     public function test_documents_list_the_signed_sow_with_fresh_links_and_an_imported_one_as_signed_on_paper(): void

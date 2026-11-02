@@ -75,11 +75,15 @@ final class PortalLinks
     /**
      * A sent proposal or SOW (its page or its PDF) opened from the signed-in portal's Documents: made each time the
      * page is drawn, so a signed SOW stays reachable after the email's link has expired.
-     * $route: portal.proposals.review, portal.proposals.pdf, portal.sow or portal.sow.pdf.
+     * $route: portal.proposals.review, portal.proposals.pdf, portal.sow, portal.sow.pdf or portal.meetings.
      */
     public static function fromPortal(string $route, string $id, ?string $clientUserId = null): string
     {
-        $key = str_starts_with($route, 'portal.sow') ? 'sow' : 'proposal';
+        $key = match (true) {
+            str_starts_with($route, 'portal.sow') => 'sow',
+            $route === 'portal.meetings' => 'opportunity',
+            default => 'proposal',
+        };
 
         return self::signed($route, array_filter([$key => $id, 'c' => $clientUserId]), now()->addHours(self::HOURS));
     }
