@@ -35,6 +35,8 @@ class SprintBoard extends Component
     public bool $canMoveOwn = false; // projects.edit: check out and move own tasks
     #[Locked]
     public bool $canMoveAny = false; // projects.approve: move anyone’s task
+    #[Locked]
+    public bool $canAssign = false; // the project's lead and managers: give an unassigned task to anyone on the team
 
     // Board State: the milestone shown (the Milestone menu) and the project's milestones
     public $activeMilestoneId = null;
@@ -64,6 +66,7 @@ class SprintBoard extends Component
 
         $this->projectId = $id;
         $this->project = $project;
+        $this->canAssign = \App\Support\Projects\ProjectRules::canManage($id);
 
         $this->loadMilestones();
         $this->activeMilestoneId = $milestone;
@@ -234,6 +237,35 @@ class SprintBoard extends Component
         $this->loadBoardData();
     }
 
+    /**
+     * The card's "Unassigned" picker (owner, 2 Nov 2026; it replaced the card's Assign to me button): anyone with
+     * projects.edit may take an unassigned task (Me); the project's lead and managers may also give it to anyone on the
+     * project team, as in the task drawer. A task that already has a lead is changed in the drawer, never from a card.
+     */
+    public function assignTo($taskId, $userId)
+    {
+        $this->authoriseBoard();
+        $manager = \App\Support\Projects\ProjectRules::canManage($this->projectId);
+        abort_unless($manager || Auth::user()->can('projects.edit'), 403);
+
+        $task = $this->boardTask($taskId);
+        if (! $task) return;
+
+        if ($task->assigned_to) {
+            // Someone took it while this board was open
+            session()->flash('error', __('projects.task.already_led'));
+        } elseif ((string) $userId === (string) Auth::id()) {
+            \App\Support\Projects\Tasks::assignToMe($task, false);
+        } else {
+            abort_unless($manager, 403);
+            if (\App\Support\Projects\ProjectRules::team($this->projectId)->contains('id', (string) $userId)) {
+                // The drawer's save: the audit log, the new lead stops sharing or watching it, and their bell
+                \App\Support\Projects\Tasks::update($this->projectId, $task, ['assigned_to' => (string) $userId]);
+            }
+        }
+        $this->loadBoardData();
+    }
+
     // --- KANBAN DRAG & DROP + SILENT TIMER LOGIC ---
     public function updateTaskStatus($taskId, $newStatus)
     {
@@ -273,6 +305,10 @@ class SprintBoard extends Component
 
     public function render()
     {
-        return view('livewire.hq.operations.sprint-board', ['handover' => $this->handover()]);
+        return view('livewire.hq.operations.sprint-board', [
+            'handover' => $this->handover(),
+            // The card picker's people (managers only; everyone else's menu holds just "Me")
+            'team' => $this->canAssign ? \App\Support\Projects\ProjectRules::team($this->projectId) : collect(),
+        ]);
     }
 }
