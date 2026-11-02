@@ -608,6 +608,21 @@
                                 </div>
                             @endforeach
 
+                            @if (count($vaultMeetings))
+                                <h3 class="section-title text-base">{{ __('portal.documents.meetings') }}</h3>
+                                <div class="mb-6">
+                                    @foreach ($vaultMeetings as $work)
+                                        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-line py-3 last:border-b-0" wire:key="meetings-{{ $work['id'] }}">
+                                            <div class="min-w-0">
+                                                <div class="font-semibold text-ink break-words">{{ $work['title'] }}</div>
+                                                <div class="text-sm text-slate">{{ __('portal.documents.meetings_help') }}</div>
+                                            </div>
+                                            <a href="{{ $work['link'] }}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm"><i data-lucide="calendar"></i> {{ __('portal.documents.meetings_open') }}</a>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+
                             {{-- Proposals signed before the opportunity pipeline (shown only where there are some) --}}
                             @if (count($vaultSows))
                             <h3 class="section-title text-base">{{ __('portal.documents.sows') }}</h3>

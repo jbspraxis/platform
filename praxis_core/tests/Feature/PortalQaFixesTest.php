@@ -56,15 +56,19 @@ class PortalQaFixesTest extends TestCase
             'title' => 'Fleet portal proposal', 'status' => 'Sent', 'sent_at' => now()->subDay(), 'validity_days' => 30]);
         $this->insertRow('proposals', ['id' => (string) Str::uuid(), 'organization_id' => $org, 'opportunity_id' => $opportunity, 'proposal_ref' => 'PRP-QA-1', 'version' => 3,
             'title' => 'Draft not sent', 'status' => 'Draft']);
+        $this->insertRow('meetings', ['id' => (string) Str::uuid(), 'opportunity_id' => $opportunity, 'organization_id' => $org, 'kind' => 'client', 'title' => 'Discovery',
+            'starts_at' => now()->subDay(), 'ends_at' => now()->subDay()->addHour(), 'status' => 'held']);
         $client = $this->client($org);
 
         $portal = Livewire::actingAs($client, 'client')->test(Dashboard::class)
             ->assertOk()->assertSet('activeTab', 'vault')
-            ->assertSee('Fleet portal proposal')->assertDontSee('Draft not sent')->assertSee('waiting for your answer');
+            ->assertSee('Fleet portal proposal')->assertDontSee('Draft not sent')->assertSee('waiting for your answer')
+            ->assertSee('Open meetings');
         $link = $portal->get('vaultProposals')[0]['open'];
         $this->assertStringContainsString('/proposals/' . $proposal, $link);
         $this->assertStringContainsString('signature=', $link);
         $this->assertStringContainsString('c=' . $client->id, $link);
+        $this->get($portal->get('vaultMeetings')[0]['link'])->assertOk();
 
         // The project sections say why they're empty; nothing breaks
         $portal->call('switchTab', 'overview')->assertSee('Your project space opens when the work starts')

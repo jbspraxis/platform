@@ -112,6 +112,9 @@ class Dashboard extends Component
     public $vaultContracts = [];
     #[Locked]
     public $vaultProposals = [];
+    /** Each piece of work that has client meetings: its meetings page (upcoming meetings, minutes, booking a follow-up) */
+    #[Locked]
+    public $vaultMeetings = [];
     #[Locked]
     public $teamMembers = [];
     public $inviteFirstName = '';
@@ -383,6 +386,13 @@ class Dashboard extends Component
                 'date' => PortalFormat::date($proposal->client_approved_at ?? $proposal->sent_at),
                 'open' => PortalLinks::fromPortal('portal.proposals.review', $proposal->id, $this->user->id),
                 'pdf' => PortalLinks::fromPortal('portal.proposals.pdf', $proposal->id)])->all();
+
+        // Meetings: each piece of work with a client meeting (a member limited to one project: that project's work only)
+        $this->vaultMeetings = \App\Models\Opportunity::whereIn('id', $opportunityIds)->where('stage', '!=', 'lost')
+            ->whereHas('meetings', fn ($q) => $q->where('kind', 'client'))
+            ->when($restricted, fn ($q) => $q->where('project_id', $restricted))
+            ->orderByDesc('created_at')->get()
+            ->map(fn ($o) => ['id' => $o->id, 'title' => $o->title, 'link' => PortalLinks::meetings($o, $this->user->id)])->all();
     }
 
     public function loadTeamCommand()
