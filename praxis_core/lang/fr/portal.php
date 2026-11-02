@@ -132,6 +132,8 @@ return [
         'verifying' => "Nous vérifions votre justificatif de paiement. Les autres rubriques seront de nouveau accessibles dès que le paiement sera vérifié.",
         'overdue' => "Accès suspendu\u{00A0}: facture impayée. Réglez la facture en retard et déposez votre justificatif de paiement dans Factures et paiements.",
         'deposit' => "Votre projet démarre dès réception du premier paiement. Déposez votre justificatif de paiement dans Factures et paiements.",
+        'deposit_member' => "Votre projet démarre dès réception du premier paiement. L’administrateur ou le contact finance de votre organisation voit la facture et envoie la preuve de paiement.",
+        'overdue_member' => "Accès suspendu\u{00A0}: une facture est en retard. L’administrateur ou le contact finance de votre organisation la voit dans Factures et paiements.",
         'tab_closed' => "Cette rubrique n’est pas encore accessible.",
         'no_permission' => "Vous n’avez pas l’autorisation d’ouvrir cette rubrique. Demandez à votre interlocuteur principal de modifier votre rôle.",
     ],

@@ -94,6 +94,25 @@ class PortalQaFixesTest extends TestCase
             ->assertDontSee('App\\Models', false)->assertDontSee('No query results', false)->assertDontSee($missing);
     }
 
+    public function test_on_hold_for_the_deposit_a_member_without_billing_lands_on_documents_and_is_told_who_pays(): void
+    {
+        $org = $this->organisation();
+        $project = $this->project(['organization_id' => $org, 'status' => 'Scoping']);
+        $this->phase($project, 1, 100);
+        $this->invoice($project, null, 'Pending', 4800000);
+        $admin = $this->client($org);
+        $member = $this->client($org, ['is_primary_client' => 0, 'role_id' => DB::table('roles')->where('slug', 'client-member')->value('id')]);
+        $this->assertFalse(Access::allows($member, Access::CLIENT_PREFIX . 'billing.view'));
+
+        // The admin is sent to the invoice to pay it
+        Livewire::actingAs($admin, 'client')->test(Dashboard::class)->assertSet('financialLockout', true)->assertSet('activeTab', 'financials');
+
+        // The member can't see invoices: Documents, a message saying who pays, and the project's sections closed
+        $page = Livewire::actingAs($member, 'client')->test(Dashboard::class)->assertSet('financialLockout', true)
+            ->assertSet('activeTab', 'vault')->assertSet('lockoutReason', __('portal.lockout.deposit_member'))->assertSee('administrator or finance contact');
+        $page->call('switchTab', 'overview')->assertSet('activeTab', 'vault');
+    }
+
     public function test_documents_list_the_signed_sow_with_fresh_links_and_an_imported_one_as_signed_on_paper(): void
     {
         $org = $this->organisation();

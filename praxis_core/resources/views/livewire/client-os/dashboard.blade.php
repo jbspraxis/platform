@@ -108,7 +108,7 @@
             <nav class="rail-nav">
                 @foreach ($tabs as $tab => [$permission, $icon])
                     @if ($can[$permission] ?? false)
-                        @php $locked = $financialLockout && $tab !== 'financials'; @endphp
+                        @php $locked = $financialLockout && in_array($tab, \App\Livewire\ClientOs\Dashboard::LOCKED_TABS, true); @endphp
                         <button type="button" wire:click="switchTab('{{ $tab }}')" @click="mobileMenuOpen = false"
                                 class="rail-link {{ $activeTab === $tab ? 'is-active' : '' }} {{ $locked ? 'is-locked' : '' }}"
                                 @if ($activeTab === $tab) aria-current="page" @endif
@@ -209,8 +209,12 @@
                     @endif
                 </div>
 
+                {{-- ===================== ON HOLD, with nowhere else this account may go ===================== --}}
+                @if ($financialLockout && in_array($activeTab, \App\Livewire\ClientOs\Dashboard::LOCKED_TABS, true))
+                    <section class="card"><div class="empty-state"><strong>{{ __('portal.lockout.tab_closed') }}</strong> {{ $lockoutReason }}</div></section>
+
                 {{-- ===================== NO PROJECT YET (until the statement of work is signed) ===================== --}}
-                @if (! $activeProject && in_array($activeTab, \App\Livewire\ClientOs\Dashboard::PROJECT_TABS, true))
+                @elseif (! $activeProject && in_array($activeTab, \App\Livewire\ClientOs\Dashboard::PROJECT_TABS, true))
                     <section class="card">
                         <div class="empty-state">
                             <strong>{{ __('portal.no_project.title') }}</strong>

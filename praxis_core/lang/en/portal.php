@@ -133,6 +133,8 @@ return [
         'verifying' => 'We’re verifying your proof of payment. The other sections open again once the payment is verified.',
         'overdue' => 'Access on hold: unpaid invoice. Pay the overdue invoice and upload your proof of payment in Invoices and payments.',
         'deposit' => 'Your project starts once we receive the first payment. Upload your proof of payment in Invoices and payments.',
+        'deposit_member' => 'Your project starts once we receive the first payment. Your organisation’s administrator or finance contact sees the invoice and sends the proof of payment.',
+        'overdue_member' => 'Access on hold: an invoice is overdue. Your organisation’s administrator or finance contact sees it under Invoices and payments.',
         'tab_closed' => 'This section isn’t available yet.',
         'no_permission' => 'You don’t have permission to open this section. Ask your primary contact to change your role.',
     ],

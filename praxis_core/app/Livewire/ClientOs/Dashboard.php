@@ -144,6 +144,9 @@ class Dashboard extends Component
     // Sections about a project; before the first one exists (until the SOW is signed) they say so
     public const PROJECT_TABS = ['overview', 'sprints', 'qa_hub', 'financials'];
 
+    // What a payment hold closes: the project's work. Invoices stay open to pay; Documents and Team aren't the project's
+    public const LOCKED_TABS = ['overview', 'sprints', 'qa_hub'];
+
     private function allowed(string $permission): bool
     {
         return Access::allows($this->user, Access::CLIENT_PREFIX . $permission);
@@ -259,9 +262,11 @@ class Dashboard extends Component
         $this->activeProject = $project;
         
         $this->enforceFinancialLockout();
-        
-        if ($this->financialLockout && $this->activeTab !== 'financials') {
-            $this->activeTab = 'financials';
+
+        // On hold: to the invoices if this account may see them, else to a section that stays open (a member without
+        // billing used to land on an invoices page its role can't read, with every other section closed)
+        if ($this->financialLockout && in_array($this->activeTab, self::LOCKED_TABS, true)) {
+            $this->activeTab = collect(['financials', 'vault', 'team'])->first(fn ($tab) => $this->allowed(self::TAB_PERMISSIONS[$tab])) ?? $this->activeTab;
         }
 
         // Initialize default tab data
@@ -290,9 +295,11 @@ class Dashboard extends Component
         if ($blockingInvoice) {
             $this->financialLockout = true;
             $hasPendingTx = DB::table('transactions')->where('invoice_id', $blockingInvoice->id)->where('status', 'Pending Verification')->exists();
+            // Someone who can't see invoices is told who can
+            $member = $this->allowed('billing.view') ? '' : '_member';
             $this->lockoutReason = $hasPendingTx
                 ? __('portal.lockout.verifying')
-                : ($blockingInvoice->status === 'Overdue' ? __('portal.lockout.overdue') : __('portal.lockout.deposit'));
+                : ($blockingInvoice->status === 'Overdue' ? __('portal.lockout.overdue' . $member) : __('portal.lockout.deposit' . $member));
         } else {
             $this->financialLockout = false;
         }
@@ -416,7 +423,7 @@ class Dashboard extends Component
 
     public function switchTab($tab)
     {
-        if ($this->financialLockout && $tab !== 'financials') {
+        if ($this->financialLockout && in_array($tab, self::LOCKED_TABS, true)) {
             session()->flash('lockout_error', __('portal.lockout.tab_closed') . ' ' . $this->lockoutReason);
             return;
         }
