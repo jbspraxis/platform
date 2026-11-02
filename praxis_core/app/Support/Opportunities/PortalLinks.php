@@ -69,6 +69,21 @@ final class PortalLinks
         return $sow->validUntil() ?? now()->addDays(self::DAYS);
     }
 
+    /** How long a link made by fromPortal() stays good */
+    public const HOURS = 4;
+
+    /**
+     * A sent proposal or SOW (its page or its PDF) opened from the signed-in portal's Documents: made each time the
+     * page is drawn, so a signed SOW stays reachable after the email's link has expired.
+     * $route: portal.proposals.review, portal.proposals.pdf, portal.sow or portal.sow.pdf.
+     */
+    public static function fromPortal(string $route, string $id, ?string $clientUserId = null): string
+    {
+        $key = str_starts_with($route, 'portal.sow') ? 'sow' : 'proposal';
+
+        return self::signed($route, array_filter([$key => $id, 'c' => $clientUserId]), now()->addHours(self::HOURS));
+    }
+
     private static function signed(string $route, array $parameters, \DateTimeInterface $expires): string
     {
         $relative = URL::temporarySignedRoute($route, $expires, $parameters, absolute: false);

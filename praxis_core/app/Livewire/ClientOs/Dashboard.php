@@ -6,7 +6,12 @@ use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\WithFileUploads;
+use App\Models\Proposal;
+use App\Models\StatementOfWork;
 use App\Support\People;
+use App\Support\Opportunities\PortalLinks;
+use App\Support\Opportunities\Sows;
+use App\Support\Projects\ProjectPlan;
 use App\Support\Access;
 use App\Support\MailLocale;
 use App\Mail\TeamMemberInvitation;
@@ -102,6 +107,11 @@ class Dashboard extends Component
     public $vaultSows = [];
     #[Locked]
     public $vaultSignoffs = [];
+    /** The statements of work and proposals the client was sent (opportunity pipeline), with links made when drawn */
+    #[Locked]
+    public $vaultContracts = [];
+    #[Locked]
+    public $vaultProposals = [];
     #[Locked]
     public $teamMembers = [];
     public $inviteFirstName = '';
@@ -127,6 +137,9 @@ class Dashboard extends Component
         'overview' => 'projects.view', 'sprints' => 'projects.view', 'qa_hub' => 'qa.view',
         'financials' => 'billing.view', 'vault' => 'documents.view', 'team' => 'team.view',
     ];
+
+    // Sections about a project; before the first one exists (until the SOW is signed) they say so
+    public const PROJECT_TABS = ['overview', 'sprints', 'qa_hub', 'financials'];
 
     private function allowed(string $permission): bool
     {
@@ -184,7 +197,14 @@ class Dashboard extends Component
         $this->allProjects = $projectQuery->get()->toArray();
 
         if (empty($this->allProjects)) {
-            abort(403, __('portal.errors.no_projects'));
+            // No project yet: Documents (their proposals and SOWs) and Team still work; the other sections say why they're empty
+            if (in_array($this->activeTab, self::PROJECT_TABS, true)) {
+                $this->activeTab = collect(['vault', 'team'])->first(fn ($tab) => $this->can[self::TAB_PERMISSIONS[$tab]] ?? false) ?? $this->activeTab;
+            }
+            if ($this->activeTab === 'vault') $this->loadVault();
+            if ($this->activeTab === 'team') $this->loadTeamCommand();
+
+            return;
         }
 
         $defaultProject = collect($this->allProjects)->firstWhere('status', 'Active') 
@@ -281,16 +301,14 @@ class Dashboard extends Component
     {
         if (!$this->activeProject || !$this->allowed('projects.view')) return;
 
-        $architect = DB::table('users')->where('id', $this->activeProject->created_by)->first();
+        // The project's lead (projects created before leads existed: whoever created it)
+        $architect = DB::table('users')->where('id', $this->activeProject->lead_user_id ?? $this->activeProject->created_by)->first();
         $this->leadArchitect = $architect ? trim($architect->first_name . ' ' . mb_substr((string) $architect->last_name, 0, 1) . '.') : __('portal.overview.lead_fallback');
         
-        $rawPhases = DB::table('project_phases')->where('project_id', $this->activeProject->id)->whereNull('deleted_at')->orderBy('phase_number', 'asc')->get();
-        $completedWeight = 0;
-        $this->phases = $rawPhases->map(function ($phase) use (&$completedWeight) {
-            if ($phase->status === 'Completed') $completedWeight += $phase->weight_percentage;
-            return (array) $phase;
-        })->toArray();
-        $this->overallProgress = $completedWeight;
+        $this->phases = DB::table('project_phases')->where('project_id', $this->activeProject->id)->whereNull('deleted_at')->orderBy('phase_number', 'asc')->get()
+            ->map(fn ($phase) => (array) $phase)->toArray();
+        // The same figure as HQ's project page: each milestone's weight × its share of done tasks (docs/PROJECTS.md, decision 3)
+        $this->overallProgress = (int) round(ProjectPlan::progress(ProjectPlan::milestones($this->activeProject->id)));
 
         // The client's own approvals only: staff comments on a task stay inside HQ (docs/PROJECTS.md)
         $logs = $this->clientTasks()->join('task_comments', 'task_comments.task_id', '=', 'tasks.id')->where('task_comments.author_type', 'client')->whereNull('task_comments.deleted_at')
@@ -308,7 +326,7 @@ class Dashboard extends Component
         $this->activeTasks = $this->clientTasks()->select('tasks.id', 'tasks.title', 'tasks.status')->get()->toArray();
         // A ticket on an internal task keeps its own title; the task's is not shown
         $this->qaTickets = DB::table('qa_tickets')->leftJoin('tasks', fn ($j) => $j->on('qa_tickets.task_id', '=', 'tasks.id')->where('tasks.is_client_visible', 1))
-            ->where('qa_tickets.project_id', $this->activeProject->id)->select('qa_tickets.*', 'tasks.title as task_title')->orderBy('qa_tickets.created_at', 'desc')->get()->toArray();
+            ->where('qa_tickets.project_id', $this->activeProject->id)->whereNull('qa_tickets.deleted_at')->select('qa_tickets.*', 'tasks.title as task_title')->orderBy('qa_tickets.created_at', 'desc')->get()->toArray();
     }
 
     public function loadFinancials()
@@ -338,6 +356,33 @@ class Dashboard extends Component
             ->select('project_signoffs.*', 'projects.title as project_title')
             ->orderBy('project_signoffs.created_at', 'desc')
             ->get()->toArray();
+
+        // Sent through the opportunity pipeline: the version they have now (older ones are superseded). A member limited
+        // to one project sees that project's SOW only. Links are made now, so they outlive the email's (docs/QA-PORTAL.md)
+        $opportunityIds = DB::table('opportunities')->where('organization_id', $this->organization->id)->whereNull('deleted_at')->pluck('id');
+        $restricted = $this->user->restricted_project_id;
+        $this->vaultContracts = StatementOfWork::whereIn('opportunity_id', $opportunityIds)
+            ->whereIn('status', [StatementOfWork::SENT, StatementOfWork::CHANGES_REQUESTED, StatementOfWork::SIGNED])
+            ->when($restricted, fn ($q) => $q->where('project_id', $restricted))
+            ->orderByDesc('created_at')->get()
+            ->map(function (StatementOfWork $sow) {
+                $paper = Sows::isImported($sow);
+                $online = ! $paper && $sow->sent_at;
+
+                return ['id' => $sow->id, 'title' => $sow->title, 'reference' => $sow->reference, 'version' => $sow->version,
+                    'state' => $sow->status === StatementOfWork::SIGNED ? ($paper ? 'paper' : 'signed') : $sow->status,
+                    'date' => PortalFormat::date($sow->signed_at ?? $sow->changes_requested_at ?? $sow->sent_at),
+                    'open' => $online ? PortalLinks::fromPortal('portal.sow', $sow->id, $this->user->id) : null,
+                    'pdf' => $online ? PortalLinks::fromPortal('portal.sow.pdf', $sow->id) : null];
+            })->all();
+        $this->vaultProposals = $restricted ? [] : Proposal::whereIn('opportunity_id', $opportunityIds)
+            ->whereIn('status', [Proposal::SENT, Proposal::CHANGES_REQUESTED, Proposal::CLIENT_APPROVED])->whereNotNull('sent_at')
+            ->orderByDesc('created_at')->get()
+            ->map(fn (Proposal $proposal) => ['id' => $proposal->id, 'title' => $proposal->title, 'reference' => $proposal->proposal_ref, 'version' => $proposal->version,
+                'state' => match ($proposal->status) { Proposal::CLIENT_APPROVED => 'approved', Proposal::CHANGES_REQUESTED => 'changes_requested', default => 'sent' },
+                'date' => PortalFormat::date($proposal->client_approved_at ?? $proposal->sent_at),
+                'open' => PortalLinks::fromPortal('portal.proposals.review', $proposal->id, $this->user->id),
+                'pdf' => PortalLinks::fromPortal('portal.proposals.pdf', $proposal->id)])->all();
     }
 
     public function loadTeamCommand()
@@ -426,7 +471,7 @@ class Dashboard extends Component
 
             $notifications = [];
             foreach (Access::staffWith('qa.edit') as $adminId) {
-                $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => $isGeneralMessage ? 'Message from a client' : 'Issue reported by a client', 'message' => "{$this->user->first_name} {$this->user->last_name} ({$this->organization->name}) " . ($isGeneralMessage ? 'sent a message' : 'reported an issue') . " on {$this->activeProject->title}: “{$this->qaTitle}”. Reply in Quality and issues.", 'type' => 'Project', 'created_at' => now()];
+                $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => $isGeneralMessage ? 'Message from a client' : 'Issue reported by a client', 'message' => "{$this->user->first_name} {$this->user->last_name} ({$this->organization->name}) " . ($isGeneralMessage ? 'sent a message' : 'reported an issue') . " on {$this->activeProject->title}: “{$this->qaTitle}”. Reply in Quality and issues.", 'link_url' => route('hq.ops.qa', ['project' => $this->activeProject->id]), 'type' => 'Project', 'created_at' => now()];
             }
             if(!empty($notifications)) DB::table('notifications')->insert($notifications);
         });
@@ -441,9 +486,12 @@ class Dashboard extends Component
     public function approveTask($taskId)
     {
         abort_unless($this->allowed('projects.approve'), 403);
-        if (!$this->ownsTask($taskId)) return;
+        // Only a task waiting for the client's review (the button shows on those alone)
+        if (!$this->ownsTask($taskId) || !$this->clientTasks()->where('tasks.id', $taskId)->where('tasks.status', 'QA_Review')->exists()) return;
 
         DB::table('tasks')->where('id', $taskId)->update(['status' => 'Done', 'updated_at' => now()]);
+        $this->tellProjectLead('Task approved by the client', "{$this->user->first_name} {$this->user->last_name} ({$this->organization->name}) approved “"
+            . DB::table('tasks')->where('id', $taskId)->value('title') . "” on {$this->activeProject->title}.");
         
         DB::table('task_comments')->insert([
             'task_id' => $taskId, 'user_id' => $this->user->id, 'author_type' => 'client',
@@ -452,6 +500,14 @@ class Dashboard extends Component
 
         $this->loadProjectTelemetry();
         session()->flash('global_success', __('portal.tasks.approved'));
+    }
+
+    /** A bell for the project's lead about what the client just did, opening the project's milestone board */
+    private function tellProjectLead(string $title, string $message): void
+    {
+        if (!$this->activeProject || !($this->activeProject->lead_user_id ?? null)) return;
+        DB::table('notifications')->insert(['id' => (string) Str::uuid(), 'user_id' => $this->activeProject->lead_user_id, 'title' => $title,
+            'message' => $message, 'link_url' => route('hq.ops.project', ['project' => $this->activeProject->id, 'tab' => 'board']), 'type' => 'Project', 'created_at' => now()]);
     }
 
     public function teleportToQa($taskId, $taskTitle)
@@ -531,7 +587,7 @@ class Dashboard extends Component
         // Notify HQ
         $notifications = [];
         foreach (Access::staffWith('qa.edit') as $adminId) {
-            $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => 'Client replied to an issue', 'message' => "{$this->user->first_name} {$this->user->last_name} ({$this->organization->name}) replied on “{$this->selectedTicket->title}”. Read it in Quality and issues.", 'type' => 'Project', 'created_at' => now()];
+            $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => 'Client replied to an issue', 'message' => "{$this->user->first_name} {$this->user->last_name} ({$this->organization->name}) replied on “{$this->selectedTicket->title}”. Read it in Quality and issues.", 'link_url' => route('hq.ops.qa', ['project' => $this->activeProject->id]), 'type' => 'Project', 'created_at' => now()];
         }
         if(!empty($notifications)) DB::table('notifications')->insert($notifications);
 
@@ -648,7 +704,7 @@ class Dashboard extends Component
             foreach (Access::staffWith('finance.approve') as $adminId) {
                 $notifications[] = [
                     'id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => 'Proof of payment uploaded',
-                    'message' => "{$this->organization->name} uploaded proof of a {$this->activeProject->currency} " . number_format((float) $this->popAmount, 2) . " payment for invoice {$invoiceNumber}" . ($this->popWhtAmount > 0 ? ' (withholding tax ' . number_format((float) $this->popWhtAmount, 2) . ')' : '') . '. Verify it in Payment verification.', 'type' => 'Financial', 'created_at' => now()
+                    'message' => "{$this->organization->name} uploaded proof of a {$this->activeProject->currency} " . number_format((float) $this->popAmount, 2) . " payment for invoice {$invoiceNumber}" . ($this->popWhtAmount > 0 ? ' (withholding tax ' . number_format((float) $this->popWhtAmount, 2) . ')' : '') . '. Verify it in Payment verification.', 'link_url' => route('hq.finance.escrow'), 'type' => 'Financial', 'created_at' => now()
                 ];
             }
             if(!empty($notifications)) DB::table('notifications')->insert($notifications);
@@ -664,8 +720,8 @@ class Dashboard extends Component
     {
         abort_unless($this->allowed('settings.edit'), 403);
         $this->validate([
-            'brandPrimary' => 'required|string|size:7', 'brandSecondary' => 'required|string|size:7',
-            'brandAccent' => 'required|string|size:7', 'brandLogo' => 'nullable|image|mimes:png|max:5120',
+            'brandPrimary' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'], 'brandSecondary' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'brandAccent' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'], 'brandLogo' => 'nullable|image|mimes:png|max:5120',
         ]);
 
         $logoPath = $this->clientSettings->logo_path ?? null;

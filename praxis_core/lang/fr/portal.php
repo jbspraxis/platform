@@ -232,9 +232,31 @@ return [
         'pay_empty' => "Les coordonnées de paiement ne sont pas encore disponibles. Contactez votre responsable de projet pour obtenir les instructions de paiement.",
     ],
 
+    'no_project' => [
+        'title' => "Votre espace projet s’ouvre au démarrage des travaux",
+        'body' => "Dès que votre énoncé des travaux est signé, votre projet, son avancement, vos signalements et vos factures s’affichent ici. D’ici là, vos propositions et énoncés des travaux sont dans Documents, et chaque invitation à une réunion vous parvient par e-mail.",
+        'documents' => "Ouvrir vos documents",
+    ],
+
     'documents' => [
-        'signed' => "Documents signés",
-        'sows' => "Propositions signées",
+        'signed' => "Vos documents",
+        'contracts' => "Énoncés des travaux",
+        'no_contracts' => "Aucun énoncé des travaux pour l’instant",
+        'no_contracts_help' => "Votre énoncé des travaux s’affiche ici dès que nous vous l’envoyons.",
+        'proposals' => "Propositions",
+        'no_proposals' => "Aucune proposition pour l’instant",
+        'no_proposals_help' => "Une proposition s’affiche ici dès que nous vous l’envoyons.",
+        'version_meta' => "Référence :ref · Version :version",
+        'state' => [
+            'sent' => "Envoyée le :date, en attente de votre réponse",
+            'changes_requested' => "Modifications demandées le :date",
+            'signed' => "Signé le :date",
+            'paper' => "Signé sur papier le :date",
+            'approved' => "Approuvée le :date",
+        ],
+        'open' => "Ouvrir",
+        'pdf' => "Télécharger le PDF",
+        'sows' => "Propositions signées auparavant",
         'sow_meta' => "Référence :ref · Dernière mise à jour le :date",
         'no_sows' => "Aucune proposition signée pour l’instant",
         'no_sows_help' => "Une proposition s’affiche ici dès que vous l’avez signée.",

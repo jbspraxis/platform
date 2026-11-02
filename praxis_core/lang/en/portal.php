@@ -236,9 +236,31 @@ return [
         'pay_empty' => 'Payment details aren’t available yet. Contact your project lead for payment instructions.',
     ],
 
+    'no_project' => [
+        'title' => 'Your project space opens when the work starts',
+        'body' => 'Once your statement of work is signed, your project, its progress, issues and invoices appear here. Until then, your proposals and statements of work are under Documents, and each meeting invitation reaches you by email.',
+        'documents' => 'Open your documents',
+    ],
+
     'documents' => [
-        'signed' => 'Signed documents',
-        'sows' => 'Signed proposals',
+        'signed' => 'Your documents',
+        'contracts' => 'Statements of work',
+        'no_contracts' => 'No statement of work yet',
+        'no_contracts_help' => 'Your statement of work appears here once we send it to you.',
+        'proposals' => 'Proposals',
+        'no_proposals' => 'No proposal yet',
+        'no_proposals_help' => 'A proposal appears here once we send it to you.',
+        'version_meta' => 'Reference :ref · Version :version',
+        'state' => [
+            'sent' => 'Sent on :date, waiting for your answer',
+            'changes_requested' => 'You asked for changes on :date',
+            'signed' => 'Signed on :date',
+            'paper' => 'Signed on paper on :date',
+            'approved' => 'Approved on :date',
+        ],
+        'open' => 'Open',
+        'pdf' => 'Download PDF',
+        'sows' => 'Earlier signed proposals',
         'sow_meta' => 'Reference :ref · Last updated :date',
         'no_sows' => 'No signed proposals yet',
         'no_sows_help' => 'A proposal appears here once you sign it.',
