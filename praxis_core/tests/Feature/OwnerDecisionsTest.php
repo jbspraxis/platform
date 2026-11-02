@@ -28,6 +28,24 @@ class OwnerDecisionsTest extends TestCase
         ]);
     }
 
+    public function test_d6_a_company_being_registered_is_added_without_its_numbers_and_bills_nigerian_clients(): void
+    {
+        $this->actingAs($this->staff('owner', ['owner']));
+        DB::table('mdm_legal_entities')->where('region_code', 'NG')->delete(); // live had only the Cameroon company
+
+        Livewire::test(\App\Livewire\Hq\Mdm\LegalEntityRegistry::class)
+            ->set('region_code', 'NG')->set('legal_name', 'JBS Praxis LLC')->set('registered_address', '21B Bode Ajakaiye Street, Lekki, Lagos')
+            ->set('legal_representative_name', 'Tom-Blake Forghab')->set('legal_representative_title', 'Managing Partner')
+            ->call('saveEntity')->assertHasNoErrors()->assertSee('Being registered');
+
+        $entity = DB::table('mdm_legal_entities')->where('region_code', 'NG')->sole();
+        $this->assertSame([null, null, null, 0], [$entity->registration_number, $entity->tax_identification_number, $entity->employer_social_security_code, (int) $entity->charges_vat]);
+        // It is Nigeria's company now: it issues, without VAT ("off", not "no company")
+        $this->assertSame($entity->id, \App\Support\Finance\Vat::issuer(null)?->id);
+        $vat = \App\Support\Finance\Vat::for('Nigeria');
+        $this->assertSame(['off', 'JBS Praxis LLC'], [$vat['why'], $vat['company']]);
+    }
+
     public function test_d1_an_organisation_has_up_to_10_portal_accounts(): void
     {
         Mail::fake();
