@@ -47,7 +47,7 @@ Defaults chosen in PR 1 without asking (change them here if the owner disagrees)
 |---|---|---|---|---|
 | **1 Foundation** | `leads/pr1-foundation` | Data and backfill (section 4); the timeline (section 5); the `App\Support\Leads` contracts (section 6); Add a lead, Lead 360 with Overview and Activity built and the other tabs as stubs, the slimmed list, Lead settings (section 7); website forms and signing through the contracts; this runbook. | — | Built, in review |
 | **2 Lead 360 tabs** | `leads/pr2-lead360` | Meetings (schedule with a Google invite and Meet, or log one; transcript plus Claude summary, reusing the opportunity meeting code), **Open an opportunity** from a meeting (meeting, notes and contacts carried over, AI-suggested title), website bookings as lead meetings, the Emails tab (HQ Mail both ways by contact address, "Email them"), the Opportunities tab in full, timeline entries for all of these. | 1 | Not started |
-| **3 List and sales** | `leads/pr3-list-sales` | Excel import (template, preview Ready / Needs fixing / Already exists, owner and source in the modal, bad rows back as an Excel), list filters with **Mine** on by default, **My follow-ups** (overdue in red, a morning bell), the summary strip (new this week/month, by status, conversion, open opportunity value, overdue, per owner, period filter). | 1 | Not started |
+| **3 List and sales** | `leads/pr3-list-sales` | Excel import on a **shared import engine** that Campaigns Outreach (C2) reuses (section 6, *The shared import engine*): template, preview Ready / Needs fixing / Already exists, owner and source in the modal, bad rows back as an Excel; Leads is its first schema. List filters with **Mine** on by default, **My follow-ups** (overdue in red, a morning bell), the summary strip (new this week/month, by status, conversion, open opportunity value, overdue, per owner, period filter). | 1 | Not started |
 
 **Done means** for every PR: the scope works end to end on a local server, desktop and 375 px; tests cover it (section 10); CI is green; the PR description lists what the owner should click to check it live; section 11 gets a line once it is live. HQ is English (no language switch); anything a client sees is in English and French.
 
@@ -112,6 +112,30 @@ All in `App\Support\Leads`. Rules that are broken throw **`LeadRuleBroken`** (`-
 - **`Sources`**: `LABELS`, `WEBSITE`, `BY_HAND` (what the Add a lead form offers), `label`, `isWebsite`. **`Countries`**: `NAMES`, `FRENCH` (emails start in French there), `DIAL_CODES`, `fromDialCode`, `language`.
 - **Livewire event `lead-changed`**: `LeadPage` listens and redraws (tab counts, timeline). PR 2's tabs dispatch it after a change.
 
+### The shared import engine (PR 3 builds it; Campaigns Outreach reuses it)
+
+The lead chat's request of 3 Nov 2026: the Excel import is built **once**, generic, so Campaigns Outreach (C2, later) imports prospects with the same engine and screen. Nothing of it is in PR 1.
+
+- **Where**: `App\Support\Import\…` (the engine) and one **schema** class per import type. Leads' schema is the first (e.g. `App\Support\Leads\LeadImportSchema`); Outreach adds a `prospects` schema without changing the engine. The screen is one Livewire import modal that takes a schema key, so Leads and Outreach show the same thing.
+- **A schema** says:
+  - its columns, each with a label, whether it is required, an example and a help line for the guide;
+  - its validators per column, plus rules across columns (for example "at least one of these");
+  - the values it fills in itself (for example the language from the country);
+  - how rows group into one record (Leads: one row per contact, rows with the same organisation name are one lead);
+  - how to tell that a group already exists (Leads: `Duplicates::find`);
+  - how to import one good group with the modal's options (Leads: `Leads::create` / `Contacts::add`, as in section 9).
+- **The engine** gives every schema:
+  - **the template**: an .xlsx with sheet 1 a guide to the columns (required ones marked, examples) and sheet 2 the data with its headers;
+  - **reading a file** into a **preview**: each row or group is Ready, Needs fixing (the reason, and the cell in red), or Already exists;
+  - **import the good rows**: only the Ready ones, each once (a `dedupe_key` per file and row);
+  - **the bad rows as an Excel** to fix and upload again, with their reasons and red cells.
+- **Leads' schema**:
+  - columns as Add a lead (section 7): organisation name, country, industry, phone, email, city, address, then the contact's name, job title, email, phone and deal role, and an optional owner email that overrides the modal's owner for that row;
+  - required as decision 1 (`Leads::validate`);
+  - an existing lead is skipped, but its new contacts are added.
+- **Outreach's schema** (C2, not built here): `prospects`, with company, contact first name, email, country and industry, plus at least one of "What we found" or website; the language is filled from the country (`Countries::language`).
+- **The library**: PR 3 chooses it and checks its `require` against the live PHP first (`docs/OPPORTUNITIES.md` section 5: no `intl`, `fileinfo`, `exif`, `sodium` or `gmp`, and PR 5 found no `gd`). PhpSpreadsheet needs `gd` and `fileinfo`, so it is out unless they are confirmed live. A small reader and writer on `ZipArchive` and `XMLReader` is the fallback, if `zip` is there.
+
 ## 7. Screens and routes (PR 1)
 
 - **`hq.crm.leads`** `/intelligence/leads` (`App\Livewire\Hq\Intelligence\LeadsRegister`, crm.view): every lead and client, latest activity first: organisation (industry, country, "Possible duplicate"), main contact, status, next step (red when overdue), owner ("Assign to me" when unowned), COPQ. A row opens the lead. *Book free audit* (as before), *Download CSV* (crm.export: organisation, country, industry, contact, email, phone, status, source, owner, next step and date, COPQ, tier, date added), *Lead settings* (only `opportunities.approve`), *Add lead*. The board by stage is gone (stages are gone); filters, Mine, the summary strip and the import are PR 3's.
@@ -141,8 +165,8 @@ PRs 2 and 3 run at the same time; each owns its files, and the few shared ones a
   - Meetings: schedule (Google invite + Meet, or an address) or log; transcript, Claude summary and next steps, typed notes, download; timeline `meeting` lines with `meeting_id`.
   - *Open an opportunity* from a meeting: the meeting (`meetings.opportunity_id` set), its notes and contacts carried over; the AI suggests the title from the transcript; timeline `opportunity_opened` with `opportunity_id`.
   - Emails: HQ Mail to and from the lead's contacts, matched by address (`client_users.email`, lower case), both ways; *Email them* opens the composer with the contact; timeline `email` lines (`related_type = mail_message`).
-- **PR 3 owns**: `App\Livewire\Hq\Intelligence\LeadsRegister` and `leads-register.blade.php` (filters, Mine on by default, the summary strip, the import button); new `App\Livewire\Hq\Leads\ImportLeads` and `FollowUps` (route of its own), `App\Support\Leads\Import` and any `LeadNumbers`; the morning bell's command and its schedule line; the import template (sheet 1 a guide with required columns marked, sheet 2 the data; one row per contact; rows with the same organisation name are one lead).
-  - The import validates rows with `Leads::validate`, finds "Already exists" with `Duplicates::find`, creates with `Leads::create($lead, $contacts, $by, ['owner_id' => …, 'source' => 'import' or the modal's, 'contact_source' => 'import', 'dedupe_key' => 'import:<file hash>:<row>'])`, adds new contacts to existing leads with `Contacts::add`, and records `imported` lines.
+- **PR 3 owns**: `App\Livewire\Hq\Intelligence\LeadsRegister` and `leads-register.blade.php` (filters, Mine on by default, the summary strip, the import button); the **shared import engine** `App\Support\Import\…` and its import modal (section 6, *The shared import engine*), with Leads' schema (`App\Support\Leads\LeadImportSchema`) as the first; new `App\Livewire\Hq\Leads\FollowUps` (route of its own) and any `LeadNumbers`; the morning bell's command and its schedule line; the Leads template (sheet 1 a guide with required columns marked, sheet 2 the data; one row per contact; rows with the same organisation name are one lead). Campaigns Outreach (C2) later adds only its own schema; a change it needs in the engine is made with PR 3's tests kept green.
+  - Leads' schema validates rows with `Leads::validate`, finds "Already exists" with `Duplicates::find`, creates with `Leads::create($lead, $contacts, $by, ['owner_id' => …, 'source' => 'import' or the modal's, 'contact_source' => 'import', 'dedupe_key' => 'import:<file hash>:<row>'])`, adds new contacts to existing leads with `Contacts::add`, and records `imported` lines.
   - Follow-ups read `organizations.next_step` / `next_step_due` for open leads (`LeadStatus::OPEN`), overdue first in red (`NextStep::isOverdue`), leads with no next step flagged; the morning bell through `LeadOwner::bell`.
 - **Shared, append-only**: `LeadTimeline::TYPES` and `partials/timeline-icon.blade.php` (add your types); `routes/web.php` (add your routes under the Leads group); this file (your own section in 12).
 - **PR 1 keeps**: `App\Support\Leads\*` as they are (a change to a contract is recorded in section 12), `AddLead`, `LeadPage`'s Overview and Activity, `LeadSettings`, the migrations.
@@ -173,3 +197,4 @@ PRs 2 and 3 run at the same time; each owns its files, and the few shared ones a
   - **The board by stage is gone** from the list; PR 3 may add a board by status if sales want one.
 - **Found in passing, fixed**: Free audits' *Mark as lost* wrote `organizations.status = 'Lost'` (not a value of that column); it now marks the lead Lost. The contact form stored the dialling code as the country; it stores the country's name.
 - **Open owner decisions**: none needed to merge. To confirm after it is live: the choices above.
+- **3 Nov 2026, the lead chat**: PR 3's import is a shared engine with a schema per import type, so Campaigns Outreach (C2) reuses it for prospects (section 6, *The shared import engine*; section 9). PR 1 places no part of it. The Broadcasts revamp (C1, branch `campaigns/c1-broadcasts`) runs in parallel and doesn't touch the Leads files.
