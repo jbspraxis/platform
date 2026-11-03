@@ -46,8 +46,10 @@
                             <div class="relative">
                                 <input type="password" :type="show ? 'text' : 'password'" id="client-password" wire:model="password" class="input pr-11" required autocomplete="current-password">
                                 <button type="button" @click="show = !show" :aria-pressed="show.toString()" aria-label="{{ __('portal.login.show_password') }}" title="{{ __('portal.login.show_password') }}"
+                                        :title="show ? @js(__('portal.login.hide_password')) : @js(__('portal.login.show_password'))"
                                         class="absolute inset-y-0 right-0 flex w-11 cursor-pointer items-center justify-center border-0 bg-transparent text-muted hover:text-ink">
-                                    <i data-lucide="eye" class="h-4 w-4"></i>
+                                    <span x-show="!show" class="flex"><i data-lucide="eye" class="h-4 w-4"></i></span>
+                                    <span x-show="show" x-cloak class="flex"><i data-lucide="eye-off" class="h-4 w-4"></i></span>
                                 </button>
                             </div>
                             @error('password') <span class="field-error" role="alert">{{ $message }}</span> @enderror

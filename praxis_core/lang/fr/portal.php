@@ -49,6 +49,7 @@ return [
         'email' => "Adresse e-mail",
         'password' => "Mot de passe",
         'show_password' => "Afficher le mot de passe",
+        'hide_password' => "Masquer le mot de passe",
         'forgot' => "Mot de passe oublié\u{202F}?",
         'submit' => "Se connecter",
         'submitting' => "Connexion en cours…",

@@ -42,12 +42,20 @@
                     <span wire:loading wire:target="signInWithPin">{{ __('sign_in.login.pin_submitting') }}</span>
                 </button>
             @else
-                <div class="field">
+                <div class="field" x-data="{ show: false }">
                     <div class="flex items-center justify-between gap-3">
                         <label for="password" class="label">Password</label>
                         <button type="button" wire:click.prevent="toggleView('recovery')" class="btn btn-ghost btn-sm">Forgot your password?</button>
                     </div>
-                    <input type="password" id="password" wire:model="password" class="input" required autocomplete="current-password">
+                    {{-- The eye shows what was typed (the same button as the Client Portal's sign-in) --}}
+                    <div class="relative">
+                        <input type="password" :type="show ? 'text' : 'password'" id="password" wire:model="password" class="input pr-11" required autocomplete="current-password">
+                        <button type="button" @click="show = !show" :aria-pressed="show.toString()" aria-label="Show password" title="Show password" :title="show ? 'Hide password' : 'Show password'"
+                                class="absolute inset-y-0 right-0 flex w-11 cursor-pointer items-center justify-center border-0 bg-transparent text-muted hover:text-ink">
+                            <span x-show="!show" class="flex"><i data-lucide="eye" class="h-4 w-4"></i></span>
+                            <span x-show="show" x-cloak class="flex"><i data-lucide="eye-off" class="h-4 w-4"></i></span>
+                        </button>
+                    </div>
                     @error('password') <span class="field-error">{{ $message }}</span> @enderror
                 </div>
 
