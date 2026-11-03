@@ -32,6 +32,7 @@ return [
         'plan_project' => "Plan du projet",
         'broadcast_draft' => 'Brouillon de diffusion',
         'broadcast_translate' => 'Traduction de diffusion',
+        'outreach_email' => 'E-mail de prospection',
         'connection_test' => "Test de la clé",
     ],
 ];

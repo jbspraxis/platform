@@ -166,8 +166,13 @@ class ProcessBroadcastQueue extends Command
         if (! $e instanceof TransportExceptionInterface) {
             return false;
         }
-        $message = $e->getMessage();
 
+        return self::refusesAddress($e->getMessage());
+    }
+
+    /** The mail server's words refuse the address for good (Outreach reads its own mailer's errors with it too) */
+    public static function refusesAddress(string $message): bool
+    {
         return (bool) preg_match('/\b55[0-4]\b|\b5\.1\.[0-9]\b|user unknown|no such user|mailbox (unavailable|not found)|does not exist|address rejected|recipient (address )?rejected/i', $message)
             && ! preg_match('/\b(4[0-9]{2}|5\.7\.[0-9])\b|rate|try again|temporar/i', $message);
     }

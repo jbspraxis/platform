@@ -49,6 +49,11 @@ return [
             // Roles that already exist get them from the migration 2026_10_31_800002_grant_opportunity_permissions.
             'opportunities' => ['label' => 'Opportunities', 'actions' => ['view', 'create', 'manage', 'approve', 'transcripts']],
             'broadcasts' => ['label' => 'Broadcasts', 'actions' => ['view', 'create', 'approve']],
+            // Campaigns › Outreach (docs/CAMPAIGNS.md section 10): view = see campaigns, prospects, drafts and numbers;
+            // create = make campaigns, import prospects and review drafts (approve, edit, rewrite, skip) for emails sent from
+            // your own mailbox; approve = the sending limits, resuming a paused sender, and every campaign. Roles that
+            // already exist get them from the migration 2026_11_03_800001_grant_outreach_permissions.
+            'outreach' => ['label' => 'Outreach', 'actions' => ['view', 'create', 'approve']],
             'marketing' => ['label' => 'Marketing campaigns', 'actions' => ['view', 'create', 'edit', 'delete', 'approve']],
             // What jbspraxis.com shows: company details, contact, social links, leadership (HQ → Marketing → Website settings).
             // Roles that already exist get it from the migration 2026_10_30_000002_grant_website_settings_permissions.
@@ -101,7 +106,7 @@ return [
             ]],
             // marketing.delete also opens the social-account password vault, so it stays with Owner/Partner
             'sales' => ['name' => 'Sales & Marketing', 'description' => 'Leads, proposals, broadcasts, campaigns and website settings.', 'grant' => [
-                'dashboard.view', 'crm.*', 'broadcasts.*', 'marketing.view', 'marketing.create', 'marketing.edit', 'marketing.approve',
+                'dashboard.view', 'crm.*', 'broadcasts.*', 'outreach.view', 'outreach.create', 'marketing.view', 'marketing.create', 'marketing.edit', 'marketing.approve',
                 'website.*', 'kaizen.*', 'projects.view', 'expenses.create', 'mail.view',
                 'opportunities.view', 'opportunities.create', 'opportunities.manage', 'opportunities.transcripts',
             ]],

@@ -102,18 +102,23 @@
                 @endif
             @endif
 
-            {{-- Campaigns (docs/CAMPAIGNS.md): Broadcasts to people who know us; Outreach (C2) adds its link here --}}
-            @can('broadcasts.view')
-                <a href="{{ route('hq.campaigns.broadcasts') }}" class="rail-link {{ $on('hq.campaigns.*') }}" wire:navigate>
+            {{-- Campaigns (docs/CAMPAIGNS.md): Broadcasts to people who know us; Outreach (C2) to researched prospects --}}
+            @canany(['broadcasts.view', 'outreach.view'])
+                <a href="{{ $user->can('broadcasts.view') ? route('hq.campaigns.broadcasts') : route('hq.campaigns.outreach') }}" class="rail-link {{ $on('hq.campaigns.*') }}" wire:navigate>
                     <i data-lucide="send"></i> Campaigns
                 </a>
                 @if (request()->routeIs('hq.campaigns.*'))
                     <div class="rail-sub">
-                        <a href="{{ route('hq.campaigns.broadcasts') }}" class="{{ $on('hq.campaigns.broadcasts', 'hq.campaigns.broadcast', 'hq.campaigns.report') }}" wire:navigate>Broadcasts</a>
-                        <a href="{{ route('hq.campaigns.audiences') }}" class="{{ $on('hq.campaigns.audiences') }}" wire:navigate>Audiences</a>
+                        @can('broadcasts.view')
+                            <a href="{{ route('hq.campaigns.broadcasts') }}" class="{{ $on('hq.campaigns.broadcasts', 'hq.campaigns.broadcast', 'hq.campaigns.report') }}" wire:navigate>Broadcasts</a>
+                            <a href="{{ route('hq.campaigns.audiences') }}" class="{{ $on('hq.campaigns.audiences') }}" wire:navigate>Audiences</a>
+                        @endcan
+                        @can('outreach.view')
+                            <a href="{{ route('hq.campaigns.outreach') }}" class="{{ $on('hq.campaigns.outreach', 'hq.campaigns.outreach.*') }}" wire:navigate>Outreach</a>
+                        @endcan
                     </div>
                 @endif
-            @endcan
+            @endcanany
 
             @canany(['projects.view', 'qa.view', 'timesheets.view', 'signoffs.view'])
                 @php

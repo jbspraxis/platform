@@ -10,6 +10,12 @@ Schedule::command('marketing:sync-telemetry')->everySixHours();
 // Broadcasts (docs/CAMPAIGNS.md 4.6): starts scheduled ones and sends 30 emails a run, the cPanel SMTP pace; never two runs at once
 Schedule::command('broadcast:process')->everyFiveMinutes()->withoutOverlapping(10);
 
+// Outreach (docs/CAMPAIGNS.md section 10): Claude writes the next imported prospects' emails (on the 'ai' queue below);
+// the sender sends one approved email per salesperson at most, within the owner's limits and window, and stops
+// follow-ups when a prospect replies. Each never runs twice at once.
+Schedule::command('outreach:write')->everyMinute()->withoutOverlapping(10);
+Schedule::command('outreach:send')->everyMinute()->withoutOverlapping(10);
+
 // The The 120-Minute Idle Killswitch Command on hours spent working and the The QA SLA Auto-Approver Command from clients.
 Schedule::command('ops:qa-auto-approve')->everyMinute();
 Schedule::command('ops:timer-killswitch')->everyFiveMinutes();

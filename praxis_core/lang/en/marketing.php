@@ -19,4 +19,15 @@ return [
         'preview' => 'This is a preview from a test email: the button doesn’t unsubscribe anyone.',
         'other_language' => 'Français',
     ],
+    // The same page for an outreach email's link (/email/unsubscribe/o/…, docs/CAMPAIGNS.md section 10): the person
+    // never asked for news, so it speaks of emails from us. Keys missing here use the ones above.
+    'outreach_unsubscribe' => [
+        'heading' => 'Stop emails from JBS Praxis?',
+        'body' => 'We won’t write to :email again: no more emails from our team, and no news or invitations.',
+        'body_plain' => 'We won’t write to this address again: no more emails from our team, and no news or invitations.',
+        'keeps' => 'If you write to us one day, we’ll still answer you.',
+        'done_body' => 'We won’t write to :email again.',
+        'done_body_plain' => 'We won’t write to this address again.',
+        'mistake' => 'If this was a mistake, reply to the email you received or write to :contact.',
+    ],
 ];

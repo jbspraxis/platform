@@ -21,6 +21,11 @@ Route::prefix('email')->group(function () {
     // Inboxes post one-click unsubscribes from a few servers: a higher limit than the page
     Route::post('/unsubscribe/{token}', [EmailLinkController::class, 'unsubscribe'])->where('token', '[A-Za-z0-9]{7,40}')
         ->middleware('throttle:120,1')->name('email.unsubscribe.confirm');
+    // Outreach emails (C2, docs/CAMPAIGNS.md section 10): the same page and one-click POST, for an outreach_emails.token
+    Route::get('/unsubscribe/o/{token}', [EmailLinkController::class, 'outreachPage'])->where('token', '[A-Za-z0-9]{40}')
+        ->middleware('throttle:30,1')->name('email.unsubscribe.outreach');
+    Route::post('/unsubscribe/o/{token}', [EmailLinkController::class, 'outreachUnsubscribe'])->where('token', '[A-Za-z0-9]{40}')
+        ->middleware('throttle:120,1')->name('email.unsubscribe.outreach.confirm');
     // Mail image proxies (Gmail, Outlook) fetch for many readers from a few addresses: a high limit
     Route::get('/open/{token}.png', [EmailLinkController::class, 'open'])->where('token', '[A-Za-z0-9]{40}')
         ->middleware('throttle:600,1')->name('email.open');

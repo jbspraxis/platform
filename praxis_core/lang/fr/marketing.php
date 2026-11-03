@@ -19,4 +19,15 @@ return [
         'preview' => 'Ceci est un aperçu depuis un e-mail de test : le bouton ne désabonne personne.',
         'other_language' => 'English',
     ],
+    // La même page pour le lien d’un e-mail de prospection (/email/unsubscribe/o/…, docs/CAMPAIGNS.md section 10) : la
+    // personne n’a jamais demandé nos nouvelles, elle parle donc de nos e-mails. Les clés absentes reprennent celles du dessus.
+    'outreach_unsubscribe' => [
+        'heading' => "Ne plus recevoir d’e-mails de JBS Praxis\u{202F}?",
+        'body' => "Nous n’écrirons plus à :email\u{00A0}: plus aucun e-mail de notre équipe, ni actualités ni invitations.",
+        'body_plain' => "Nous n’écrirons plus à cette adresse\u{00A0}: plus aucun e-mail de notre équipe, ni actualités ni invitations.",
+        'keeps' => 'Si un jour vous nous écrivez, nous vous répondrons toujours.',
+        'done_body' => 'Nous n’écrirons plus à :email.',
+        'done_body_plain' => 'Nous n’écrirons plus à cette adresse.',
+        'mistake' => 'S’il s’agit d’une erreur, répondez à l’e-mail reçu ou écrivez-nous à :contact.',
+    ],
 ];

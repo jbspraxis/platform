@@ -32,6 +32,7 @@ return [
         'plan_project' => 'Project plan',
         'broadcast_draft' => 'Broadcast draft',
         'broadcast_translate' => 'Broadcast translation',
+        'outreach_email' => 'Outreach email',
         'connection_test' => 'Key test',
     ],
 ];
