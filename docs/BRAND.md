@@ -953,7 +953,7 @@ Rules:
 - **Container**: width 100%, max-width 600px; under 600px the card goes full width with 24px side padding.
 - **Footer**: two lines, no separators: "JBS Praxis, Lagos and Douala" and why the person received the email.
 - One primary action per email, as a "bulletproof" HTML button (works without images). The link is also written out below it.
-- No images other than the logo. No photographs, no animated GIFs. Live text only; the email reads correctly with images off.
+- No images other than the logo, except the pictures a broadcast may carry (Broadcasts, below). No animated GIFs. Live text only; the email reads correctly with images off.
 - Codes, amounts and dates are set in the sans at 600 with tabular figures.
 - Every HTML email has a matching plain-text version. Inline CSS; tables for layout.
 - Test matrix: Gmail (web, Android, iOS, light and dark), Outlook (Windows, web), Apple Mail (macOS, iOS, light and dark), Yahoo Mail.
@@ -967,7 +967,7 @@ Email colours are written as literal hex (CSS variables do not work in email): b
 
 ### Language
 
-English and French from launch. The email goes in the recipient’s language: the language they used on the website, or their account’s language preference once it exists. When unknown, English. All wording lives in translation files (`lang/en/emails.php`, `lang/fr/emails.php`); templates contain no hard-coded sentences.
+English and French from launch. The email goes in the recipient’s language: the language they used on the website, or their account’s language preference once it exists. When unknown, English. Broadcasts have an English and a French version, and each person gets theirs: their own preference, else their organisation’s, else French for a French-speaking country (`MailLocale::forContact`, docs/CAMPAIGNS.md 4.3). All wording lives in translation files (`lang/en/emails.php`, `lang/fr/emails.php`); templates contain no hard-coded sentences.
 
 **Placeholders are code, not words.** They are identical in both languages, in lower case and in English (`:name`, `:first_name`, `:last_name`, `:company`, `:project`, `:date`, `:time`, `:code`, `:amount`, `:invoice`).
 
@@ -993,17 +993,31 @@ English and French from launch. The email goes in the recipient’s language: th
 | Payment reminder | Client | Reminder: invoice :invoice is due on :date | Rappel : la facture :invoice arrive à échéance le :date |
 | Overdue notice | Client | Invoice :invoice is now overdue | La facture :invoice est en retard de paiement |
 | Access on hold | Client | Your Client Portal access is on hold: unpaid invoice :invoice | Votre accès au portail client est suspendu : facture :invoice impayée |
-| Broadcast | Subscribed contacts | Editorial subject, sentence case | Objet éditorial |
+| Broadcast (one of five layouts, Broadcasts below) | Clients, leads and subscribers who haven’t unsubscribed (HQ › Campaigns) | Editorial subject, sentence case | Objet éditorial |
+| Broadcast test | The person testing | Test: :subject | Test : :subject |
 | New enquiry (internal) | intelligence@ | New enquiry: :company | — |
 | New free audit request (internal) | intelligence@ | New free audit request: :company, :date | — |
 | System Health alert (internal) | intelligence@ | System Health: :what_failed | — |
 
 The signing code appears in the body only, never in the subject. Internal emails use the same layout in English only, with the facts in a simple two-column table and the action link to HQ.
 
+### Broadcasts
+
+Designed emails from HQ › Campaigns › Broadcasts (docs/CAMPAIGNS.md) to people who already know us. Same frame as every email (header, rule, footer, sign-off); between the headline and the sign-off, blocks drawn with the email components, tables and inline styles only.
+
+- **Layouts:** Announcement, Insight, Event invite and Case study carry a small label above the headline, in Plus Jakarta Sans 13/20 600, Deep Teal: "News from JBS Praxis" / « Nouvelles de JBS Praxis », "JBS Praxis Insights" / « Analyses JBS Praxis », "Invitation" / « Invitation », "Case study" / « Étude de cas ». Letter has none: it is rich text only.
+- **Blocks:** section heading (Newsreader 22/28, Ink); text (the body styles, with bold, italics, underline, links, lists and two heading levels, nothing else); key figures (one to three, Newsreader 32/38 Deep Teal with tabular figures, the label 14/20 Muted, side by side on computers and stacked on phones, between two divider lines); details (the label and value table used for bookings); quote (the existing quote, its source 14/22 Muted); one button; a divider (1px `#D8DEE6`).
+- **Pictures:** only in broadcasts, never the only place a message is written, always with a description (alt text). JPG or PNG, under 2 MB, at most 1200 px wide, shown at the card's width (520 px) with a 4px radius. No animated GIFs.
+- **One button per email**, verb first, naming the outcome ("Book a free audit and demo", "Reserve your place"). The free audit and demo is the default.
+- **Greeting:** optional per broadcast, "Hello :first_name," / « Bonjour, »; off by default for Insight, which opens with its headline.
+- **Subjects:** sentence case, under 60 characters, no exclamation marks, no clickbait. The preview text adds to the subject rather than repeating it.
+- **Preview and tests:** the editor shows the email at computer and phone width; a test goes to the person testing, its subject starting "Test:".
+
 ### Legal lines
 
 - Why you received this: "You are receiving this because you contacted JBS Praxis through jbspraxis.com." / « Vous recevez ce message parce que vous avez contacté JBS Praxis via jbspraxis.com. »
-- Broadcasts only: "Unsubscribe from JBS Praxis Insights" / « Se désabonner de JBS Praxis Insights ».
+- Broadcasts only: "Unsubscribe from JBS Praxis news and insights" / « Se désabonner des actualités et analyses de JBS Praxis ». The link opens a page with one button in the email’s language; inboxes also get a one-click `List-Unsubscribe` header. One unsubscribe stops all marketing to that address, broadcasts and outreach.
+- Why a broadcast was received, by who the person is to us: "You are receiving this because your organisation works with JBS Praxis." (clients) / "… because you are in touch with JBS Praxis." (leads) / "… because you asked to hear from JBS Praxis." (subscribers) / "… because you wrote for JBS Praxis Insights." (Kaizen writers); the French in `lang/fr/emails/broadcast.php`. Counsel to confirm.
 - Proposals and reports: "Confidential: prepared for :company." / « Confidentiel : préparé pour :company. »
 - Data protection wording (Nigeria’s Data Protection Act and Cameroon’s personal data law) is confirmed by counsel before launch.
 

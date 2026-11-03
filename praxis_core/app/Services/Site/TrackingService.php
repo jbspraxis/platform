@@ -2,6 +2,7 @@
 
 namespace App\Services\Site;
 
+use App\Support\Campaigns\Marketing;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -59,7 +60,7 @@ final class TrackingService
     }
 
     /**
-     * Stops broadcast emails to a contact (confirmed with a click). A link that names its campaign (every link
+     * Stops broadcast emails to a contact (confirmed with a click), and puts the address on the do-not-email list. A link that names its campaign (every link
      * sent from now on) works when that email was sent to the contact and, if it was sent with tokens, the token
      * matches. A link without a campaign (emails from before tokens) works only while the contact has such an
      * email. Returns false when the link is not valid.
@@ -78,6 +79,9 @@ final class TrackingService
         }
 
         DB::table('client_users')->where('id', $userId)->update(['is_subscribed' => 0, 'updated_at' => now()]);
+        // One unsubscribe stops all marketing to the address, wherever it appears (docs/CAMPAIGNS.md 4.1)
+        Marketing::suppress(DB::table('client_users')->where('id', $userId)->value('email'), 'unsubscribed',
+            ['source' => 'legacy_link', 'broadcast_id' => $campaignId ?: null, 'note' => 'Unsubscribe link in a broadcast sent before 3 Nov 2026']);
 
         return true;
     }

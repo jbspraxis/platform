@@ -7,7 +7,8 @@ use Illuminate\Mail\Mailables\Headers;
 use Illuminate\Support\Str;
 
 /**
- * An editorial broadcast written in HQ → Broadcasts (BroadcastLedger) and sent in batches by broadcast:process.
+ * A broadcast written before Campaigns (3 Nov 2026) in the old Broadcasts screen, still sent by broadcast:process if one was queued;
+ * new broadcasts are BroadcastEmail (docs/CAMPAIGNS.md).
  * The subject and the HTML body are the campaign's own, with the contact's details already filled in.
  * The layout adds the sign-off, the unsubscribe link (footer and List-Unsubscribe header) and the open-tracking pixel.
  */

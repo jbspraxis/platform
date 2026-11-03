@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Str;
+
 /**
  * Which language an email goes out in (docs/BRAND.md section 13): the recipient's stated preference,
  * else the language they are using on the website, else English. Only 'en' and 'fr' exist.
@@ -32,4 +34,33 @@ final class MailLocale
     {
         return self::parse($preference) ?? 'en';
     }
+
+    /**
+     * Marketing email (docs/CAMPAIGNS.md 4.3): the person's own preference, else their organisation's, else French
+     * for a French-speaking country, else English.
+     */
+    public static function forContact(?string $own, ?string $organisation = null, ?string $country = null): string
+    {
+        return self::parse($own) ?? self::parse($organisation) ?? self::fromCountry($country) ?? 'en';
+    }
+
+    /** 'fr' for a country where business is done in French (a name in English or French, or its ISO code); else null */
+    public static function fromCountry(?string $country): ?string
+    {
+        $key = trim((string) preg_replace('/[^a-z]+/', ' ', strtolower(Str::ascii((string) $country))));
+
+        return $key !== '' && in_array($key, self::FRANCOPHONE, true) ? 'fr' : null;
+    }
+
+    /** French-speaking countries, as fromCountry() reads them: ISO codes, English and French names, without accents */
+    private const FRANCOPHONE = [
+        'cm', 'cameroon', 'cameroun', 'ci', 'cote d ivoire', 'ivory coast', 'sn', 'senegal', 'bj', 'benin', 'tg', 'togo',
+        'bf', 'burkina faso', 'ml', 'mali', 'ne', 'niger', 'td', 'chad', 'tchad', 'cf', 'central african republic',
+        'republique centrafricaine', 'centrafrique', 'ga', 'gabon', 'cg', 'congo', 'republic of the congo', 'congo brazzaville',
+        'cd', 'dr congo', 'drc', 'democratic republic of the congo', 'republique democratique du congo', 'rdc', 'congo kinshasa',
+        'gn', 'guinea', 'guinee', 'gq', 'equatorial guinea', 'guinee equatoriale', 'mg', 'madagascar', 'bi', 'burundi',
+        'dj', 'djibouti', 'km', 'comoros', 'comores', 'fr', 'france', 'be', 'belgium', 'belgique', 'lu', 'luxembourg',
+        'mc', 'monaco', 'ht', 'haiti', 'ma', 'morocco', 'maroc', 'dz', 'algeria', 'algerie', 'tn', 'tunisia', 'tunisie',
+        'mr', 'mauritania', 'mauritanie',
+    ];
 }

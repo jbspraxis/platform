@@ -326,7 +326,7 @@ class PwaRoutesTest extends TestCase
     public function test_a_shortcut_follows_the_rail_order_when_the_first_screen_is_not_open_to_the_person(): void
     {
         $person = $this->staff(null, ['broadcasts.view', 'signoffs.view', 'timesheets.view', 'expenses.view', 'expenses.create']);
-        $this->assertLandsOn($this->actingAs($person)->get($this->hq('/pwa/go/leads')), 'hq.crm.broadcast');
+        $this->assertLandsOn($this->actingAs($person)->get($this->hq('/pwa/go/leads')), 'hq.campaigns.broadcasts');
         $this->assertLandsOn($this->actingAs($person)->get($this->hq('/pwa/go/projects')), 'hq.ops.timers');
         $this->assertLandsOn($this->actingAs($person)->get($this->hq('/pwa/go/finance')), 'hq.finance.manager');
 

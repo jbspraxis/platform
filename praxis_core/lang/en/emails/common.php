@@ -11,7 +11,7 @@ return [
     'contact_line' => 'Reply to this email, or write to :email.',
     'button_fallback' => 'If the button doesn’t work, copy this link into your browser:',
     'code_expiry' => 'This code works for :minutes minutes. Never share it: JBS Praxis will never ask you for it.',
-    'unsubscribe' => 'Unsubscribe from JBS Praxis Insights',
+    'unsubscribe' => 'Unsubscribe from JBS Praxis news and insights',
     'confidential' => 'Confidential: prepared for :company.',
     'date_format' => 'dddd D MMMM YYYY', // Carbon isoFormat: Thursday 5 November 2026
     'reason_contact' => 'You are receiving this because you contacted JBS Praxis through jbspraxis.com.',

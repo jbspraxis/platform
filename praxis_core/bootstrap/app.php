@@ -44,6 +44,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trimStrings(except: [$siteApi]);
         $middleware->convertEmptyStringsToNull(except: [$siteApi]);
 
+        // A broadcast's unsubscribe link is posted by inboxes themselves (one-click, RFC 8058), which can't send a CSRF
+        // token; the link's own secret token is what proves it (routes/email-links.php)
+        $middleware->validateCsrfTokens(except: ['email/unsubscribe/*']);
+
         // 4. DYNAMIC SESSION EXPIRATION ROUTING
         $middleware->redirectGuestsTo(function (Request $request) {
             // Each host has its own sign-in page: the portal for clients, HQ for staff
