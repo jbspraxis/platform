@@ -219,11 +219,16 @@ hide images, so opens can be over- or under-counted. A click also counts as an o
   version's counted links go into `broadcast_links`, and the content is kept as it went out. Nobody left: Completed at
   once, with a bell to the sender.
 - **`broadcast:process`** runs every 5 minutes (`routes/console.php`, `withoutOverlapping`):
+  0. an email a run claimed but never finished (the run died mid-send: a PHP timeout, an SMTP hang cPanel killed)
+     is still Sending after 15 minutes: it becomes **Failed** ("Interrupted while sending…") and is **not** sent
+     again, because the first try may have reached the person; so the broadcast can still complete;
   1. scheduled broadcasts whose time has come start;
   2. the next **30** queued emails go out, oldest first, each in its person's language. Each row is claimed before
      sending (Queued → Sending), so an email can never go twice. At the last moment `Marketing::canEmail()` is asked
      again: an address listed since is **Skipped**. A permanent refusal from the mail server (550, 5.1.x, user unknown,
-     an invalid address) is **Bounced** and goes on the do-not-email list; anything else is **Failed** and reported;
+     an invalid address) is **Bounced** and goes on the do-not-email list; only the mailer's own errors
+     (`RfcComplianceException`, Symfony's `TransportExceptionInterface`) can be a bounce, so a bug in HQ never
+     unsubscribes anyone. Anything else is **Failed** and reported;
   3. broadcasts with nothing left to send are **Completed**, with a bell to whoever sent them ("Broadcast sent").
 - **Pace:** 30 every 5 minutes (360 an hour) is the pace the cPanel server has always kept, as before.
 - **The one-broadcast-at-a-time lock is gone.** It only protected the SMTP limit, and the sender's pace now does that

@@ -135,6 +135,57 @@ class BroadcastSendingTest extends TestCase
         $this->assertTrue(ProcessBroadcastQueue::isPermanent(new TransportException('550 mailbox unavailable')));
     }
 
+    public function test_a_bug_in_hq_is_never_taken_for_a_bounce(): void
+    {
+        $this->started([['ada@example.test', 'Nigeria'], ['brice@example.test', 'Nigeria']]);
+        $pending = Mockery::mock();
+        $pending->shouldReceive('send')->once()->andThrow(new \BadMethodCallException('Method App\Mail\BroadcastEmail::nope does not exist.'));
+        $pending->shouldReceive('send')->once()->andThrow(new \RuntimeException('Row 550 of the 554 rows: user unknown'));
+        Mail::shouldReceive('to')->andReturn($pending);
+
+        $this->artisan('broadcast:process')->assertSuccessful();
+
+        foreach (['ada@example.test', 'brice@example.test'] as $email) {
+            $this->assertSame('Failed', DB::table('broadcast_logs')->where('email', $email)->value('status'), $email);
+            $this->assertTrue(Marketing::canEmail($email), "{$email} stays off the do-not-email list");
+            $this->assertSame(1, (int) DB::table('client_users')->where('email', $email)->value('is_subscribed'));
+        }
+        $this->assertSame(0, DB::table('marketing_suppressions')->count());
+        $this->assertFalse(ProcessBroadcastQueue::isPermanent(new \BadMethodCallException('Method X::y does not exist.')));
+        $this->assertFalse(ProcessBroadcastQueue::isPermanent(new \RuntimeException('550 5.1.1 User unknown')));
+    }
+
+    public function test_an_email_a_dead_run_left_sending_fails_after_15_minutes_and_is_never_sent_again(): void
+    {
+        Mail::fake();
+        $broadcast = $this->started([['dead@example.test', 'Nigeria'], ['recent@example.test', 'Nigeria'], ['next@example.test', 'Nigeria']]);
+        // A run died after claiming these two: one 20 minutes ago, one 5 minutes ago (that run may still be going)
+        DB::table('broadcast_logs')->where('email', 'dead@example.test')->update(['status' => 'Sending', 'updated_at' => now()->subMinutes(20)]);
+        DB::table('broadcast_logs')->where('email', 'recent@example.test')->update(['status' => 'Sending', 'updated_at' => now()->subMinutes(5)]);
+
+        $this->artisan('broadcast:process')->assertSuccessful();
+
+        $dead = DB::table('broadcast_logs')->where('email', 'dead@example.test')->first();
+        $this->assertSame('Failed', $dead->status);
+        $this->assertSame(ProcessBroadcastQueue::INTERRUPTED_MESSAGE, $dead->error_message);
+        $this->assertSame('Sending', DB::table('broadcast_logs')->where('email', 'recent@example.test')->value('status'));
+        $this->assertSame('Sent', DB::table('broadcast_logs')->where('email', 'next@example.test')->value('status'));
+        $this->assertSame(1, (int) $broadcast->fresh()->failed_count);
+        $this->assertSame('Sending', $broadcast->fresh()->status, 'Not complete while a row may still be on its way');
+        Mail::assertSent(BroadcastEmail::class, 1);
+        Mail::assertNotSent(BroadcastEmail::class, fn ($m) => $m->hasTo('dead@example.test'));
+
+        $this->travel(15)->minutes();
+        $this->artisan('broadcast:process')->assertSuccessful();
+
+        $this->assertSame('Failed', DB::table('broadcast_logs')->where('email', 'recent@example.test')->value('status'));
+        $this->assertSame(2, (int) $broadcast->fresh()->failed_count);
+        $this->assertSame('Completed', $broadcast->fresh()->status);
+        $this->assertTrue(DB::table('notifications')->where('title', 'Broadcast sent')->where('user_id', $broadcast->sent_by)->exists());
+        Mail::assertSent(BroadcastEmail::class, 1);
+        $this->assertTrue(Marketing::canEmail('dead@example.test'), 'An interruption is not a bounce');
+    }
+
     public function test_a_broadcast_from_before_campaigns_still_goes_out_the_old_way(): void
     {
         Mail::fake();

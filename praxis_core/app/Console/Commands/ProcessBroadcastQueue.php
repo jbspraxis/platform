@@ -13,11 +13,14 @@ use App\Support\MailLocale;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mime\Exception\RfcComplianceException;
 use Throwable;
 
 /**
  * The broadcast sender (docs/CAMPAIGNS.md 4.6), every 5 minutes from the scheduler, never two at once:
+ *   0. emails a run claimed but never finished (it died mid-send: a PHP timeout, an SMTP hang cPanel killed) fail after
+ *      INTERRUPTED_MINUTES; they are not sent again, because the first try may have reached the person;
  *   1. scheduled broadcasts whose time has come start (their audience is worked out now);
  *   2. the next 30 queued emails go out, oldest broadcast first, each in its person's language, unless the address is
  *      on the do-not-email list by now (Skipped); an address the mail server refuses for good is Bounced and goes on
@@ -32,8 +35,14 @@ class ProcessBroadcastQueue extends Command
 
     protected $description = 'Sends the next broadcast emails (30 a run) and starts scheduled broadcasts.';
 
+    /** A row claimed this long ago and still Sending belongs to a run that died */
+    public const INTERRUPTED_MINUTES = 15;
+
+    public const INTERRUPTED_MESSAGE = 'Interrupted while sending; not sent again so nobody gets it twice.';
+
     public function handle(): int
     {
+        $this->failInterrupted();
         Broadcasts::startDue();
 
         $ids = DB::table('broadcast_logs')->where('status', 'Queued')->orderBy('id')->limit(Broadcasts::PER_RUN)->pluck('id');
@@ -59,6 +68,19 @@ class ProcessBroadcastQueue extends Command
         Broadcasts::finishDone();
 
         return self::SUCCESS;
+    }
+
+    /** Rows a dead run left in Sending: Failed, counted on their broadcast, never queued again */
+    private function failInterrupted(): void
+    {
+        $stuck = DB::table('broadcast_logs')->where('status', 'Sending')->where('updated_at', '<', now()->subMinutes(self::INTERRUPTED_MINUTES));
+        foreach ((clone $stuck)->groupBy('campaign_id')->selectRaw('campaign_id, COUNT(*) AS n')->pluck('n', 'campaign_id') as $campaignId => $n) {
+            $failed = (clone $stuck)->where('campaign_id', $campaignId)
+                ->update(['status' => 'Failed', 'error_message' => self::INTERRUPTED_MESSAGE, 'updated_at' => now()]);
+            if ($failed) {
+                DB::table('broadcast_campaigns')->where('id', $campaignId)->increment('failed_count', $failed);
+            }
+        }
     }
 
     private function send(object $log, Broadcast $campaign): void
@@ -131,11 +153,18 @@ class ProcessBroadcastQueue extends Command
         DB::table('broadcast_logs')->where('id', $log->id)->update(['status' => $status, 'error_message' => mb_substr($message, 0, 250), 'updated_at' => now()]);
     }
 
-    /** The server refused the address itself (unknown mailbox, invalid address): sending again would fail the same way */
+    /**
+     * The mail server refused the address itself (unknown mailbox, invalid address): sending again would fail the same
+     * way. Only a mailer's own error can say so; any other exception (a bug in HQ) is Failed and reported, so it can
+     * never put people on the do-not-email list.
+     */
     public static function isPermanent(Throwable $e): bool
     {
         if ($e instanceof RfcComplianceException) {
             return true;
+        }
+        if (! $e instanceof TransportExceptionInterface) {
+            return false;
         }
         $message = $e->getMessage();
 
