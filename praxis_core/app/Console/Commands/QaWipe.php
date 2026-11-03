@@ -317,6 +317,7 @@ class QaWipe extends Command
             ['push_subscriptions', $this->any('push_subscriptions', ['client_user_id' => $ids['clients']])],
             ['passkeys', $this->any('passkeys', ['owner_id' => $ids['clients']])->where('guard', 'client')],
             ['sign_in_pins', $this->any('sign_in_pins', ['owner_id' => $ids['clients']])->where('guard', 'client')],
+            ['password_reset_links', $this->any('password_reset_links', ['owner_id' => $ids['clients']])->where('guard', 'client')],
             ['password_reset_tokens', $this->any('password_reset_tokens', ['email' => array_values(array_diff($emails, $staffEmails))])],
             ['sessions', $this->any(config('session.table', 'sessions'), ['id' => $ids['sessions']])],
             ['meeting_points', $this->any('meeting_points', ['meeting_id' => $ids['meetings']])],

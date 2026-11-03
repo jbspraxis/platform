@@ -137,6 +137,7 @@ class QaWipeTest extends TestCase
         $this->insertRow('push_subscriptions', ['client_user_id' => $ids['admin'], 'endpoint' => 'https://push.test/' . Str::random(8), 'endpoint_hash' => Str::random(40)]);
         $this->insertRow('passkeys', ['guard' => 'client', 'owner_id' => $ids['admin'], 'credential_id' => Str::random(30)]);
         $this->insertRow('sign_in_pins', ['guard' => 'client', 'owner_id' => $ids['admin']]);
+        $this->insertRow('password_reset_links', ['guard' => 'client', 'owner_id' => $ids['admin'], 'token_hash' => hash('sha256', Str::random(20)), 'expires_at' => now()]);
         $ids['session'] = Str::random(40);
         DB::table('sessions')->insert(['id' => $ids['session'], 'payload' => base64_encode(serialize(['_token' => 'x', 'login_client_' . sha1('Illuminate\Auth\SessionGuard') => $ids['admin']])),
             'last_activity' => time()]);

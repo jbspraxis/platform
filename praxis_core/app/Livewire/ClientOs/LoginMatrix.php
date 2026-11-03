@@ -4,6 +4,7 @@ namespace App\Livewire\ClientOs;
 
 use App\Support\Access;
 use App\Support\SignIn\Passkeys;
+use App\Support\SignIn\PasswordResets;
 use App\Support\SignIn\SignIn;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Livewire\Component;
@@ -47,6 +48,11 @@ class LoginMatrix extends Component
         // A language the person chose, else their browser's (English or French) for this page only: the
         // organisation's preference applies once they sign in, so nothing is stored in the session here.
         App::setLocale($this->chosenPortalLocale() ?? (request()->getPreferredLanguage(['en', 'fr']) === 'fr' ? 'fr' : 'en'));
+
+        // ?forgot=1 (from an expired reset link) opens the reset request
+        if (request()->boolean('forgot')) {
+            $this->viewState = 'forgot_password';
+        }
     }
 
     protected function messages(): array
@@ -125,38 +131,21 @@ class LoginMatrix extends Component
         return redirect()->route('client.dashboard');
     }
 
-    // There is no self-service reset page yet, so a request alerts HQ, who re-send
-    // a setup link. The reply is the same whether or not the email has an account.
+    // "Forgot your password?": emails a reset link, or the invitation again to someone who hasn't set up their
+    // account yet (App\Support\SignIn\PasswordResets, docs/SIGN_IN.md section 8). Leads have no account: nothing goes.
     public function sendResetLink()
     {
         $this->validate(['resetEmail' => 'required|email']);
 
-        $rateKey = 'client-reset:' . request()->ip();
-        if (! RateLimiter::tooManyAttempts($rateKey, 3)) {
-            RateLimiter::hit($rateKey, 3600);
-
-            // Only portal accounts (a password set), not leads
-            $client = DB::table('client_users')
-                ->where('email', $this->resetEmail)
-                ->whereNotNull('password')
-                ->whereNull('deleted_at')
-                ->select('first_name', 'last_name', 'email')
-                ->first();
-            if ($client) {
-                $notifications = [];
-                foreach (Access::staffWith('access.edit') as $adminId) {
-                    $notifications[] = [
-                        'id' => (string) Str::uuid(), 'user_id' => $adminId,
-                        'title' => 'Client asked for a new setup link',
-                        'message' => "{$client->first_name} {$client->last_name} ({$client->email}) forgot their Client Portal password. Send them a new setup link from Accounts.",
-                        'type' => 'System', 'created_at' => now(),
-                    ];
-                }
-                if (!empty($notifications)) DB::table('notifications')->insert($notifications);
-            }
+        if ($minutes = PasswordResets::throttle(SignIn::CLIENT, $this->resetEmail)) {
+            $this->addError('resetEmail', trans_choice('portal.login.reset_too_many', $minutes, ['minutes' => $minutes]));
+            return;
         }
 
-        $this->authMessage = __('portal.login.reset_done');
+        // A failed send is logged; the page still says the same, so nobody can test which emails have an account
+        rescue(fn () => PasswordResets::request(SignIn::CLIENT, $this->resetEmail));
+
+        $this->authMessage = __('portal.login.reset_done', ['minutes' => PasswordResets::MINUTES]);
         $this->resetEmail = '';
     }
 

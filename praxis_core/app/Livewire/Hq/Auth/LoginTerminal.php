@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Auth;
 
 use App\Http\Middleware\HqStaff;
 use App\Support\SignIn\Passkeys;
+use App\Support\SignIn\PasswordResets;
 use App\Support\SignIn\SignIn;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Livewire\Component;
@@ -11,7 +12,6 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Validate;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 #[Layout('components.layouts.auth')]
 class LoginTerminal extends Component
@@ -29,6 +29,14 @@ class LoginTerminal extends Component
     // --- UI STATE ---
     public $viewMode = 'login'; // 'login' or 'recovery'
     public $recoveryMessage = '';
+
+    /** ?forgot=1 (from an expired reset link) opens the reset request */
+    public function mount()
+    {
+        if (request()->boolean('forgot')) {
+            $this->viewMode = 'recovery';
+        }
+    }
 
     /**
      * Switches the card between sign-in and the password reset request.
@@ -137,30 +145,23 @@ class LoginTerminal extends Component
     }
 
     /**
-     * Records a password reset request (the reset email is not built yet, see the TODO below).
+     * "Forgot your password?": emails a reset link, or the invitation again to someone who hasn't set up their
+     * account yet (App\Support\SignIn\PasswordResets, docs/SIGN_IN.md section 8).
      */
     public function initiateRecovery()
     {
         $this->validate(['email' => 'required|email'], $this->fieldMessages());
 
-        $user = DB::table('users')->where('email', $this->email)->first();
-
-        // Every users row is staff (clients live in client_users and reset via Client OS)
-        if ($user) {
-            $token = Str::random(60);
-
-            DB::table('users')->where('id', $user->id)->update([
-                'invitation_token' => $token,
-                'updated_at' => now()
-            ]);
-
-            // TODO: Hook this up to the HQ key recovery email later
-            // Mail::to($user->email)->send(new \App\Mail\HqKeyRecovery($user->first_name, $token));
+        if ($minutes = PasswordResets::throttle(SignIn::HQ, $this->email)) {
+            $this->addError('email', $minutes === 1 ? 'Too many requests. Try again in 1 minute.' : "Too many requests. Try again in {$minutes} minutes.");
+            return;
         }
 
-        // The same message whether or not the address has an account, so nobody can test which emails exist.
-        // No email is sent yet, so the message says so plainly instead of promising a link.
-        $this->recoveryMessage = "Thank you. Password reset by email isn’t available yet, so ask an administrator to reset your password.";
+        // A failed send is logged; the page still says the same, so nobody can test which emails have an account
+        rescue(fn () => PasswordResets::request(SignIn::HQ, $this->email));
+
+        $this->recoveryMessage = 'If ' . $this->email . ' has an HQ account, we’ve sent it a link to choose a new password. The link works for '
+            . PasswordResets::MINUTES . ' minutes. If nothing arrives within a few minutes, check your spam folder.';
     }
 
     /** Plain validation messages (docs/BRAND.md section 12). */

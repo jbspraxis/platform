@@ -55,10 +55,11 @@ return [
         'failed' => "L’adresse e-mail et le mot de passe ne correspondent pas. Vérifiez-les et réessayez, ou réinitialisez votre mot de passe.",
         'too_many' => "{1} Trop de tentatives de connexion. Réessayez dans 1\u{00A0}minute.|[2,*] Trop de tentatives de connexion. Réessayez dans :minutes\u{00A0}minutes.",
         'reset_title' => "Réinitialiser votre mot de passe",
-        'reset_intro' => "Saisissez l’adresse e-mail que vous utilisez pour vous connecter. Notre équipe vous enverra un nouveau lien de configuration pour choisir un nouveau mot de passe.",
-        'reset_submit' => "Demander un nouveau lien de configuration",
-        'reset_submitting' => "Envoi de la demande…",
-        'reset_done' => "Demande reçue. Si cette adresse e-mail correspond à un compte du portail client, notre équipe vous enverra un nouveau lien de configuration.",
+        'reset_intro' => "Saisissez l’adresse e-mail que vous utilisez pour vous connecter. Nous vous enverrons par e-mail un lien pour choisir un nouveau mot de passe.",
+        'reset_submit' => "M’envoyer un lien de réinitialisation",
+        'reset_submitting' => "Envoi…",
+        'reset_done' => "Si cette adresse e-mail correspond à un compte du portail client, nous lui avons envoyé un lien pour choisir un nouveau mot de passe. Le lien est valable :minutes\u{00A0}minutes. Si rien n’arrive d’ici quelques minutes, vérifiez vos courriers indésirables.",
+        'reset_too_many' => "{1} Trop de demandes. Réessayez dans 1\u{00A0}minute.|[2,*] Trop de demandes. Réessayez dans :minutes\u{00A0}minutes.",
         'back' => "Retour à la connexion",
         'staff_prompt' => "Vous faites partie de l’équipe JBS Praxis\u{202F}?",
         'staff_link' => "Se connecter à HQ",
@@ -98,6 +99,19 @@ return [
         'privacy' => "Votre mot de passe est stocké de façon sécurisée. Personne chez JBS Praxis ne peut le voir.",
         'submit' => "Définir le mot de passe et se connecter",
         'submitting' => "Configuration de votre compte…",
+    ],
+
+    // Lien de réinitialisation du mot de passe (ClientOs\ResetPassword) ; l’aide, la confirmation et la mention de confidentialité sont celles de setup
+    'reset' => [
+        'page_title' => "Choisir un nouveau mot de passe",
+        'title' => "Choisissez un nouveau mot de passe",
+        'intro' => "Choisissez un nouveau mot de passe pour votre compte du portail client, :email.",
+        'password' => "Nouveau mot de passe",
+        'submit' => "Enregistrer le mot de passe et se connecter",
+        'submitting' => "Enregistrement…",
+        'expired_title' => "Ce lien ne fonctionne plus",
+        'expired' => "Un lien de réinitialisation ne fonctionne qu’une seule fois, pendant :minutes\u{00A0}minutes. Demandez-en un nouveau sur la page de connexion.",
+        'request_new' => "Demander un nouveau lien",
     ],
 
     // ---- Le portail ----

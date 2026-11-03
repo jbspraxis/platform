@@ -239,6 +239,10 @@
                                 @if($canEdit)
                                     @if($user->lifecycle_stage === 'Onboarding')
                                         <button type="button" wire:click="resendInvitation('{{ $user->id }}')" class="btn btn-ghost btn-sm">Resend invitation</button>
+                                    @elseif($user->status === 'Active')
+                                        <button type="button" wire:click="sendPasswordReset('{{ $user->id }}')"
+                                                wire:confirm="Email {{ $user->first_name }} {{ $user->last_name }} a link to choose a new password? It goes to {{ $user->email }} and works for {{ \App\Support\SignIn\PasswordResets::MINUTES }} minutes."
+                                                class="btn btn-ghost btn-sm">Send reset link</button>
                                     @endif
 
                                     <button type="button" wire:click="editUser('{{ $user->id }}')" class="btn btn-ghost btn-sm">Edit</button>

@@ -1,4 +1,4 @@
-# Passkeys and the sign-in PIN (HQ and Client Portal)
+# Passkeys, the sign-in PIN and forgotten passwords (HQ and Client Portal)
 
 Agreed with the owner on 31 October 2026: staff (HQ, `hq.jbspraxis.com`) and clients (Client Portal, `portal.jbspraxis.com`) can sign in with a **passkey** (their device's fingerprint, face or screen lock) or a **4-digit PIN** as well as their password, the way MyCity App does. The task force tracker is not touched.
 
@@ -44,7 +44,7 @@ Migration `2026_10_31_700000_create_sign_in_methods.php`:
 
 No foreign keys (one table serves both account tables); `SignIn::forget()` deletes an account's rows if accounts are ever deleted for good. Suspended accounts can't sign in with either (only Active accounts are looked up; clients also need a password set).
 
-Audit log (`system_audit_logs`): `AUTH_LOGIN` says which way someone signed in; `PASSKEY_ADDED`, `PASSKEY_REMOVED`, `PIN_SET`, `PIN_CHANGED`, `PIN_REMOVED`, `PIN_SWITCHED_OFF`. Client rows carry `target_table = client_users`.
+Audit log (`system_audit_logs`): `AUTH_LOGIN` says which way someone signed in; `PASSKEY_ADDED`, `PASSKEY_REMOVED`, `PIN_SET`, `PIN_CHANGED`, `PIN_REMOVED`, `PIN_SWITCHED_OFF`. Client rows carry `target_table = client_users`. Password resets add their own lines (section 8).
 
 ## 6. Files
 
@@ -56,6 +56,7 @@ Audit log (`system_audit_logs`): `AUTH_LOGIN` says which way someone signed in; 
 | Browser | `resources/views/partials/passkey-script.blade.php` (included by `partials/app-head.blade.php`) |
 | Words | `lang/en/sign_in.php`, `lang/fr/sign_in.php` |
 | Tests | `tests/Unit/SignIn/*`, `tests/Feature/SignInMethodsTest.php` (MySQL), `tests/Support/SoftAuthenticator.php` (a software authenticator with real keys) |
+| Forgotten passwords (section 8) | `app/Support/SignIn/PasswordResets.php`, `app/Livewire/{Hq/Auth,ClientOs}/ResetPassword.php` and their views, `app/Mail/PasswordResetMail.php`, `resources/views/emails/password-reset.blade.php`, `lang/{en,fr}/emails/password_reset.php`, `portal.reset` in `lang/{en,fr}/portal.php`, Accounts (`Hq/System/RoleManagement::sendPasswordReset`), `tests/Feature/PasswordResetTest.php` |
 
 ## 7. Running it locally
 
@@ -69,3 +70,27 @@ WEBAUTHN_ORIGIN_PORTAL=http://portal.localhost:8000
 ```
 
 Live needs none of these: the defaults are the real hosts on https.
+
+## 8. Forgotten passwords
+
+Owner, 3 November 2026. Before this, "Forgot your password?" sent nothing: HQ told people to ask an administrator (who had no way to help), and it overwrote the account's `invitation_token`, so typing the address of someone who hadn't accepted their invitation broke the link in their invitation email. The portal alerted HQ to send "a new setup link from Accounts", but Accounts only offers that for accounts that never set a password.
+
+**What people see**
+
+- **"Forgot your password?"** (both sign-in pages): the email address, then **Email me a reset link**. The answer is the same whether or not the address has an account: "If … has an account, we've sent it a link … The link works for 60 minutes."
+- **The email** (`PasswordResetMail`, branded, English and French): **Choose a new password**, good once, for 60 minutes. Staff get English; a client gets their organisation's language, as with invitations.
+- **The link** opens `hq.jbspraxis.com/reset/{token}` or `portal.jbspraxis.com/reset/{token}`: new password (at least 8 characters) twice, then **Save password and sign in**. A link that expired or was used says so and offers **Ask for a new link**, which opens the request form (`/login?forgot=1`).
+- **Someone still invited** (Onboarding, with an invitation link) gets their invitation email again, with the same link, so the one they already have keeps working. Leads (no portal account), suspended and removed accounts get nothing.
+- **Accounts** (Owner and Partner / Director, `access.edit`): **Send reset link** on every active account that has set up its password (invited ones keep **Resend invitation**). The link goes to the account's own address, never to the person sending it, and the current password keeps working until a new one is chosen. Not for an account with more access than yours (the same rule as suspending).
+
+**Rules** (`App\Support\SignIn\PasswordResets`)
+
+1. The token is 64 random characters; only its sha256 is stored. One live link per account: a new request replaces the earlier one.
+2. Using a link locks its row, sets the password, gives the account a new remember token (ending "remember me" on other devices; open sessions elsewhere are not ended), marks the link used and signs the person in.
+3. Requests from the sign-in page: 3 an hour per email address and 10 an hour per connection, counted whether or not the address has an account, then "Too many requests. Try again in N minutes."
+4. A failed send is logged (Journal d'Erreurs) and the page answers as usual.
+5. The `/reset/{token}` pages are rate-limited like the setup links (30 a minute per IP).
+
+**Data**: migration `2026_11_03_100000_create_password_reset_links.php`, table `password_reset_links`: `guard` (`web` = users, `client` = client_users), `owner_id`, `token_hash` (unique), `requested_by` (the staff member who sent it from Accounts, else null), `ip_address`, `expires_at`, `used_at`, `created_at`. Laravel's own `password_reset_tokens` table is not used. `SignIn::forget()` and `qa:wipe` delete an account's links with it.
+
+**Audit log**: `PASSWORD_RESET_REQUESTED` (asked on the sign-in page), `INVITATION_RESENT` (asked before accepting the invitation), `PASSWORD_RESET_SENT` (sent from Accounts; `user_id` is the sender), `PASSWORD_RESET` (a new password chosen from a link).
