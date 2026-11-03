@@ -77,6 +77,21 @@ class AudienceTest extends TestCase
         $this->assertSame('Acme Ltd (test)', $people[0]['company']);
     }
 
+    public function test_the_same_people_always_come_in_the_same_order(): void
+    {
+        // Same kind and same name: the address decides (contacts come back from the database in no set order)
+        $org = $this->org(['status' => 'Lead']);
+        foreach (['m@example.test', 'b@example.test', 'z@example.test', 'a@example.test', 'k@example.test'] as $email) {
+            $this->contact($org, ['email' => $email, 'first_name' => 'Ada', 'last_name' => 'Test']);
+        }
+        $this->contact($org, ['email' => 'y@example.test', 'first_name' => 'Ada', 'last_name' => 'Abara']);
+
+        $expected = ['y@example.test', 'a@example.test', 'b@example.test', 'k@example.test', 'm@example.test', 'z@example.test'];
+        foreach (range(1, 3) as $try) {
+            $this->assertSame($expected, Audience::recipients(['who' => ['leads']])->pluck('email')->all(), "try {$try}");
+        }
+    }
+
     public function test_filters_narrow_their_groups_and_leave_out_people_who_lack_the_field(): void
     {
         $bank = $this->org(['status' => 'Lead', 'industry' => 'Banking', 'country' => 'Cameroon', 'preferred_language' => null]);

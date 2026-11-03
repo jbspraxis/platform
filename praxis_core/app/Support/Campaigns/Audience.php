@@ -113,10 +113,12 @@ final class Audience
         foreach ($rows->where('opted_out', true) as $r) {
             $optedOut[$r['email']] = true;
         }
+        // Always the same order for the same people (the database returns contacts in no set order): which row wins a
+        // shared address, and the order the sender queues and sends them in
         $recipients = $rows->reject(fn ($r) => isset($optedOut[$r['email']]))
-            ->sortBy(fn ($r) => self::ORDER[$r['kind']])
+            ->sortBy([['kind_order', 'asc'], ['contact_id', 'asc']])
             ->unique('email')
-            ->sortBy([['kind_order', 'asc'], ['last_name', 'asc'], ['first_name', 'asc']])
+            ->sortBy([['kind_order', 'asc'], ['last_name', 'asc'], ['first_name', 'asc'], ['email', 'asc']])
             ->map(fn ($r) => array_diff_key($r, ['kind_order' => 1, 'opted_out' => 1]))
             ->values();
 
