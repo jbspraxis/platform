@@ -986,7 +986,8 @@ English and French from launch. The email goes in the recipient’s language: th
 | Proposal to sign | Client | Your proposal for :project is ready for signature | Votre proposition pour :project est prête pour signature |
 | Signing code | Client | Your JBS Praxis signing code (valid for 10 minutes) | Votre code de signature JBS Praxis (valable 10 minutes) |
 | Sign-off request | Client | :project: the handover is ready for your sign-off | :project : la livraison est prête pour votre validation |
-| Password help | Client or staff | Reset your JBS Praxis password | Réinitialisez votre mot de passe JBS Praxis |
+| Password reset (staff) | Staff member | Reset your JBS Praxis HQ password | Réinitialisez votre mot de passe JBS Praxis HQ |
+| Password reset (client) | Client | Reset your JBS Praxis Client Portal password | Réinitialisez votre mot de passe du portail client JBS Praxis |
 | Invoice issued | Client | Invoice :invoice from JBS Praxis | Facture :invoice de JBS Praxis |
 | Payment verified | Client | Payment received for invoice :invoice | Paiement reçu pour la facture :invoice |
 | Payment reminder | Client | Reminder: invoice :invoice is due on :date | Rappel : la facture :invoice arrive à échéance le :date |

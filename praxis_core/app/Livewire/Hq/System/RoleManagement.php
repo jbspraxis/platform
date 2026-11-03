@@ -5,6 +5,8 @@ namespace App\Livewire\Hq\System;
 use App\Models\User;
 use App\Support\Access;
 use App\Support\MailLocale;
+use App\Support\SignIn\PasswordResets;
+use App\Support\SignIn\SignIn;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -445,6 +447,44 @@ class RoleManagement extends Component
             $this->showSuccessModal = true;
             $this->loadLedger();
         }
+    }
+
+    /**
+     * Emails an active account a link to choose a new password (docs/SIGN_IN.md section 8). The link goes to the
+     * account's own address, never to the person sending it. Not for an account with more access than yours.
+     */
+    public function sendPasswordReset($id)
+    {
+        abort_unless(Auth::user()->can('access.edit'), 403);
+
+        [$user, $isClient] = $this->findAccount($id);
+        $guard = $isClient ? SignIn::CLIENT : SignIn::HQ;
+        $account = $user && $user->lifecycle_stage !== 'Onboarding' ? SignIn::account($guard, $user->id) : null;
+        if (!$account) {
+            return;
+        }
+        if (!$isClient && $this->outranksMe($account)) {
+            session()->flash('error', 'You can’t send a reset link to an account that has more access than yours.');
+            return;
+        }
+
+        try {
+            PasswordResets::send($guard, $account, Auth::id());
+        } catch (Exception $e) {
+            report($e);
+            session()->flash('error', "We couldn’t send the email to {$account->email}. Try again in a few minutes.");
+            return;
+        }
+        DB::table('system_audit_logs')->insert([
+            'user_id' => Auth::id(), 'action' => 'PASSWORD_RESET_SENT',
+            'description' => "Sent {$account->first_name} {$account->last_name} a password reset link.",
+            'target_table' => $isClient ? 'client_users' : 'users', 'target_id' => $account->id,
+            'ip_address' => request()?->ip(), 'created_at' => now(),
+        ]);
+
+        $this->successMessage = "We’ve sent {$account->first_name} a link to choose a new password at {$account->email}. It works for "
+            . PasswordResets::MINUTES . ' minutes. Their current password keeps working until they choose a new one.';
+        $this->showSuccessModal = true;
     }
 
     /**

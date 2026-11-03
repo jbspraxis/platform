@@ -62,7 +62,7 @@
         @include('livewire.sign-in.alternatives')
     @else
         <h1 class="page-title">Reset your password</h1>
-        <p class="page-subtitle" style="margin-bottom: 24px;">Enter the email address you use to sign in to HQ.</p>
+        <p class="page-subtitle" style="margin-bottom: 24px;">Enter the email address you use to sign in to HQ. We’ll email you a link to choose a new password.</p>
 
         <form wire:submit="initiateRecovery" class="flex flex-col gap-4">
             @if ($recoveryMessage)
@@ -78,8 +78,8 @@
                 </div>
 
                 <button type="submit" class="btn btn-primary" style="width: 100%;" wire:loading.attr="disabled" wire:target="initiateRecovery">
-                    <span wire:loading.remove wire:target="initiateRecovery">Request a password reset</span>
-                    <span wire:loading wire:target="initiateRecovery">Sending request…</span>
+                    <span wire:loading.remove wire:target="initiateRecovery">Email me a reset link</span>
+                    <span wire:loading wire:target="initiateRecovery">Sending…</span>
                 </button>
             @endif
 

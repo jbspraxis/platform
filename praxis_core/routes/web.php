@@ -34,6 +34,8 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
     })->name('hq.logout');
     // Setup link for a newly invited staff member (rate-limited so tokens can't be guessed at speed)
     Route::get('/setup/{token}', \App\Livewire\Hq\Auth\SetupAccount::class)->middleware('throttle:30,1')->name('hq.setup');
+    // Password reset link from "Forgot your password?" or Accounts (docs/SIGN_IN.md section 8), rate-limited the same way
+    Route::get('/reset/{token}', \App\Livewire\Hq\Auth\ResetPassword::class)->middleware('throttle:30,1')->name('hq.password.reset');
 
     // Protected HQ Routes: staff only. Each screen needs its module's view permission
     // (can:<module>.view, see config/access.php); actions inside are checked per component.
@@ -209,6 +211,9 @@ Route::domain(Hosts::portal())->group(function () use ($notOwnRoute, $legacy) {
     Route::middleware('throttle:30,1')->group(function () {
         // Setup link for an invited client account
         Route::get('/setup/{token}', \App\Livewire\ClientOs\SetupAccount::class)->name('client.setup');
+
+        // Password reset link from "Forgot your password?" or HQ's Accounts (docs/SIGN_IN.md section 8)
+        Route::get('/reset/{token}', \App\Livewire\ClientOs\ResetPassword::class)->name('client.password.reset');
 
         // The SOW / Proposal Binding Engine
         Route::get('/proposal/{token}', \App\Livewire\Portal\ProposalGateway::class)->name('portal.proposal');

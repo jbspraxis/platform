@@ -55,10 +55,11 @@ return [
         'failed' => 'That email address and password don’t match. Check them and try again, or reset your password.',
         'too_many' => '{1} Too many sign-in attempts. Try again in 1 minute.|[2,*] Too many sign-in attempts. Try again in :minutes minutes.',
         'reset_title' => 'Reset your password',
-        'reset_intro' => 'Enter the email address you use to sign in. Our team will send you a new setup link so you can choose a new password.',
-        'reset_submit' => 'Request a new setup link',
-        'reset_submitting' => 'Sending request…',
-        'reset_done' => 'Request received. If this email address has a Client Portal account, our team will send you a new setup link.',
+        'reset_intro' => 'Enter the email address you use to sign in. We’ll email you a link to choose a new password.',
+        'reset_submit' => 'Email me a reset link',
+        'reset_submitting' => 'Sending…',
+        'reset_done' => 'If this email address has a Client Portal account, we’ve sent it a link to choose a new password. The link works for :minutes minutes. If nothing arrives within a few minutes, check your spam folder.',
+        'reset_too_many' => '{1} Too many requests. Try again in 1 minute.|[2,*] Too many requests. Try again in :minutes minutes.',
         'back' => 'Back to sign in',
         'staff_prompt' => 'JBS Praxis staff member?',
         'staff_link' => 'Sign in to HQ',
@@ -98,6 +99,19 @@ return [
         'privacy' => 'Your password is stored securely. Nobody at JBS Praxis can see it.',
         'submit' => 'Set password and sign in',
         'submitting' => 'Setting up your account…',
+    ],
+
+    // A password reset link (ClientOs\ResetPassword); the help, confirmation and privacy lines are setup's
+    'reset' => [
+        'page_title' => 'Choose a new password',
+        'title' => 'Choose a new password',
+        'intro' => 'Choose a new password for your Client Portal account, :email.',
+        'password' => 'New password',
+        'submit' => 'Save password and sign in',
+        'submitting' => 'Saving…',
+        'expired_title' => 'This link no longer works',
+        'expired' => 'Reset links work once, for :minutes minutes. Ask for a new one on the sign-in page.',
+        'request_new' => 'Ask for a new link',
     ],
 
     // ---- The portal ----

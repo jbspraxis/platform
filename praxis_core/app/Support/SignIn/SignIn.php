@@ -100,10 +100,11 @@ final class SignIn
         ]), null, false);
     }
 
-    /** When an account is deleted for good: its passkeys and PIN go with it */
+    /** When an account is deleted for good: its passkeys, PIN and password reset links go with it */
     public static function forget(string $guard, string $ownerId): void
     {
         DB::table('passkeys')->where('guard', $guard)->where('owner_id', $ownerId)->delete();
         DB::table('sign_in_pins')->where('guard', $guard)->where('owner_id', $ownerId)->delete();
+        DB::table('password_reset_links')->where('guard', $guard)->where('owner_id', $ownerId)->delete();
     }
 }
