@@ -100,11 +100,16 @@ class BroadcastSendingTest extends TestCase
         Mail::fake();
         $people = array_map(fn ($n) => ["p{$n}@example.test", 'Nigeria'], range(1, 33));
         $broadcast = $this->started($people);
-        Marketing::suppress('p2@example.test', 'unsubscribed'); // after it was queued
+        // The first email in the queue is sure to be in the first run; its person unsubscribes after it was queued
+        $first = DB::table('broadcast_logs')->where('campaign_id', $broadcast->id)->orderBy('id')->value('email');
+        Marketing::suppress($first, 'unsubscribed');
 
         $this->artisan('broadcast:process')->assertSuccessful();
         $this->assertSame(Broadcasts::PER_RUN, DB::table('broadcast_logs')->whereNotIn('status', ['Queued'])->count());
-        $this->assertSame('Skipped', DB::table('broadcast_logs')->where('email', 'p2@example.test')->value('status'));
+        $this->assertSame('Skipped', DB::table('broadcast_logs')->where('email', $first)->value('status'));
+        // Oldest first: the 3 still waiting are the last 3 queued
+        $this->assertSame(DB::table('broadcast_logs')->orderByDesc('id')->limit(3)->pluck('id')->sort()->values()->all(),
+            DB::table('broadcast_logs')->where('status', 'Queued')->orderBy('id')->pluck('id')->all());
         $this->assertSame('Sending', $broadcast->fresh()->status);
         Mail::assertSent(BroadcastEmail::class, 29);
 
