@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\Site\BookingService;
+use App\Support\Leads\LeadMeetings;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +39,8 @@ class ExpireAuditRequests extends Command
             if ($updated !== 1) {
                 continue;
             }
+            // Its requested lead meeting closes with it (docs/LEADS.md section 9)
+            LeadMeetings::closeBooking($appt->id, 'expired');
 
             $company = $appt->company_name ?? 'an organisation no longer on file';
             DB::table('system_audit_logs')->insert([

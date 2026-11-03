@@ -172,7 +172,10 @@ class FakeGoogle extends GoogleWorkspace
         $this->guard('createMeeting');
         $n = count($this->created) + 1;
         $code = sprintf('abc-%s-xyz', substr(str_repeat(chr(96 + min(26, $n)), 4), 0, 4));
-        $event = new CalendarEvent("fake_event_{$n}", "https://meet.google.com/{$code}", $code, "https://calendar.google.test/event/{$n}");
+        // In person (withMeet false): an event without a Meet link, as Google returns it
+        $event = $meeting->withMeet
+            ? new CalendarEvent("fake_event_{$n}", "https://meet.google.com/{$code}", $code, "https://calendar.google.test/event/{$n}")
+            : new CalendarEvent("fake_event_{$n}", null, null, "https://calendar.google.test/event/{$n}");
         $this->created[] = ['event' => $event, 'request' => $meeting];
 
         return $event;

@@ -133,6 +133,11 @@
                                     <div>
                                         <h4 class="mtg-sub">{{ __('meetings.agenda.title') }}</h4>
                                         <p class="mtg-pre">{{ $m->agenda ?: __('meetings.agenda.none') }}</p>
+                                        @if ($m->location)
+                                            {{-- A meeting in person, from the lead's Meetings tab (docs/LEADS.md section 9) --}}
+                                            <h4 class="mtg-sub" style="margin-top: 16px">{{ __('meetings.in_person') }}</h4>
+                                            <p class="mtg-pre">{{ $m->location }}</p>
+                                        @endif
                                         @if ($m->meet_link)
                                             <h4 class="mtg-sub" style="margin-top: 16px">{{ __('meetings.link') }}</h4>
                                             <a class="mtg-link" href="{{ $m->meet_link }}" target="_blank" rel="noopener"><i data-lucide="external-link" style="width: 16px; height: 16px"></i>{{ $m->meet_link }}</a>
@@ -158,6 +163,14 @@
 
                                 @if ($m->status === 'requested')
                                     <div class="callout" role="note">{{ __('meetings.requested_note') }}</div>
+                                @endif
+
+                                @if (filled($m->typed_notes))
+                                    {{-- Typed on the lead's Meetings tab before this opportunity was opened from the meeting (docs/LEADS.md section 9) --}}
+                                    <div>
+                                        <h4 class="mtg-sub">{{ __('meetings.file.typed_notes') }}</h4>
+                                        <p class="mtg-pre">{{ $m->typed_notes }}</p>
+                                    </div>
                                 @endif
 
                                 @if ($canManage && $changeable)

@@ -14,12 +14,9 @@ use App\Mail\MeetingApprovedMail;
 // use App\Mail\CopqReportMail; // Commented out for now until logic is finalized
 use App\Support\MailLocale;
 use App\Support\Ai\CompanyBrief;
-use App\Models\Opportunity;
 use App\Support\Google\GoogleUnavailable;
 use App\Support\Google\GoogleWorkspace;
-use App\Support\Opportunities\Meetings;
-use App\Support\Opportunities\OpportunityAccess;
-use Carbon\CarbonImmutable;
+use App\Support\Leads\LeadMeetings;
 
 #[Layout('components.layouts.hq')]
 class LiveConsultation extends Component
@@ -116,6 +113,11 @@ class LiveConsultation extends Component
         $appt = DB::table('appointments')->where('id', $appointmentId)->first();
         $org = DB::table('organizations')->where('id', $appt->organization_id)->first();
         $clientEmail = $this->clientEmail($appt, $org);
+        // The booking's lead meeting takes the link too, so its transcript and notes live on the lead (docs/LEADS.md section 9)
+        $meeting = LeadMeetings::forAppointment($appt);
+        if ($meeting?->status === 'requested') {
+            LeadMeetings::approveBookingWithLink($meeting, $meetingLink);
+        }
 
         if ($clientEmail) {
             try {
@@ -136,10 +138,11 @@ class LiveConsultation extends Component
     }
 
     /**
-     * Approve through Google: the booking joins the organisation's open opportunity (or opens one, source
-     * website_booking, led by whoever approves), becomes a client meeting in praxisjbs@gmail.com's calendar with a Meet
-     * link (Google invites the client), and the client gets the free audit email with that link. If Google refuses,
-     * the request waits again and nothing is sent.
+     * Approve through Google: the booking's lead meeting (made when it was booked, docs/LEADS.md section 9; no
+     * opportunity: one is opened from the meeting when there is work to discuss) becomes a client meeting in
+     * praxisjbs@gmail.com's calendar with a Meet link (Google invites the client), with whoever approves and the lead's
+     * owner, and the client gets the free audit email with that link. If Google refuses, the request waits again and
+     * nothing is sent.
      */
     private function approveWithGoogle(string $appointmentId): void
     {
@@ -156,24 +159,13 @@ class LiveConsultation extends Component
         $appt = DB::table('appointments')->where('id', $appointmentId)->first();
         $org = DB::table('organizations')->where('id', $appt->organization_id)->first();
         $clientEmail = $this->clientEmail($appt, $org);
-        $booker = $appt->created_by && DB::table('client_users')->where('id', $appt->created_by)->where('organization_id', $org->id)->whereNull('deleted_at')->exists()
-            ? $appt->created_by : null;
-        $starts = CarbonImmutable::parse($appt->start_time, Meetings::TIME_ZONE);
-        $ends = $appt->end_time ? CarbonImmutable::parse($appt->end_time, Meetings::TIME_ZONE) : null;
-        $ends = $ends && $ends->greaterThan($starts) ? $ends : $starts->addHour();
 
         try {
-            $opportunity = DB::transaction(fn () => $this->opportunityForBooking($org, $appt));
-            $change = Meetings::schedule($opportunity, [
-                'kind' => 'client',
-                'title' => $appt->title ?: 'Free audit',
-                'starts_at' => $starts,
-                'ends_at' => $ends,
-                'staff' => array_values(array_unique(array_filter([Auth::id(), $opportunity->lead_user_id]))),
-                'contacts' => $booker ? [$booker] : [],
-                'guests' => ! $booker && $clientEmail ? [['email' => $clientEmail, 'name' => null]] : [],
-                'appointment_id' => $appt->id,
-            ], brandedEmail: false);
+            $meeting = LeadMeetings::forAppointment($appt);
+            if (! $meeting || $meeting->status !== 'requested') {
+                throw new \LogicException('The booking has no requested lead meeting');
+            }
+            $change = LeadMeetings::approveBooking($meeting, array_values(array_filter([Auth::id(), $org->assigned_to ?? null])), $clientEmail);
         } catch (\Throwable $e) {
             DB::table('appointments')->where('id', $appt->id)->update(['status' => 'Requested', 'updated_at' => now()]);
             if (! $e instanceof GoogleUnavailable) {
@@ -203,30 +195,6 @@ class LiveConsultation extends Component
         }
 
         $this->loadLobby();
-    }
-
-    /** The organisation's open opportunity, else a new one from this booking */
-    private function opportunityForBooking(object $org, object $appt): Opportunity
-    {
-        $open = Opportunity::where('organization_id', $org->id)->whereNotIn('stage', Opportunity::CLOSED)->orderByDesc('updated_at')->first();
-        if ($open) {
-            return $open;
-        }
-
-        $title = trim(Str::after((string) $appt->title, ':')) ?: $org->name;
-        $opportunity = Opportunity::create([
-            'organization_id' => $org->id,
-            'title' => Str::limit($title, 200, ''),
-            'stage' => 'discovery',
-            'lead_user_id' => Auth::id(),
-            'language' => MailLocale::parse($org->preferred_language ?? null) ?? 'en',
-            'source' => 'website_booking',
-            'created_by' => Auth::id(),
-        ]);
-        OpportunityAccess::log('OPPORTUNITY_OPENED', "Opened the opportunity “{$opportunity->title}” for {$org->name} from its website booking.", 'opportunities', $opportunity->id,
-            [], $opportunity->only(['organization_id', 'title', 'stage', 'lead_user_id', 'language', 'source']));
-
-        return $opportunity;
     }
 
     /**
@@ -261,6 +229,9 @@ class LiveConsultation extends Component
             $this->loadLobby();
             return;
         }
+
+        // Its requested lead meeting goes too (the lead's timeline says so, with the reason for the team)
+        LeadMeetings::closeBooking($appt->id, 'declined', $reason);
 
         $org = DB::table('organizations')->where('id', $appt->organization_id)->first();
         $companyName = $org->name ?? 'your organisation';

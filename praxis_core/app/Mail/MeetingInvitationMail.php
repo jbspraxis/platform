@@ -48,7 +48,8 @@ class MeetingInvitationMail extends BrandedMail
         $contact = $this->meeting->attendees->first(fn ($a) => $a->client_user_id !== null)?->client_user_id;
 
         return new Content(view: 'emails.meeting-invitation', with: [
-            'company' => $this->meeting->opportunity?->organization?->name ?? '',
+            // A lead's meeting has no opportunity (docs/LEADS.md section 9): its organisation, and no booking page
+            'company' => $this->meeting->opportunity?->organization?->name ?? $this->meeting->organization?->name ?? '',
             'meetingDate' => $this->meetingDay($this->meeting->starts_at, $tz),
             'meetingTime' => $this->meetingRange($this->meeting->starts_at, $this->meeting->ends_at, $tz),
             'bookingUrl' => $this->meeting->opportunity ? PortalLinks::meetings($this->meeting->opportunity, $contact) : null,

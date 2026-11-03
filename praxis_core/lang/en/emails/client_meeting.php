@@ -29,4 +29,12 @@ return [
     'book_link' => 'Book a meeting with us',
     'book_button' => 'Book another time',
     'reason' => 'You are receiving this because you were invited to a meeting between :company and JBS Praxis.',
+    // A lead's meeting (docs/LEADS.md section 9): in person at an address, or without the portal's booking page
+    'in_person' => [
+        'format' => 'In person, at :address',
+        'invite_preheader' => 'We meet in person; the address is in this email. Google Calendar has sent the invitation too.',
+        'moved_preheader' => 'Our meeting has moved. The place stays the same.',
+        'moved_intro' => 'We’ve moved the meeting between :company and JBS Praxis. Here are the new details; the place stays the same.',
+    ],
+    'cancelled_reply' => 'We’ve cancelled the meeting of :date between :company and JBS Praxis. Google Calendar will remove it from your calendar. Reply to this email and we’ll find another time.',
 ];

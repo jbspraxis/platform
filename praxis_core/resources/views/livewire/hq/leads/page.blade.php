@@ -64,14 +64,14 @@
         $statusLabel = fn ($s) => \App\Support\Leads\LeadStatus::label($s);
         $statusTone = fn ($s) => \App\Support\Leads\LeadStatus::tone($s);
         $isClient = $lead->lead_status === 'client';
+        // The tab counts come from LeadPage::render() (PR 2): meetings, emails this person may read, opportunities
         $tabs = [
             'overview' => 'Overview',
-            'meetings' => 'Meetings',
-            'emails' => 'Emails',
-            'opportunities' => 'Opportunities' . ($opportunities->count() ? ' (' . $opportunities->count() . ')' : ''),
+            'meetings' => 'Meetings' . (($counts['meetings'] ?? 0) ? ' (' . $counts['meetings'] . ')' : ''),
+            'emails' => 'Emails' . (($counts['emails'] ?? 0) ? ' (' . ($counts['emails'] >= \App\Support\Leads\LeadEmails::LIMIT ? $counts['emails'] . '+' : $counts['emails']) . ')' : ''),
+            'opportunities' => 'Opportunities' . (($counts['opportunities'] ?? 0) ? ' (' . $counts['opportunities'] . ')' : ''),
             'activity' => 'Activity',
         ];
-        $stageLabel = fn ($s) => __('opportunities.stages.' . $s);
     @endphp
 
     <a href="{{ route('hq.crm.leads') }}" class="ld-back" wire:navigate><i data-lucide="arrow-left"></i> All leads</a>
