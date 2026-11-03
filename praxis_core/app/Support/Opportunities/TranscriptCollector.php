@@ -109,9 +109,10 @@ final class TranscriptCollector
         $tries = $meeting->transcript_tries + 1;
         if ($now->greaterThanOrEqualTo($meeting->ends_at->copy()->addHours(self::GIVE_UP_AFTER_HOURS))) {
             $meeting->forceFill(['transcript_status' => 'not_found', 'transcript_next_try_at' => null, 'transcript_tries' => $tries])->save();
-            OpportunityAccess::log('TRANSCRIPT_NOT_FOUND', sprintf('No transcript of “%s” was found in Google after %d tries.', $meeting->title, $tries),
-                'opportunities', $meeting->opportunity_id, [], ['meeting_id' => $meeting->id]);
-            Meetings::tellLead($meeting->opportunity, __('meetings.notify.not_found_title'), __('meetings.notify.not_found', ['title' => $meeting->title]), $meeting->id);
+            Meetings::log($meeting, 'TRANSCRIPT_NOT_FOUND', sprintf('No transcript of “%s” was found in Google after %d tries.', $meeting->title, $tries),
+                [], ['meeting_id' => $meeting->id]);
+            // The opportunity's lead, or for a lead meeting (no opportunity) the lead's owner
+            Meetings::tellOwner($meeting, __('meetings.notify.not_found_title'), __('meetings.notify.not_found', ['title' => $meeting->title]));
 
             return 'not_found';
         }

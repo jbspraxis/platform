@@ -9,6 +9,8 @@ use App\Support\Leads\Contacts;
 use App\Support\Leads\Copq;
 use App\Support\Leads\Countries;
 use App\Support\Leads\LeadAccess;
+use App\Support\Leads\LeadEmails;
+use App\Support\Leads\LeadMeetings;
 use App\Support\Leads\LeadOwner;
 use App\Support\Leads\LeadRuleBroken;
 use App\Support\Leads\Leads;
@@ -32,9 +34,9 @@ use Livewire\Component;
  *
  *   overview       details (owner and source too), contacts, status (Lost with a reason, Mark as client), next step,
  *                  cost of poor quality (Calculate when missing; merging duplicate assessments), Log activity
- *   meetings       PR 2 (partial tabs/meetings)
- *   emails         PR 2 (partial tabs/emails)
- *   opportunities  the lead's opportunities, simply; PR 2 builds it out (partial tabs/opportunities)
+ *   meetings       PR 2: MeetingsTab (schedule, log, transcripts and notes, Open an opportunity from a meeting)
+ *   emails         PR 2: EmailsTab (HQ Mail to and from the contacts, Email them)
+ *   opportunities  PR 2: OpportunitiesTab
  *   activity       the timeline (LeadTimeline)
  *
  * crm.view opens it (everyone with Leads access sees every lead: decision 8); crm.edit changes it; handing it to
@@ -530,14 +532,18 @@ class LeadPage extends Component
         $lead = $this->lead()->load('owner');
         $user = Auth::user();
         $contacts = Contacts::of($lead->id);
-        $opportunities = $lead->opportunities()->with('lead:id,first_name,last_name')->get(['id', 'organization_id', 'title', 'stage', 'lead_user_id', 'created_at', 'closed_at']);
         $canAssign = LeadOwner::canAssign($user, $lead);
         $owner = $lead->owner ? LeadOwner::option($lead->owner) : null;
 
         return view('livewire.hq.leads.page', [
             'lead' => $lead,
             'contacts' => $contacts,
-            'opportunities' => $opportunities,
+            // The tab counts (PR 2): the lead's meetings, the emails this person may read, its opportunities
+            'counts' => [
+                'meetings' => LeadMeetings::count($lead->id),
+                'emails' => LeadEmails::count($user, $lead->id),
+                'opportunities' => $lead->opportunities()->count(),
+            ],
             'copqLatest' => Copq::latest($lead->id),
             'recent' => $this->tab === 'overview' ? LeadTimeline::for($lead->id, null, 5) : collect(),
             'timeline' => $this->tab === 'activity' ? LeadTimeline::for($lead->id, $this->activityFilter !== '' ? [$this->activityFilter] : null, 200) : collect(),
@@ -546,7 +552,6 @@ class LeadPage extends Component
             'ownerSelected' => $this->ownerPicking ? null : $owner,
             'ownerOptions' => $canAssign && ($this->ownerPicking || ! $owner) ? LeadOwner::options($this->ownerSearch, $lead->assigned_to) : collect(),
             'canOpenOpportunity' => (bool) $user?->can('opportunities.create'),
-            'canSeeOpportunity' => fn ($o) => OpportunityAccess::canView($user, $o),
             'industries' => $this->editingDetails ? Leads::industries() : [],
             'countries' => Countries::NAMES,
             'sources' => Sources::LABELS,

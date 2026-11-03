@@ -137,7 +137,7 @@ final class Transcripts
         if ($run->purpose === 'meeting_notes') {
             $transcript->forceFill(['notes' => $run->output])->save();
         } elseif ($transcript->minutes_sent_at === null) {
-            $transcript->forceFill(['minutes' => self::minutesText($run->output, $transcript->meeting->opportunity->language)])->save();
+            $transcript->forceFill(['minutes' => self::minutesText($run->output, Meetings::language($transcript->meeting))])->save();
         }
     }
 
@@ -195,8 +195,8 @@ final class Transcripts
             return $unsent;
         }
         $transcript->forceFill(['minutes_unsent' => $unsent ?: null])->save();
-        OpportunityAccess::log('MINUTES_SENT', sprintf('Sent the minutes of “%s” to %d %s.', $meeting->title, $recipients->count() - count($unsent),
-            $recipients->count() - count($unsent) === 1 ? 'person' : 'people'), 'opportunities', $meeting->opportunity_id, [], ['transcript_id' => $transcript->id]);
+        Meetings::log($meeting, 'MINUTES_SENT', sprintf('Sent the minutes of “%s” to %d %s.', $meeting->title, $recipients->count() - count($unsent),
+            $recipients->count() - count($unsent) === 1 ? 'person' : 'people'), [], ['transcript_id' => $transcript->id]);
 
         return $unsent;
     }
@@ -226,8 +226,8 @@ final class Transcripts
         $unsent = self::mailMinutes($transcript, $meeting, $recipients);
         $transcript->forceFill(['minutes_unsent' => $unsent ?: null])->save();
         if (count($unsent) < $recipients->count()) {
-            OpportunityAccess::log('MINUTES_SENT', sprintf('Sent the minutes of “%s” again to %d %s.', $meeting->title, $recipients->count() - count($unsent),
-                $recipients->count() - count($unsent) === 1 ? 'person' : 'people'), 'opportunities', $meeting->opportunity_id, [], ['transcript_id' => $transcript->id]);
+            Meetings::log($meeting, 'MINUTES_SENT', sprintf('Sent the minutes of “%s” again to %d %s.', $meeting->title, $recipients->count() - count($unsent),
+                $recipients->count() - count($unsent) === 1 ? 'person' : 'people'), [], ['transcript_id' => $transcript->id]);
         }
 
         return $unsent;
@@ -239,7 +239,7 @@ final class Transcripts
         $unsent = [];
         foreach ($recipients as $a) {
             try {
-                Mail::to($a->email, $a->name)->locale($meeting->opportunity->language)
+                Mail::to($a->email, $a->name)->locale(Meetings::language($meeting))
                     ->send(new MeetingMinutesMail($transcript, $a->client_user_id, Meetings::firstName($a)));
             } catch (Throwable $e) {
                 Log::warning('Meetings: minutes could not be sent', ['transcript' => $transcript->id, 'error' => $e->getMessage()]);
@@ -263,9 +263,9 @@ final class Transcripts
             return $transcript;
         });
 
-        OpportunityAccess::log($automatic ? 'TRANSCRIPT_COLLECTED' : 'TRANSCRIPT_ADDED',
+        Meetings::log($meeting, $automatic ? 'TRANSCRIPT_COLLECTED' : 'TRANSCRIPT_ADDED',
             sprintf('%s the transcript of “%s” (%s).', $automatic ? 'Collected' : 'Added', $meeting->title, $values['source']),
-            'opportunities', $meeting->opportunity_id, [], ['meeting_id' => $meeting->id, 'transcript_id' => $transcript->id, 'source' => $values['source']]);
+            [], ['meeting_id' => $meeting->id, 'transcript_id' => $transcript->id, 'source' => $values['source']]);
         TranscriptCollected::dispatch($transcript, $automatic);
 
         return $transcript;
@@ -273,20 +273,24 @@ final class Transcripts
 
     private static function draft(string $purpose, MeetingTranscript $transcript): AiRun
     {
-        $meeting = $transcript->meeting()->with('attendees', 'opportunity.organization')->first();
-        $opportunity = $meeting->opportunity;
+        $meeting = $transcript->meeting()->with('attendees', 'opportunity.organization', 'organization')->first();
 
         return Ai::queue($purpose, $transcript, [
-            // Who the client is, cached after the company brief; the transcript itself is this job's material
-            'context' => OpportunityContext::for($opportunity, include: ['profile']),
+            // Who the client is, cached after the company brief; the transcript itself is this job's material.
+            // A lead meeting has no opportunity yet: the organisation alone.
+            'context' => $meeting->opportunity
+                ? OpportunityContext::for($meeting->opportunity, include: ['profile'])
+                : OpportunityContext::forLead($meeting->organization),
             'material' => self::material($meeting, $transcript),
-            'language' => $opportunity->language,
+            'language' => Meetings::language($meeting),
         ]);
     }
 
-    private static function material(Meeting $meeting, MeetingTranscript $transcript): string
+    /** The meeting's details, the team's typed notes, then the transcript: what the AI reads about one meeting */
+    public static function material(Meeting $meeting, MeetingTranscript $transcript): string
     {
-        $org = $meeting->opportunity->organization?->name ?: 'the client';
+        $meeting->loadMissing('attendees', 'organization');
+        $org = $meeting->organization?->name ?: 'the client';
         $who = $meeting->attendees->map(fn ($a) => ($a->name ?: $a->email) . ' (' . match ($a->role) {
             'staff' => 'JBS Praxis', 'client' => $org, default => 'guest',
         } . ')')->implode('; ');
@@ -295,6 +299,7 @@ final class Transcripts
             sprintf('Meeting: %s (%s meeting), %s WAT', $meeting->title, $meeting->kind, Meetings::when($meeting)),
             $who !== '' ? "Attendees: {$who}" : null,
             filled($meeting->agenda) ? 'Agenda: ' . trim($meeting->agenda) : null,
+            filled($meeting->typed_notes) ? 'Notes typed by the team: ' . trim($meeting->typed_notes) : null,
             '',
             'Transcript:',
             trim($transcript->text),

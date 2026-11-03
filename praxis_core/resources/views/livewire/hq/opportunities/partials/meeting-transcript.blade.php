@@ -35,7 +35,8 @@
         @endif
     </div>
 
-    @if ($m->kind === 'client')
+    {{-- A lead's meeting sends no minutes (docs/LEADS.md section 12): they come once an opportunity is opened from it --}}
+    @if ($m->kind === 'client' && ! $m->isLeadMeeting())
         <div class="mtg-block">
             <h4>{{ __('meetings.minutes.title') }}</h4>
             @if ($t->minutes_sent_at)

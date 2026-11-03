@@ -156,18 +156,18 @@ class GoogleWorkspace
 
     // ---- Calendar and Meet --------------------------------------------------------------------------------
 
-    /** Create the event with a Meet link in the company calendar; Google sends the invitations */
+    /** Create the event in the company calendar, with a Meet link unless it is in person; Google sends the invitations */
     public function createMeeting(MeetingRequest $meeting): CalendarEvent
     {
         $event = $this->call('post', self::CALENDAR . '/calendars/primary/events', [
             'conferenceDataVersion' => 1,
             'sendUpdates' => $meeting->notify ? 'all' : 'none',
-        ], $meeting->toEvent() + [
+        ], $meeting->toEvent() + ($meeting->withMeet ? [
             'conferenceData' => ['createRequest' => [
                 'requestId' => (string) Str::uuid(),
                 'conferenceSolutionKey' => ['type' => 'hangoutsMeet'],
             ]],
-        ]);
+        ] : []));
 
         // Google may still be creating the Meet space: read the event again for its link
         for ($i = 0; $i < 3 && ($event['conferenceData']['createRequest']['status']['statusCode'] ?? 'success') === 'pending'; $i++) {

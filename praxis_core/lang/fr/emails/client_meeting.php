@@ -30,4 +30,12 @@ return [
     'book_link' => 'Réservez une réunion avec nous',
     'book_button' => 'Réserver un autre créneau',
     'reason' => 'Vous recevez ce message parce que vous êtes invité à une réunion entre :company et JBS Praxis.',
+    // La réunion d’un prospect (docs/LEADS.md, section 9) : en personne à une adresse, ou sans la page de réservation du portail
+    'in_person' => [
+        'format' => "En personne, à l’adresse suivante\u{00A0}: :address",
+        'invite_preheader' => "Nous nous retrouvons en personne\u{202F}; l’adresse figure dans cet e-mail. Google Agenda vous a aussi envoyé l’invitation.",
+        'moved_preheader' => 'Notre réunion est déplacée. Le lieu reste le même.',
+        'moved_intro' => "Nous avons déplacé la réunion entre :company et JBS Praxis. En voici les nouveaux détails\u{202F}; le lieu reste le même.",
+    ],
+    'cancelled_reply' => 'Nous avons annulé la réunion du :date entre :company et JBS Praxis. Google Agenda la retirera de votre agenda. Répondez à cet e-mail et nous trouverons un autre créneau.',
 ];

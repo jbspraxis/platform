@@ -4,6 +4,7 @@ namespace App\Support\Opportunities;
 
 use App\Models\Meeting;
 use App\Models\Opportunity;
+use App\Models\Organization;
 use App\Models\Proposal;
 use App\Models\StatementOfWork;
 use Carbon\CarbonInterface;
@@ -56,9 +57,32 @@ final class OpportunityContext
         return implode("\n\n", array_filter($blocks));
     }
 
+    /**
+     * A lead's meeting has no opportunity yet (docs/LEADS.md section 9): the organisation alone, as the profile part
+     * gives it, for the AI's notes and the suggested title of the opportunity opened from it
+     */
+    public static function forLead(?Organization $lead): string
+    {
+        return implode("\n", self::organisation($lead));
+    }
+
     private static function profile(Opportunity $opportunity): string
     {
-        $org = $opportunity->organization;
+        $lines = self::organisation($opportunity->organization);
+
+        $lines[] = '';
+        $lines[] = 'THIS PIECE OF WORK';
+        $lines[] = 'Title: ' . $opportunity->title;
+        $lines[] = 'Stage: ' . str_replace('_', ' ', $opportunity->stage);
+        $lines[] = 'Language of the documents: ' . ($opportunity->language === 'fr' ? 'French' : 'English');
+        $lines[] = 'Opened: ' . self::date($opportunity->created_at);
+
+        return implode("\n", $lines);
+    }
+
+    /** @return list<string> */
+    private static function organisation(?Organization $org): array
+    {
         $lines = ['ORGANISATION'];
         foreach ([
             'Name' => $org?->name, 'Industry' => $org?->industry, 'Country' => $org?->country, 'City' => $org?->city,
@@ -71,14 +95,7 @@ final class OpportunityContext
             }
         }
 
-        $lines[] = '';
-        $lines[] = 'THIS PIECE OF WORK';
-        $lines[] = 'Title: ' . $opportunity->title;
-        $lines[] = 'Stage: ' . str_replace('_', ' ', $opportunity->stage);
-        $lines[] = 'Language of the documents: ' . ($opportunity->language === 'fr' ? 'French' : 'English');
-        $lines[] = 'Opened: ' . self::date($opportunity->created_at);
-
-        return implode("\n", $lines);
+        return $lines;
     }
 
     private static function copq(Opportunity $opportunity): ?string
@@ -128,6 +145,13 @@ final class OpportunityContext
             }
             if (filled($m->agenda)) {
                 $out[] = 'Agenda: ' . trim($m->agenda);
+            }
+            if (filled($m->location)) {
+                $out[] = 'In person at: ' . trim($m->location);
+            }
+            // A meeting held while the client was a lead brings the team's typed notes with it (docs/LEADS.md section 9)
+            if ($notes && filled($m->typed_notes)) {
+                $out[] = 'Notes typed by the team: ' . trim($m->typed_notes);
             }
             foreach ($m->transcripts as $t) {
                 if ($notes && is_array($t->notes) && $t->notes) {

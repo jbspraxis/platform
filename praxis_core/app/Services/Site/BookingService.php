@@ -5,6 +5,7 @@ namespace App\Services\Site;
 use App\Mail\AuditRequestAlert;
 use App\Mail\AuditRequested;
 use App\Support\Access;
+use App\Support\Leads\LeadMeetings;
 use App\Support\Leads\WebsiteLeads;
 use App\Support\MailLocale;
 use Carbon\Carbon;
@@ -218,10 +219,12 @@ final class BookingService
                 'updated_at' => now()
             ]);
 
-            // The lead's source, default owner (with a bell) and timeline (docs/LEADS.md); PR 2 turns the booking into a lead meeting
+            // The lead's source, default owner (with a bell) and timeline (docs/LEADS.md); the booking waits on the lead's
+            // Meetings tab as a requested lead meeting (not an opportunity) until Free audits approves or declines it
             WebsiteLeads::received($orgId, $isNew, 'website_booking', $bookerId,
                 "Free audit requested on the website for {$startDateTime->format('D j M, H:i')} (WAT): {$finalFocus}.", null,
                 ['appointment_id' => $appointmentId, 'focus' => $finalFocus, 'start' => $startDateTime->format('Y-m-d H:i')]);
+            LeadMeetings::fromBooking($orgId, $appointmentId, $bookerId, 'Free audit: ' . $finalFocus, $startDateTime, $endDateTime);
 
             // 4. Notify the staff who handle leads
             // Notices are for staff; with no CRM staff account yet, skip it rather than fail the booking
