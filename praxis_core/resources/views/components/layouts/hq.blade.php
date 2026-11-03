@@ -18,6 +18,7 @@
         default => [
             'dash' => 'Overview', 'mdm' => 'Master data', 'hr' => 'Team', 'crm' => 'Leads and proposals',
             'ops' => 'Projects', 'finance' => 'Finance', 'marketing' => 'Marketing', 'system' => 'Settings and access', 'mail' => 'Mail',
+            'campaigns' => 'Campaigns',
         ][explode('.', (string) request()->route()?->getName())[1] ?? ''] ?? null,
     };
     $user = auth()->user();
@@ -81,8 +82,8 @@
             @endcanany
 
             @php $opportunities = \App\Support\Opportunities\OpportunityAccess::canOpenBoard($user); @endphp
-            @if ($opportunities || $user->canAny(['crm.view', 'broadcasts.view']))
-                <a href="{{ $opportunities ? route('hq.crm.opportunities') : ($user->can('crm.view') ? route('hq.crm.leads') : route('hq.crm.broadcast')) }}" class="rail-link {{ $on('hq.crm.*') }}" wire:navigate>
+            @if ($opportunities || $user->can('crm.view'))
+                <a href="{{ $opportunities ? route('hq.crm.opportunities') : route('hq.crm.leads') }}" class="rail-link {{ $on('hq.crm.*') }}" wire:navigate>
                     <i data-lucide="target"></i> Leads and proposals
                 </a>
                 @if (request()->routeIs('hq.crm.*'))
@@ -96,12 +97,22 @@
                             <a href="{{ route('hq.crm.consult') }}" class="{{ $on('hq.crm.consult') }}" wire:navigate>Free audits</a>
                             <a href="{{ route('hq.crm.proposal') }}" class="{{ $on('hq.crm.proposal') }}" wire:navigate>Proposals</a>
                         @endcan
-                        @can('broadcasts.view')
-                            <a href="{{ route('hq.crm.broadcast') }}" class="{{ $on('hq.crm.broadcast') }}" wire:navigate>Broadcasts</a>
-                        @endcan
                     </div>
                 @endif
             @endif
+
+            {{-- Campaigns (docs/CAMPAIGNS.md): Broadcasts to people who know us; Outreach (C2) adds its link here --}}
+            @can('broadcasts.view')
+                <a href="{{ route('hq.campaigns.broadcasts') }}" class="rail-link {{ $on('hq.campaigns.*') }}" wire:navigate>
+                    <i data-lucide="send"></i> Campaigns
+                </a>
+                @if (request()->routeIs('hq.campaigns.*'))
+                    <div class="rail-sub">
+                        <a href="{{ route('hq.campaigns.broadcasts') }}" class="{{ $on('hq.campaigns.broadcasts', 'hq.campaigns.broadcast', 'hq.campaigns.report') }}" wire:navigate>Broadcasts</a>
+                        <a href="{{ route('hq.campaigns.audiences') }}" class="{{ $on('hq.campaigns.audiences') }}" wire:navigate>Audiences</a>
+                    </div>
+                @endif
+            @endcan
 
             @canany(['projects.view', 'qa.view', 'timesheets.view', 'signoffs.view'])
                 @php
@@ -193,7 +204,8 @@
                 @if (request()->routeIs('hq.marketing.*'))
                     <div class="rail-sub">
                         @can('marketing.view')
-                            <a href="{{ route('hq.marketing.campaigns') }}" class="{{ $on('hq.marketing.campaigns') }}" wire:navigate>Campaigns</a>
+                            {{-- Paid ads; email campaigns are under Campaigns --}}
+                            <a href="{{ route('hq.marketing.campaigns') }}" class="{{ $on('hq.marketing.campaigns') }}" wire:navigate>Ad campaigns</a>
                         @endcan
                         @can('website.view')
                             <a href="{{ route('hq.marketing.website') }}" class="{{ $on('hq.marketing.website') }}" wire:navigate>Website settings</a>

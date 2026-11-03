@@ -49,6 +49,22 @@ $sections = ['type' => 'array', 'items' => [
     'additionalProperties' => false,
 ]];
 
+// Campaigns › Broadcasts (docs/CAMPAIGNS.md 4.4): the blocks of one language's version, as the AI writes them. Every
+// field is always present (empty when the block type doesn't use it); App\Support\Campaigns\Blocks turns them into blocks.
+$broadcastItems = ['type' => 'array', 'items' => [
+    'type' => 'object',
+    'properties' => ['value' => ['type' => 'string'], 'label' => ['type' => 'string']],
+    'required' => ['value', 'label'],
+    'additionalProperties' => false,
+]];
+$broadcastBlock = [
+    'type' => ['type' => 'string', 'enum' => ['heading', 'text', 'quote', 'figures', 'details', 'button', 'divider']],
+    'text' => ['type' => 'string'],
+    'source' => ['type' => 'string', 'description' => 'quote only: who said it, as the brief gives it'],
+    'label' => ['type' => 'string', 'description' => 'button only'],
+    'items' => $broadcastItems,
+];
+
 return [
 
     // Default monthly cap in US dollars; HQ › System › Integrations overrides it (ai.monthly_budget_usd)
@@ -278,6 +294,34 @@ return [
                     ], 'required' => ['title', 'detail', 'estimate_hours'], 'additionalProperties' => false]],
                 ], 'required' => ['title', 'goal', 'tasks'], 'additionalProperties' => false]],
             ], 'required' => ['milestones'], 'additionalProperties' => false],
+        ],
+
+        // Campaigns › Broadcasts: a first draft of one language's version from a short brief (instructions) and the layout
+        // (material). Claude Sonnet: it goes to every client. The person reads and edits it before anything is sent.
+        'broadcast_draft' => [
+            'provider' => 'claude', 'model' => 'claude-sonnet-5-5', 'effort' => 'medium', 'max_tokens' => 8000,
+            'stream' => false, 'sync' => false, 'expected_chars' => 4000,
+            'task' => 'Write a broadcast email from JBS Praxis to people who already know us (clients, leads and subscribers), from the brief in INSTRUCTIONS FROM THE LEAD, following the layout in MATERIAL. Return: subject (under 60 characters, sentence case, no exclamation mark, no clickbait); preheader (the line inboxes show after the subject, under 110 characters, adding to the subject rather than repeating it); headline (the subject or a fuller version of it); blocks, in order. Block types and their fields: heading (text: a few words); text (text: plain paragraphs separated by a blank line, "- " starts a list item, **bold** for a few key words, no headings inside); quote (text: the words, without quotation marks; source: who said it, never invented); figures (items: 1 to 3, value: a short figure such as "41%" or "9 weeks", label: what it measures); details (items: rows with label and value, such as Date, Time, Place); button (label: a verb-first action of at most 6 words; HQ sets its address); divider. Leave the fields a block type doesn’t use empty. Voice: plain, precise, warm and measured; short sentences; no hype (revolutionary, cutting-edge, seamless, robust, unlock, leverage, elite); no guaranteed outcomes. The email adds the greeting and the sign-off: write neither. You may use {{ first_name }} and {{ company_name }} where they read naturally. Never invent a fact, a figure, a name, a date or a quote the brief doesn’t give: leave that block out instead.',
+            'schema' => ['type' => 'object', 'properties' => [
+                'subject' => ['type' => 'string'], 'preheader' => ['type' => 'string'], 'headline' => ['type' => 'string'],
+                'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => $broadcastBlock,
+                    'required' => ['type', 'text', 'source', 'label', 'items'], 'additionalProperties' => false]],
+            ], 'required' => ['subject', 'preheader', 'headline', 'blocks'], 'additionalProperties' => false],
+        ],
+
+        // Campaigns › Broadcasts: one language's version translated into the other, block by block (index), for editing.
+        // MATERIAL is the version as JSON; a text block's text is its HTML.
+        'broadcast_translate' => [
+            'provider' => 'claude', 'model' => 'claude-sonnet-5-5', 'effort' => 'low', 'max_tokens' => 8000,
+            'stream' => false, 'sync' => false, 'expected_chars' => 4000, 'brief' => false,
+            'task' => 'Translate the broadcast email in MATERIAL (JSON: subject, preheader, headline and its numbered blocks) into the language below, for the same readers. Keep the meaning, facts, figures and names exactly; adapt idioms and typography to the language rather than translating word for word. Return every block with its index and its fields. A text block’s text is HTML: keep its tags (p, br, strong, em, u, a with its href, ul, ol, li, h2, h3) and translate only the words. Keep {{ first_name }} and {{ company_name }} exactly as they are. For figures, translate the label, and the unit in the value when it has one ("3 weeks" → "3 semaines"), never the number. For details, translate the label and the value. For a button, translate the label. For an image, text is its description for people who can’t see images. Leave a field empty when the original’s is empty.',
+            'schema' => ['type' => 'object', 'properties' => [
+                'subject' => ['type' => 'string'], 'preheader' => ['type' => 'string'], 'headline' => ['type' => 'string'],
+                'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
+                    'index' => ['type' => 'integer'], 'text' => ['type' => 'string'], 'source' => ['type' => 'string'],
+                    'label' => ['type' => 'string'], 'items' => $broadcastItems,
+                ], 'required' => ['index', 'text', 'source', 'label', 'items'], 'additionalProperties' => false]],
+            ], 'required' => ['subject', 'preheader', 'headline', 'blocks'], 'additionalProperties' => false],
         ],
 
         // System › Integrations › Test the Claude key: one tiny Haiku request (a fraction of a cent)

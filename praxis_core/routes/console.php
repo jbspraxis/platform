@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\Artisan;
 // The 6-Hour Shift Marketing Telemetry Cron Job
 Schedule::command('marketing:sync-telemetry')->everySixHours();
 
-// The Stealth Broadcast Sender (30 emails every 5 minutes to avoid being pushed to spams)
-Schedule::command('broadcast:process')->everyFiveMinutes();
+// Broadcasts (docs/CAMPAIGNS.md 4.6): starts scheduled ones and sends 30 emails a run, the cPanel SMTP pace; never two runs at once
+Schedule::command('broadcast:process')->everyFiveMinutes()->withoutOverlapping(10);
 
 // The The 120-Minute Idle Killswitch Command on hours spent working and the The QA SLA Auto-Approver Command from clients.
 Schedule::command('ops:qa-auto-approve')->everyMinute();

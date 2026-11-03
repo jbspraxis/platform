@@ -30,6 +30,8 @@ return [
         'project_draft' => "Projet préparé",
         'plan_milestone' => "Plan d’un jalon",
         'plan_project' => "Plan du projet",
+        'broadcast_draft' => 'Brouillon de diffusion',
+        'broadcast_translate' => 'Traduction de diffusion',
         'connection_test' => "Test de la clé",
     ],
 ];

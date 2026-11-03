@@ -30,6 +30,8 @@ return [
         'project_draft' => 'Project draft',
         'plan_milestone' => 'Milestone plan',
         'plan_project' => 'Project plan',
+        'broadcast_draft' => 'Broadcast draft',
+        'broadcast_translate' => 'Broadcast translation',
         'connection_test' => 'Key test',
     ],
 ];

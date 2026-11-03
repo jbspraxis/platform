@@ -3,6 +3,7 @@
 @props([
     'preheader' => '',        // the grey line inboxes show after the subject
     'headline' => null,       // Newsreader headline at the top of the card
+    'eyebrow' => null,        // broadcasts: the small label above the headline ("JBS Praxis Insights")
     'unsubscribeUrl' => null, // broadcasts only
     'internal' => false,      // team alerts: no contact line, English only
 ])
@@ -35,6 +36,7 @@
     .mail-h1 { font-size: 24px !important; line-height: 30px !important; }
     .mail-btn { width: 100% !important; }
     .mail-btn a { display: block !important; text-align: center !important; }
+    .mail-col { display: block !important; width: 100% !important; padding-right: 0 !important; }
   }
 </style>
 <!--[if mso]><style>h1, h2, .serif { font-family: Georgia, serif !important; } td, p, a, li, span, div { font-family: Arial, sans-serif !important; }</style><![endif]-->
@@ -62,6 +64,9 @@
     </tr>
     <tr>
         <td class="mail-pad" style="padding: 32px 40px 16px; font-family: 'Plus Jakarta Sans', Arial, sans-serif; font-size: 16px; line-height: 26px; color: #4A5468;">
+            @if ($eyebrow)
+                <p style="margin: 0 0 8px; font-family: 'Plus Jakarta Sans', Arial, sans-serif; font-size: 13px; line-height: 20px; font-weight: 600; letter-spacing: 0.02em; color: #08707C;">{{ $eyebrow }}</p>
+            @endif
             @if ($headline)
                 <h1 class="mail-h1 serif" style="margin: 0 0 20px; font-family: 'Newsreader', Georgia, serif; font-weight: 400; font-size: 28px; line-height: 34px; color: #0C142B;">{{ $headline }}</h1>
             @endif

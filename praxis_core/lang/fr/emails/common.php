@@ -11,7 +11,7 @@ return [
     'contact_line' => 'Répondez à cet e-mail ou écrivez-nous à :email.',
     'button_fallback' => "Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur\u{00A0}:",
     'code_expiry' => "Ce code est valable :minutes minutes. Ne le communiquez à personne\u{00A0}: JBS Praxis ne vous le demandera jamais.",
-    'unsubscribe' => 'Se désabonner de JBS Praxis Insights',
+    'unsubscribe' => 'Se désabonner des actualités et analyses de JBS Praxis',
     'confidential' => "Confidentiel\u{00A0}: préparé pour :company.",
     'date_format' => 'dddd Do MMMM YYYY', // jeudi 5 novembre 2026, dimanche 1er novembre 2026
     'reason_contact' => 'Vous recevez ce message parce que vous avez contacté JBS Praxis via jbspraxis.com.',

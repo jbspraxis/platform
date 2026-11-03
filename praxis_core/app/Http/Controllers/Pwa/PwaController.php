@@ -30,7 +30,8 @@ class PwaController extends Controller
     // Where a shortcut lands: the first screen of that rail section the person can open, in the rail's
     // order (components/layouts/hq.blade.php). A section they can't open lands on My workspace.
     private const SECTIONS = [
-        'leads' => ['crm.view' => 'hq.crm.leads', 'broadcasts.view' => 'hq.crm.broadcast'],
+        // Broadcasts left Leads for Campaigns (docs/CAMPAIGNS.md); someone who only sends broadcasts still lands there
+        'leads' => ['crm.view' => 'hq.crm.leads', 'broadcasts.view' => 'hq.campaigns.broadcasts'],
         'projects' => ['projects.view' => 'hq.ops.deployments', 'qa.view' => 'hq.ops.qa', 'timesheets.view' => 'hq.ops.timers', 'signoffs.view' => 'hq.ops.signoffs'],
         'finance' => ['finance.view' => 'hq.finance.bi', 'payroll.view' => 'hq.finance.payroll', 'expenses.view' => 'hq.finance.manager', 'expenses.create' => 'hq.finance.request'],
     ];

@@ -116,7 +116,8 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
                 Route::get('/consultation', \App\Livewire\Hq\Intelligence\LiveConsultation::class)->name('hq.crm.consult');
                 Route::get('/proposal-builder/{id?}', \App\Livewire\Hq\Intelligence\ProposalBuilder::class)->name('hq.crm.proposal');
             });
-            Route::get('/broadcast-ledger', \App\Livewire\Hq\Intelligence\BroadcastLedger::class)->middleware('can:broadcasts.view')->name('hq.crm.broadcast');
+            // Broadcasts moved to Campaigns (docs/CAMPAIGNS.md); old links and bells still arrive here
+            Route::redirect('/broadcast-ledger', '/campaigns/broadcasts')->name('hq.crm.broadcast');
         });
 
         // Opportunities (docs/OPPORTUNITIES.md): one record per piece of work with a client, under Leads and proposals
@@ -173,6 +174,9 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
 
         // 8. MAIL (docs/MAIL.md): own and shared mailboxes; routes/mail.php
         require __DIR__ . '/mail.php';
+
+        // 9. CAMPAIGNS (docs/CAMPAIGNS.md): Broadcasts, and Outreach from C2; routes/campaigns.php
+        require __DIR__ . '/campaigns.php';
 
         // Private uploads (receipts, payment proofs, QA evidence, CVs), checked per file
         Route::get('/files/{path}', [\App\Http\Controllers\SecureFileController::class, 'show'])->where('path', '.*')->name('hq.file');
@@ -259,6 +263,9 @@ Route::domain(Hosts::portal())->group(function () use ($notOwnRoute, $legacy) {
         Route::get('/sow/{sow}/pdf', [\App\Http\Controllers\SowPdfController::class, 'portal'])->whereUuid('sow')
             ->middleware('signed:relative')->name('portal.sow.pdf');
     });
+
+    // Links inside broadcasts: unsubscribe, opens, clicks, pictures (docs/CAMPAIGNS.md 4.5); routes/email-links.php
+    require __DIR__ . '/email-links.php';
 
     // Client accounts only (guard 'client', table client_users)
     Route::middleware(['auth:client', 'client.active'])->group(function () {
