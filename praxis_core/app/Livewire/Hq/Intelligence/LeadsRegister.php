@@ -2,66 +2,29 @@
 
 namespace App\Livewire\Hq\Intelligence;
 
-use Livewire\Component;
+use App\Models\Organization;
+use App\Services\Site\BookingService;
+use App\Support\Leads\LeadAccess;
+use App\Support\Leads\LeadOwner;
+use App\Support\Leads\LeadStatus;
+use App\Support\Leads\Sources;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
-use Carbon\Carbon;
-use App\Services\Site\BookingService;
+use Livewire\Component;
 
+/**
+ * HQ › Leads (docs/LEADS.md section 7): every lead and client for everyone with crm.view (owner's decision 8). Each row
+ * opens the lead's page (hq.crm.lead); "Assign to me" takes a lead nobody owns; "Book free audit" asks Free audits for
+ * one; crm.export downloads the list. Filters, "Mine", the summary strip and the Excel import are PR 3's.
+ */
 #[Layout('components.layouts.hq')]
 class LeadsRegister extends Component
 {
-    public $viewMode = 'grid'; // 'grid' or 'kanban'
-    public $leads = [];
-    
-    // Slide-Out Drawer State
-    public $showDrawer = false;
-    public $selectedLead = null;
-    
-    // Diff-Viewer State: the two records being merged are set on the server only
-    public $showDiffModal = false;
-    #[Locked]
-    public $diffOld = null;
-    #[Locked]
-    public $diffNew = null;
-    public $mergeSelections = []; 
-    
-    // The organisations the register lists (and the only ones its actions change)
-    private const REGISTER_STATUSES = ['Lead', 'Active Client'];
-
-    // The only copq_assessments columns a merge may write, with their labels (sentence case, docs/BRAND.md section 12)
-    private const MERGE_FIELDS = [
-        'company_name' => 'Company name',
-        'executive_name' => 'Contact name',
-        'copq_industry' => 'Industry',
-        'primary_tool' => 'Systems in use',
-        'bottleneck' => 'Main bottleneck',
-        'copq_turnover' => 'Annual turnover',
-        'headcount' => 'Headcount',
-        'calculated_leakage' => 'Cost of poor quality (a year)',
-    ];
-
-    // Shown in the merge dialog; locked so the browser cannot name other columns for executeMerge to write
-    #[Locked]
-    public $diffFields = self::MERGE_FIELDS;
-    
-    // Manual intake state
-    public $showIntakeModal = false;
-    public $name = '', $company = '', $email = '', $currency = 'NGN';
-    public $industry = '', $tool = '', $bottleneck = '';
-    
-    // Explicitly nullifying defaults so the user MUST provide them for accurate COPQ
-    public $acv = ''; 
-    public $headcount = ''; 
-    public $mgmtNodes = '';
-    public $turnover = ''; 
-    public $manualHrs = ''; 
-    public $hourlyCost = ''; 
-    public $errorRate = ''; 
-    
     // Book a free audit from HQ: the date and time are entered in Lagos time (WAT), like website bookings
     public $showBookingModal = false;
     #[Locked]
@@ -71,420 +34,48 @@ class LeadsRegister extends Component
     public $bookingDate = '', $bookingTime = '';
 
     // Field names in validation messages (sentence case, docs/BRAND.md section 12)
-    protected $validationAttributes = [
-        'company' => 'organisation name', 'name' => 'contact name', 'email' => 'work email',
-        'industry' => 'industry', 'tool' => 'system in use', 'bottleneck' => 'main bottleneck',
-        'turnover' => 'annual turnover', 'headcount' => 'total headcount', 'mgmtNodes' => 'number of managers who approve work',
-        'acv' => 'average contract value', 'manualHrs' => 'manual hours a week', 'hourlyCost' => 'hourly cost of a manager',
-        'errorRate' => 'error rate', 'currency' => 'currency', 'bookingDate' => 'date', 'bookingTime' => 'time',
-    ];
+    protected $validationAttributes = ['bookingDate' => 'date', 'bookingTime' => 'time'];
 
-    // All MDM Collections dynamically loaded
-    public $dbIndustries = [], $dbArchitectures = [], $dbBottlenecks = [], $dbCurrencies = [];
-    // The stages someone can move a lead to by hand; locked so the browser cannot add its own
-    #[Locked]
-    public $stages = ['Lead Captured', 'Qualifying', 'In Consultation', 'Proposal Sent', 'Won', 'Lost'];
-
-    // Owner picker in the lead details (x-hq.picker): type part of a name, choose anyone on the staff
-    public string $ownerSearch = '';
-
-    public bool $ownerPicking = false;
-
-    public function mount()
+    /** Every lead and client, newest activity first, with its owner, main contact and latest cost estimate */
+    private function leads(): Collection
     {
-        $this->loadMasterData();
-        $this->loadLeads();
-    }
-
-    public function loadMasterData()
-    {
-        $this->dbIndustries = DB::table('mdm_copq_industries')->orderBy('industry_name')->get();
-        $this->dbArchitectures = DB::table('mdm_copq_architectures')->orderBy('display_name')->get();
-        $this->dbBottlenecks = DB::table('mdm_copq_bottlenecks')->orderBy('bottleneck_name')->get();
-        $this->dbCurrencies = DB::table('mdm_exchange_rates')->orderBy('currency_code')->get();
-    }
-
-    public function loadLeads()
-    {
-        // Fetch raw organizations
-        $organizations = DB::table('organizations')
+        $leads = DB::table('organizations')
             ->select('organizations.*', 'owner.first_name as owner_first', 'owner.last_name as owner_last', 'owner.id as owner_id', 'owner.avatar_path as owner_avatar')
             ->leftJoin('users as owner', 'organizations.assigned_to', '=', 'owner.id')
-            ->whereIn('organizations.status', self::REGISTER_STATUSES)
+            ->whereIn('organizations.status', LeadAccess::STATUSES)->whereNull('organizations.deleted_at')
+            ->orderByRaw('COALESCE(organizations.last_activity_at, organizations.created_at) DESC')
             ->get();
+        $ids = $leads->pluck('id');
 
-        // Map ONLY the latest COPQ assessment to avoid double-rendering duplicates
-        $mappedLeads = $organizations->map(function ($org) {
-            $latestCopq = DB::table('copq_assessments')
-                ->where('organization_id', $org->id)
-                ->orderBy('created_at', 'desc')
-                ->first();
+        $contacts = DB::table('client_users')->whereIn('organization_id', $ids)->whereNull('deleted_at')
+            ->orderByDesc('is_main_contact')->orderBy('created_at')->get(['organization_id', 'first_name', 'last_name', 'email', 'phone'])
+            ->groupBy('organization_id')->map->first();
+        $copq = DB::table('copq_assessments')->whereIn('organization_id', $ids)->whereNull('deleted_at')->orderByDesc('created_at')
+            ->get(['organization_id', 'calculated_leakage', 'copq_currency', 'lead_tier', 'executive_name', 'corporate_email'])
+            ->groupBy('organization_id')->map->first();
 
-            $org->org_id = $org->id;
-            $org->company_name = $org->name;
-            $org->is_duplicate_suspect = (bool) ($org->is_duplicate_suspect ?? 0);
-            $org->executive_name = $latestCopq->executive_name ?? 'No contact recorded';
-            $org->corporate_email = $latestCopq->corporate_email ?? '';
-            $org->calculated_leakage = $latestCopq->calculated_leakage ?? 0;
-            $org->copq_currency = $latestCopq->copq_currency ?? 'NGN';
-            $org->lead_tier = $latestCopq->lead_tier ?? 3;
-            $org->ai_friction_analysis = $latestCopq->ai_friction_analysis ?? '';
-            $org->report_token = $latestCopq->report_token ?? '';
-            $org->copq_turnover = $latestCopq->copq_turnover ?? 0;
-            $org->copq_industry = $latestCopq->copq_industry ?? 'Industry not given';
-            $org->primary_tool = $latestCopq->primary_tool ?? 'Not given';
-            $org->bottleneck = $latestCopq->bottleneck ?? 'Not given';
-            
-            return $org;
+        return $leads->map(function ($lead) use ($contacts, $copq) {
+            $contact = $contacts[$lead->id] ?? null;
+            $estimate = $copq[$lead->id] ?? null;
+            $lead->contact_name = $contact ? trim($contact->first_name . ' ' . $contact->last_name) : ($estimate->executive_name ?? null);
+            $lead->contact_email = $contact->email ?? ($estimate->corporate_email ?? null);
+            $lead->contact_phone = $contact->phone ?? null;
+            $lead->calculated_leakage = $estimate->calculated_leakage ?? null;
+            $lead->copq_currency = $estimate->copq_currency ?? null;
+            $lead->lead_tier = $estimate->lead_tier ?? null;
+
+            return $lead;
         });
-
-        // Sort by highest value leads first
-        $this->leads = $mappedLeads->sortByDesc('calculated_leakage')->values()->all();
-    }
-
-    public function toggleView($mode) { $this->viewMode = $mode; }
-
-    // --- SLIDE-OUT DRAWER ---
-    public function openDrawer($orgId)
-    {
-        $this->selectedLead = collect($this->leads)->firstWhere('org_id', $orgId);
-        $this->showDrawer = true;
-        $this->ownerPicking = false;
-        $this->ownerSearch = '';
-    }
-
-    /**
-     * Who may hand the open lead to someone: anyone with crm.edit while nobody owns it; afterwards its owner, or
-     * a partner or the owner of the firm (opportunities.approve: the one Leads-and-proposals permission the sales
-     * role does not hold), so a lead can be reassigned without its owner's say.
-     */
-    public function canAssignOpenLead(): bool
-    {
-        $user = Auth::user();
-        if (! $this->selectedLead || ! $user?->can('crm.edit')) {
-            return false;
-        }
-
-        return ! $this->selectedLead->owner_id || $this->selectedLead->owner_id === $user->id || $user->can('opportunities.approve');
-    }
-
-    public function startReassign()
-    {
-        abort_unless($this->canAssignOpenLead(), 403);
-        $this->ownerPicking = true;
-        $this->ownerSearch = '';
-    }
-
-    public function cancelReassign()
-    {
-        $this->ownerPicking = false;
-        $this->ownerSearch = '';
-    }
-
-    /** Give the open lead to $userId (any active staff member), with the audit log and a bell for them */
-    public function assignLead(string $userId)
-    {
-        abort_unless($this->canAssignOpenLead(), 403);
-        $orgId = $this->selectedLead->org_id;
-        $lead = DB::table('organizations')->where('id', $orgId)->whereIn('status', self::REGISTER_STATUSES)->first();
-        $person = \App\Models\User::where('id', $userId)->where('status', 'Active')->whereNull('deleted_at')->first(['id', 'first_name', 'last_name']);
-        if (! $lead || ! $person) {
-            $this->cancelReassign();
-
-            return;
-        }
-
-        if ($lead->assigned_to !== $person->id) {
-            DB::table('organizations')->where('id', $lead->id)->update(['assigned_to' => $person->id, 'updated_at' => now()]);
-            $name = trim($person->first_name . ' ' . $person->last_name);
-            DB::table('system_audit_logs')->insert([
-                'user_id' => Auth::id(),
-                'action' => 'LEAD_ASSIGNED',
-                'description' => $person->id === Auth::id() ? "Took ownership of the lead {$lead->name}." : "Assigned the lead {$lead->name} to {$name}.",
-                'target_table' => 'organizations',
-                'target_id' => $lead->id,
-                'old_values' => json_encode(['assigned_to' => $lead->assigned_to]),
-                'new_values' => json_encode(['assigned_to' => $person->id]),
-                'ip_address' => request()?->ip(),
-                'created_at' => now(),
-            ]);
-            if ($person->id !== Auth::id()) {
-                $by = Auth::user();
-                DB::table('notifications')->insert([
-                    'id' => (string) Str::uuid(),
-                    'user_id' => $person->id,
-                    'type' => 'System',
-                    'title' => 'A lead was assigned to you',
-                    'message' => trim($by->first_name . ' ' . $by->last_name) . " assigned you the lead {$lead->name}.",
-                    'link_url' => route('hq.crm.leads'),
-                    'is_read' => 0,
-                    'created_at' => now(),
-                ]);
-            }
-        }
-        $this->loadLeads();
-        $this->openDrawer($orgId);
-    }
-
-    /** The owner picker's list: active staff matching the typed name, the current owner left out */
-    private function ownerOptions()
-    {
-        $term = trim($this->ownerSearch);
-        $like = '%' . addcslashes($term, '%_\\') . '%';
-
-        return \App\Models\User::query()->where('status', 'Active')->whereNull('deleted_at')
-            ->when($this->selectedLead?->owner_id, fn ($q, $id) => $q->where('id', '!=', $id))
-            ->when($term !== '', fn ($q) => $q->where(fn ($w) => $w->where('first_name', 'like', $like)->orWhere('last_name', 'like', $like)
-                ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", [$like])->orWhere('email', 'like', $like)))
-            ->orderBy('first_name')->orderBy('last_name')->limit(30)
-            ->get(['id', 'first_name', 'last_name', 'avatar_path', 'job_title'])
-            ->map(fn ($u) => ['id' => $u->id, 'label' => trim($u->first_name . ' ' . $u->last_name), 'meta' => $u->job_title, 'user' => $u])->values();
-    }
-
-    public function closeDrawer()
-    {
-        $this->showDrawer = false;
-        $this->selectedLead = null;
-    }
-
-    public function updateStage($orgId, $newStage)
-    {
-        abort_unless(Auth::user()->can('crm.edit'), 403);
-
-        // Only one of the register's stages, and only for an organisation the register shows
-        if (! in_array($newStage, $this->stages, true)) {
-            $this->loadLeads();
-            return;
-        }
-
-        DB::table('organizations')->where('id', $orgId)->whereIn('status', self::REGISTER_STATUSES)
-            ->update(['pipeline_stage' => $newStage, 'updated_at' => now()]);
-        $this->loadLeads();
-        if ($this->selectedLead && $this->selectedLead->org_id === $orgId) {
-            $this->selectedLead->pipeline_stage = $newStage;
-        }
     }
 
     public function claimLead($orgId)
     {
-        abort_unless(Auth::user()->can('crm.edit'), 403);
-
-        $userId = Auth::id();
-        $lead = DB::table('organizations')->where('id', $orgId)->whereIn('status', self::REGISTER_STATUSES)->first();
-
+        abort_unless(LeadAccess::canEdit(Auth::user()), 403);
+        $lead = Organization::query()->whereKey($orgId)->whereIn('status', LeadAccess::STATUSES)->first();
         // Only a lead nobody owns yet ("Assign to me" is offered only for those): an owned lead can't be taken over
-        $claimed = $lead ? DB::table('organizations')->where('id', $lead->id)->whereIn('status', self::REGISTER_STATUSES)
-            ->whereNull('assigned_to')
-            ->update(['assigned_to' => $userId, 'updated_at' => now()]) : 0;
-
-        if ($claimed) {
-            DB::table('system_audit_logs')->insert([
-                'user_id' => $userId,
-                'action' => 'LEAD_CLAIMED',
-                'description' => "Took ownership of the lead {$lead->name}.",
-                'target_table' => 'organizations',
-                'target_id' => $lead->id,
-                'old_values' => json_encode(['assigned_to' => $lead->assigned_to]),
-                'new_values' => json_encode(['assigned_to' => $userId]),
-                'ip_address' => request()?->ip(),
-                'created_at' => now(),
-            ]);
+        if ($lead) {
+            LeadOwner::claim($lead, Auth::user());
         }
-        $this->loadLeads();
-        if ($this->selectedLead && $this->selectedLead->org_id === $orgId) { $this->openDrawer($orgId); }
-    }
-
-    // --- THE DIFF-VIEWER ENGINE ---
-    public function openDiffViewer($orgId)
-    {
-        abort_unless(Auth::user()->can('crm.edit'), 403);
-
-        $records = DB::table('copq_assessments')
-            ->where('organization_id', $orgId)
-            ->orderBy('created_at', 'desc')
-            ->limit(2)
-            ->get();
-
-        if ($records->count() < 2) {
-            DB::table('organizations')->where('id', $orgId)->update(['is_duplicate_suspect' => 0]);
-            $this->loadLeads();
-            return;
-        }
-
-        $this->diffNew = $records[0];
-        $this->diffOld = $records[1];
-
-        foreach (array_keys(self::MERGE_FIELDS) as $field) {
-            $this->mergeSelections[$field] = 'new';
-        }
-
-        $this->showDiffModal = true;
-    }
-
-    public function closeDiffViewer()
-    {
-        $this->showDiffModal = false;
-        $this->diffOld = null;
-        $this->diffNew = null;
-    }
-
-    public function executeMerge()
-    {
-        abort_unless(Auth::user()->can('crm.edit'), 403);
-
-        if (!$this->diffOld || !$this->diffNew) return;
-
-        $finalData = [];
-        
-        // Only the whitelisted columns, whatever the component state says
-        foreach (array_keys(self::MERGE_FIELDS) as $field) {
-            $finalData[$field] = ($this->mergeSelections[$field] ?? 'new') === 'old' 
-                ? $this->diffOld->$field 
-                : $this->diffNew->$field;
-        }
-        
-        $finalData['updated_at'] = now();
-        $targetOrgId = $this->diffNew->organization_id;
-
-        DB::table('copq_assessments')->where('id', $this->diffNew->id)->update($finalData);
-        DB::table('organizations')->where('id', $targetOrgId)->update([
-            'is_duplicate_suspect' => 0,
-            'updated_at' => now()
-        ]);
-
-        $kept = array_keys(array_filter(array_intersect_key($this->mergeSelections, self::MERGE_FIELDS), fn ($pick) => $pick === 'old'));
-        DB::table('system_audit_logs')->insert([
-            'user_id' => Auth::id(),
-            'action' => 'LEAD_RECORDS_MERGED',
-            'description' => 'Merged two assessments for ' . ($finalData['company_name'] ?: 'a lead') . '.',
-            'target_table' => 'copq_assessments',
-            'target_id' => $this->diffNew->id,
-            'old_values' => json_encode(array_intersect_key((array) $this->diffNew, self::MERGE_FIELDS), JSON_UNESCAPED_UNICODE),
-            'new_values' => json_encode(['merged_from' => $this->diffOld->id, 'kept_from_older_record' => $kept]),
-            'ip_address' => request()?->ip(),
-            'created_at' => now(),
-        ]);
-
-        $this->closeDiffViewer();
-        $this->loadLeads();
-        $this->openDrawer($targetOrgId); 
-    }
-
-    // --- MANUAL PITCH INTAKE ENGINE ---
-    public function openIntakeModal() { $this->showIntakeModal = true; }
-    public function closeIntakeModal() { $this->showIntakeModal = false; }
-
-    public function submitManualPitch()
-    {
-        abort_unless(Auth::user()->can('crm.create'), 403);
-
-        // Strict validation requiring every single variable for the COPQ formula
-        $this->validate([
-            'company' => 'required|string', 
-            'name' => 'required|string', 
-            'email' => 'required|email',
-            'industry' => 'required|string', 
-            'tool' => 'required|string', 
-            'bottleneck' => 'required|string',
-            'turnover' => 'required|numeric|min:0', 
-            'headcount' => 'required|numeric|min:1', 
-            'mgmtNodes' => 'required|numeric|min:1',
-            'acv' => 'required|numeric|min:0',
-            'manualHrs' => 'required|numeric|min:0',
-            'hourlyCost' => 'required|numeric|min:0',
-            'errorRate' => 'required|numeric|min:0|max:100',
-            'currency' => 'required|string'
-        ]);
-
-        // 1. Fetch Multipliers
-        $archData = DB::table('mdm_copq_architectures')->where('tech_key', $this->tool)->first();
-        $bnData = DB::table('mdm_copq_bottlenecks')->where('bottleneck_name', $this->bottleneck)->first();
-        $indData = DB::table('mdm_copq_industries')->where('industry_name', $this->industry)->first();
-        
-        $archMultiplier = $archData ? $archData->error_multiplier : 1.00;
-        $actualErrorRate = $this->errorRate * $archMultiplier;
-
-        $appMult = $bnData ? $bnData->appraisal_multiplier : 1.00;
-        $failMult = $bnData ? $bnData->failure_multiplier : 1.00;
-
-        // 2. Organization Check & De-Duplication
-        $cleanOrgName = trim($this->company);
-        
-        // Find existing organization (Case-Insensitive)
-        $existingOrg = DB::table('organizations')->whereRaw('LOWER(name) = ?', [strtolower($cleanOrgName)])->first();
-
-        if ($existingOrg) {
-            $orgId = $existingOrg->id;
-            // Update the existing record to reflect the manual pitch activity
-            DB::table('organizations')->where('id', $orgId)->update([
-                'industry' => $this->industry,
-                'tech_reality' => $this->tool,
-                'turnover_bracket' => $this->turnover,
-                'updated_at' => now()
-            ]);
-        } else {
-            // Create new organization if it truly doesn’t exist
-            $orgId = (string) Str::uuid();
-            DB::table('organizations')->insert([
-                'id' => $orgId, 
-                'name' => $cleanOrgName, 
-                'industry' => $this->industry,
-                'tech_reality' => $this->tool, 
-                'turnover_bracket' => $this->turnover,
-                'status' => 'Lead', 
-                'pipeline_stage' => 'Lead Captured', 
-                'assigned_to' => Auth::id() ?? null, 
-                'created_at' => now(), 
-                'updated_at' => now(),
-            ]);
-        }
-
-        // 3. Fallback summary (plain wording, docs/BRAND.md section 4)
-        $industryPart = $indData ? $indData->fallback_diagnostic : "We found signs of avoidable cost in how {COMPANY_NAME} runs.";
-        $bottleneckPart = $bnData ? $bnData->bottleneck_narrative : "We recommend a review of the main bottleneck.";
-        $fallbackText = $industryPart . " " . $bottleneckPart;
-        $aiAnalysis = str_replace('{COMPANY_NAME}', $cleanOrgName, $fallbackText);
-
-        // 4. Server-Side Mathematics (Using exact user inputs)
-        $mgmtHeadcount = $this->mgmtNodes;
-        
-        $appraisalCost = ($mgmtHeadcount * $this->manualHrs * $this->hourlyCost * 52) * $appMult;
-        $internalFailure = ($this->turnover * ($actualErrorRate / 100) * 0.60) * $failMult;
-        $estimatedClients = $this->acv > 0 ? max(1, $this->turnover / $this->acv) : 0;
-        $churnProb = ($actualErrorRate / 100) * 0.40;
-        $externalFailure = ($estimatedClients * $churnProb) * $this->acv * 1.5;
-        
-        $totalCOPQ = $appraisalCost + $internalFailure + $externalFailure;
-
-        // 5. Tier Scoring Logic
-        $tier = 3; // Default SME/Junk
-        if ($this->turnover >= 5000000 || $totalCOPQ >= 250000) $tier = 1; 
-        elseif ($this->turnover >= 1000000 || $totalCOPQ >= 50000) $tier = 2; 
-
-        // 6. Save the assessment
-        $token = 'PRX-' . strtoupper(Str::random(24)) . '-' . date('Y');
-        DB::table('copq_assessments')->insert([
-            'id' => (string) Str::uuid(), 'report_token' => $token, 'organization_id' => $orgId,
-            'executive_name' => $this->name, 'company_name' => $this->company, 'corporate_email' => $this->email,
-            'copq_industry' => $this->industry, 'primary_tool' => $this->tool, 'bottleneck' => $this->bottleneck,
-            'copq_currency' => $this->currency, 'copq_turnover' => $this->turnover, 'headcount' => $this->headcount,
-            'mgmt_nodes' => $this->mgmtNodes, // <-- ADD THIS LINE HERE
-            'copq_latency' => $this->manualHrs, 'copq_hourly_cost' => $this->hourlyCost,
-            'copq_error_rate' => $actualErrorRate, 'avg_contract_value' => $this->acv,
-            'calculated_leakage' => $totalCOPQ, 'ai_friction_analysis' => trim($aiAnalysis),
-            'lead_tier' => $tier, 'created_at' => now(), 'updated_at' => now(),
-        ]);
-
-        // 7. Notification Trigger
-        DB::table('notifications')->insert([
-            'id' => (string) Str::uuid(), 'user_id' => Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c',
-            'title' => 'Lead added', 'message' => $cleanOrgName . " was added to the pipeline. Estimated cost of poor quality: " . $this->currency . " " . number_format($totalCOPQ) . " a year.",
-            'link_url' => route('hq.crm.leads', [], false), 'type' => 'System', 'is_read' => 0, 'created_at' => now()
-        ]);
-
-        $this->closeIntakeModal();
-        $this->loadLeads();
-        $this->openDrawer($orgId); 
     }
 
     // --- AD-HOC CONSULTATION PIPELINE ---
@@ -551,8 +142,9 @@ class LeadsRegister extends Component
             return;
         }
 
+        $appointmentId = (string) Str::uuid();
         DB::table('appointments')->insert([
-            'id' => (string) Str::uuid(),
+            'id' => $appointmentId,
             'organization_id' => $this->bookingOrgId,
             'title' => 'Free audit (booked from HQ)',
             'start_time' => $start->format('Y-m-d H:i:s'),
@@ -560,6 +152,9 @@ class LeadsRegister extends Component
             'status' => 'Requested',
             'created_at' => now(),
             'updated_at' => now()
+        ]);
+        \App\Support\Leads\LeadTimeline::record($this->bookingOrgId, 'free_audit_booked', "Free audit booked from HQ for {$start->format('D j M, H:i')} (WAT).", [
+            'actor' => Auth::user(), 'related_type' => 'appointment', 'related_id' => $appointmentId,
         ]);
 
         session()->flash('success', "Free audit booked for {$this->bookingCompany} on {$start->format('D j M, H:i')} WAT. Approve it with the meeting link to email the client.");
@@ -575,32 +170,33 @@ class LeadsRegister extends Component
 
         $filename = "JBS_Praxis_leads_" . now()->format('Ymd_His') . ".csv";
         $headers = ["Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=$filename"];
-        $columns = ['Company', 'Contact', 'Email', 'Stage', 'Owner', 'Cost of poor quality', 'Currency', 'Tier', 'Date added'];
+        $columns = ['Organisation', 'Country', 'Industry', 'Main contact', 'Email', 'Phone', 'Status', 'Source', 'Owner', 'Next step', 'Next step by',
+            'Cost of poor quality', 'Currency', 'Tier', 'Date added'];
+        $leads = $this->leads();
 
-        $callback = function() use ($columns) {
+        $callback = function () use ($columns, $leads) {
             $file = fopen('php://output', 'w');
             fputcsv($file, $columns);
-            foreach ($this->leads as $lead) {
+            foreach ($leads as $lead) {
                 fputcsv($file, [
-                    $lead->company_name, $lead->executive_name, $lead->corporate_email, $lead->pipeline_stage, 
+                    $lead->name, $lead->country, $lead->industry, $lead->contact_name, $lead->contact_email ?: $lead->email, $lead->contact_phone ?: $lead->phone,
+                    LeadStatus::label($lead->lead_status), Sources::label($lead->source),
                     $lead->owner_first ? $lead->owner_first . ' ' . $lead->owner_last : 'Not assigned',
-                    $lead->calculated_leakage, $lead->copq_currency, $lead->lead_tier, $lead->created_at
+                    $lead->next_step, $lead->next_step_due,
+                    $lead->calculated_leakage, $lead->copq_currency, $lead->lead_tier, $lead->created_at,
                 ]);
             }
             fclose($file);
         };
+
         return response()->stream($callback, 200, $headers);
     }
 
     public function render()
     {
-        $owner = $this->selectedLead?->owner_id ? ['id' => $this->selectedLead->owner_id, 'label' => trim($this->selectedLead->owner_first . ' ' . $this->selectedLead->owner_last),
-            'user' => ['id' => $this->selectedLead->owner_id, 'first_name' => $this->selectedLead->owner_first, 'last_name' => $this->selectedLead->owner_last, 'avatar_path' => $this->selectedLead->owner_avatar ?? null]] : null;
-
         return view('livewire.hq.intelligence.leads-register', [
-            'canAssign' => $this->showDrawer && $this->canAssignOpenLead(),
-            'ownerSelected' => $this->ownerPicking ? null : $owner,
-            'ownerOptions' => $this->showDrawer && $this->ownerPicking || ($this->showDrawer && ! $owner) ? $this->ownerOptions() : collect(),
+            'leads' => $this->leads(),
+            'canSetDefault' => LeadOwner::canSetDefault(Auth::user()),
         ]);
     }
 }

@@ -52,7 +52,7 @@
         </div>
         @can('crm.view')
         <div class="card flex flex-col justify-center gap-2">
-            <a href="{{ route('hq.crm.leads') }}" wire:navigate class="btn btn-primary btn-sm"><i data-lucide="plus"></i> Add a lead</a>
+            <a href="{{ auth()->user()->can('crm.create') ? route('hq.crm.leads.new') : route('hq.crm.leads') }}" wire:navigate class="btn btn-primary btn-sm"><i data-lucide="plus"></i> Add a lead</a>
             <a href="{{ route('hq.crm.proposal') }}" wire:navigate class="btn btn-secondary btn-sm"><i data-lucide="file-text"></i> Start a proposal</a>
         </div>
         @endcan
