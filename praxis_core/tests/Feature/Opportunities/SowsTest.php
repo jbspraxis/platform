@@ -300,6 +300,10 @@ class SowsTest extends TestCase
         $this->assertSame(['won', null], [$o->stage, $o->project_id]);
         $this->assertNotNull($o->closed_at);
         $this->assertSame('Active Client', DB::table('organizations')->where('id', $o->organization_id)->value('status'));
+        // and the lead is a client since the signature, "signed" with the SOW's reference (docs/LEADS.md)
+        $client = DB::table('organizations')->where('id', $o->organization_id)->first();
+        $this->assertSame(['client', 'signed', $sow->reference], [$client->lead_status, $client->client_via, $client->client_reference]);
+        $this->assertDatabaseHas('lead_timeline', ['organization_id' => $o->organization_id, 'type' => 'marked_client', 'related_id' => $sow->id]);
         Event::assertDispatched(SowSigned::class, fn ($e) => $e->sowId === $sow->id && $e->projectId === $project->id);
 
         // The project draft: the SOW's milestones, dated from the first working day after signing (Fri 6 Nov), with the AI's tasks

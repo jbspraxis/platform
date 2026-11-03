@@ -240,7 +240,8 @@ class ProposalGateway extends Component
                 return false;
             }
 
-            DB::table('organizations')->where('id', $organization->id)->update(['status' => 'Active Client', 'updated_at' => $timestamp]);
+            // The lead becomes a client (Active Client; the first signature sets since when and how: docs/LEADS.md)
+            \App\Support\Leads\LeadStatus::markClientFromSigning($organization->id, 'proposal', $proposal->proposal_ref, $proposal->id, $timestamp);
 
             // 2. Create the project, led by the opportunity's lead (else the proposal's author: docs/PROJECTS.md 9)
             $projectId = (string) Str::uuid();

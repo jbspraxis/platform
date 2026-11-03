@@ -5,6 +5,8 @@ namespace App\Services\Site;
 use App\Mail\EnquiryAlert;
 use App\Mail\EnquiryReceived;
 use App\Support\Access;
+use App\Support\Leads\Countries;
+use App\Support\Leads\WebsiteLeads;
 use App\Support\MailLocale;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -108,6 +110,7 @@ final class EnquiryService
 
             // A. Find or Create Organization (Case-Insensitive Lock)
             $existingOrg = DB::table('organizations')->whereRaw('LOWER(name) = ?', [strtolower($cleanOrgName)])->first();
+            $isNew = ! $existingOrg;
 
             if ($existingOrg) {
                 $orgId = $existingOrg->id;
@@ -122,7 +125,8 @@ final class EnquiryService
                     'name' => $cleanOrgName,
                     'status' => 'Lead',
                     'pipeline_stage' => 'Lead Captured',
-                    'country' => $in['country_code'],
+                    'country' => Countries::fromDialCode($in['country_code']) ?? ($in['country_code'] ?: 'Nigeria'), // the form sends a dialling code
+                    'lead_status' => 'new',
                     'city' => $in['city'],
                     'preferred_language' => $in['language'] !== null ? mb_substr((string) $in['language'], 0, 20) : null, // the column's size: a long value is cut, never a 500
                     'budget_estimation' => $in['budget'] !== null ? mb_substr((string) $in['budget'], 0, 50) : null,
@@ -177,6 +181,12 @@ final class EnquiryService
                 'updated_at' => now()
             ]);
 
+            // The lead's source, default owner (with a bell) and timeline (docs/LEADS.md)
+            $timelineBody = trim($in['message'] . ($diagnostic ? "\n\nMain bottleneck: {$finalBottleneck}" : '')
+                . ($startTiming !== null ? "\n\nWhen they would like to start: " . self::START_TIMINGS[$startTiming] : ''));
+            WebsiteLeads::received($orgId, $isNew, 'website_enquiry', $userId, "Website enquiry from {$in['full_name']}.", $timelineBody,
+                array_filter(['start_timing' => $startTiming, 'bottleneck' => $diagnostic ? $finalBottleneck : null]));
+
             // D. HQ notification, as the booking form does
             $notifications = [];
             foreach (Access::staffWith('crm.edit') as $adminId) {
@@ -184,6 +194,7 @@ final class EnquiryService
                     'id' => (string) Str::uuid(), 'user_id' => $adminId,
                     'title' => 'New website enquiry',
                     'message' => "{$in['full_name']} ({$cleanOrgName}) sent a message through the contact form.",
+                    'link_url' => route('hq.crm.lead', ['organization' => $orgId], false),
                     'type' => 'System', 'created_at' => now(),
                 ];
             }

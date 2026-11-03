@@ -5,6 +5,7 @@ namespace App\Services\Site;
 use App\Mail\AuditRequestAlert;
 use App\Mail\AuditRequested;
 use App\Support\Access;
+use App\Support\Leads\WebsiteLeads;
 use App\Support\MailLocale;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -152,7 +153,8 @@ final class BookingService
             // lead: a match on a client organisation gets its own lead record, flagged for review.
             $existingOrg = DB::table('organizations')->whereRaw('LOWER(name) = ?', [strtolower($cleanOrgName)])->first();
 
-            if ($existingOrg && $existingOrg->status === 'Lead') {
+            $isNew = ! ($existingOrg && $existingOrg->status === 'Lead');
+            if (! $isNew) {
                 $orgId = $existingOrg->id;
                 // Update timestamp and flag as suspect so command sees a new interaction
                 DB::table('organizations')->where('id', $orgId)->update([
@@ -203,8 +205,9 @@ final class BookingService
             $endDateTime = $startDateTime->copy()->addMinutes(60); // 1 hour block
 
             // 3. Create the Appointment mapped straight to the Pending Lobby
+            $appointmentId = (string) Str::uuid();
             DB::table('appointments')->insert([
-                'id' => (string) Str::uuid(),
+                'id' => $appointmentId,
                 'organization_id' => $orgId,
                 'title' => 'Free audit: ' . $finalFocus,
                 'start_time' => $startDateTime,
@@ -214,6 +217,11 @@ final class BookingService
                 'created_at' => now(),
                 'updated_at' => now()
             ]);
+
+            // The lead's source, default owner (with a bell) and timeline (docs/LEADS.md); PR 2 turns the booking into a lead meeting
+            WebsiteLeads::received($orgId, $isNew, 'website_booking', $bookerId,
+                "Free audit requested on the website for {$startDateTime->format('D j M, H:i')} (WAT): {$finalFocus}.", null,
+                ['appointment_id' => $appointmentId, 'focus' => $finalFocus, 'start' => $startDateTime->format('Y-m-d H:i')]);
 
             // 4. Notify the staff who handle leads
             // Notices are for staff; with no CRM staff account yet, skip it rather than fail the booking

@@ -4,6 +4,8 @@ namespace App\Services\Site;
 
 use App\Mail\CopqReportMail;
 use App\Support\Access;
+use App\Support\Leads\Copq;
+use App\Support\Leads\WebsiteLeads;
 use App\Support\MailLocale;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -96,17 +98,7 @@ final class CostReportService
         $baseError   = floatval($in['error_rate'] ?? 3);
         $currency    = $in['currency'] ?? 'USD';
 
-        // 1. Fetch Multipliers (Architecture & Bottleneck)
-        $archData = DB::table('mdm_copq_architectures')->where('tech_key', $tool)->first();
-        $bnData = DB::table('mdm_copq_bottlenecks')->where('bottleneck_name', $bottleneck)->first();
-
-        $archMultiplier = $archData ? $archData->error_multiplier : 1.00;
-        $actualErrorRate = $baseError * $archMultiplier;
-
-        $appMult = $bnData ? $bnData->appraisal_multiplier : 1.00;
-        $failMult = $bnData ? $bnData->failure_multiplier : 1.00;
-
-        // 2. Lead organisation and contact, without duplicates
+        // 1. Lead organisation and contact, without duplicates
         $cleanOrgName = trim($company);
         $emailStr = strtolower(trim($email));
 
@@ -115,7 +107,8 @@ final class CostReportService
 
         // Only merge into an existing *lead*: anyone can type a client's company name, so a
         // match on a client organisation gets its own lead record, flagged for HQ to review.
-        if ($existingOrg && $existingOrg->status === 'Lead') {
+        $isNew = ! ($existingOrg && $existingOrg->status === 'Lead');
+        if (! $isNew) {
             $orgId = $existingOrg->id;
             // Flag the organization as having a duplicate submission / new diagnostic activity
             DB::table('organizations')->where('id', $orgId)->update([
@@ -136,6 +129,7 @@ final class CostReportService
 
         // 2B. Find or create the contact (a lead: client account with no password)
         $existingUser = DB::table('client_users')->where('email', $emailStr)->first();
+        $userId = $existingUser->id ?? null;
 
         if (!$existingUser) {
             $userId = (string) Str::uuid();
@@ -181,48 +175,21 @@ final class CostReportService
             }
         }
 
-        // 4. Server-side calculation by sector archetype
-        $mgmtNodes = intval($in['mgmt_nodes'] ?? max(1, floor($headcount * 0.20)));
-        $mgmtHeadcount = $mgmtNodes;
-
-        // Universal Internal Costs (Time & Process Friction)
-        $appraisalCost = ($mgmtHeadcount * $manualHrs * $hourlyCost * 52) * $appMult;
-        $internalFailure = ($turnover * ($actualErrorRate / 100) * 0.60) * $failMult;
-
-        // External costs by sector
-        if ($archetype === 'SOVEREIGN') {
-            // Government: Macroeconomic drag & fund misallocation risk (No ACV or Clients)
-            $externalFailure = ($turnover * ($actualErrorRate / 100) * 0.85);
-        } elseif ($archetype === 'IMPACT') {
-            // NGO: Beneficiary impact loss & Donor compliance clawbacks
-            $externalFailure = ($turnover * ($actualErrorRate / 100) * 0.80);
-        } elseif ($archetype === 'ASSET_HEAVY') {
-            // O&G/Manufacturing: Non-Productive Time (NPT) & Severe Supply Chain Penalties
-            $externalFailure = ($turnover * ($actualErrorRate / 100) * 0.90);
-        } else {
-            // COMMERCIAL: The standard B2B/SaaS Churn Logic
-            $estimatedClients = $acv > 0 ? max(1, $turnover / $acv) : 0;
-            $churnProb = ($actualErrorRate / 100) * 0.40;
-            $externalFailure = ($estimatedClients * $churnProb) * $acv * 1.5;
-        }
-
-        // Apply global failure multiplier to the sector-specific result
-        $externalFailure = $externalFailure * $failMult;
-        $totalCOPQ = $appraisalCost + $internalFailure + $externalFailure;
-
-        // 5. Tier Scoring Logic (thresholds are in USD; rate_to_usd = units of this currency per 1 USD)
-        $rateToUsd = (float) (DB::table('mdm_exchange_rates')->where('currency_code', $currency)->value('rate_to_usd') ?: 0);
-        $turnoverUsd = $rateToUsd > 0 ? $turnover / $rateToUsd : $turnover;
-        $copqUsd = $rateToUsd > 0 ? $totalCOPQ / $rateToUsd : $totalCOPQ;
-
-        $tier = 3; // Default SME/Junk
-        if ($turnoverUsd >= 5000000 || $copqUsd >= 250000) $tier = 1; // Enterprise
-        elseif ($turnoverUsd >= 1000000 || $copqUsd >= 50000) $tier = 2; // Mid-Market
+        // 4. Server-side calculation by sector archetype, and the tier on USD thresholds (App\Support\Leads\Copq: HQ uses the same)
+        $estimate = Copq::calculate($industry, $tool, $bottleneck, [
+            'acv' => $acv, 'headcount' => $headcount, 'mgmt_nodes' => $in['mgmt_nodes'] ?? null, 'turnover' => $turnover,
+            'manual_hrs' => $manualHrs, 'hourly_cost' => $hourlyCost, 'error_rate' => $baseError,
+        ], $currency);
+        $totalCOPQ = $estimate['total'];
+        $tier = $estimate['tier'];
+        $actualErrorRate = $estimate['error_rate'];
+        $mgmtNodes = $estimate['mgmt_nodes'];
 
         // 6. Store the assessment
         $token = 'PRX-' . strtoupper(Str::random(24)) . '-' . date('Y');
+        $assessmentId = (string) Str::uuid();
         DB::table('copq_assessments')->insert([
-            'id' => (string) Str::uuid(), 'report_token' => $token, 'organization_id' => $orgId,
+            'id' => $assessmentId, 'report_token' => $token, 'organization_id' => $orgId,
             'executive_name' => $name, 'company_name' => $company, 'corporate_email' => $email,
             'copq_industry' => $industry, 'primary_tool' => $tool, 'bottleneck' => $bottleneck,
             'copq_currency' => $currency, 'copq_turnover' => $turnover, 'headcount' => $headcount,
@@ -232,6 +199,11 @@ final class CostReportService
             'calculated_leakage' => $totalCOPQ, 'ai_friction_analysis' => trim($aiAnalysis),
             'lead_tier' => $tier, 'created_at' => now(), 'updated_at' => now(),
         ]);
+
+        // The lead's source, default owner (with a bell) and timeline (docs/LEADS.md)
+        WebsiteLeads::received($orgId, $isNew, 'cost_report', $userId, 'Ran the cost calculator on the website: estimated '
+            . CopqReportMail::money((float) $totalCOPQ, $currency, 'en') . ' a year.', null,
+            ['tier' => $tier, 'report_token' => $token, 'assessment_id' => $assessmentId]);
 
         SiteLimits::hit('assessment', $ip, $limitIds);
 
@@ -246,7 +218,7 @@ final class CostReportService
                 'user_id' => $adminId,
                 'title' => $tier == 1 ? 'High-value lead from the cost calculator' : 'New cost report from the website',
                 'message' => "{$who} ran the cost of poor quality calculator: estimated {$amount} a year.",
-                'link_url' => route('hq.crm.leads', [], false),
+                'link_url' => route('hq.crm.lead', ['organization' => $orgId], false),
                 'type' => 'System',
                 'is_read' => 0,
                 'created_at' => now()

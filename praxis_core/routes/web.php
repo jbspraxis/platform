@@ -109,7 +109,10 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
         // 4. INTELLIGENCE DESK (CRM / Lead Management)
         Route::prefix('intelligence')->group(function () {
             Route::middleware('can:crm.view')->group(function () {
+                // Leads (docs/LEADS.md): the list, Add a lead, and one page per lead with its tabs
                 Route::get('/leads', \App\Livewire\Hq\Intelligence\LeadsRegister::class)->name('hq.crm.leads');
+                Route::get('/leads/new', \App\Livewire\Hq\Leads\AddLead::class)->middleware('can:crm.create')->name('hq.crm.leads.new');
+                Route::get('/leads/{organization}', \App\Livewire\Hq\Leads\LeadPage::class)->whereUuid('organization')->name('hq.crm.lead');
                 Route::get('/consultation', \App\Livewire\Hq\Intelligence\LiveConsultation::class)->name('hq.crm.consult');
                 Route::get('/proposal-builder/{id?}', \App\Livewire\Hq\Intelligence\ProposalBuilder::class)->name('hq.crm.proposal');
             });
