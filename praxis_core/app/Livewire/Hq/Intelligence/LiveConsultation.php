@@ -547,12 +547,11 @@ class LiveConsultation extends Component
             return;
         }
 
-        DB::table('organizations')->where('id', $this->activeOrgId)->update([
-            'status' => 'Lost',
-            'pipeline_stage' => 'Lost',
-            'disqualification_reason' => trim($reason) ?: 'Marked as lost by an approver, no reason given',
-            'updated_at' => now()
-        ]);
+        // The lead's status (docs/LEADS.md): Lost, "other" with the reason as the note; a client is never marked lost
+        $lead = \App\Support\Leads\LeadAccess::find($this->activeOrgId);
+        if ($lead && $lead->lead_status !== 'client' && $lead->status !== 'Active Client') {
+            \App\Support\Leads\LeadStatus::markLost($lead, 'other', mb_substr(trim($reason) ?: 'Marked as lost by an approver, no reason given', 0, 2000), Auth::user());
+        }
 
         if ($this->activeApptId) {
             DB::table('appointments')->where('id', $this->activeApptId)->update(['status' => 'Completed']);

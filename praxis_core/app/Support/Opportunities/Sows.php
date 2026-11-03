@@ -13,6 +13,7 @@ use App\Support\Access;
 use App\Support\Ai\Ai;
 use App\Support\Finance\DepositInvoice;
 use App\Support\Finance\Vat;
+use App\Support\Leads\LeadStatus;
 use App\Support\Portal\SignerOnboarding;
 use App\Support\Signing\SigningCodes;
 use App\Support\WebsiteSettings;
@@ -741,7 +742,8 @@ final class Sows
             StatementOfWork::where('opportunity_id', $locked->opportunity_id)->whereKeyNot($locked->id)
                 ->whereIn('status', [StatementOfWork::DRAFT, StatementOfWork::SENT, StatementOfWork::CHANGES_REQUESTED])->update(['status' => StatementOfWork::SUPERSEDED, 'updated_at' => $timestamp]);
 
-            DB::table('organizations')->where('id', $organization->id)->update(['status' => 'Active Client', 'updated_at' => $timestamp]);
+            // The lead becomes a client (Active Client; the first signature sets since when and how: docs/LEADS.md)
+            LeadStatus::markClientFromSigning($organization->id, 'sow', $locked->reference, $locked->id, $timestamp);
 
             // The project, to hold the deposit invoice (invoices.project_id is required); its plan comes with Create project
             $projectId = (string) Str::uuid();

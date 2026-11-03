@@ -3,6 +3,8 @@
 namespace Tests\Feature\Controls;
 
 use App\Livewire\Hq\Intelligence\LeadsRegister;
+use App\Livewire\Hq\Leads\LeadPage;
+use App\Models\Organization;
 use Database\Seeders\CoreSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -12,9 +14,9 @@ use Tests\Feature\UsesThrowawayDatabase;
 use Tests\TestCase;
 
 /**
- * HQ → Leads: merging two assessments writes only the whitelisted columns (the browser can't name others),
- * the merge is in the audit log, a lead only moves to one of the register's own stages, and a lead someone
- * owns can't be taken over by another "Assign to me".
+ * HQ → Leads: merging two assessments (now on the lead's page) writes only the whitelisted columns (the browser can't
+ * name others) and is in the audit log; JBS Praxis itself never opens as a lead; a lead someone owns can't be taken
+ * over by another "Assign to me", and only its owner or a partner hands it on.
  * Runs on a throwaway MySQL database (see UsesThrowawayDatabase).
  */
 class LeadsControlsTest extends TestCase
@@ -48,12 +50,17 @@ class LeadsControlsTest extends TestCase
         return $id;
     }
 
+    private function page()
+    {
+        return Livewire::test(LeadPage::class, ['organization' => Organization::find($this->orgId)]);
+    }
+
     public function test_the_merge_columns_and_records_cannot_be_changed_from_the_browser(): void
     {
         $this->actingAs($this->staff('sales', ['sales']));
-        $screen = Livewire::test(LeadsRegister::class)->call('openDiffViewer', $this->orgId)->assertSet('showDiffModal', true);
+        $screen = $this->page()->call('openDiffViewer')->assertSet('showDiffModal', true);
 
-        foreach (['diffFields', 'diffOld', 'diffNew', 'stages'] as $property) {
+        foreach (['diffFields', 'diffOld', 'diffNew', 'leadId', 'canEdit'] as $property) {
             try {
                 $screen->set($property, ['report_token' => 'Token']);
                 $this->fail("{$property} should be locked");
@@ -68,8 +75,8 @@ class LeadsControlsTest extends TestCase
         $sales = $this->staff('sales', ['sales']);
         $this->actingAs($sales);
 
-        Livewire::test(LeadsRegister::class)
-            ->call('openDiffViewer', $this->orgId)
+        $this->page()
+            ->call('openDiffViewer')
             ->set('mergeSelections.executive_name', 'old')
             ->set('mergeSelections.report_token', 'old')
             ->set('mergeSelections.lead_tier', 'old')
@@ -87,29 +94,15 @@ class LeadsControlsTest extends TestCase
         $this->assertSame($this->newer, $log->target_id);
         $this->assertSame($sales->id, $log->user_id);
         $this->assertEquals(['merged_from' => $this->older, 'kept_from_older_record' => ['executive_name']], json_decode($log->new_values, true));
+        $this->assertDatabaseHas('lead_timeline', ['organization_id' => $this->orgId, 'type' => 'records_merged', 'actor_id' => $sales->id]);
     }
 
-    public function test_a_lead_only_moves_to_one_of_the_register_stages(): void
+    public function test_jbs_praxis_itself_is_not_a_lead(): void
     {
-        $internal = CoreSeeder::INTERNAL_ORG_ID;
-        $internalStage = DB::table('organizations')->where('id', $internal)->value('pipeline_stage');
         $this->actingAs($this->staff('sales', ['sales']));
-
-        Livewire::test(LeadsRegister::class)
-            ->call('updateStage', $this->orgId, 'Anything at all')
-            ->call('updateStage', $internal, 'Won');
-        $this->assertSame('Lead Captured', DB::table('organizations')->where('id', $this->orgId)->value('pipeline_stage'));
-        $this->assertSame($internalStage, DB::table('organizations')->where('id', $internal)->value('pipeline_stage'));
-
-        Livewire::test(LeadsRegister::class)->call('updateStage', $this->orgId, 'Qualifying');
-        $this->assertSame('Qualifying', DB::table('organizations')->where('id', $this->orgId)->value('pipeline_stage'));
-
-        // Won and Lost are two stages now, shown as a green and a red pill
-        Livewire::test(LeadsRegister::class)->call('updateStage', $this->orgId, 'Lost')
-            ->assertSeeHtml('pill pill-danger')->assertSee('Lost');
-        $this->assertSame('Lost', DB::table('organizations')->where('id', $this->orgId)->value('pipeline_stage'));
-        Livewire::test(LeadsRegister::class)->call('updateStage', $this->orgId, 'Won')->assertSeeHtml('pill pill-success');
-        $this->assertSame('Won', DB::table('organizations')->where('id', $this->orgId)->value('pipeline_stage'));
+        Livewire::test(LeadPage::class, ['organization' => Organization::find(CoreSeeder::INTERNAL_ORG_ID)])->assertNotFound();
+        Livewire::test(LeadsRegister::class)->call('claimLead', CoreSeeder::INTERNAL_ORG_ID);
+        $this->assertNull(DB::table('organizations')->where('id', CoreSeeder::INTERNAL_ORG_ID)->value('assigned_to'));
     }
 
     public function test_a_lead_can_be_assigned_to_anyone_by_its_owner_or_a_partner(): void
@@ -122,30 +115,31 @@ class LeadsControlsTest extends TestCase
 
         // Nobody owns it: anyone with crm.edit hands it to anyone, not only to themselves
         $this->actingAs($sales);
-        Livewire::test(LeadsRegister::class)->call('openDrawer', $this->orgId)->assertSee('Who follows this lead up')
-            ->call('assignLead', $sales2->id)->assertSee('Sales2 Test');
+        $this->page()->assertSee('Who follows this lead up')->call('assignLead', $sales2->id)->assertSee('Sales2 Test');
         $this->assertSame($sales2->id, $owner());
         $log = DB::table('system_audit_logs')->where('action', 'LEAD_ASSIGNED')->first();
         $this->assertSame($sales->id, $log->user_id);
         $this->assertEquals(['assigned_to' => $sales2->id], json_decode($log->new_values, true));
-        $this->assertDatabaseHas('notifications', ['user_id' => $sales2->id, 'title' => 'A lead was assigned to you']);
+        $this->assertDatabaseHas('notifications', ['user_id' => $sales2->id, 'title' => 'A lead was assigned to you',
+            'link_url' => route('hq.crm.lead', ['organization' => $this->orgId], false)]);
 
         // A colleague who neither owns it nor approves can't take it back or move it
-        Livewire::test(LeadsRegister::class)->call('openDrawer', $this->orgId)->assertDontSee('Keep ')
+        $this->page()->assertDontSee('Keep ')->assertSee('Only Sales2 or a partner can hand this lead to someone else')
             ->call('assignLead', $sales->id)->assertForbidden();
         $this->assertSame($sales2->id, $owner());
 
         // Its owner can hand it on (to someone without crm.edit too); a partner can reassign it without the owner's say
         $this->actingAs($sales2);
-        Livewire::test(LeadsRegister::class)->call('openDrawer', $this->orgId)->call('startReassign')->assertSet('ownerPicking', true)
+        $this->page()->call('startReassign')->assertSet('ownerPicking', true)
             ->assertSee('Keep Sales2')->call('assignLead', $delivery->id)->assertSet('ownerPicking', false)->assertSee('Delivery Test');
         $this->assertSame($delivery->id, $owner());
         $this->actingAs($delivery);
-        Livewire::test(LeadsRegister::class)->call('openDrawer', $this->orgId)->call('startReassign')->assertForbidden();
+        $this->page()->call('startReassign')->assertForbidden();
         $this->actingAs($partner);
-        Livewire::test(LeadsRegister::class)->call('openDrawer', $this->orgId)->call('startReassign')->call('assignLead', $sales->id);
+        $this->page()->call('startReassign')->call('assignLead', $sales->id);
         $this->assertSame($sales->id, $owner());
         $this->assertSame(3, DB::table('system_audit_logs')->where('action', 'LEAD_ASSIGNED')->count());
+        $this->assertSame(3, DB::table('lead_timeline')->where('organization_id', $this->orgId)->where('type', 'owner_changed')->count());
     }
 
     public function test_a_lead_someone_owns_cannot_be_taken_over_and_claims_are_logged(): void
@@ -155,9 +149,10 @@ class LeadsControlsTest extends TestCase
         Livewire::test(LeadsRegister::class)->call('claimLead', $this->orgId);
         $this->assertSame($first->id, DB::table('organizations')->where('id', $this->orgId)->value('assigned_to'));
 
-        // A colleague's "Assign to me" sent from an old page doesn't take it over
+        // A colleague's "Assign to me" sent from an old page doesn't take it over, from the list or the lead's page
         $this->actingAs($this->staff('sales2', ['sales']));
         Livewire::test(LeadsRegister::class)->call('claimLead', $this->orgId);
+        $this->page()->call('claim')->assertSee('Someone took this lead a moment ago.');
         $this->assertSame($first->id, DB::table('organizations')->where('id', $this->orgId)->value('assigned_to'));
 
         $log = DB::table('system_audit_logs')->where('action', 'LEAD_CLAIMED')->get();

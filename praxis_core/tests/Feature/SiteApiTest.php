@@ -270,10 +270,10 @@ class SiteApiTest extends TestCase
         Mail::assertSent(EnquiryReceived::class, fn ($mail) => $mail->hasTo('timing@example.test') && $mail->firstName === 'Adaeze');
         Mail::assertSent(EnquiryAlert::class, fn ($mail) => $mail->hasTo('team@local.test') && ($mail->facts()['When they’d like to start'] ?? null) === 'Next quarter');
 
-        // Shown in HQ → Leads
+        // Shown on the lead's page in HQ → Leads
         $this->actingAs($this->staff('sales', ['sales']));
-        Livewire::test(\App\Livewire\Hq\Intelligence\LeadsRegister::class)->call('openDrawer', $org->id)
-            ->assertSee('When they’d like to start')->assertSee('Next quarter');
+        Livewire::test(\App\Livewire\Hq\Leads\LeadPage::class, ['organization' => \App\Models\Organization::find($org->id)])
+            ->assertSee('Would like to start')->assertSee('Next quarter');
 
         $this->api('POST', '/enquiries', $this->enquiry('timing2@example.test', 'Timing Two') + ['start_timing' => 'tomorrow'])
             ->assertStatus(422)->assertJsonStructure(['error' => ['fields' => ['start_timing']]]);
