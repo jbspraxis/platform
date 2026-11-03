@@ -5,6 +5,8 @@ namespace App\Livewire\Hq\Intelligence;
 use App\Models\Organization;
 use App\Services\Site\BookingService;
 use App\Support\Leads\LeadAccess;
+use App\Support\Leads\LeadImportSchema;
+use App\Support\Leads\LeadNumbers;
 use App\Support\Leads\LeadOwner;
 use App\Support\Leads\LeadStatus;
 use App\Support\Leads\Sources;
@@ -15,16 +17,57 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * HQ › Leads (docs/LEADS.md section 7): every lead and client for everyone with crm.view (owner's decision 8). Each row
- * opens the lead's page (hq.crm.lead); "Assign to me" takes a lead nobody owns; "Book free audit" asks Free audits for
- * one; crm.export downloads the list. Filters, "Mine", the summary strip and the Excel import are PR 3's.
+ * HQ › Leads (docs/LEADS.md sections 7 and 9): every lead and client for everyone with crm.view (owner's decision 8).
+ * Each row opens the lead's page (hq.crm.lead); "Assign to me" takes a lead nobody owns; "Book free audit" asks Free
+ * audits for one; crm.export downloads the list (as filtered).
+ *
+ * PR 3: the filters (owner, with Mine on by default; status; next step; source; country; a search), the summary
+ * strip above the list (LeadNumbers: new leads, by status, conversion, open opportunity value, overdue follow-ups;
+ * a period and a per-owner view), the Excel import (<livewire:hq.import.import-dialog schema="leads" />) and the
+ * way to My follow-ups. Filters live in the address, so a link can open the list filtered.
  */
 #[Layout('components.layouts.hq')]
 class LeadsRegister extends Component
 {
+    /** The filters ('' = any). owner: mine, all, none (nobody) or a users.id */
+    #[Url(except: 'mine')]
+    public string $owner = 'mine';
+
+    #[Url(except: '')]
+    public string $status = '';
+
+    /** Next step: overdue, today, week (due within 7 days), none (open leads without one) */
+    #[Url(except: '')]
+    public string $step = '';
+
+    #[Url(except: '')]
+    public string $source = '';
+
+    #[Url(except: '')]
+    public string $country = '';
+
+    #[Url(as: 'q', except: '')]
+    public string $search = '';
+
+    /** The summary strip's period (LeadNumbers::PERIODS) and its per-owner view */
+    #[Url(except: 'month')]
+    public string $period = 'month';
+
+    public bool $byOwner = false;
+
+    /** Rows shown; "Show more" adds 100 */
+    public int $limit = 100;
+
+    public const STEPS = ['overdue' => 'Overdue', 'today' => 'Due today', 'week' => 'Due in the next 7 days', 'none' => 'No next step'];
+
+    /** Status filter: one status, or every open one */
+    public const STATUS_FILTERS = ['open' => 'Open (new, contacted, qualified)'] + LeadStatus::LABELS;
+
     // Book a free audit from HQ: the date and time are entered in Lagos time (WAT), like website bookings
     public $showBookingModal = false;
     #[Locked]
@@ -36,15 +79,57 @@ class LeadsRegister extends Component
     // Field names in validation messages (sentence case, docs/BRAND.md section 12)
     protected $validationAttributes = ['bookingDate' => 'date', 'bookingTime' => 'time'];
 
-    /** Every lead and client, newest activity first, with its owner, main contact and latest cost estimate */
-    private function leads(): Collection
+    /** The leads and clients the filters let through, newest activity first */
+    private function query()
     {
-        $leads = DB::table('organizations')
+        $this->sanitise();
+        $me = Auth::user();
+        $today = LeadNumbers::today();
+        $open = fn ($q) => $q->whereIn('organizations.lead_status', LeadStatus::OPEN);
+
+        return DB::table('organizations')
             ->select('organizations.*', 'owner.first_name as owner_first', 'owner.last_name as owner_last', 'owner.id as owner_id', 'owner.avatar_path as owner_avatar')
             ->leftJoin('users as owner', 'organizations.assigned_to', '=', 'owner.id')
             ->whereIn('organizations.status', LeadAccess::STATUSES)->whereNull('organizations.deleted_at')
-            ->orderByRaw('COALESCE(organizations.last_activity_at, organizations.created_at) DESC')
-            ->get();
+            ->when($this->owner === 'mine', fn ($q) => $q->where('organizations.assigned_to', $me->id))
+            ->when($this->owner === 'none', fn ($q) => $q->whereNull('organizations.assigned_to'))
+            ->when(! in_array($this->owner, ['mine', 'all', 'none'], true), fn ($q) => $q->where('organizations.assigned_to', $this->owner))
+            ->when($this->status === 'open', $open)
+            ->when($this->status !== '' && $this->status !== 'open', fn ($q) => $q->where('organizations.lead_status', $this->status))
+            ->when($this->step === 'overdue', fn ($q) => $open($q)->where('organizations.next_step_due', '<', $today))
+            ->when($this->step === 'today', fn ($q) => $open($q)->where('organizations.next_step_due', $today))
+            ->when($this->step === 'week', fn ($q) => $open($q)->whereBetween('organizations.next_step_due', [$today, Carbon::now(\App\Support\Leads\NextStep::TZ)->addDays(7)->format('Y-m-d')]))
+            ->when($this->step === 'none', fn ($q) => $open($q)->where(fn ($w) => $w->whereNull('organizations.next_step')->orWhere('organizations.next_step', '')))
+            ->when($this->source !== '', fn ($q) => $q->where('organizations.source', $this->source))
+            ->when($this->country !== '', fn ($q) => $q->where('organizations.country', $this->country))
+            ->when(trim($this->search) !== '', function ($q) {
+                $like = '%' . addcslashes(trim($this->search), '%_\\') . '%';
+                $q->where(fn ($w) => $w->where('organizations.name', 'like', $like)->orWhere('organizations.email', 'like', $like)->orWhere('organizations.phone', 'like', $like)
+                    ->orWhere('organizations.industry', 'like', $like)->orWhere('organizations.city', 'like', $like)
+                    ->orWhereExists(fn ($c) => $c->select(DB::raw(1))->from('client_users')->whereColumn('client_users.organization_id', 'organizations.id')->whereNull('client_users.deleted_at')
+                        ->where(fn ($m) => $m->whereRaw("CONCAT(client_users.first_name, ' ', client_users.last_name) LIKE ?", [$like])
+                            ->orWhere('client_users.email', 'like', $like)->orWhere('client_users.phone', 'like', $like))));
+            })
+            ->orderByRaw('COALESCE(organizations.last_activity_at, organizations.created_at) DESC');
+    }
+
+    /** Filters from the address that aren't one of the choices fall back to their defaults */
+    private function sanitise(): void
+    {
+        if (! in_array($this->owner, ['mine', 'all', 'none'], true) && ! LeadOwner::activeStaff($this->owner) && ! DB::table('organizations')->where('assigned_to', $this->owner)->exists()) {
+            $this->owner = 'mine';
+        }
+        $this->status = isset(self::STATUS_FILTERS[$this->status]) ? $this->status : '';
+        $this->step = isset(self::STEPS[$this->step]) ? $this->step : '';
+        $this->source = isset(Sources::LABELS[$this->source]) ? $this->source : '';
+        $this->period = isset(LeadNumbers::PERIODS[$this->period]) ? $this->period : 'month';
+        $this->search = mb_substr($this->search, 0, 100);
+    }
+
+    /** Leads and clients with their owner, main contact and latest cost estimate ($limit rows; null: all of them) */
+    private function leads(?int $limit = null): Collection
+    {
+        $leads = $this->query()->when($limit, fn ($q) => $q->limit($limit))->get();
         $ids = $leads->pluck('id');
 
         $contacts = DB::table('client_users')->whereIn('organization_id', $ids)->whereNull('deleted_at')
@@ -192,11 +277,76 @@ class LeadsRegister extends Component
         return response()->stream($callback, 200, $headers);
     }
 
+    // --- Filters, the summary strip and the import (PR 3) ---
+
+    /** Any filter changed: start the list from the top again */
+    public function updated(string $name): void
+    {
+        if (in_array($name, ['owner', 'status', 'step', 'source', 'country', 'search'], true)) {
+            $this->limit = 100;
+        }
+    }
+
+    public function clearFilters(): void
+    {
+        $this->reset(['status', 'step', 'source', 'country', 'search', 'limit']);
+    }
+
+    public function showMore(): void
+    {
+        $this->limit += 100;
+    }
+
+    /** The summary strip's links: a status, the overdue follow-ups, or an owner's row in the per-owner view */
+    public function filterBy(string $what, string $value): void
+    {
+        match ($what) {
+            'status' => $this->status = $value,
+            'step' => $this->step = $value,
+            'owner' => $this->owner = $value,
+            default => null,
+        };
+        $this->limit = 100;
+    }
+
+    /** The import dialog finished: the list redraws with the new leads */
+    #[On('import-finished')]
+    public function imported(): void
+    {
+        $this->limit = 100;
+    }
+
+    /** The owner filter's people: whoever owns a lead (Mine, Everyone and No owner come first) */
+    private function owners(): Collection
+    {
+        return DB::table('organizations')->join('users', 'users.id', '=', 'organizations.assigned_to')
+            ->whereIn('organizations.status', LeadAccess::STATUSES)->whereNull('organizations.deleted_at')
+            ->where('users.id', '!=', Auth::id())
+            ->groupBy('users.id', 'users.first_name', 'users.last_name')->orderBy('users.first_name')->orderBy('users.last_name')
+            ->get(['users.id', DB::raw("TRIM(CONCAT(users.first_name, ' ', users.last_name)) as name")]);
+    }
+
     public function render()
     {
+        $me = Auth::user();
+        $query = $this->query();
+        $total = (clone $query)->count();
+        $owners = $this->owners();
+        $scope = $this->owner;
+
         return view('livewire.hq.intelligence.leads-register', [
-            'leads' => $this->leads(),
-            'canSetDefault' => LeadOwner::canSetDefault(Auth::user()),
+            'leads' => $this->leads($this->limit),
+            'total' => $total,
+            'canSetDefault' => LeadOwner::canSetDefault($me),
+            'canImport' => (new LeadImportSchema())->canImport($me),
+            'owners' => $owners,
+            'ownerName' => match ($scope) { 'mine' => 'you', 'all' => 'everyone', 'none' => 'no one', default => $owners->firstWhere('id', $scope)?->name ?? 'this person' },
+            'countries' => DB::table('organizations')->whereIn('status', LeadAccess::STATUSES)->whereNull('deleted_at')->whereNotNull('country')->where('country', '!=', '')
+                ->distinct()->orderBy('country')->pluck('country'),
+            'numbers' => LeadNumbers::summary($scope, $this->period, $me),
+            'perOwner' => $this->byOwner ? LeadNumbers::byOwner($this->period, $me) : collect(),
+            'filtered' => $this->status !== '' || $this->step !== '' || $this->source !== '' || $this->country !== '' || trim($this->search) !== '',
+            'myOverdue' => LeadNumbers::open('mine', $me)->where('organizations.next_step_due', '<', LeadNumbers::today())->count(),
         ]);
     }
 }

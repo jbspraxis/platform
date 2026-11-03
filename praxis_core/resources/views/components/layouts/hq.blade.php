@@ -94,6 +94,7 @@
                         @endif
                         @can('crm.view')
                             <a href="{{ route('hq.crm.leads') }}" class="{{ $on('hq.crm.leads', 'hq.crm.leads.new', 'hq.crm.lead') }}" wire:navigate>Leads</a>
+                            <a href="{{ route('hq.crm.leads.follow-ups') }}" class="{{ $on('hq.crm.leads.follow-ups') }}" wire:navigate>My follow-ups</a>
                             <a href="{{ route('hq.crm.consult') }}" class="{{ $on('hq.crm.consult') }}" wire:navigate>Free audits</a>
                             <a href="{{ route('hq.crm.proposal') }}" class="{{ $on('hq.crm.proposal') }}" wire:navigate>Proposals</a>
                         @endcan

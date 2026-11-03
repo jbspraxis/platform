@@ -20,6 +20,10 @@ Schedule::command('finance:sync-exchange-rates')->dailyAt('00:00');
 // 'finance:run-automations' (00:30) was removed: no such command exists, so it failed every night.
 // Add it back here once the ledger automation command is built.
 
+// Leads (docs/LEADS.md section 9): on working days at 07:30 Lagos time, each lead owner gets one bell about overdue and
+// today's follow-ups and open leads with no next step; it opens My follow-ups. Rings nobody twice in a day.
+Schedule::command('leads:morning-bell')->weekdays()->dailyAt('07:30')->timezone('Africa/Lagos')->withoutOverlapping(10);
+
 // Free audit requests nobody approved before their start time close by themselves (Cancelled, logged, no email)
 Schedule::command('crm:expire-audit-requests')->hourly()->withoutOverlapping(10);
 

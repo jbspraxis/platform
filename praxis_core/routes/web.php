@@ -112,6 +112,8 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
                 // Leads (docs/LEADS.md): the list, Add a lead, and one page per lead with its tabs
                 Route::get('/leads', \App\Livewire\Hq\Intelligence\LeadsRegister::class)->name('hq.crm.leads');
                 Route::get('/leads/new', \App\Livewire\Hq\Leads\AddLead::class)->middleware('can:crm.create')->name('hq.crm.leads.new');
+                // PR 3: every open lead's next step, overdue first (the morning bell opens it)
+                Route::get('/leads/follow-ups', \App\Livewire\Hq\Leads\FollowUps::class)->name('hq.crm.leads.follow-ups');
                 Route::get('/leads/{organization}', \App\Livewire\Hq\Leads\LeadPage::class)->whereUuid('organization')->name('hq.crm.lead');
                 Route::get('/consultation', \App\Livewire\Hq\Intelligence\LiveConsultation::class)->name('hq.crm.consult');
                 Route::get('/proposal-builder/{id?}', \App\Livewire\Hq\Intelligence\ProposalBuilder::class)->name('hq.crm.proposal');
