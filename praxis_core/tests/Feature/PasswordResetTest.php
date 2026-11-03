@@ -257,6 +257,18 @@ class PasswordResetTest extends TestCase
         $this->get('https://' . Hosts::portal() . '/login?forgot=1')->assertOk()->assertSee(__('portal.login.reset_submit'));
     }
 
+    public function test_both_sign_in_pages_have_the_eye_to_show_the_password(): void
+    {
+        $hq = $this->get('https://' . Hosts::hq() . '/login')->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('/<input type="password" :type="show \? \'text\' : \'password\'" id="password"/', $hq);
+        $this->assertStringContainsString('aria-label="Show password"', $hq);
+        $this->assertStringContainsString('data-lucide="eye-off"', $hq);
+
+        $portal = $this->get('https://' . Hosts::portal() . '/login')->assertOk()->getContent();
+        $this->assertStringContainsString(':type="show ? \'text\' : \'password\'" id="client-password"', $portal);
+        $this->assertStringContainsString('data-lucide="eye-off"', $portal);
+    }
+
     public function test_the_email_reads_well_in_both_languages(): void
     {
         foreach (PasswordResetMail::samples() as $name => $mail) {

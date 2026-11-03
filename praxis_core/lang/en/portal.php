@@ -49,6 +49,7 @@ return [
         'email' => 'Email address',
         'password' => 'Password',
         'show_password' => 'Show password',
+        'hide_password' => 'Hide password',
         'forgot' => 'Forgot your password?',
         'submit' => 'Sign in',
         'submitting' => 'Signing in…',
