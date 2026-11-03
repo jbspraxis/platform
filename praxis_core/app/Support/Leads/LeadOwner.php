@@ -141,13 +141,16 @@ final class LeadOwner
         return $u ? ['id' => $u->id, 'label' => self::name($u), 'meta' => $u->job_title, 'user' => $u] : null;
     }
 
-    /** A bell (and so a phone push) for $userId about the lead, opening its page */
-    public static function bell(string $userId, string $title, string $message, string $organizationId): void
+    /**
+     * A bell (and so a phone push) for $userId about the lead, opening its page, or $link (a relative URL) for a bell
+     * about several leads (PR 3: the morning bell opens My follow-ups, an import the list)
+     */
+    public static function bell(string $userId, string $title, string $message, string $organizationId, ?string $link = null): void
     {
         DB::table('notifications')->insert([
             'id' => (string) Str::uuid(), 'user_id' => $userId, 'type' => 'System',
             'title' => Str::limit($title, 150, ''), 'message' => $message,
-            'link_url' => route('hq.crm.lead', ['organization' => $organizationId], false),
+            'link_url' => $link ?? route('hq.crm.lead', ['organization' => $organizationId], false),
             'is_read' => 0, 'created_at' => now(),
         ]);
     }
