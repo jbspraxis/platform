@@ -19,7 +19,9 @@ use Tests\TestCase;
 
 /**
  * Live consultation's approval (docs/OPPORTUNITIES.md section 4, row 2): with Google connected, approving a website
- * booking creates the meeting through Google instead of a pasted link, under the organisation's opportunity.
+ * booking creates the meeting through Google instead of a pasted link. Since Leads PR 2 (docs/LEADS.md section 9) the
+ * booking is the lead's meeting, not an opportunity's: no opportunity is opened or reused; one is opened from the
+ * meeting on the lead's page when there is work to discuss.
  */
 class LiveConsultationGoogleTest extends TestCase
 {
@@ -32,7 +34,7 @@ class LiveConsultationGoogleTest extends TestCase
         Mail::fake();
     }
 
-    public function test_approving_creates_the_google_meeting_under_a_new_opportunity_and_emails_the_meet_link(): void
+    public function test_approving_schedules_the_bookings_lead_meeting_through_google_and_emails_the_meet_link(): void
     {
         $google = FakeGoogle::install();
         $sales = $this->staff('sales', ['sales']);
@@ -43,10 +45,9 @@ class LiveConsultationGoogleTest extends TestCase
             ->assertSee('Approve and invite')->assertDontSee('Paste the meeting link')
             ->call('approveMeeting', $appt);
 
-        $o = Opportunity::where('organization_id', $org)->sole();
-        $this->assertSame(['Finance and accounting', 'website_booking', 'discovery', $sales->id, 'fr'], [$o->title, $o->source, $o->stage, $o->lead_user_id, $o->language]);
+        $this->assertSame(0, Opportunity::count(), 'A booking is a lead meeting, not an opportunity');
         $m = Meeting::with('attendees')->sole();
-        $this->assertSame([$o->id, $appt, 'scheduled', 'Free audit: Finance and accounting'], [$m->opportunity_id, $m->appointment_id, $m->status, $m->title]);
+        $this->assertSame([null, $org, $appt, 'scheduled', 'Free audit: Finance and accounting'], [$m->opportunity_id, $m->organization_id, $m->appointment_id, $m->status, $m->title]);
         $this->assertSame('2026-11-06 09:30:00', $m->starts_at->format('Y-m-d H:i:s'));   // 10:30 WAT
         $this->assertSame('2026-11-06 10:30:00', $m->ends_at->format('Y-m-d H:i:s'));
         $this->assertSame($sales->id, $m->attendees->firstWhere('role', 'staff')->user_id);
@@ -57,14 +58,14 @@ class LiveConsultationGoogleTest extends TestCase
         $this->assertSame(['Scheduled', $m->meet_link], [$appointment->status, $appointment->meeting_link]);
         Mail::assertSent(MeetingApprovedMail::class, fn ($mail) => $mail->hasTo('ada@acme.test') && $mail->meetingLink === $m->meet_link && $mail->locale === 'fr');
         Mail::assertNotSent(MeetingInvitationMail::class);   // the free audit email is the branded one here
-        $this->assertDatabaseHas('system_audit_logs', ['action' => 'OPPORTUNITY_OPENED', 'target_id' => $o->id]);
-        $this->assertDatabaseHas('system_audit_logs', ['action' => 'MEETING_SCHEDULED', 'target_id' => $o->id]);
+        $this->assertDatabaseHas('system_audit_logs', ['action' => 'MEETING_CONFIRMED', 'target_table' => 'organizations', 'target_id' => $org]);
+        $this->assertDatabaseHas('lead_timeline', ['organization_id' => $org, 'type' => 'meeting', 'meeting_id' => $m->id, 'summary' => 'Free audit scheduled for Fri 6 Nov, 10:30 (WAT) on Google Meet.']);
 
         $html = (new MeetingApprovedMail($appointment, 'Acme', $m->meet_link, 'Ada'))->locale('en')->renderParts()['html'];
         $this->assertStringContainsString('We record a transcript of this meeting with Google Meet', $html);
     }
 
-    public function test_an_open_opportunity_is_reused_and_a_google_failure_leaves_the_request_waiting(): void
+    public function test_an_open_opportunity_is_left_alone_and_a_google_failure_leaves_the_request_waiting(): void
     {
         $google = FakeGoogle::install();
         $this->actingAs($this->staff('sales', ['sales']));
@@ -74,34 +75,44 @@ class LiveConsultationGoogleTest extends TestCase
         $google->fail('quota', 'createMeeting');
         Livewire::test(LiveConsultation::class)->call('approveMeeting', $appt)->assertSee('The free audit wasn’t approved');
         $this->assertSame('Requested', DB::table('appointments')->where('id', $appt)->value('status'));
-        $this->assertSame(0, Meeting::count());
+        $this->assertSame(['requested', null], [Meeting::sole()->status, Meeting::sole()->google_event_id]);   // the booking's lead meeting waits too
         Mail::assertNothingSent();
 
-        $google = FakeGoogle::install();
+        FakeGoogle::install();
         Livewire::test(LiveConsultation::class)->call('approveMeeting', $appt)->assertSee('Free audit approved');
-        $this->assertSame($open->id, Meeting::sole()->opportunity_id);
+        $this->assertSame([null, 'scheduled'], [Meeting::sole()->opportunity_id, Meeting::sole()->status]);
+        $this->assertSame(0, Meeting::where('opportunity_id', $open->id)->count());
         $this->assertSame(1, Opportunity::count());
     }
 
-    public function test_without_google_the_pasted_link_still_works(): void
+    public function test_without_google_the_pasted_link_still_works_and_declining_closes_the_meeting(): void
     {
         FakeGoogle::install()->disconnected();
         $this->actingAs($this->staff('sales', ['sales']));
-        [, , $appt] = $this->booking();
+        [$org, , $appt] = $this->booking();
 
         Livewire::test(LiveConsultation::class)
             ->assertSee('Paste the meeting link')
             ->call('approveMeeting', $appt, '')->assertSee('Add the meeting link')
             ->call('approveMeeting', $appt, 'meet.google.com/abc-defg-hij')->assertSee('Free audit approved');
         $this->assertSame('https://meet.google.com/abc-defg-hij', DB::table('appointments')->where('id', $appt)->value('meeting_link'));
-        $this->assertSame(0, Meeting::count());
+        $m = Meeting::sole();
+        $this->assertSame([null, 'scheduled', 'https://meet.google.com/abc-defg-hij', 'abc-defg-hij'], [$m->opportunity_id, $m->status, $m->meet_link, $m->meet_code]);
+
+        // Another booking, declined: its meeting is cancelled and the timeline keeps the team's reason
+        [, , $other] = $this->booking('EN', 'Beta Ltd', 'bola@beta.test');
+        \App\Support\Leads\LeadMeetings::forAppointment(DB::table('appointments')->where('id', $other)->first());   // as BookingService makes it
+        Livewire::test(LiveConsultation::class)->call('declineRequest', $other, 'A test booking', false)->assertSee('Request declined');
+        $declined = Meeting::where('appointment_id', $other)->sole();
+        $this->assertSame('cancelled', $declined->status);
+        $this->assertDatabaseHas('lead_timeline', ['type' => 'meeting', 'meeting_id' => $declined->id, 'summary' => 'Free audit request declined in Free audits.', 'body' => 'A test booking']);
     }
 
     /** A free audit booked on the website: organisation, the contact who booked, the Requested appointment (Lagos wall-clock) */
-    private function booking(string $language = 'EN'): array
+    private function booking(string $language = 'EN', string $name = 'Acme Ltd', string $email = 'ada@acme.test'): array
     {
-        $org = $this->organisation(['name' => 'Acme Ltd', 'preferred_language' => $language]);
-        $booker = $this->clientContact($org, ['first_name' => 'Ada', 'email' => 'ada@acme.test']);
+        $org = $this->organisation(['name' => $name, 'preferred_language' => $language]);
+        $booker = $this->clientContact($org, ['first_name' => 'Ada', 'email' => $email]);
         $appt = (string) Str::uuid();
         $this->insertRow('appointments', ['id' => $appt, 'organization_id' => $org, 'title' => 'Free audit: Finance and accounting', 'status' => 'Requested',
             'start_time' => '2026-11-06 10:30:00', 'end_time' => '2026-11-06 11:30:00', 'created_by' => $booker, 'meeting_link' => null, 'created_at' => now()]);

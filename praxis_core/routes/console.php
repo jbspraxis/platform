@@ -47,6 +47,9 @@ Schedule::call(fn () => \App\Support\Ai\Ai::expireStuck())->name('ai:expire-stuc
 // minutes after the end, every 10 minutes until 6 hours after it, then the lead is asked to add it by hand
 Schedule::command('meetings:collect-transcripts')->everyFiveMinutes()->withoutOverlapping(10);
 
+// Leads (docs/LEADS.md section 9): mail to and from a lead's contacts goes on the lead's timeline (who wrote to whom, never the text)
+Schedule::command('leads:file-emails')->everyFiveMinutes()->withoutOverlapping(10);
+
 // The privacy policy on jbspraxis.com: the website's visitor limits keep IP addresses 24 hours at most, so expired
 // cache rows (whose keys hold them) go within minutes instead of whenever the same key is read again
 Schedule::command('cache:prune-expired')->everyFiveMinutes()->withoutOverlapping(5);

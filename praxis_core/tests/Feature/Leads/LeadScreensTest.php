@@ -222,10 +222,11 @@ class LeadScreensTest extends TestCase
         Opportunity::create(['organization_id' => $lead->id, 'title' => 'Fleet tracking (test)', 'stage' => 'proposal_sent', 'lead_user_id' => $sales->id,
             'language' => 'en', 'source' => 'manual', 'created_by' => $sales->id]);
 
-        $this->page($lead, ['tab' => 'meetings'])->assertSee('Meetings with this lead are coming');
-        $this->page($lead, ['tab' => 'emails'])->assertSee('Emails with this lead are coming');
+        // PR 2 built the tabs (tests/Feature/Leads/LeadTabsTest, LeadEmailsTest)
+        $this->page($lead, ['tab' => 'meetings'])->assertSeeLivewire('hq.leads.meetings-tab')->assertSee('No meetings yet');
+        $this->page($lead, ['tab' => 'emails'])->assertSeeLivewire('hq.leads.emails-tab');
         $this->page($lead, ['tab' => 'opportunities'])->assertSee('Opportunities (1)')->assertSee('Fleet tracking (test)')
-            ->assertSee('led by Sales Test')->assertSeeHtml(e(route('hq.crm.opportunities', ['new' => 1, 'organization' => $lead->id])));
+            ->assertSee('Led by Sales Test')->assertSeeHtml(e(route('hq.crm.opportunities', ['new' => 1, 'organization' => $lead->id])));
         $this->page($lead, ['tab' => 'nonsense'])->assertSet('tab', 'overview');
     }
 

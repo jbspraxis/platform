@@ -35,7 +35,7 @@ class MeetingMinutesMail extends BrandedMail
 
         return new Content(view: 'emails.meeting-minutes', with: [
             'meeting' => $meeting,
-            'company' => $meeting->opportunity?->organization?->name ?? '',
+            'company' => $meeting->opportunity?->organization?->name ?? $meeting->organization?->name ?? '',
             'meetingDate' => $this->meetingDay($meeting->starts_at, $meeting->time_zone ?: 'Africa/Lagos'),
             'blocks' => self::blocks((string) $this->transcript->minutes),
             'portalUrl' => $meeting->opportunity ? PortalLinks::meetings($meeting->opportunity, $this->clientUserId) : null,

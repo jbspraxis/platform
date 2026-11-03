@@ -113,6 +113,9 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
                 Route::get('/leads', \App\Livewire\Hq\Intelligence\LeadsRegister::class)->name('hq.crm.leads');
                 Route::get('/leads/new', \App\Livewire\Hq\Leads\AddLead::class)->middleware('can:crm.create')->name('hq.crm.leads.new');
                 Route::get('/leads/{organization}', \App\Livewire\Hq\Leads\LeadPage::class)->whereUuid('organization')->name('hq.crm.lead');
+                // Leads PR 2: a lead meeting's notes as a Markdown file (?transcript=<id> for an earlier transcript)
+                Route::get('/leads/{organization}/meetings/{meeting}/{what}.md', [\App\Http\Controllers\MeetingNotesController::class, 'lead'])
+                    ->whereUuid(['organization', 'meeting'])->whereIn('what', ['notes', 'transcript'])->name('hq.crm.lead-meeting-notes');
                 Route::get('/consultation', \App\Livewire\Hq\Intelligence\LiveConsultation::class)->name('hq.crm.consult');
                 Route::get('/proposal-builder/{id?}', \App\Livewire\Hq\Intelligence\ProposalBuilder::class)->name('hq.crm.proposal');
             });

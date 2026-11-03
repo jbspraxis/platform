@@ -132,6 +132,17 @@ return [
             ], 'required' => ['subject', 'summary', 'decisions', 'next_steps'], 'additionalProperties' => false],
         ],
 
+        // Leads PR 2 (docs/LEADS.md section 9): the title of the opportunity opened from a lead's meeting, from its transcript
+        // (and the team's typed notes), while the person waits; they edit it before saving. About $0.002 for an hour of talk.
+        'opportunity_title' => [
+            'provider' => 'claude', 'model' => 'claude-haiku-5-5', 'effort' => 'low', 'max_tokens' => 1000,
+            'stream' => false, 'sync' => true, 'expected_chars' => 120,
+            'task' => 'From the meeting below, name the piece of work the client and JBS Praxis discussed, as the title of the opportunity HQ opens for it: 3 to 8 words, sentence case, naming the work itself (for example “Fleet tracking and dispatch” or “Month-end closing in the finance system”), never the client’s name, a date, the word “meeting” or a price. When several pieces of work came up, the one the meeting spent most time on. When the meeting gives too little to tell, a short plain title from what it does say.',
+            'schema' => ['type' => 'object', 'properties' => [
+                'title' => ['type' => 'string', 'description' => '3 to 8 words, sentence case'],
+            ], 'required' => ['title'], 'additionalProperties' => false],
+        ],
+
         // PR 6: the points raised in a milestone's handover meeting, from its transcript. MATERIAL numbers the milestone's
         // tasks; task_number points at one of them (0: can't tell). Nothing is created until the lead confirms a point
         // (App\Support\Opportunities\Handovers), which makes it a QA ticket the client also sees in the portal.

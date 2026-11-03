@@ -7,9 +7,13 @@ use App\Mail\MeetingInvitationMail;
 use App\Models\Meeting;
 use App\Models\MeetingAttendee;
 use App\Models\Opportunity;
+use App\Models\Organization;
 use App\Models\User;
 use App\Support\Google\GoogleWorkspace;
 use App\Support\Google\MeetingRequest;
+use App\Support\Leads\LeadAccess;
+use App\Support\Leads\LeadOwner;
+use App\Support\MailLocale;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Auth;
@@ -26,8 +30,10 @@ use Throwable;
  * get HQ's branded email in the opportunity's language. Internal meetings get the Google invite only and never
  * reach the client. Google is called first: when it fails (GoogleUnavailable, with a message fit for a toast)
  * nothing is saved. A meeting from a website booking keeps its appointment in step (time, link, cancellation).
+ * A lead's meeting (docs/LEADS.md section 9) is scheduled the same way for the organisation, with no opportunity
+ * (opportunity_id null): App\Support\Leads\LeadMeetings adds its timeline lines around these calls.
  *
- *   Meetings::schedule($opportunity, $data)       create (status scheduled, Google event, invites)
+ *   Meetings::schedule($opportunity|$lead, $data) create (status scheduled, Google event, invites)
  *   Meetings::request($opportunity, $data)        a client's proposed times from the portal (no Google event yet)
  *   Meetings::update($meeting, $data)             reschedule or change; a requested meeting gets its event here
  *   Meetings::cancel($meeting)                    Google tells the attendees; clients get the branded email
@@ -36,7 +42,8 @@ use Throwable;
  * ids), contacts (the organisation's client_users ids; client meetings only), guests ([['email' => …, 'name' => …]]),
  * appointment_id (the website booking it comes from), phase_id (a milestone of the opportunity's project: a client
  * meeting with one hands that milestone over, an internal one is the team's meeting about it;
- * App\Support\Opportunities\Handovers::milestoneFor checks it before scheduling).
+ * App\Support\Opportunities\Handovers::milestoneFor checks it before scheduling), location (an address: a meeting in
+ * person, whose Google invite has no Meet link).
  */
 final class Meetings
 {
@@ -54,20 +61,27 @@ final class Meetings
     /** Who gets the branded email: everyone invited who is not staff */
     public const EMAILED_ROLES = ['client', 'guest'];
 
-    public static function schedule(Opportunity $opportunity, array $data, bool $brandedEmail = true): MeetingChange
+    /** @param  Opportunity|Organization  $for  an opportunity, or a lead for a meeting with no opportunity (client meetings only) */
+    public static function schedule(Opportunity|Organization $for, array $data, bool $brandedEmail = true): MeetingChange
     {
         $kind = self::kind($data);
+        if ($for instanceof Organization && $kind !== 'client') {
+            throw new LogicException('A lead meeting is with the client');
+        }
         [$starts, $ends] = self::times($data);
-        $attendees = self::attendees($opportunity, $kind, $data['staff'] ?? [], $data['contacts'] ?? [], $data['guests'] ?? []);
+        $opportunityId = $for instanceof Opportunity ? $for->id : null;
+        $organizationId = $for instanceof Opportunity ? $for->organization_id : $for->id;
+        $location = self::location($data);
+        $attendees = self::attendees($for, $kind, $data['staff'] ?? [], $data['contacts'] ?? [], $data['guests'] ?? []);
         $google = app(GoogleWorkspace::class);
-        $event = $google->createMeeting(self::googleRequest($opportunity, $kind, $data, $starts, $ends, $attendees));
+        $event = $google->createMeeting(self::googleRequest(self::languageOf($for), $kind, $data, $starts, $ends, $attendees));
 
         try {
-            $meeting = DB::transaction(function () use ($opportunity, $data, $kind, $starts, $ends, $attendees, $event) {
+            $meeting = DB::transaction(function () use ($opportunityId, $organizationId, $location, $data, $kind, $starts, $ends, $attendees, $event) {
                 $meeting = Meeting::create([
-                    'opportunity_id' => $opportunity->id,
+                    'opportunity_id' => $opportunityId,
                     'phase_id' => $data['phase_id'] ?? null,
-                    'organization_id' => $opportunity->organization_id,
+                    'organization_id' => $organizationId,
                     'kind' => $kind,
                     'title' => self::title($data),
                     'agenda' => self::agenda($data),
@@ -79,8 +93,10 @@ final class Meetings
                     'google_event_id' => $event->eventId,
                     'meet_link' => $event->meetLink,
                     'meet_code' => $event->meetCode,
-                    'transcript_status' => 'waiting',
-                    'transcript_next_try_at' => $ends->addMinutes(self::FIRST_TRY_AFTER_MINUTES),
+                    'location' => $location,
+                    // In person, Google has no transcript to look for: it is added by hand
+                    'transcript_status' => $location ? 'manual' : 'waiting',
+                    'transcript_next_try_at' => $location ? null : $ends->addMinutes(self::FIRST_TRY_AFTER_MINUTES),
                     'transcript_tries' => 0,
                     'created_by' => Auth::guard('web')->id(),
                 ]);
@@ -97,10 +113,10 @@ final class Meetings
             throw $e;
         }
 
-        OpportunityAccess::log('MEETING_SCHEDULED', sprintf('Scheduled the %s meeting “%s” for %s WAT.', $kind, $meeting->title, self::when($meeting)),
-            'opportunities', $opportunity->id, [], ['meeting_id' => $meeting->id, 'starts_at' => $meeting->starts_at->toIso8601String(), 'attendees' => count($attendees)]);
+        self::log($meeting, 'MEETING_SCHEDULED', sprintf('Scheduled the %s meeting “%s” for %s WAT.', $kind, $meeting->title, self::when($meeting)),
+            [], ['meeting_id' => $meeting->id, 'starts_at' => $meeting->starts_at->toIso8601String(), 'attendees' => count($attendees)]);
         MeetingScheduled::dispatch($meeting);
-        $meeting->load('attendees', 'opportunity.organization');
+        $meeting->load('attendees', 'opportunity.organization', 'organization');
 
         return new MeetingChange($meeting, $brandedEmail && $kind === 'client' ? self::emailClients($meeting, 'invite') : []);
     }
@@ -141,17 +157,24 @@ final class Meetings
         return $meeting->load('attendees');
     }
 
-    /** Move or change a meeting that hasn't started; a requested one is created in Google here */
-    public static function update(Meeting $meeting, array $data): MeetingChange
+    /**
+     * Move or change a meeting that hasn't started; a requested one is created in Google here. A meeting in person keeps
+     * its address unless $data['location'] gives another one. $brandedEmail false: no branded email to the client (a free
+     * audit sends its own, LiveConsultation).
+     */
+    public static function update(Meeting $meeting, array $data, bool $brandedEmail = true): MeetingChange
     {
         if (! self::canChange($meeting)) {
             throw new LogicException('Only a requested or upcoming meeting can be changed');
         }
-        $opportunity = $meeting->opportunity;
+        $for = $meeting->opportunity ?? $meeting->organization;
         $data['kind'] = $meeting->kind;
+        if (! array_key_exists('location', $data)) {
+            $data['location'] = $meeting->location;
+        }
         [$starts, $ends] = self::times($data);
-        $attendees = self::attendees($opportunity, $meeting->kind, $data['staff'] ?? [], $data['contacts'] ?? [], $data['guests'] ?? []);
-        $request = self::googleRequest($opportunity, $meeting->kind, $data, $starts, $ends, $attendees);
+        $attendees = self::attendees($for, $meeting->kind, $data['staff'] ?? [], $data['contacts'] ?? [], $data['guests'] ?? []);
+        $request = self::googleRequest(self::language($meeting), $meeting->kind, $data, $starts, $ends, $attendees);
         $google = app(GoogleWorkspace::class);
         $wasRequested = $meeting->status === 'requested' || ! $meeting->google_event_id;
         $event = $wasRequested ? $google->createMeeting($request) : $google->updateMeeting($meeting->google_event_id, $request);
@@ -161,6 +184,7 @@ final class Meetings
         $old = ['starts_at' => $meeting->starts_at->toIso8601String(), 'ends_at' => $meeting->ends_at->toIso8601String(), 'status' => $meeting->status, 'title' => $meeting->title];
 
         DB::transaction(function () use ($meeting, $data, $starts, $ends, $attendees, $event) {
+            $location = self::location($data);
             $meeting->fill([
                 'title' => self::title($data),
                 'agenda' => self::agenda($data),
@@ -170,8 +194,9 @@ final class Meetings
                 'google_event_id' => $event->eventId,
                 'meet_link' => $event->meetLink ?? $meeting->meet_link,
                 'meet_code' => $event->meetCode ?? $meeting->meet_code,
-                'transcript_status' => 'waiting',
-                'transcript_next_try_at' => $ends->addMinutes(self::FIRST_TRY_AFTER_MINUTES),
+                'location' => $location,
+                'transcript_status' => $location ? 'manual' : 'waiting',
+                'transcript_next_try_at' => $location ? null : $ends->addMinutes(self::FIRST_TRY_AFTER_MINUTES),
                 'transcript_tries' => 0,
                 'updated_by' => Auth::guard('web')->id(),
             ])->save();
@@ -183,15 +208,15 @@ final class Meetings
             }
             self::syncAppointment($meeting);
         });
-        $meeting->load('attendees', 'opportunity.organization');
+        $meeting->load('attendees', 'opportunity.organization', 'organization');
 
-        OpportunityAccess::log($wasRequested ? 'MEETING_CONFIRMED' : 'MEETING_RESCHEDULED',
+        self::log($meeting, $wasRequested ? 'MEETING_CONFIRMED' : 'MEETING_RESCHEDULED',
             sprintf('%s the meeting “%s” for %s WAT.', $wasRequested ? 'Scheduled the requested' : 'Changed', $meeting->title, self::when($meeting)),
-            'opportunities', $opportunity->id, $old, ['meeting_id' => $meeting->id, 'starts_at' => $meeting->starts_at->toIso8601String(), 'ends_at' => $meeting->ends_at->toIso8601String()]);
+            $old, ['meeting_id' => $meeting->id, 'starts_at' => $meeting->starts_at->toIso8601String(), 'ends_at' => $meeting->ends_at->toIso8601String()]);
         if ($wasRequested) {
             MeetingScheduled::dispatch($meeting);
         }
-        if ($meeting->kind !== 'client') {
+        if ($meeting->kind !== 'client' || ! $brandedEmail) {
             return new MeetingChange($meeting);
         }
 
@@ -222,10 +247,10 @@ final class Meetings
                 ->update(['status' => 'Cancelled', 'updated_by' => Auth::guard('web')->id() ?? 'system', 'updated_at' => now()]);
         }
 
-        OpportunityAccess::log($wasScheduled ? 'MEETING_CANCELLED' : 'MEETING_DECLINED',
+        self::log($meeting, $wasScheduled ? 'MEETING_CANCELLED' : 'MEETING_DECLINED',
             sprintf('%s the meeting “%s” of %s WAT.', $wasScheduled ? 'Cancelled' : 'Declined the client’s request for', $meeting->title, self::when($meeting)),
-            'opportunities', $meeting->opportunity_id, ['status' => $wasScheduled ? 'scheduled' : 'requested'], ['meeting_id' => $meeting->id, 'status' => 'cancelled']);
-        $meeting->load('attendees', 'opportunity.organization');
+            ['status' => $wasScheduled ? 'scheduled' : 'requested'], ['meeting_id' => $meeting->id, 'status' => 'cancelled']);
+        $meeting->load('attendees', 'opportunity.organization', 'organization');
 
         return new MeetingChange($meeting, $wasScheduled && $meeting->kind === 'client' ? self::emailClients($meeting, 'cancelled') : []);
     }
@@ -264,8 +289,9 @@ final class Meetings
      *
      * @return list<array{user_id: ?string, client_user_id: ?string, email: string, name: ?string, role: string}>
      */
-    public static function attendees(Opportunity $opportunity, string $kind, array $staff, array $contacts, array $guests): array
+    public static function attendees(Opportunity|Organization $for, string $kind, array $staff, array $contacts, array $guests): array
     {
+        $organizationId = $for instanceof Opportunity ? $for->organization_id : $for->id;
         $out = [];
         $add = function (?string $email, array $row) use (&$out) {
             $email = mb_strtolower(trim((string) $email));
@@ -281,7 +307,7 @@ final class Meetings
             }
         }
         if ($kind === 'client' && $contacts) {
-            $people = DB::table('client_users')->whereIn('id', array_values($contacts))->where('organization_id', $opportunity->organization_id)
+            $people = DB::table('client_users')->whereIn('id', array_values($contacts))->where('organization_id', $organizationId)
                 ->whereNull('deleted_at')->orderBy('first_name')->get(['id', 'first_name', 'last_name', 'email']);
             foreach ($people as $c) {
                 $add($c->email, ['client_user_id' => $c->id, 'name' => $name($c), 'role' => 'client']);
@@ -299,20 +325,20 @@ final class Meetings
 
     /**
      * The branded email to everyone invited who isn't staff ($only: just these addresses), in the opportunity's
-     * language. Returns the addresses it could not send to.
+     * language (a lead meeting: the lead's). Returns the addresses it could not send to.
      *
      * @param  'invite'|'moved'|'cancelled'  $variant
      */
     public static function emailClients(Meeting $meeting, string $variant, ?array $only = null): array
     {
-        $meeting->loadMissing('attendees', 'opportunity.organization');
+        $meeting->loadMissing('attendees', 'opportunity.organization', 'organization');
         $unsent = [];
         foreach ($meeting->attendees->whereIn('role', self::EMAILED_ROLES) as $a) {
             if ($only !== null && ! in_array($a->email, $only, true)) {
                 continue;
             }
             try {
-                Mail::to($a->email, $a->name)->locale($meeting->opportunity->language)
+                Mail::to($a->email, $a->name)->locale(self::language($meeting))
                     ->send(new MeetingInvitationMail($meeting, $variant, self::firstName($a)));
             } catch (Throwable $e) {
                 Log::warning('Meetings: the branded email could not be sent', ['meeting' => $meeting->id, 'variant' => $variant, 'error' => $e->getMessage()]);
@@ -342,6 +368,51 @@ final class Meetings
         ]);
     }
 
+    /**
+     * The bell for whoever looks after the meeting: the opportunity's lead (tellLead), or for a lead meeting the lead's
+     * owner, opening the lead's Meetings tab
+     */
+    public static function tellOwner(Meeting $meeting, string $title, string $message): void
+    {
+        if ($meeting->opportunity) {
+            self::tellLead($meeting->opportunity, $title, $message, $meeting->id);
+
+            return;
+        }
+        $owner = LeadOwner::activeStaff(DB::table('organizations')->where('id', $meeting->organization_id)->value('assigned_to'));
+        if (! $owner) {
+            return;
+        }
+        // As LeadOwner::bell, opening the lead's Meetings tab at this meeting
+        DB::table('notifications')->insert([
+            'id' => (string) Str::uuid(),
+            'user_id' => $owner->id,
+            'type' => 'System',
+            'title' => Str::limit($title, 150, '…'),
+            'message' => $message,
+            'link_url' => route('hq.crm.lead', ['organization' => $meeting->organization_id, 'tab' => 'meetings', 'meeting' => $meeting->id], false),
+            'is_read' => 0,
+            'created_at' => now(),
+        ]);
+    }
+
+    /** en or fr: the opportunity's language, or for a lead meeting the lead's (organizations.preferred_language) */
+    public static function language(Meeting $meeting): string
+    {
+        return $meeting->opportunity?->language
+            ?: MailLocale::parse(DB::table('organizations')->where('id', $meeting->organization_id)->value('preferred_language')) ?? 'en';
+    }
+
+    /** One audit line about the meeting: on its opportunity, or on the lead for a lead meeting */
+    public static function log(Meeting $meeting, string $action, string $description, array $old = [], array $new = []): void
+    {
+        if ($meeting->opportunity_id) {
+            OpportunityAccess::log($action, $description, 'opportunities', $meeting->opportunity_id, $old, $new);
+        } else {
+            LeadAccess::log($action, $description, $meeting->organization_id, $old, $new);
+        }
+    }
+
     /** "Thursday 5 November 2026, 10:30" in WAT, for the audit log */
     public static function when(Meeting $meeting): string
     {
@@ -354,12 +425,19 @@ final class Meetings
         return preg_match('~meet\.google\.com/([a-z]{3}-[a-z]{4}-[a-z]{3})~i', (string) $link, $m) ? strtolower($m[1]) : null;
     }
 
-    private static function googleRequest(Opportunity $opportunity, string $kind, array $data, CarbonImmutable $starts, CarbonImmutable $ends, array $attendees): MeetingRequest
+    /** The language of the invitations: the opportunity's, or the lead's */
+    private static function languageOf(Opportunity|Organization $for): string
     {
+        return $for instanceof Opportunity ? $for->language : (MailLocale::parse($for->preferred_language) ?? 'en');
+    }
+
+    private static function googleRequest(string $language, string $kind, array $data, CarbonImmutable $starts, CarbonImmutable $ends, array $attendees): MeetingRequest
+    {
+        $location = self::location($data);
         $description = array_filter([
             self::agenda($data),
-            // Every client invite carries the transcription notice (section 1, defaults)
-            $kind === 'client' ? __('meetings.calendar.notice', [], $opportunity->language) : null,
+            // Every client invite on Meet carries the transcription notice (section 1, defaults); in person nothing is recorded
+            $kind === 'client' && ! $location ? __('meetings.calendar.notice', [], $language) : null,
         ]);
 
         return new MeetingRequest(
@@ -369,7 +447,17 @@ final class Meetings
             array_map(fn ($a) => ['email' => $a['email'], 'name' => $a['name']], $attendees),
             $description ? implode("\n\n", $description) : null,
             self::TIME_ZONE,
+            location: $location,
+            withMeet: $location === null,
         );
+    }
+
+    /** The address of a meeting in person, or null for one on Meet */
+    private static function location(array $data): ?string
+    {
+        $location = trim((string) ($data['location'] ?? ''));
+
+        return $location === '' ? null : Str::limit($location, 255, '');
     }
 
     /** The website booking follows its meeting: new time (Lagos wall-clock, as it stores it) and link */
