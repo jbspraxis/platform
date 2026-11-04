@@ -13,7 +13,7 @@ The way of working is the Praxis Method (formerly the Praxis Framework): See, De
 - [How we work]({{ url('/how-we-work') }}): the Praxis Method stage by stage
 - [Our work]({{ url('/work') }}): case studies, each with what the client needed, the system built, how it runs and what changed
 - [Industries]({{ url('/industries') }}): the sectors JBS Praxis works in, each linked to the work behind it
-- [Company]({{ url('/company') }}): offices, registration, contact, our product nfelia
+- [Company]({{ url('/company') }}): offices, registration, contact, our product NFELIA
 - [Security and data]({{ url('/security') }}): roles and permissions, audit logs, private storage, ISO 27001-aligned processes, NDPA and Cameroonian law
 - [Book a free audit]({{ url('/schedule') }})
 - [Contact]({{ url('/contact') }})

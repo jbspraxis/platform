@@ -111,14 +111,14 @@ class ProofTest extends TestCase
         $company = $this->get('/company')->assertOk()->getContent();
         $this->assertStringContainsString('id="products"', $company);
         $this->assertStringContainsString('<h3 class="product-name">Praxis LS</h3>', $company);
-        $this->assertStringContainsString('<h3 class="product-name">nfelia</h3>', $company);
+        $this->assertStringContainsString('<h3 class="product-name">NFELIA</h3>', $company);
         $this->assertStringContainsString('SYSCOHADA accounting at its core', $company);
         // What is built is said plainly; what is being built is said to be in build
         $this->assertStringContainsString('The version for many operators is now in build.', $company);
         $this->assertStringContainsString('href="' . route('work.show', ['slug' => 'smart-logistics']) . '"', $company);
 
         $this->get('/fr/company')->assertOk()->assertSee('Notre ERP logistique');
-        $this->get('/work')->assertOk()->assertSee('nfelia and Praxis LS are ours')
+        $this->get('/work')->assertOk()->assertSee('NFELIA and Praxis LS are ours')
             ->assertSee('href="' . route('company') . '#products"', false);
     }
 

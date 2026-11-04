@@ -94,7 +94,19 @@ function enhanceChat() {
 
     const textarea = form.querySelector('textarea');
     const button = form.querySelector('button[type="submit"]');
-    const scrollDown = (smooth = true) => log.scrollTo({ top: log.scrollHeight, behavior: smooth && !REDUCED() ? 'smooth' : 'auto' });
+    const behavior = (smooth) => (smooth && !REDUCED() ? 'smooth' : 'instant');
+    const scrollDown = (smooth = true) => log.scrollTo({ top: log.scrollHeight, behavior: behavior(smooth) });
+    // A reply is read from its first line: bring its top to the top of the log, not the log's end
+    const scrollToTurn = (item, smooth = true) => {
+        const top = log.scrollTop + item.getBoundingClientRect().top - log.getBoundingClientRect().top - (parseFloat(getComputedStyle(log).paddingTop) || 0);
+        log.scrollTo({ top: Math.max(0, top), behavior: behavior(smooth) });
+    };
+    // On opening: the latest reply from its start (or the end, when the last turn is a question)
+    const showLatest = (smooth = false) => {
+        const last = log.lastElementChild;
+        if (last?.classList.contains('is-assistant')) scrollToTurn(last, smooth);
+        else scrollDown(smooth);
+    };
     let busy = false;
 
     const addTurn = (role, text, links = [], animate = false) => {
@@ -106,7 +118,8 @@ function enhanceChat() {
         item.append(who, ...(role === 'user' ? [document.createTextNode(text)] : [...chatNodes(text), ...chatLinks(links, form.dataset.links)]));
         if (animate) writeIn(item);
         log.append(item);
-        scrollDown();
+        if (role === 'user') scrollDown();
+        else scrollToTurn(item);
         return item;
     };
 
@@ -156,19 +169,41 @@ function enhanceChat() {
         details.open = false;
         details.querySelector('summary')?.focus();
     };
+    // The (i) beside the title: a tap or a keypress toggles the notice; a tap elsewhere or Escape hides it
+    const info = details?.querySelector('[data-chat-info]');
+    const infoButton = info?.querySelector('[data-chat-info-button]');
+    const setInfo = (open) => {
+        if (!info) return false;
+        const was = info.classList.contains('is-open');
+        info.classList.toggle('is-open', open);
+        infoButton.setAttribute('aria-expanded', String(open));
+        return was;
+    };
+    if (info && infoButton) {
+        info.classList.add('is-ready');
+        infoButton.addEventListener('click', () => setInfo(!info.classList.contains('is-open')));
+        document.addEventListener('pointerdown', (event) => {
+            if (!info.contains(event.target)) setInfo(false);
+        });
+    }
+
     const closer = details?.querySelector('[data-chat-close]');
     if (closer) {
         closer.hidden = false;
         closer.addEventListener('click', close);
     }
     details?.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') { event.preventDefault(); close(); }
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        if (setInfo(false)) infoButton.focus(); // the notice first, then the panel
+        else close();
     });
 
     details?.addEventListener('toggle', () => {
-        if (details.open) { scrollDown(false); textarea?.focus(); }
+        if (details.open) { showLatest(); textarea?.focus(); }
+        else setInfo(false);
     });
-    if (details?.open) scrollDown(false);
+    if (details?.open) showLatest();
 
     form.addEventListener('submit', async (event) => {
         const message = textarea.value.trim();
