@@ -7,25 +7,60 @@ namespace App\Support\Backups;
  * fresh dump is imported into the scratch database, then compared with what the dump holds, table by table and row
  * by row, and with the live database's list of tables. The scratch database is emptied before and after.
  *
- * The rows a dump holds are counted while it is fed to mysql: each "INSERT INTO `t` VALUES (...),(...);" line, its
- * strings skipped (they may hold parentheses). DEFINER clauses are dropped on the way in: the backup user may not
- * create views or triggers in another user's name, and the test is about the data, not who owns a view.
+ * Without a scratch database (cPanel's plan allows 5 databases and the five sites use them all, 4 Nov 2026) it is a
+ * dump check instead, and says so: the whole .gz is decompressed with its checksum verified, every table's rows are
+ * counted, every live table and view must be in it and mysqldump's closing line must be there. Nothing is imported.
+ * Row counts against the live database are shown, never failed on: writes after the dump make them differ.
+ *
+ * The rows a dump holds are counted as it is read: each "INSERT INTO `t` VALUES (...),(...);" line, its strings
+ * skipped (they may hold parentheses). DEFINER clauses are dropped on the way into the import: the backup user may
+ * not create views or triggers in another user's name, and the test is about the data, not who owns a view.
  */
 final class RestoreTest
 {
+    public const IMPORT = 'import';
+
+    public const DUMP_CHECK = 'dump_check';
+
     private const DEFINER = '/\bDEFINER\s*=\s*(?:`(?:[^`]|``)*`|\'[^\']*\'|[^\s@]+)@(?:`(?:[^`]|``)*`|\'[^\']*\'|[^\s*]+)/';
 
-    /** @return array{ok: bool, tables: int, views: int, rows: int, mismatches: list<string>, seconds: float} */
+    private const CUT = 'the dump has no "Dump completed" line at its end: it was cut off';
+
+    /**
+     * @return array{ok: bool, mode: string, tables: int, views: int, rows: int, mismatches: list<string>, seconds: float,
+     *               live_rows?: int, differences?: list<string>, reason?: string}
+     */
     public static function run(MysqlClient $mysql, string $database, string $gzPath): array
     {
-        $started = microtime(true);
         $scratch = (string) config('backups.scratch_database');
+
+        return $mysql->canUse($scratch) ? self::import($mysql, $database, $scratch, $gzPath) : self::dumpCheck($mysql, $database, $gzPath);
+    }
+
+    /** What a test result says, for System health and the run's output: never "restore test" when nothing was imported */
+    public static function label(?array $test): ?string
+    {
+        if (! $test) {
+            return null;
+        }
+
+        return (self::isDumpCheck($test) ? 'Dump check ' : 'Restore test ') . (($test['ok'] ?? false) ? 'passed' : 'failed');
+    }
+
+    public static function isDumpCheck(?array $test): bool
+    {
+        return ($test['mode'] ?? self::IMPORT) === self::DUMP_CHECK;
+    }
+
+    private static function import(MysqlClient $mysql, string $database, string $scratch, string $gzPath): array
+    {
+        $started = microtime(true);
         $mysql->emptyDatabase($scratch);
 
         try {
-            [$rows, $views] = self::import($mysql, $scratch, $gzPath);
+            [$rows, $views, $complete] = self::feedMysql($mysql, $scratch, $gzPath);
 
-            $mismatches = [];
+            $mismatches = $complete ? [] : [self::CUT];
             $imported = $mysql->objects($scratch);
             foreach ($rows as $table => $expected) {
                 if (! in_array($table, $imported['tables'], true)) {
@@ -51,6 +86,7 @@ final class RestoreTest
 
         return [
             'ok' => $mismatches === [],
+            'mode' => self::IMPORT,
             'tables' => count($rows),
             'views' => count($views),
             'rows' => array_sum($rows),
@@ -59,8 +95,62 @@ final class RestoreTest
         ];
     }
 
-    /** @return array{0: array<string, int>, 1: array<string, true>} rows per table in the dump, and its views */
-    private static function import(MysqlClient $mysql, string $scratch, string $gzPath): array
+    private static function dumpCheck(MysqlClient $mysql, string $database, string $gzPath): array
+    {
+        $started = microtime(true);
+        $rows = [];
+        $views = [];
+        $complete = false;
+        $mismatches = [];
+        try {
+            foreach (self::lines($gzPath) as $line) {
+                self::inspect($line, $rows, $views);
+                if (trim($line) !== '') {
+                    $complete = str_starts_with($line, '-- Dump completed');
+                }
+            }
+            if (! $complete) {
+                $mismatches[] = self::CUT;
+            }
+        } catch (BackupFailed $e) {
+            $mismatches[] = $e->getMessage();
+        }
+
+        $live = $mysql->objects($database);
+        foreach (array_diff($live['tables'], array_keys($rows)) as $table) {
+            $mismatches[] = "{$table}: in the live database but not in the dump";
+        }
+        foreach (array_diff($live['views'], array_keys($views)) as $view) {
+            $mismatches[] = "view {$view}: in the live database but not in the dump";
+        }
+
+        // Shown, not judged: the live database moved on after the dump
+        $liveRows = 0;
+        $differences = [];
+        foreach ($live['tables'] as $table) {
+            $now = $mysql->countRows($database, $table);
+            $liveRows += $now;
+            if (isset($rows[$table]) && $rows[$table] !== $now && count($differences) < 10) {
+                $differences[] = "{$table}: {$rows[$table]} in the dump, {$now} live now";
+            }
+        }
+
+        return [
+            'ok' => $mismatches === [],
+            'mode' => self::DUMP_CHECK,
+            'reason' => 'no scratch database (the cPanel plan’s database limit)',
+            'tables' => count($rows),
+            'views' => count($views),
+            'rows' => array_sum($rows),
+            'live_rows' => $liveRows,
+            'differences' => $differences,
+            'mismatches' => array_slice($mismatches, 0, 20),
+            'seconds' => round(microtime(true) - $started, 1),
+        ];
+    }
+
+    /** @return array{0: array<string, int>, 1: array<string, true>, 2: bool} rows per table, views, whether it ends complete */
+    private static function feedMysql(MysqlClient $mysql, string $scratch, string $gzPath): array
     {
         $command = Programs::niced([(string) config('backups.bin.mysql'), ...$mysql->clientOptions(), '--max-allowed-packet=1G', $scratch]);
         $errors = tempnam(sys_get_temp_dir(), 'bkr');
@@ -72,31 +162,70 @@ final class RestoreTest
 
         $rows = [];
         $views = [];
+        $complete = false;
         $broken = false;
-        $gz = gzopen($gzPath, 'rb');
-        $line = '';
-        while (! $broken && ($chunk = gzgets($gz, 1 << 20)) !== false) {
-            $line .= $chunk;
-            if (! str_ends_with($chunk, "\n") && ! gzeof($gz)) {
-                continue;
+        $unreadable = null;
+        try {
+            foreach (self::lines($gzPath) as $line) {
+                if (! self::feed($pipes[0], self::inspect($line, $rows, $views))) {
+                    $broken = true;
+
+                    break;
+                }
+                if (trim($line) !== '') {
+                    $complete = str_starts_with($line, '-- Dump completed');
+                }
             }
-            $broken = ! self::feed($pipes[0], self::inspect($line, $rows, $views));
-            $line = '';
+        } catch (BackupFailed $e) {
+            $unreadable = $e;
         }
-        if (! $broken && $line !== '') {
-            self::feed($pipes[0], self::inspect($line, $rows, $views));
-        }
-        gzclose($gz);
         fclose($pipes[0]);
         $code = proc_close($process);
         $stderr = Programs::tail($errors);
         @unlink($errors);
 
+        if ($unreadable) {
+            throw $unreadable;
+        }
         if ($code !== 0 || $broken) {
             throw new BackupFailed('restore_test', 'The dump did not import into the scratch database: ' . (Programs::lastLine($stderr) ?: "mysql stopped with code {$code}"));
         }
 
-        return [$rows, $views];
+        return [$rows, $views, $complete];
+    }
+
+    /**
+     * The dump's lines, decompressed with zlib's own checks: a damaged file (bad data or checksum) or one cut short
+     * (its gzip stream never ends) throws, where gzopen would quietly stop early.
+     *
+     * @return \Generator<string>
+     */
+    public static function lines(string $gzPath): \Generator
+    {
+        $in = fopen($gzPath, 'rb');
+        $zlib = inflate_init(ZLIB_ENCODING_GZIP);
+        $buffer = '';
+        try {
+            while (! feof($in) && inflate_get_status($zlib) !== ZLIB_STREAM_END) {
+                $plain = @inflate_add($zlib, (string) fread($in, 1 << 20), ZLIB_SYNC_FLUSH);
+                if ($plain === false) {
+                    throw new BackupFailed('restore_test', 'The dump does not decompress: its .gz file is damaged.');
+                }
+                $buffer .= $plain;
+                for ($at = 0; ($newline = strpos($buffer, "\n", $at)) !== false; $at = $newline + 1) {
+                    yield substr($buffer, $at, $newline + 1 - $at);
+                }
+                $buffer = substr($buffer, $at);
+            }
+            if (inflate_get_status($zlib) !== ZLIB_STREAM_END) {
+                throw new BackupFailed('restore_test', 'The dump is cut short: its .gz file ends before the compressed data does.');
+            }
+            if ($buffer !== '') {
+                yield $buffer;
+            }
+        } finally {
+            fclose($in);
+        }
     }
 
     /** Counts what the line creates or inserts; returns it as mysql should get it */

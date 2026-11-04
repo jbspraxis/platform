@@ -337,7 +337,9 @@ class ServerBackupsTest extends TestCase
         Livewire::test(SystemHealth::class)
             ->assertSee('Server backups')
             ->assertSee('HQ, jbspraxis.com and the portal')
-            ->assertSee('Passed')
+            ->assertSee('Restore test passed')
+            ->assertSee('3 rows imported')
+            ->assertDontSee('Dump check')
             ->assertSee('Sun 1 Nov, 02:00')
             ->assertSee('on Drive');
     }
@@ -348,40 +350,11 @@ class ServerBackupsTest extends TestCase
         unlink($this->home . '/.backup-my.cnf');
         $db = config('database.connections.' . config('database.default'));
         config(['backups.databases_from' => 'cpanel', 'backups.mysql_user' => self::BACKUP_USER, 'backups.mysql_host' => $db['host'], 'backups.mysql_port' => $db['port']]);
-        $root = $this->root();
         $calls = [];
         $users = [];
         $databases = [['database' => 'praxis_test_bk_praxis_core', 'users' => []], ['database' => 'praxis_test_bk_wp', 'users' => []]];
-        // uapi as cPanel answers, doing on the test server what cPanel does: the user really exists, with that password
-        Process::fake(function ($process) use (&$calls, &$users, &$databases, $root) {
-            $args = array_slice($process->command, 2);
-            $calls[] = $args;
-            [$module, $function] = $args;
-            $params = [];
-            foreach (array_slice($args, 2) as $pair) {
-                [$k, $v] = explode('=', $pair, 2);
-                $params[$k] = rawurldecode($v);
-            }
-            $data = match ("{$module}::{$function}") {
-                'Mysql::list_users' => array_map(fn ($u) => ['user' => $u], $users),
-                'Mysql::list_databases' => $databases,
-                'Mysql::create_user' => (function () use (&$users, $params, $root) {
-                    $root->prepare("CREATE USER '" . self::BACKUP_USER . "'@'%' IDENTIFIED BY ?")->execute([$params['password']]);
-                    $users[] = $params['name'];
-
-                    return null;
-                })(),
-                'Mysql::set_privileges_on_database' => (function () use ($params, $root) {
-                    $root->exec("GRANT {$params['privileges']} ON `{$params['database']}`.* TO '" . self::BACKUP_USER . "'@'%'");
-
-                    return null;
-                })(),
-                'Mysql::create_database' => (function () use (&$databases, $params) { $databases[] = ['database' => $params['name'], 'users' => []]; return null; })(),
-                default => null,
-            };
-
-            return Process::result(json_encode(['result' => ['status' => 1, 'data' => $data, 'errors' => null]]));
-        });
+        $this->root()->exec('DROP DATABASE `' . self::SCRATCH . '`');
+        $this->fakeUapi($calls, $users, $databases);
 
         $this->artisan('backups:setup --dry-run')->assertSuccessful()->expectsOutputToContain('Would create the read-only MySQL user praxis_test_bk_bkread');
         $this->assertFileDoesNotExist($this->home . '/.backup-my.cnf');
@@ -391,6 +364,7 @@ class ServerBackupsTest extends TestCase
             ->expectsOutputToContain('praxis_test_bk_praxis_core → praxis')
             ->expectsOutputToContain('praxis_test_bk_wp → other/praxis_test_bk_wp')
             ->expectsOutputToContain('Signed in to MySQL as praxis_test_bk_bkread')
+            ->expectsOutputToContain('Created the scratch database ' . self::SCRATCH . ': the weekly restore test imports each dump into it')
             ->doesntExpectOutputToContain('password=');
         $create = collect($calls)->first(fn ($c) => $c[1] === 'create_user');
         $password = rawurldecode(substr($create[3], strlen('password=')));
@@ -404,9 +378,9 @@ class ServerBackupsTest extends TestCase
         }
         $grants = collect($calls)->filter(fn ($c) => $c[1] === 'set_privileges_on_database')->map(fn ($c) => rawurldecode(substr($c[3], 9)) . ' ' . rawurldecode(substr($c[4], 11)))->values()->all();
         $this->assertSame([
-            self::SCRATCH . ' ALL PRIVILEGES',
             'praxis_test_bk_praxis_core SELECT,SHOW VIEW,LOCK TABLES,TRIGGER,EVENT',
             'praxis_test_bk_wp SELECT,SHOW VIEW,LOCK TABLES,TRIGGER,EVENT',
+            self::SCRATCH . ' ALL PRIVILEGES',
         ], $grants);
         $this->assertTrue(collect($calls)->contains(fn ($c) => $c[1] === 'create_database' && $c[2] === 'name=' . self::SCRATCH));
         $this->assertNotNull(ErrorMonitor::state('backups.setup_at'));

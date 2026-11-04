@@ -3,6 +3,7 @@
 namespace Tests\Feature\Backups;
 
 use App\Support\Backups\Envelope;
+use Illuminate\Support\Facades\Process;
 use PDO;
 use Tests\Support\Google\FakeDrive;
 
@@ -83,6 +84,54 @@ trait BackupFixtures
         }
         $pdo->exec("DROP USER IF EXISTS '" . self::BACKUP_USER . "'@'%'");
         self::removeTree($this->home);
+    }
+
+    /**
+     * uapi as cPanel answers it, doing on the test server what cPanel does: create_user really creates the MySQL user
+     * with that password, set_privileges_on_database really grants. $databaseLimit is the plan's number of databases:
+     * beyond it, create_database is refused with cPanel's own words, as on live on 4 Nov 2026 (5 of 5 used).
+     */
+    protected function fakeUapi(array &$calls, array &$users, array &$databases, ?int $databaseLimit = null): void
+    {
+        $root = $this->root();
+        Process::fake(function ($process) use (&$calls, &$users, &$databases, $databaseLimit, $root) {
+            $args = array_slice($process->command, 2);
+            $calls[] = $args;
+            [$module, $function] = $args;
+            $params = [];
+            foreach (array_slice($args, 2) as $pair) {
+                [$k, $v] = explode('=', $pair, 2);
+                $params[$k] = rawurldecode($v);
+            }
+            if ("{$module}::{$function}" === 'Mysql::create_database' && $databaseLimit !== null && count($databases) >= $databaseLimit) {
+                return Process::result(json_encode(['result' => ['status' => 0, 'data' => null,
+                    'errors' => ["You have reached your maximum allotment of databases ({$databaseLimit})."]]]));
+            }
+            $data = match ("{$module}::{$function}") {
+                'Mysql::list_users' => array_map(fn ($u) => ['user' => $u], $users),
+                'Mysql::list_databases' => $databases,
+                'Mysql::create_user' => (function () use (&$users, $params, $root) {
+                    $root->prepare("CREATE USER '" . self::BACKUP_USER . "'@'%' IDENTIFIED BY ?")->execute([$params['password']]);
+                    $users[] = $params['name'];
+
+                    return null;
+                })(),
+                'Mysql::set_privileges_on_database' => (function () use ($params, $root) {
+                    $root->exec("GRANT {$params['privileges']} ON `{$params['database']}`.* TO '" . self::BACKUP_USER . "'@'%'");
+
+                    return null;
+                })(),
+                'Mysql::create_database' => (function () use (&$databases, $params, $root) {
+                    $root->exec("CREATE DATABASE `{$params['name']}`");
+                    $databases[] = ['database' => $params['name'], 'users' => []];
+
+                    return null;
+                })(),
+                default => null,
+            };
+
+            return Process::result(json_encode(['result' => ['status' => 1, 'data' => $data, 'errors' => null]]));
+        });
     }
 
     /** The test connection's user, on its own connection (DDL here must not end the test's transaction) */

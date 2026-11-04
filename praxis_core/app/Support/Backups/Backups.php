@@ -176,7 +176,8 @@ class Backups
                 try {
                     $test = RestoreTest::run($this->mysql, $database, $plain);
                 } catch (BackupFailed $e) {
-                    $test = ['ok' => false, 'tables' => 0, 'views' => 0, 'rows' => 0, 'mismatches' => [$e->getMessage()], 'seconds' => 0];
+                    $mode = $this->mysql->canUse((string) config('backups.scratch_database')) ? RestoreTest::IMPORT : RestoreTest::DUMP_CHECK;
+                    $test = ['ok' => false, 'mode' => $mode, 'tables' => 0, 'views' => 0, 'rows' => 0, 'mismatches' => [$e->getMessage()], 'seconds' => 0];
                 }
                 $row = $this->save($row, ['restore_test' => json_encode($test, JSON_UNESCAPED_UNICODE)]);
             }
@@ -186,7 +187,7 @@ class Backups
 
             if ($test !== null && ! $test['ok']) {
                 return $this->save($row, ['status' => 'failed', 'stage' => 'restore_test', 'finished_at' => now(),
-                    'error' => 'The restore test failed: ' . implode('; ', array_slice($test['mismatches'], 0, 3)) . ' The backup was still encrypted and kept.']);
+                    'error' => RestoreTest::label($test) . ': ' . implode('; ', array_slice($test['mismatches'], 0, 3)) . '. The backup was still encrypted and kept.']);
             }
 
             return $this->save($row, ['status' => 'ok', 'stage' => null, 'error' => null, 'finished_at' => now()]);
@@ -405,7 +406,9 @@ class Backups
 
             return "{$row['site']} ({$where}): {$row['file_name']}, " . self::size((int) ($row['size_bytes'] ?? 0))
                 . (! empty($row['drive_file_id']) ? ', on Drive' : ', on the server only')
-                . ($test ? ", restore test passed ({$test['tables']} " . Str::plural('table', $test['tables']) . ", {$test['rows']} " . Str::plural('row', $test['rows']) . ')' : '') . '.';
+                . ($test ? ', ' . lcfirst((string) RestoreTest::label($test)) . (RestoreTest::isDumpCheck($test) ? ', not imported: ' . ($test['reason'] ?? 'no scratch database') . ';' : ' (')
+                    . " {$test['tables']} " . Str::plural('table', $test['tables']) . ", {$test['rows']} " . Str::plural('row', $test['rows'])
+                    . (RestoreTest::isDumpCheck($test) ? ' in the dump' . (isset($test['live_rows']) ? ", {$test['live_rows']} live now" : '') : ')') : '') . '.';
         }
 
         return "{$row['site']} ({$where}): FAILED at {$row['stage']}: {$row['error']}";
