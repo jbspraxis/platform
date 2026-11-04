@@ -18,7 +18,7 @@ class HealthChecks
     public static function all(): array
     {
         $checks = [];
-        foreach (['scheduler', 'errors', 'email', 'ai', 'integrations', 'queue', 'logs', 'leads', 'rates', 'config', 'push'] as $key) {
+        foreach (['scheduler', 'errors', 'email', 'ai', 'integrations', 'backups', 'queue', 'logs', 'leads', 'rates', 'config', 'push'] as $key) {
             try {
                 $checks[] = ['key' => $key] + self::$key();
             } catch (\Throwable $e) {
@@ -114,6 +114,12 @@ class HealthChecks
         };
 
         return ['label' => 'Integrations (Google, Claude)', 'state' => $state, 'detail' => $detail, 'fix' => $fix];
+    }
+
+    /** Server backups (docs/BACKUPS.md): every site's last database and files backup, and the weekly restore test */
+    private static function backups(): array
+    {
+        return \App\Support\Backups\Status::check();
     }
 
     private static function queue(): array

@@ -12,8 +12,12 @@ return [
     'secret_saved' => 'Saved. It is never shown again: enter a new one only to replace it.',
 
     'google' => [
-        'title' => 'Google (Calendar, Meet and Docs)',
-        'intro' => 'HQ creates meetings with a Meet link in :account’s calendar and collects their transcripts. Enter the OAuth client from the Google Cloud project, save it, then connect the account.',
+        'title' => 'Google (Calendar, Meet, Docs and Drive backups)',
+        'intro' => 'HQ creates meetings with a Meet link in :account’s calendar and collects their transcripts, and puts the encrypted server backups in its Drive. Enter the OAuth client from the Google Cloud project, save it, then connect the account.',
+        'drive' => [
+            'allowed' => 'Drive backups: allowed. HQ sees only the backup folder it created, nothing else in Drive.',
+            'missing' => 'Drive backups: reconnect Google to allow. Click Reconnect Google and tick “See, edit, create and delete only the specific Google Drive files you use with this app”; HQ sees nothing else in Drive.',
+        ],
         'status' => [
             'connected' => 'Connected as :email',
             'not_connected' => 'Not connected',

@@ -48,6 +48,15 @@ Schedule::command('monitor:run')->everyFiveMinutes()->withoutOverlapping(10);
 Schedule::command('pwa:push-pending')->everyMinute()->withoutOverlapping(5);
 Schedule::command('pwa:push-prune')->dailyAt('03:10');
 
+// Server backups (docs/BACKUPS.md): every database of the cPanel account at 02:00 Lagos time (restore test on Sundays),
+// every site's uploaded files on Sundays at 03:00 (it waits for the databases if they are still running), each encrypted
+// and sent to Drive in its own process; hourly, a bell to the owner for any site whose last good backup is too old
+Schedule::command('backups:run')->dailyAt('02:00')->timezone('Africa/Lagos')->withoutOverlapping(360)->runInBackground()
+    ->appendOutputTo(storage_path('logs/backups.log'));
+Schedule::command('backups:files')->sundays()->at('03:00')->timezone('Africa/Lagos')->withoutOverlapping(360)->runInBackground()
+    ->appendOutputTo(storage_path('logs/backups.log'));
+Schedule::command('backups:check')->hourlyAt(17)->withoutOverlapping(10);
+
 // HQ Mail (docs/MAIL.md): copy new mail from every connected mailbox, send what is due, tidy up
 Schedule::command('mail:sync')->everyMinute()->withoutOverlapping(10);
 Schedule::command('mail:send-due')->everyMinute()->withoutOverlapping(5);

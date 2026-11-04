@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Hq\System;
 
+use App\Support\Backups\Backups;
+use App\Support\Backups\Status;
 use App\Support\Monitor\ErrorMonitor;
 use App\Support\Monitor\HealthChecks;
 use App\Support\Monitor\LogScanner;
@@ -130,6 +132,16 @@ class SystemHealth extends Component
         ];
     }
 
+    /** The Server backups table (docs/BACKUPS.md); null when it can't be read, so the page still opens */
+    private function backups(): ?array
+    {
+        try {
+            return ['setUp' => app(Backups::class)->setUp(), 'sites' => Status::sites()];
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     public function render()
     {
         $checks = HealthChecks::all();
@@ -171,6 +183,7 @@ class SystemHealth extends Component
             'counts' => $counts,
             'open' => $open,
             'heartbeat' => ErrorMonitor::state('heartbeat'),
+            'backups' => $this->tab === 'health' ? $this->backups() : null,
             'alertEmail' => config('services.monitor.alert_email'),
         ]);
     }
