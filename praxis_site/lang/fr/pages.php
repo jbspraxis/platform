@@ -122,6 +122,9 @@ return [
         'ourselves_text' => 'Nous gérons notre propre facturation, notre paie, nos projets et nos validations sur le système que nous construisons pour nos clients.',
         'products_title' => 'Nos produits',
         'nfelia' => 'nfelia, un produit JBS Praxis.',
+        'hq_caption' => 'JBS Praxis HQ, où nous gérons notre propre facturation, notre paie, nos projets et nos validations.',
+        'hq_alt' => 'L’écran de connexion de JBS Praxis HQ.',
+        'product_screen_alt' => 'L’écran de connexion de :name.',
         'products_lead' => 'Deux produits que nous concevons, construisons et exploitons nous-mêmes, selon les mêmes principes que les systèmes que nous construisons pour nos clients.',
         'products' => [
             'praxis-ls' => [

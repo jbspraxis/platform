@@ -942,6 +942,8 @@
     .product-line { margin: var(--space-3) 0 var(--space-5); font-size: var(--step-lead); line-height: var(--lh-lead); color: var(--color-slate); }
     .product-status { margin: var(--space-5) 0 var(--space-3); font-size: var(--step-small); color: var(--color-muted); }
     .product-link { font-weight: 500; }
+    .product-screen { margin-top: var(--space-5); }
+    .ourselves-screen { margin-top: var(--space-7); }
 
     /* ---- The platforms' own screens ---- */
     .band-tight { padding: var(--section-y-tight) 0; }
