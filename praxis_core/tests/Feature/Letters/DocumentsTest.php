@@ -329,6 +329,39 @@ class DocumentsTest extends TestCase
             ->call('save')->assertHasErrors('image');
     }
 
+    public function test_an_issued_document_can_be_filed_with_the_company_s_other_papers(): void
+    {
+        $owner = $this->owner();
+        $this->signatureFor($owner);
+        $this->actingAs($owner);
+        $document = Letters::start('formal_letter', null, $this->company(), $owner);
+        $document->forceFill(['title' => 'Confirmation of our bank details'])->save();
+        Letters::sign($document, $owner);
+        Letters::issue($document->fresh(), $owner);
+
+        Livewire::actingAs($owner)->test(DocumentPage::class, ['document' => $document->id])
+            ->call('fileAway')->assertHasNoErrors();
+
+        $filed = $document->fresh();
+        $this->assertNotNull($filed->company_document_id);
+        $this->assertTrue($filed->isFiled());
+
+        $row = \App\Models\CompanyDocument::findOrFail($filed->company_document_id);
+        $this->assertSame($document->legal_entity_id, $row->legal_entity_id);
+        $this->assertStringContainsString($document->reference, $row->title);
+
+        // The file in Company documents is the issued PDF, byte for byte
+        $version = $row->currentVersion;
+        $this->assertSame($filed->file_sha256, hash('sha256', (string) \Illuminate\Support\Facades\Storage::disk('local')->get($version->path)));
+
+        // Filing it twice is refused, so one document is never in the register twice
+        Livewire::actingAs($owner)->test(DocumentPage::class, ['document' => $document->id])
+            ->call('fileAway')->assertHasErrors('filing');
+        $this->assertSame(1, \App\Models\CompanyDocument::count());
+
+        $this->assertDatabaseHas('system_audit_logs', ['action' => 'LETTER_FILED', 'target_id' => $document->id]);
+    }
+
     public function test_the_register_lists_every_document_and_new_document_starts_a_draft(): void
     {
         $owner = $this->owner();

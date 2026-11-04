@@ -2,12 +2,17 @@
 
 namespace App\Support\Letters;
 
+use App\Models\CompanyDocument;
 use App\Models\Letters\LetterDocument;
 use App\Models\Letters\LetterDocumentSignature;
 use App\Models\User;
+use App\Support\CompanyDocuments\Companies;
+use App\Support\CompanyDocuments\Documents;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -233,6 +238,47 @@ final class Letters
         }
         LetterDocumentSignature::where('document_id', $document->id)->where('user_id', $user->id)->delete();
         self::audit('LETTER_SIGNATURE_REMOVED', 'Took a signature off ' . $document->reference, $document);
+    }
+
+    /**
+     * Files an issued document in Master data › Company documents (docs/COMPANY_DOCUMENTS.md), so the papers the
+     * firm issues sit beside the ones it receives. The PDF goes in exactly as it was issued, under its own
+     * reference; filing it again is refused, so one document is never in the register twice.
+     */
+    public static function fileInCompanyDocuments(LetterDocument $document, User $by): CompanyDocument
+    {
+        if ($document->status === LetterDocument::DRAFT) {
+            throw new RuntimeException('Only an issued document can be filed.');
+        }
+        if ($document->company_document_id) {
+            throw new RuntimeException('This document is already in Company documents.');
+        }
+        $pdf = self::file($document);
+        if ($pdf === null) {
+            throw new RuntimeException('The issued file is missing, so there is nothing to file.');
+        }
+
+        // Company documents takes an uploaded file; the issued PDF is handed over as one, unchanged
+        $temporary = storage_path('app/private/letters/tmp-' . $document->id . '.pdf');
+        File::ensureDirectoryExists(dirname($temporary));
+        File::put($temporary, $pdf);
+
+        try {
+            $filed = Documents::create([
+                'company' => Companies::keyFor($document->legal_entity_id),
+                'kind' => 'other',
+                'title' => $document->reference . ' — ' . ($document->title ?: 'Document'),
+                'issued_on' => $document->document_date?->toDateString(),
+                'notes' => 'Issued by JBS Praxis from HQ › Documents. Reference ' . $document->reference . '.',
+            ], new UploadedFile($temporary, self::filename($document), 'application/pdf', null, true), $by);
+        } finally {
+            File::delete($temporary);
+        }
+
+        $document->forceFill(['company_document_id' => $filed->id])->save();
+        self::audit('LETTER_FILED', $document->reference . ' was filed in Company documents', $document);
+
+        return $filed;
     }
 
     /** The issued PDF, or null when the file has gone missing */

@@ -74,7 +74,7 @@ return [
             // document; create = draft one and ask Claude for a draft; sign = apply your own stored signature;
             // manage = issue, revoke and replace, and whether a document's copy may be shown on the verify page.
             // Owner decision, 4 Nov 2026: the Owner role only until the owner ticks it for other roles on Roles and
-            // permissions, so 2026_11_04_950001_grant_letters_permissions grants no other role anything.
+            // permissions, so 2026_11_04_960001_grant_letters_permissions grants no other role anything.
             'letters' => ['label' => 'Documents', 'actions' => ['view', 'create', 'sign', 'manage'], 'wildcard' => false],
             'access' => ['label' => 'Accounts, roles & permissions', 'actions' => ['view', 'create', 'edit', 'delete']],
             'system' => ['label' => 'System health', 'actions' => ['view']],

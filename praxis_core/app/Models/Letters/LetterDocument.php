@@ -66,6 +66,12 @@ class LetterDocument extends Model
         return $this->belongsTo(self::class, 'replaces_id');
     }
 
+    /** It has been filed in Master data › Company documents */
+    public function isFiled(): bool
+    {
+        return $this->company_document_id !== null;
+    }
+
     public function isDraft(): bool
     {
         return $this->status === self::DRAFT;

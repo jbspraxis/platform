@@ -350,6 +350,20 @@ class DocumentPage extends Component
         $this->flash = 'Revoked. Anyone who checks it now sees that it no longer stands.';
     }
 
+    /** Keeps the issued PDF with the company's other papers (Master data › Company documents) */
+    public function fileAway(): void
+    {
+        $this->authorize('mdm.create');
+        try {
+            Letters::fileInCompanyDocuments($this->document(), Auth::user());
+        } catch (Throwable $e) {
+            $this->addError('filing', $e->getMessage());
+
+            return;
+        }
+        $this->flash = 'Filed in Company documents, under Master data.';
+    }
+
     public function replace()
     {
         $this->authorize('letters.manage');
@@ -376,6 +390,7 @@ class DocumentPage extends Component
             'canEdit' => $record->isDraft() && $user->can('letters.create'),
             'canSign' => $record->isDraft() && $user->can('letters.sign'),
             'canManage' => $user->can('letters.manage'),
+            'canFile' => $user->can('mdm.create'),
         ])->title($record->reference);
     }
 }

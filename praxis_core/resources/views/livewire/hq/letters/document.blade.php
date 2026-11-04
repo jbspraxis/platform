@@ -262,7 +262,14 @@
                             @if (in_array($document->status, ['issued', 'revoked'], true))
                                 <button type="button" class="btn btn-secondary" wire:click="replace">Replace it with a new version</button>
                             @endif
+                            @if ($canFile && ! $document->isFiled())
+                                <button type="button" class="btn btn-secondary" wire:click="fileAway" wire:loading.attr="disabled"><i data-lucide="folder-plus"></i> File in Company documents</button>
+                            @endif
                         </div>
+                        @if ($document->isFiled())
+                            <p class="help mt-3">Filed in <a href="{{ route('hq.mdm.documents.show', ['document' => $document->company_document_id]) }}" wire:navigate>Company documents</a>, with the company's other papers.</p>
+                        @endif
+                        @error('filing')<p class="field-error">{{ $message }}</p>@enderror
                     @endif
                 </div>
             @endif

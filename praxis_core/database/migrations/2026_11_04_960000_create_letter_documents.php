@@ -49,6 +49,7 @@ return new class extends Migration
             $table->char('replaces_id', 36)->nullable()->comment('The document this one replaces');
             $table->char('created_by', 36);
             $table->char('ai_run_id', 36)->nullable()->comment('The Claude draft the body started from');
+            $table->char('company_document_id', 36)->nullable()->comment('Filed in Master data > Company documents (docs/COMPANY_DOCUMENTS.md)');
             $table->timestamps();
             $table->index(['type_code', 'year', 'sequence']);
             $table->index('status');
