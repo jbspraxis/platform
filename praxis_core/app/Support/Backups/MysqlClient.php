@@ -64,6 +64,17 @@ class MysqlClient
         return (int) $found->fetchColumn() > 0;
     }
 
+    /** @return array<string, int> each base table's exact row count */
+    public function rowCounts(string $database): array
+    {
+        $counts = [];
+        foreach ($this->objects($database)['tables'] as $table) {
+            $counts[$table] = $this->countRows($database, $table);
+        }
+
+        return $counts;
+    }
+
     public function countRows(string $database, string $table): int
     {
         return (int) $this->pdo()->query('SELECT COUNT(*) FROM ' . self::quote($database) . '.' . self::quote($table))->fetchColumn();

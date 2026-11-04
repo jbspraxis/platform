@@ -167,6 +167,15 @@ class Backups
         $plain = $this->dir('tmp') . '/' . substr($name, 0, -4);
         $stage = 'dump';
         try {
+            // On test nights, each table's rows just before the dump: a table empty then and filled since is no loss
+            $before = null;
+            if ($restoreTest) {
+                try {
+                    $before = $this->mysql->rowCounts($database);
+                } catch (Throwable) {
+                    // Counted again after the dump; without these, any table empty in the dump but not live fails
+                }
+            }
             $dump = Dumper::dump($this->mysql, $database, $plain);
             $row = $this->save($row, ['plain_bytes' => $dump['bytes'], 'plain_sha256' => $dump['sha256']]);
 
@@ -174,7 +183,7 @@ class Backups
             if ($restoreTest) {
                 $stage = 'restore_test';
                 try {
-                    $test = RestoreTest::run($this->mysql, $database, $plain);
+                    $test = RestoreTest::run($this->mysql, $database, $plain, $before);
                 } catch (BackupFailed $e) {
                     $mode = $this->mysql->canUse((string) config('backups.scratch_database')) ? RestoreTest::IMPORT : RestoreTest::DUMP_CHECK;
                     $test = ['ok' => false, 'mode' => $mode, 'tables' => 0, 'views' => 0, 'rows' => 0, 'mismatches' => [$e->getMessage()], 'seconds' => 0];
