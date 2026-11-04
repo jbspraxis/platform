@@ -112,7 +112,7 @@
                                     <td>
                                         @if($test = $s['restore_result'])
                                             <span class="pill {{ $test['ok'] ? 'pill-success' : 'pill-danger' }}">{{ $test['ok'] ? 'Passed' : 'Failed' }}</span>
-                                            <div class="sh-where">{{ $when($s['restore']) }} · {{ number_format($test['tables']) }} tables, {{ number_format($test['rows']) }} rows</div>
+                                            <div class="sh-where">{{ $when($s['restore']) }} · {{ number_format($test['tables']) }} {{ \Illuminate\Support\Str::plural('table', $test['tables']) }}, {{ number_format($test['rows']) }} {{ \Illuminate\Support\Str::plural('row', $test['rows']) }}</div>
                                         @else
                                             <span class="help">Not yet</span>
                                         @endif

@@ -7,6 +7,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -404,7 +405,7 @@ class Backups
 
             return "{$row['site']} ({$where}): {$row['file_name']}, " . self::size((int) ($row['size_bytes'] ?? 0))
                 . (! empty($row['drive_file_id']) ? ', on Drive' : ', on the server only')
-                . ($test ? ", restore test passed ({$test['tables']} tables, {$test['rows']} rows)" : '') . '.';
+                . ($test ? ", restore test passed ({$test['tables']} " . Str::plural('table', $test['tables']) . ", {$test['rows']} " . Str::plural('row', $test['rows']) . ')' : '') . '.';
         }
 
         return "{$row['site']} ({$where}): FAILED at {$row['stage']}: {$row['error']}";
