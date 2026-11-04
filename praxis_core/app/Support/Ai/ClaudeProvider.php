@@ -90,7 +90,11 @@ class ClaudeProvider implements AiProvider
                 fn (string $block) => ['type' => 'text', 'text' => $block, 'cacheControl' => ['type' => 'ephemeral']],
                 array_filter($request->system, fn ($b) => trim($b) !== ''),
             )),
-            'messages' => [['role' => 'user', 'content' => $request->prompt]],
+            'messages' => [['role' => 'user', 'content' => $request->attachments ? [...array_map(fn (array $a) => [
+                // Files first, then the text that asks about them
+                'type' => $a['media_type'] === 'application/pdf' ? 'document' : 'image',
+                'source' => ['type' => 'base64', 'mediaType' => $a['media_type'], 'data' => $a['data']],
+            ], $request->attachments), ['type' => 'text', 'text' => $request->prompt]] : $request->prompt]],
             'thinking' => ['type' => 'adaptive'],
             'outputConfig' => [
                 'effort' => $request->effort,

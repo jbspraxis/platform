@@ -30,6 +30,10 @@ Schedule::command('finance:sync-exchange-rates')->dailyAt('00:00');
 // 'finance:run-automations' (00:30) was removed: no such command exists, so it failed every night.
 // Add it back here once the ledger automation command is built.
 
+// Company documents (docs/COMPANY_DOCUMENTS.md): on working days at 07:30 Lagos time, documents nearing their expiry and
+// compliance deadlines nearing their due date ring the owner and everyone with mdm.edit, once per item and date
+Schedule::command('mdm:compliance-bell')->weekdays()->dailyAt('07:30')->timezone('Africa/Lagos')->withoutOverlapping(10);
+
 // Leads (docs/LEADS.md section 9): on working days at 07:30 Lagos time, each lead owner gets one bell about overdue and
 // today's follow-ups and open leads with no next step; it opens My follow-ups. Rings nobody twice in a day.
 Schedule::command('leads:morning-bell')->weekdays()->dailyAt('07:30')->timezone('Africa/Lagos')->withoutOverlapping(10);

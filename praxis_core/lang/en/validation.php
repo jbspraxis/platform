@@ -179,6 +179,10 @@ return [
     */
 
     'custom' => [
+        // Livewire checks every upload before a screen sees it: 20 MB at most (AppServiceProvider, Company documents)
+        'files.*' => [
+            'max' => 'The file is over 20 MB. Upload a smaller file, such as a compressed PDF or a lighter scan.',
+        ],
         'attribute-name' => [
             'rule-name' => 'custom-message',
         ],

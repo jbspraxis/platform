@@ -63,6 +63,13 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
 
                 // Corporate Entities
                 Route::get('/legal-entities', \App\Livewire\Hq\Mdm\LegalEntityRegistry::class)->name('hq.mdm.legal');
+
+                // Company documents (docs/COMPANY_DOCUMENTS.md): each company's papers, their versions and the compliance
+                // calendar; files come from the private disk through the controller, every view and download logged
+                Route::get('/company-documents', \App\Livewire\Hq\Mdm\CompanyDocuments::class)->name('hq.mdm.documents');
+                Route::get('/company-documents/{document}', \App\Livewire\Hq\Mdm\CompanyDocumentPage::class)->whereUuid('document')->name('hq.mdm.documents.show');
+                Route::get('/company-documents/{document}/versions/{version}/{mode}', [\App\Http\Controllers\CompanyDocumentController::class, 'show'])
+                    ->whereUuid(['document', 'version'])->whereIn('mode', ['view', 'download'])->name('hq.mdm.documents.file');
             });
             // People records belong to HR
             Route::get('/employees', \App\Livewire\Hq\Mdm\EmployeeRegistry::class)->middleware('can:hr.view')->name('hq.mdm.employees');
