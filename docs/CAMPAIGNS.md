@@ -339,7 +339,7 @@ own jbspraxis.com mailbox, a few a day, with exactly one follow-up. Built 3–4 
 1. **Sender:** each salesperson's own mailbox as connected in HQ Mail (a personal `mail_accounts` row), never a second
    domain. Without one, the screens say how to connect it (Mail › Mailboxes › Your mailbox).
 2. **Limits the owner edits:** 15 a day per sender for their first 2 weeks, then 30; weekdays 08:30–17:30 WAT only; at
-   least 4 minutes apart; follow-ups count toward the limit. **Auto-pause** a sender when more than 5% of that day's
+   least 4 minutes apart; follow-ups count toward the limit. **Auto-pause** a sender when more than 5% of that day’s
    emails bounced, or on any spam complaint, with a bell to them and the owner.
 3. **Review:** a clean table of drafts; a row opens a small dialog with the full email, where you **Approve**, **Edit**
    (rich text), **Rewrite** (Claude again, optionally with a note) or **Skip**. **"Approve the rest" unlocks only after
@@ -376,7 +376,7 @@ Grants for existing databases: migration `2026_11_03_800001_grant_outreach_permi
 `outreach.create` **and** being its owner or sender (or `outreach.approve`): another salesperson can read it but not
 approve emails that go out under someone else's name.
 
-### 10.3 Data (migration `2026_11_03_800000_create_campaigns_outreach`)
+### 10.3 Data (migration `2026_11_03_800000_create_campaigns_outreach`; `_800002` indexes `mail_messages` for replies)
 
 | Table | What | Key columns |
 |---|---|---|
@@ -463,14 +463,16 @@ itself every 4 seconds while Claude writes.
    days later at the same time (the window applies when it is due).
 7. Refusals: a permanent refusal of the address (`Sender::isBounce`: the mailer's own errors only, read with
    `ProcessBroadcastQueue::refusesAddress`) is **Bounced**, goes on the list (`suppress(…, 'bounced', ['source' =>
-   'outreach'])`) and stops the follow-up; when more of the sender's emails that day bounced than
-   `bounce_pause_percent` (bounced ÷ sent and bounced today) the sender **pauses** (`Senders::pause`: a bell to them
-   and to everyone with `outreach.approve`, once per pause). A refused password puts the email back and pauses the
-   sender (`mailbox`). A "try later" (4xx) puts it back, 3 tries at most. Anything else is **Not sent** (`failed`) and
-   its follow-up is cancelled.
+   'outreach'])`) and stops the follow-up; when **at least `Senders::MIN_BOUNCES_TO_PAUSE` (2)** of the sender's emails
+   bounced that day **and** more than `bounce_pause_percent` of them (bounced ÷ sent and bounced today), the sender
+   **pauses** (`Senders::pause`: a bell to them and to everyone with `outreach.approve`, once per pause). A refused
+   password puts the email back and pauses the sender (`mailbox`). A "try later" (4xx) puts it back, 3 tries at most.
+   Anything else is **Not sent** (`failed`) and its follow-up is cancelled.
 
-**Note on the bounce rule:** with 15 a day, the first bounce of a day pauses the sender unless 20 emails went before
-it (1 of 20 is exactly 5%). This is the owner's rule taken literally; the owner can raise the percentage.
+**Note on the bounce rule** (lead chat's audit, 4 Nov 2026): at 15 a day one bounce is already 6.7%, and only the owner
+can resume, so one out-of-date address on a list would stop a salesperson until the owner looked. The owner's rule
+("more than 5% of the day's emails") stands, but it needs 2 bounces that day before it can pause: 1 of 15 doesn't, 2 of
+15 (13%) does. Sending limits says so under the percentage; the 2 is a constant, not a setting.
 
 ### 10.8 Unsubscribes and replies
 
@@ -478,10 +480,12 @@ it (1 of 20 is exactly 5%). This is the owner's rule taken literally; the owner 
   `Marketing::suppress($email, 'unsubscribed', ['source' => 'outreach'])`, the prospect `unsubscribed`, the unsent
   first email skipped and the follow-up cancelled (`Outreach::unsubscribe`). CSRF is already exempt for
   `email/unsubscribe/*`. The page speaks the prospect's language.
-- A **reply** (`Replies::found`): a message in HQ Mail's copy of any mailbox (`mail_messages`, not sent by HQ) from the
-  prospect's address that arrived after the first email went, or whose `In-Reply-To` or `References` name the first
-  email's Message-ID. It marks the prospect `replied` and cancels the follow-up ("They replied"). C2 doesn't read or
-  sort the reply.
+- A **reply** (`Replies::found`): a message in HQ Mail's copy of any mailbox (`mail_messages`, not sent by HQ) that
+  arrived after the first email went (from a minute before, for clocks), **and** is from the prospect's address or has
+  `In-Reply-To` or `References` naming the first email's Message-ID. The date bounds every condition, so the lookup
+  reads recent rows through `mail_messages_received_at_index` (migration `2026_11_03_800002`, with
+  `mail_messages_from_email_index`; plain indexes, no column changes), never the whole table. It marks the prospect
+  `replied` and cancels the follow-up ("They replied"). C2 doesn't read or sort the reply.
 - A **spam complaint**: a sent-to prospect whose address is on the list as `complained` (C3 or the owner records it)
   gets `complained_at`, the follow-up stops, and the sender who wrote to them pauses.
 
@@ -497,6 +501,7 @@ it (1 of 20 is exactly 5%). This is the owner's rule taken literally; the owner 
   ici. » Counsel to confirm (section 8, item 6).
 - **Public holidays** aren't known to the window: only weekends are skipped.
 - **Every attempt counts toward the day** (sent, bounced, failed), not only deliveries.
+- **At least 2 bounces in a day before the bounce rate can pause a sender** (`Senders::MIN_BOUNCES_TO_PAUSE`, 10.7).
 
 ### 10.10 Files
 
@@ -504,7 +509,7 @@ it (1 of 20 is exactly 5%). This is the owner's rule taken literally; the owner 
 `Sender`, `Replies`, `ProspectImportSchema`), `app/Models/Campaigns/Outreach{Campaign,Prospect,Email}.php`,
 `app/Livewire/Hq/Campaigns/Outreach/{OutreachList,OutreachCampaignPage,OutreachLimits}.php` and their views under
 `resources/views/livewire/hq/campaigns/outreach/`, `app/Console/Commands/Outreach{Write,Send}.php`,
-`app/Listeners/Campaigns/FileOutreachAi.php`, `routes/campaigns/outreach.php`, `lang/{en,fr}/outreach.php`. Shared files
+`app/Listeners/Campaigns/FileOutreachAi.php`, `routes/campaigns/outreach.php`, `lang/{en,fr}/outreach.php`, migrations `2026_11_03_8000{00,01,02}`. Shared files
 changed: `routes/campaigns.php` (one `require`), `routes/email-links.php` (two routes), `routes/console.php` (two
 schedule lines), `config/access.php` (the module, Sales' grant), `config/ai.php` (the purpose), `lang/*/ai.php` (its
 label), `lang/*/marketing.php` (`outreach_unsubscribe`), `components/layouts/hq.blade.php` (the rail),
@@ -513,8 +518,8 @@ label), `lang/*/marketing.php` (`outreach_unsubscribe`), `components/layouts/hq.
 
 ### 10.11 Testing and running it locally
 
-- `tests/Feature/Campaigns/Outreach{Sending,Drafts,Import,Review}Test.php` with `OutreachFixtures` (25 tests): the
-  window, the gap, 15 then 30, follow-ups counting, the last-moment check, bounces and the auto-pause with its bells, a
+- `tests/Feature/Campaigns/Outreach{Sending,Drafts,Import,Review}Test.php` with `OutreachFixtures` (26 tests): the
+  window, the gap, 15 then 30, follow-ups counting, the last-moment check, bounces and the auto-pause (1 in 15 never pauses, 2 do) with its bells, a
   spam complaint, never twice, interrupted sends, a refused password, 4xx retries, the unsubscribe page and one-click,
   the follow-up 3 working days later and its cancelling by In-Reply-To, References or the address, prospects never in
   an audience; drafts from research and website in the prospect's language, not written and Try again, a failed

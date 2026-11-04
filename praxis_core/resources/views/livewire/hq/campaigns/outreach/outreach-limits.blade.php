@@ -14,7 +14,7 @@
         'window_end' => 'Nothing starts at or after this time.',
         'gap_minutes' => 'So a mailbox never sends in bursts.',
         'follow_up_days' => 'Monday to Friday, then within the window. Cancelled if they reply, bounce or unsubscribe.',
-        'bounce_pause_percent' => 'Of that sender’s emails that day. Any spam complaint pauses them too. You and they get a bell.',
+        'bounce_pause_percent' => 'Of that sender’s emails that day, once at least ' . Senders::MIN_BOUNCES_TO_PAUSE . ' have bounced that day, so one out-of-date address alone never pauses them. Any spam complaint pauses them too. You and they get a bell.',
     ];
 @endphp
 <div class="orx">

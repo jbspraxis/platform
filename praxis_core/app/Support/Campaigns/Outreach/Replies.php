@@ -43,9 +43,12 @@ final class Replies
         }
         $mid = trim((string) $first->message_id, '<> ');
 
+        // Only mail that arrived after the first email went (a reply in the thread can't be older): the date bounds
+        // every condition, so the lookup reads the recent rows (index mail_messages_received_at_index), never the table
         return DB::table('mail_messages')->where('is_outbound', 0)
-            ->where(function ($q) use ($prospect, $first, $mid) {
-                $q->where(fn ($q) => $q->where('from_email', $prospect->email)->where('received_at', '>=', $first->sent_at->copy()->subMinute()));
+            ->where('received_at', '>=', $first->sent_at->copy()->subMinute())
+            ->where(function ($q) use ($prospect, $mid) {
+                $q->where('from_email', $prospect->email);
                 if ($mid !== '') {
                     $q->orWhere('in_reply_to', $mid)->orWhere('references', 'like', '%' . addcslashes($mid, '%_\\') . '%');
                 }

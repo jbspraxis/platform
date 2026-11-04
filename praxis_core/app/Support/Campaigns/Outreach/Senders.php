@@ -24,6 +24,12 @@ use Illuminate\Support\Str;
  */
 final class Senders
 {
+    /**
+     * Bounces a sender needs in a day before the bounce rate can pause them (lead chat, 4 Nov 2026): at 15 a day one
+     * stale address alone is 6.7%, and only the owner can resume, so one bounce never pauses on its own
+     */
+    public const MIN_BOUNCES_TO_PAUSE = 2;
+
     public const PAUSES = [
         'bounces' => 'Too many emails bounced today',
         'complaint' => 'Someone marked an email as spam',

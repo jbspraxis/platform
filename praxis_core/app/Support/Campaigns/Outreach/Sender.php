@@ -220,7 +220,10 @@ final class Sender
         return 'failed';
     }
 
-    /** More of today's emails bounced than the limit allows: the sender pauses (once), with a bell to them and the owner */
+    /**
+     * More of today's emails bounced than the limit allows, and at least Senders::MIN_BOUNCES_TO_PAUSE of them: the
+     * sender pauses (once), with a bell to them and the owner
+     */
     private static function checkBounces(?string $senderId): void
     {
         if (! $senderId) {
@@ -228,7 +231,7 @@ final class Sender
         }
         [$bounced, $tried] = Senders::bouncesToday($senderId);
         $limit = (int) Limits::get('bounce_pause_percent');
-        if ($tried > 0 && $bounced * 100 > $limit * $tried) {
+        if ($bounced >= Senders::MIN_BOUNCES_TO_PAUSE && $bounced * 100 > $limit * $tried) {
             Senders::pause($senderId, 'bounces', "{$bounced} of today’s {$tried} outreach " . ($tried === 1 ? 'email' : 'emails') . ' bounced (' . round(100 * $bounced / $tried) . "%, more than {$limit}%). Check the list for out-of-date addresses before resuming.");
         }
     }

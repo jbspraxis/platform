@@ -164,41 +164,53 @@ class OutreachSendingTest extends TestCase
         $this->assertSame($next->email, $this->server->sent[0]['email']->getTo()[0]->getAddress());
     }
 
-    public function test_a_bounce_goes_on_the_list_and_too_many_pause_the_sender_with_a_bell(): void
+    public function test_a_bounce_goes_on_the_list_and_two_or_more_over_the_rate_pause_the_sender_with_a_bell(): void
     {
         $owner = $this->staff('owner', ['owner']);
+        Limits::set(['gap_minutes' => 1], $owner);
+        // Tess: 1 of her 15 bounces (6.7%, over 5%), but one bounce alone never pauses
+        $tess = $this->salesperson('tess');
+        $tessCampaign = $this->outreachCampaign($tess);
+        $tessList = collect(range(1, 15))->map(fn () => $this->prospect($tessCampaign, 'approved'));
+        // Gerald: the 3rd and the 8th of his 15 bounce
         $gerald = $this->salesperson();
         $campaign = $this->outreachCampaign($gerald);
-        $ok = $this->prospect($campaign, 'approved');
-        $bad = $this->prospect($campaign, 'approved');
-        $later = $this->prospect($campaign, 'approved');
-        $this->refuse([$bad->email => new MailSendException('The outgoing mail server refused the message: 550 5.1.1 <' . $bad->email . '>: Recipient address rejected: User unknown', 'rejected', true, 550)]);
+        $list = collect(range(1, 15))->map(fn () => $this->prospect($campaign, 'approved'));
+        $refusal = fn ($p) => new MailSendException('The outgoing mail server refused the message: 550 5.1.1 <' . $p->email . '>: Recipient address rejected: User unknown', 'rejected', true, 550);
+        $this->refuse([$tessList[2]->email => $refusal($tessList[2]), $list[2]->email => $refusal($list[2]), $list[7]->email => $refusal($list[7])]);
 
         $this->at('2026-11-03 10:00');
-        Sender::run();
-        Carbon::setTestNow(now()->addMinutes(4));
-        Sender::run();
-
-        $this->assertSame('sent', $this->firstOf($ok)->status);
-        $this->assertSame('bounced', $this->firstOf($bad)->status);
-        $this->assertSame('cancelled', $this->followUpOf($bad)->status);
-        $this->assertSame('bounced', $bad->fresh()->status);
+        foreach (range(1, 7) as $run) {
+            Sender::run();
+            Carbon::setTestNow(now()->addMinute());
+        }
+        // Gerald's first bounce: on the list, his follow-up stopped, still sending
+        $bad = $list[2];
+        $this->assertSame(['bounced', 'cancelled', 'bounced'], [$this->firstOf($bad)->status, $this->followUpOf($bad)->status, $bad->fresh()->status]);
         $entry = Marketing::entry($bad->email);
         $this->assertSame(['bounced', 'outreach'], [$entry->reason, $entry->source]);
-        // 1 of 2 bounced (50%, over 5%): paused, and both the sender and the owner get a bell
+        $this->assertFalse(Senders::isPaused($gerald->id), '1 bounce in 7 (14%) is over 5%, but a single bounce never pauses');
+
+        foreach (range(8, 15) as $run) {
+            Sender::run();
+            Carbon::setTestNow(now()->addMinute());
+        }
+        // Tess: 14 sent, 1 bounced, never paused
+        $this->assertSame(['bounced' => 1, 'sent' => 14], $tessList->map(fn ($p) => $this->firstOf($p)->status)->countBy()->sortKeys()->all());
+        $this->assertFalse(Senders::isPaused($tess->id));
+        // Gerald: the second bounce (2 of 8, 25%) paused him; nothing after it went; he and the owner get a bell
         $this->assertTrue(Senders::isPaused($gerald->id));
         $this->assertSame('bounces', Senders::state($gerald->id)->paused_reason);
+        $this->assertSame(['sent' => 6, 'bounced' => 2], $list->take(8)->map(fn ($p) => $this->firstOf($p)->status)->countBy()->all());
+        $this->assertSame(['approved'], $list->slice(8)->map(fn ($p) => $this->firstOf($p)->status)->unique()->values()->all(), 'Nothing goes while paused');
         foreach ([$gerald, $owner] as $who) {
             $this->assertTrue(DB::table('notifications')->where('user_id', $who->id)->where('title', 'Outreach paused for Gerald')->exists());
         }
-
-        Carbon::setTestNow(now()->addMinutes(10));
-        Sender::run();
-        $this->assertSame('approved', $this->firstOf($later)->status, 'Nothing goes while paused');
+        $this->assertSame(0, DB::table('notifications')->where('user_id', $tess->id)->where('title', 'like', 'Outreach paused%')->count());
 
         $this->assertTrue(Senders::resume($gerald->id, $owner));
         Sender::run();
-        $this->assertSame('sent', $this->firstOf($later)->status);
+        $this->assertSame('sent', $this->firstOf($list[8])->status);
         $this->assertSame(1, DB::table('notifications')->where('user_id', $gerald->id)->where('title', 'like', 'Outreach paused%')->count(), 'One bell per pause');
     }
 
@@ -290,6 +302,32 @@ class OutreachSendingTest extends TestCase
         Sender::run();
         $this->assertCount(1, $this->server->sent);
         $this->assertSame('cancelled', $this->followUpOf($p)->status);
+    }
+
+    public function test_mail_older_than_the_first_email_is_never_a_reply_and_the_lookup_is_indexed(): void
+    {
+        $gerald = $this->salesperson();
+        $p = $this->prospect($this->outreachCampaign($gerald), 'approved');
+        $this->at('2026-11-05 10:00');
+        Sender::run();
+        $first = $this->firstOf($p);
+        $mailbox = Senders::mailbox($gerald->id);
+        // From their address, and even naming the first email, but dated before it went (an older copy, a clock gone wrong)
+        $before = Carbon::parse('2026-11-05 09:58', Limits::TIMEZONE)->utc();
+        $this->receivedMail($mailbox, $p->email, ['received_at' => $before]);
+        $this->receivedMail($mailbox, 'someone@kilo.test', ['in_reply_to' => $first->message_id, 'received_at' => $before]);
+        // Sent by the mailbox itself, after the first email
+        $this->receivedMail($mailbox, $p->email, ['is_outbound' => 1, 'received_at' => now()]);
+        $this->assertFalse(\App\Support\Campaigns\Outreach\Replies::found($p->fresh(), $first));
+
+        $this->at('2026-11-10 10:00');
+        Sender::run();
+        $this->assertSame('sent', $this->followUpOf($p)->status);
+        $this->assertSame('emailed', $p->fresh()->status);
+
+        // The date bounds every condition, on its own index
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasIndex('mail_messages', 'mail_messages_received_at_index'));
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasIndex('mail_messages', 'mail_messages_from_email_index'));
     }
 
     public function test_an_email_is_never_sent_twice_and_one_interrupted_mid_send_fails(): void
