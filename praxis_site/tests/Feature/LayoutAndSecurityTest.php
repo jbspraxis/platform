@@ -15,7 +15,7 @@ class LayoutAndSecurityTest extends TestCase
         $response = $this->get('/')->assertOk();
 
         $response->assertSee('Ask your company anything.')
-            ->assertSee('Book a free audit and demo')
+            ->assertSee('Book a free audit')
             ->assertSee('<title>JBS Praxis | Consulting and engineering for Africa’s institutions</title>', false)
             ->assertSee('<link rel="alternate" hreflang="fr" href="' . url('/fr') . '">', false);
         foreach (['/schedule', '/cost-calculator', '/kaizen', '/services', '/how-we-work', '/company', '/security', '/privacy', '/careers'] as $path) {

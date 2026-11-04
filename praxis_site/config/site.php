@@ -106,6 +106,9 @@ return [
         ['file' => 'interworks-drill-tech', 'name' => 'Interworks Drill Tech'],
         ['file' => 'rn-afriluxe', 'name' => 'RN Afriluxe'],
         ['file' => 'hod', 'name' => 'HOD'],
+        ['file' => 'ok-veggies', 'name' => 'OK Veggies'],
+        // Our own products, side by side
+        ['file' => 'praxis-ls', 'name' => 'Praxis LS'],
         ['file' => 'nfelia', 'name' => 'nfelia'],
     ],
 

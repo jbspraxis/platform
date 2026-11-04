@@ -929,6 +929,16 @@
     .desk h3 { margin: var(--space-4) 0 2px; font-family: var(--font-serif); font-weight: 400; font-size: var(--step-h3); line-height: var(--lh-h3); }
     .desk p { margin: 0; color: var(--color-muted); }
 
+    /* ---- Our products (Company) ---- */
+    .products { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-8) var(--space-9); }
+    @media (min-width: 900px) { .products { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .product { padding-top: var(--space-5); border-top: 2px solid var(--color-ink); }
+    .product-logo { display: block; height: 40px; width: auto; margin-bottom: var(--space-4); }
+    .product-name { margin: 0; font-family: var(--font-serif); font-weight: 400; font-size: var(--step-h2); line-height: var(--lh-h2); }
+    .product-line { margin: var(--space-3) 0 var(--space-5); font-size: var(--step-lead); line-height: var(--lh-lead); color: var(--color-slate); }
+    .product-status { margin: var(--space-5) 0 var(--space-3); font-size: var(--step-small); color: var(--color-muted); }
+    .product-link { font-weight: 500; }
+
     /* ---- The final call to action's second line ---- */
     .final-note { margin: var(--space-4) 0 0; max-width: var(--measure); font-size: var(--step-small); color: var(--color-fg-on-dark-muted); }
 }

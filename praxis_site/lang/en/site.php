@@ -150,7 +150,7 @@ return [
         'flows' => 'Pages and forms to test',
         'links' => [
             'contact' => ['label' => 'Contact us', 'text' => 'Send a message, with optional questions about your organisation.'],
-            'schedule' => ['label' => 'Book a free audit and demo', 'text' => 'Choose a day and a time (WAT), then add your details.'],
+            'schedule' => ['label' => 'Book a free audit', 'text' => 'Choose a day and a time (WAT), then add your details.'],
             'calculator' => ['label' => 'Cost of poor quality calculator', 'text' => 'Estimate the cost of poor quality and receive the report by email.'],
             'kaizen' => ['label' => 'JBS Praxis Insights', 'text' => 'Read the published articles.'],
             'kaizen_write' => ['label' => 'Write for JBS Praxis Insights', 'text' => 'Send an article for review.'],
@@ -223,8 +223,8 @@ return [
     ],
 
     'schedule' => [
-        'title' => 'Book a free audit and demo',
-        'intro' => 'Choose a day, then a time. Times are in West Africa Time (WAT), the time in Lagos and Douala.',
+        'title' => 'Book a free audit',
+        'intro' => 'The free audit takes about an hour and ends with a demo on one area of your organisation. Choose a day, then a time. Times are in West Africa Time (WAT), the time in Lagos and Douala.',
         'step_day' => 'Choose a day',
         'step_time' => 'Choose a time',
         'step_details' => 'Your details',
@@ -254,7 +254,7 @@ return [
         ],
         'custom_focus' => 'Describe your focus',
         'custom_focus_hint' => 'Up to 40 characters.',
-        'send' => 'Book a free audit and demo',
+        'send' => 'Book a free audit',
         'slot_taken' => 'That time was booked a moment ago. Choose another time.',
         'already_booked' => 'You already have a request for a free audit and demo with us. We’ll confirm it by email. To change it, email us at :email.',
         'when' => ':date, :time (WAT)',

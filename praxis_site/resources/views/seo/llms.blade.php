@@ -15,7 +15,7 @@ The way of working is the Praxis Method (formerly the Praxis Framework): See, De
 - [Industries]({{ url('/industries') }}): the sectors JBS Praxis works in, each linked to the work behind it
 - [Company]({{ url('/company') }}): offices, registration, contact, our product nfelia
 - [Security and data]({{ url('/security') }}): roles and permissions, audit logs, private storage, ISO 27001-aligned processes, NDPA and Cameroonian law
-- [Book a free audit and demo]({{ url('/schedule') }})
+- [Book a free audit]({{ url('/schedule') }})
 - [Contact]({{ url('/contact') }})
 - [Cost of poor quality calculator]({{ url('/cost-calculator') }})
 - [Insights]({{ url('/kaizen') }}): articles on how organisations run

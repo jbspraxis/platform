@@ -1,7 +1,7 @@
 <?php
 
 // Tout le texte du site en français (mêmes clés que lang/en/site.php). Règles de docs/BRAND.md : vouvoiement,
-// guillemets « », espace fine insécable (U+202F) avant ; : ! ?, « Réserver un audit gratuit et une démo ».
+// guillemets « », espace fine insécable (U+202F) avant ; : ! ?, « Réserver un audit gratuit ».
 // Les clés des listes envoyées à HQ (étapes, sujets, compétences…) restent exactement celles de l'anglais.
 return [
 
@@ -146,7 +146,7 @@ return [
         'flows' => 'Pages et formulaires à tester',
         'links' => [
             'contact' => ['label' => 'Nous contacter', 'text' => 'Envoyez un message.'],
-            'schedule' => ['label' => 'Réserver un audit gratuit et une démo', 'text' => 'Choisissez un jour et une heure (WAT), puis ajoutez vos coordonnées.'],
+            'schedule' => ['label' => 'Réserver un audit gratuit', 'text' => 'Choisissez un jour et une heure (WAT), puis ajoutez vos coordonnées.'],
             'calculator' => ['label' => 'Calculateur du coût de la non-qualité', 'text' => 'Estimez le coût de la non-qualité et recevez le rapport par e-mail.'],
             'kaizen' => ['label' => 'Analyses JBS Praxis', 'text' => 'Lisez les articles publiés.'],
             'kaizen_write' => ['label' => 'Écrire pour les analyses JBS Praxis', 'text' => 'Proposez un article.'],
@@ -218,8 +218,8 @@ return [
     ],
 
     'schedule' => [
-        'title' => 'Réserver un audit gratuit et une démo',
-        'intro' => 'Choisissez un jour, puis une heure. Les heures sont en heure d’Afrique de l’Ouest (WAT), l’heure de Lagos et de Douala.',
+        'title' => 'Réserver un audit gratuit',
+        'intro' => 'L’audit gratuit dure environ une heure et se termine par une démo sur un domaine de votre organisation. Choisissez un jour, puis une heure. Les heures sont en heure d’Afrique de l’Ouest (WAT), l’heure de Lagos et de Douala.',
         'step_day' => 'Choisissez un jour',
         'step_time' => 'Choisissez une heure',
         'step_details' => 'Vos coordonnées',
@@ -248,7 +248,7 @@ return [
         ],
         'custom_focus' => 'Décrivez votre sujet',
         'custom_focus_hint' => '40 caractères au plus.',
-        'send' => 'Réserver un audit gratuit et une démo',
+        'send' => 'Réserver un audit gratuit',
         'slot_taken' => 'Ce créneau vient d’être réservé. Choisissez une autre heure.',
         'already_booked' => 'Vous avez déjà une demande d’audit gratuit et de démo chez nous. Nous la confirmerons par e-mail. Pour la modifier, écrivez-nous à :email.',
         'when' => ':date, :time (WAT)',

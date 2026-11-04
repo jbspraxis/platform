@@ -26,7 +26,7 @@ return [
 
     'home' => [
         'title' => 'JBS Praxis | Conseil et ingénierie pour les institutions africaines',
-        'description' => "Nous concevons le fonctionnement de votre organisation, puis le système qui en rend compte\u{202F}: finance, équipes, opérations et risques au même endroit. Réservez un audit gratuit et une démo.",
+        'description' => "Nous concevons le fonctionnement de votre organisation, puis le système qui en rend compte\u{202F}: finance, équipes, opérations et risques au même endroit. Réservez un audit gratuit.",
         'h1' => 'Posez toutes vos questions à votre entreprise.',
         'lead' => 'Nous concevons le fonctionnement de votre organisation, puis le système qui en rend compte.',
         'see_answers' => 'Voir ce que répond Praxis AI',
@@ -122,6 +122,33 @@ return [
         'ourselves_text' => 'Nous gérons notre propre facturation, notre paie, nos projets et nos validations sur le système que nous construisons pour nos clients.',
         'products_title' => 'Nos produits',
         'nfelia' => 'nfelia, un produit JBS Praxis.',
+        'products_lead' => 'Deux produits que nous concevons, construisons et exploitons nous-mêmes, selon les mêmes principes que les systèmes que nous construisons pour nos clients.',
+        'products' => [
+            'praxis-ls' => [
+                'name' => 'Praxis LS',
+                'line' => 'Notre ERP logistique, proposé en service aux transitaires, commissionnaires en douane, entrepôts et flottes de l’espace OHADA.',
+                'points' => [
+                    'Un dossier par expédition, du devis à la douane, à l’entrepôt et au camion, jusqu’à la facture',
+                    'La comptabilité SYSCOHADA en son cœur, en français et en anglais',
+                    'La marque de chaque opérateur sur ses documents, et sa propre adresse',
+                    'Les données de chaque opérateur dans sa propre base : nous détenons le code, il détient les données',
+                ],
+                'status' => 'Fait tourner Smart Logistics and Services au Cameroun aujourd’hui. La version pour plusieurs opérateurs est en construction.',
+                'link' => 'Le voir à l’œuvre : Smart Logistics and Services',
+            ],
+            'nfelia' => [
+                'name' => 'nfelia',
+                'line' => 'Notre produit pour les petites entreprises qui vendent par WhatsApp, Instagram et le bouche-à-oreille.',
+                'points' => [
+                    'Un site web à elle pour chaque entreprise',
+                    'Chaque vente devient une commande, avec sa facture, son reçu et sa dette éventuelle',
+                    'Le stock et les livraisons sur le téléphone',
+                    'En mots simples, pour des gérants qui ne sont pas comptables',
+                ],
+                'status' => 'En service au Nigeria, au Cameroun, au Ghana et au Kenya.',
+                'link' => 'Visiter nfelia.com',
+            ],
+        ],
         'security_title' => 'Sécurité et données',
         'security_text' => "Vos données restent les vôtres. Chaque action dans les systèmes que nous construisons est autorisée selon le rôle et enregistrée dans un journal d’audit. Les fichiers sont stockés de façon privée, jamais sur des liens publics. Nos processus sont alignés sur la norme ISO\u{202F}27001. Nous respectons la loi nigériane sur la protection des données (NDPA) et la loi camerounaise sur la protection des données personnelles\u{202F}; vous pouvez demander à tout moment ce que nous détenons à votre sujet.",
         'security_link' => 'Comment nous protégeons vos données',

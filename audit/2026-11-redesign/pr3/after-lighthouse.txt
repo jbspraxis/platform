@@ -1,0 +1,8 @@
+calculator-desktop perf=99 acce=100 best=100 seo=69 | LCP 0.8 s | CLS 0.001 | TBT 0 ms | Total size was 485 KiB
+calculator-mobile  perf=93 acce=100 best=100 seo=69 | LCP 2.8 s | CLS 0 | TBT 0 ms | Total size was 353 KiB
+case-desktop       perf=100 acce=100 best=100 seo=69 | LCP 0.7 s | CLS 0.001 | TBT 0 ms | Total size was 489 KiB
+case-mobile        perf=91 acce=100 best=100 seo=69 | LCP 3.1 s | CLS 0 | TBT 0 ms | Total size was 357 KiB
+home-desktop       perf=99 acce=100 best=100 seo=69 | LCP 0.8 s | CLS 0.001 | TBT 30 ms | Total size was 821 KiB
+home-mobile        perf=89 acce=100 best=100 seo=69 | LCP 3.3 s | CLS 0 | TBT 0 ms | Total size was 510 KiB
+industries-desktop perf=99 acce=100 best=100 seo=69 | LCP 0.8 s | CLS 0.002 | TBT 0 ms | Total size was 571 KiB
+industries-mobile  perf=86 acce=100 best=100 seo=69 | LCP 3.6 s | CLS 0 | TBT 0 ms | Total size was 569 KiB

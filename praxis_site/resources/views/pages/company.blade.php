@@ -69,11 +69,32 @@
         </div>
     </section>
 
-    <section class="band band-paper" aria-labelledby="products-title">
-        <div class="container split">
-            <h2 class="band-title" id="products-title">{{ __('pages.company.products_title') }}</h2>
-            <p class="band-text">{{ __('pages.company.nfelia') }}
-                <a href="{{ config('site.nfelia_url') }}" rel="noopener">nfelia.com</a></p>
+    {{-- Our products (redesign PR 3): each as a product of its own, apart from any client's case study --}}
+    <section class="band band-paper" id="products" aria-labelledby="products-title">
+        <div class="container">
+            <x-section-head id="products-title" :title="__('pages.company.products_title')" :lead="__('pages.company.products_lead')" rule />
+            <ul class="products">
+                @foreach (__('pages.company.products') as $key => $product)
+                    <li class="product">
+                        @if (is_file(public_path('img/clients/' . $key . '.webp')))
+                            <img class="product-logo" src="{{ asset('img/clients/' . $key . '.webp') }}" alt="" height="48" loading="lazy" decoding="async">
+                        @endif
+                        <h3 class="product-name">{{ $product['name'] }}</h3>
+                        <p class="product-line">{{ $product['line'] }}</p>
+                        <ul class="ticks">
+                            @foreach ($product['points'] as $point)
+                                <li>{{ $point }}</li>
+                            @endforeach
+                        </ul>
+                        <p class="product-status">{{ $product['status'] }}</p>
+                        @if ($key === 'nfelia')
+                            <a class="product-link" href="{{ config('site.nfelia_url') }}" rel="noopener">{{ $product['link'] }}</a>
+                        @else
+                            <a class="product-link" href="{{ route('work.show', ['slug' => 'smart-logistics']) }}">{{ $product['link'] }}</a>
+                        @endif
+                    </li>
+                @endforeach
+            </ul>
         </div>
     </section>
 
