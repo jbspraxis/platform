@@ -47,6 +47,11 @@ class AppServiceProvider extends ServiceProvider
             'statement_of_work' => \App\Models\StatementOfWork::class,
             'project_draft' => \App\Models\ProjectDraft::class,
             'milestone_plan' => \App\Models\MilestonePlan::class,
+            'company_document_version' => \App\Models\CompanyDocumentVersion::class,
         ]);
+
+        // Uploads wait in Livewire's temporary folder before a screen keeps them: up to 20 MB (Company documents takes
+        // scans that large; Livewire's own default is 12 MB). Each screen still checks its own limit and file types.
+        config(['livewire.temporary_file_upload.rules' => ['required', 'file', 'max:' . \App\Support\CompanyDocuments\Documents::MAX_KB]]);
     }
 }

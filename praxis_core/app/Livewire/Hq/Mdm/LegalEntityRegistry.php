@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use App\Models\Opportunity;
 use App\Support\Finance\Vat;
+use App\Support\Mdm\LegalEntities;
 use Exception;
 use Illuminate\Database\QueryException;
 
@@ -30,6 +31,10 @@ class LegalEntityRegistry extends Component
     public $legal_name = '';
     public $registration_number = '';
     public $tax_identification_number = '';
+    // From the certificate of incorporation (Company documents applies them too: App\Support\Mdm\LegalEntities)
+    public $incorporated_on = '';
+    public $company_type = '';
+    public $share_capital = '';
     public $employer_social_security_code = '';
     public $registered_address = '';
     public $contact_email = '';
@@ -69,6 +74,8 @@ class LegalEntityRegistry extends Component
             $entity->active_headcount = $hrMetrics->active_headcount ?? 0;
             $entity->monthly_liability = $hrMetrics->monthly_liability ?? 0.00;
             $entity->local_currency = $hrMetrics->local_currency ?? 'USD';
+            // Master data › Company documents filed under this company (archived ones aside)
+            $entity->documents_count = DB::table('company_documents')->where('legal_entity_id', $entity->id)->whereNull('archived_at')->count();
 
             return $entity;
         })->toArray();
@@ -89,12 +96,9 @@ class LegalEntityRegistry extends Component
 
         $this->validate([
             'region_code' => 'required|string|max:10',
-            'legal_name' => 'required|string|max:150',
-            // Blank while the company is being registered; filled in once it is
-            'registration_number' => 'nullable|string|max:100',
-            'tax_identification_number' => 'nullable|string|max:100',
+            // Name, registration numbers, date, type, share capital and address: the same rules Company documents applies with
+            ...LegalEntities::RULES,
             'employer_social_security_code' => 'nullable|string|max:100',
-            'registered_address' => 'required|string',
             'legal_representative_name' => 'required|string|max:100',
             'legal_representative_title' => 'required|string|max:100',
             'vat_number' => [$this->charges_vat ? 'required' : 'nullable', 'string', 'max:100'],
@@ -116,6 +120,9 @@ class LegalEntityRegistry extends Component
                 'legal_name' => $this->legal_name,
                 'registration_number' => trim((string) $this->registration_number) ?: null,
                 'tax_identification_number' => trim((string) $this->tax_identification_number) ?: null,
+                'incorporated_on' => trim((string) $this->incorporated_on) ?: null,
+                'company_type' => trim((string) $this->company_type) ?: null,
+                'share_capital' => trim((string) $this->share_capital) ?: null,
                 'employer_social_security_code' => trim((string) $this->employer_social_security_code) ?: null,
                 'registered_address' => $this->registered_address,
                 'contact_email' => $this->contact_email,
@@ -178,6 +185,9 @@ class LegalEntityRegistry extends Component
             $this->legal_name = $record->legal_name;
             $this->registration_number = $record->registration_number;
             $this->tax_identification_number = $record->tax_identification_number;
+            $this->incorporated_on = $record->incorporated_on ? substr((string) $record->incorporated_on, 0, 10) : '';
+            $this->company_type = (string) $record->company_type;
+            $this->share_capital = (string) $record->share_capital;
             $this->employer_social_security_code = $record->employer_social_security_code;
             $this->registered_address = $record->registered_address;
             $this->contact_email = $record->contact_email;
@@ -278,8 +288,8 @@ class LegalEntityRegistry extends Component
     public function resetForm()
     {
         $this->reset([
-            'editMode', 'recordId', 'region_code', 'legal_name', 'registration_number', 
-            'tax_identification_number', 'employer_social_security_code', 'registered_address', 
+            'editMode', 'recordId', 'region_code', 'legal_name', 'registration_number',
+            'tax_identification_number', 'incorporated_on', 'company_type', 'share_capital', 'employer_social_security_code', 'registered_address',
             'contact_email', 'contact_phone', 'legal_representative_name', 'legal_representative_title',
             'charges_vat', 'vat_number', 'vat_starts_on',
         ]);
@@ -300,6 +310,9 @@ class LegalEntityRegistry extends Component
             'region_code' => 'country',
             'registration_number' => 'company registration number (RC)',
             'tax_identification_number' => 'tax ID (NIU or TIN)',
+            'incorporated_on' => LegalEntities::LABELS['incorporated_on'],
+            'company_type' => LegalEntities::LABELS['company_type'],
+            'share_capital' => LegalEntities::LABELS['share_capital'],
             'employer_social_security_code' => 'employer social security number',
             'registered_address' => 'registered office address',
             'legal_representative_name' => 'legal representative’s name',

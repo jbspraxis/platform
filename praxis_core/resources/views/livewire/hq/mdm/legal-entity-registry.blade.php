@@ -86,6 +86,21 @@
                         <span id="le-social-help" class="help">CNPS in Cameroon, NSITF in Nigeria.</span>
                     </div>
                 </div>
+                {{-- From the certificate of incorporation; Company documents can fill them in from the uploaded certificate --}}
+                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                    <div class="field">
+                        <label class="label" for="le-incorporated">Date of registration (optional)</label>
+                        <input id="le-incorporated" type="date" wire:model="incorporated_on" class="input">
+                    </div>
+                    <div class="field">
+                        <label class="label" for="le-type">Company type (optional)</label>
+                        <input id="le-type" type="text" wire:model="company_type" class="input" maxlength="100" placeholder="e.g. Private company limited by shares">
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label" for="le-capital">Share capital (optional)</label>
+                    <input id="le-capital" type="text" wire:model="share_capital" class="input" maxlength="100" placeholder="e.g. NGN 1,000,000" style="font-variant-numeric: tabular-nums;">
+                </div>
 
                 <hr class="divider" style="margin: 4px 0;">
                 <h3 class="label" style="font-weight: 600; margin: 0;" id="le-vat-heading">{{ __('vat.entity.heading') }}</h3>
@@ -200,6 +215,9 @@
                                     <div><span class="muted">RC</span> <span class="text-ink">{{ $entity->registration_number ?: 'Being registered' }}</span></div>
                                     <div style="margin-top: 2px;"><span class="muted">Tax ID</span> <span class="text-ink">{{ $entity->tax_identification_number ?: 'Not yet' }}</span></div>
                                     <div style="margin-top: 2px;"><span class="muted" style="white-space: nowrap;">Employer no.</span> <span class="text-ink">{{ $entity->employer_social_security_code ?: 'Not yet' }}</span></div>
+                                    @if (! empty($entity->incorporated_on))
+                                        <div style="margin-top: 2px;"><span class="muted">Registered</span> <span class="text-ink">{{ \Carbon\Carbon::parse($entity->incorporated_on)->format('j M Y') }}</span></div>
+                                    @endif
                                     {{-- VAT: on from its start date, with its number; off until the company is registered --}}
                                     <div style="margin-top: 6px;">
                                         @if ($entity->charges_vat && $entity->vat_starts_on)
@@ -231,6 +249,10 @@
 
                                 <td>
                                     <div class="flex flex-col items-end gap-1">
+                                        {{-- Master data › Company documents, filtered on this company --}}
+                                        <a href="{{ route('hq.mdm.documents', ['company' => $entity->id]) }}" class="btn btn-ghost btn-sm" wire:navigate style="white-space: nowrap;">
+                                            Documents ({{ $entity->documents_count ?? 0 }})
+                                        </a>
                                         <button type="button" wire:click="editEntity('{{ $entity->id }}')" class="btn btn-ghost btn-sm">Edit</button>
                                         <button type="button" wire:click="toggleStatus('{{ $entity->id }}', {{ $entity->is_active }})" class="btn btn-ghost btn-sm" @if($entity->is_active) style="color: var(--color-danger);" @endif>
                                             {{ $entity->is_active ? 'Deactivate' : 'Reactivate' }}

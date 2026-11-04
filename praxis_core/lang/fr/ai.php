@@ -34,6 +34,7 @@ return [
         'broadcast_translate' => 'Traduction de diffusion',
         'outreach_email' => 'E-mail de prospection',
         'outreach_reply' => 'Tri des réponses de prospection',
+        'company_document_read' => 'Lecture des documents de la société',
         'connection_test' => "Test de la clé",
     ],
 ];
