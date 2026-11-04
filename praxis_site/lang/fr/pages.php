@@ -70,7 +70,7 @@ return [
             'Orika Living',
             'Un grand laboratoire pharmaceutique, avec Tales Consulting',
             'La Petite Cour',
-            'nfelia, notre propre produit',
+            'NFELIA, notre propre produit',
         ],
         'calculator_title' => "Combien vous coûte la non-qualité\u{202F}?",
         'calculator_text' => 'Reprises, retards, erreurs et doubles saisies ont un prix. Estimez le vôtre en quelques minutes, dans votre devise.',
@@ -121,7 +121,7 @@ return [
         'ourselves_title' => 'Nous l’utilisons nous-mêmes',
         'ourselves_text' => 'Nous gérons notre propre facturation, notre paie, nos projets et nos validations sur le système que nous construisons pour nos clients.',
         'products_title' => 'Nos produits',
-        'nfelia' => 'nfelia, un produit JBS Praxis.',
+        'nfelia' => 'NFELIA, un produit JBS Praxis.',
         'products_lead' => 'Deux produits que nous concevons, construisons et exploitons nous-mêmes, selon les mêmes principes que les systèmes que nous construisons pour nos clients.',
         'products' => [
             'praxis-ls' => [
@@ -137,7 +137,7 @@ return [
                 'link' => 'Le voir à l’œuvre : Smart Logistics and Services',
             ],
             'nfelia' => [
-                'name' => 'nfelia',
+                'name' => 'NFELIA',
                 'line' => 'Notre produit pour les petites entreprises qui vendent par WhatsApp, Instagram et le bouche-à-oreille.',
                 'points' => [
                     'Un site web à elle pour chaque entreprise',
@@ -146,7 +146,7 @@ return [
                     'En mots simples, pour des gérants qui ne sont pas comptables',
                 ],
                 'status' => 'En service au Nigeria, au Cameroun, au Ghana et au Kenya.',
-                'link' => 'Visiter nfelia.com',
+                'link' => 'Visiter le site de NFELIA',
             ],
         ],
         'security_title' => 'Sécurité et données',

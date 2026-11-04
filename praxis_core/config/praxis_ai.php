@@ -71,8 +71,8 @@ return [
             'fr' => ['label' => 'Lire l’étude de cas du distributeur', 'purpose' => 'Un distributeur de biens de consommation au Cameroun (jamais nommé) dont JBS Praxis a audité puis reconstruit l’ERP en service : commandes, emballages consignés, flotte, paie et comptabilité OHADA.'],
         ],
         '/work/nfelia' => [
-            'en' => ['label' => 'Read about nfelia', 'purpose' => 'nfelia, a JBS Praxis product for small businesses: their own website, plus orders, invoices, receipts, debts, stock and deliveries on the phone, in Nigeria, Cameroon, Ghana and Kenya.'],
-            'fr' => ['label' => 'Découvrir nfelia', 'purpose' => 'nfelia, un produit JBS Praxis pour les petites entreprises : leur propre site web, avec commandes, factures, reçus, dettes, stock et livraisons sur le téléphone, au Nigeria, au Cameroun, au Ghana et au Kenya.'],
+            'en' => ['label' => 'Read about NFELIA', 'purpose' => 'NFELIA, a JBS Praxis product for small businesses: their own website, plus orders, invoices, receipts, debts, stock and deliveries on the phone, in Nigeria, Cameroon, Ghana and Kenya.'],
+            'fr' => ['label' => 'Découvrir NFELIA', 'purpose' => 'NFELIA, un produit JBS Praxis pour les petites entreprises : leur propre site web, avec commandes, factures, reçus, dettes, stock et livraisons sur le téléphone, au Nigeria, au Cameroun, au Ghana et au Kenya.'],
         ],
         '/kaizen' => [
             'en' => ['label' => 'Read JBS Praxis Insights', 'purpose' => 'Articles on running organisations: finance, operations, governance, data and systems.'],
