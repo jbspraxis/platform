@@ -484,6 +484,7 @@ return [
     'chat' => [
         'open' => 'Demander à Praxis',
         'title' => 'Praxis AI',
+        'close' => 'Fermer Demander à Praxis',
         'intro' => 'Posez vos questions sur nos services, la méthode Praxis ou l’audit gratuit et la démo. Les réponses peuvent contenir des erreurs : vérifiez les points importants avec notre équipe. Merci de ne pas communiquer de mots de passe ni de données de paiement.',
         'you' => 'Vous',
         'assistant' => 'Praxis AI',

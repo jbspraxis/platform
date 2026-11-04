@@ -492,6 +492,7 @@ return [
     'chat' => [
         'open' => 'Ask Praxis',
         'title' => 'Praxis AI',
+        'close' => 'Close Ask Praxis',
         'intro' => 'Ask about our services, the Praxis Method or the free audit and demo. Answers can contain mistakes, so check important details with our team. Please don’t share passwords or payment details.',
         'you' => 'You',
         'assistant' => 'Praxis AI',

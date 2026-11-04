@@ -150,6 +150,21 @@ function enhanceChat() {
         }
     };
 
+    // The × in the panel's corner, and Escape, close it and hand focus back to the launcher
+    const close = () => {
+        if (!details?.open) return;
+        details.open = false;
+        details.querySelector('summary')?.focus();
+    };
+    const closer = details?.querySelector('[data-chat-close]');
+    if (closer) {
+        closer.hidden = false;
+        closer.addEventListener('click', close);
+    }
+    details?.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') { event.preventDefault(); close(); }
+    });
+
     details?.addEventListener('toggle', () => {
         if (details.open) { scrollDown(false); textarea?.focus(); }
     });
