@@ -67,7 +67,8 @@ class HealthChecks
 
     private static function email(): array
     {
-        $n = DB::table('monitor_error_groups')->where('last_seen_at', '>=', now()->subDay())
+        // Open failures only, as in the errors check: one marked fixed reopens by itself if it comes back (ErrorMonitor)
+        $n = DB::table('monitor_error_groups')->where('last_seen_at', '>=', now()->subDay())->whereIn('status', ['new', 'investigating'])
             ->where(fn ($q) => $q->where('message', 'like', '%email failed%')->orWhere('message', 'like', '%Connection could not be established%')->orWhere('message', 'like', '%Expected response code%'))
             ->sum('occurrences');
         return ['label' => 'Email sending', 'state' => $n ? 'bad' : 'ok',
