@@ -1,7 +1,11 @@
 {{-- The page behind a broadcast's unsubscribe link (EmailLinkController, docs/CAMPAIGNS.md 4.5), in the language the email
-     was sent in. States: ask (one button), done, invalid (unknown link), preview (the editor's and test emails' link). --}}
+     was sent in. States: ask (one button), done, invalid (unknown link), preview (the editor's and test emails' link).
+     Outreach emails (section 10) use it too: their own words ($copy, falling back to the broadcast's) and routes. --}}
 @php
-    $t = fn (string $key, array $with = []) => __('marketing.unsubscribe.' . $key, $with);
+    $copy ??= 'unsubscribe';
+    $pageRoute ??= 'email.unsubscribe';
+    $confirmRoute ??= 'email.unsubscribe.confirm';
+    $t = fn (string $key, array $with = []) => \Illuminate\Support\Facades\Lang::has("marketing.{$copy}.{$key}") ? __("marketing.{$copy}.{$key}", $with) : __('marketing.unsubscribe.' . $key, $with);
     $contact = config('mail.brand.reply_to.address');
     $mailto = '<a href="mailto:' . e($contact) . '">' . e($contact) . '</a>';
     $other = app()->getLocale() === 'fr' ? 'en' : 'fr';
@@ -41,12 +45,12 @@
             @endif
             <p>{{ $email ? $t('body', ['email' => $email]) : $t('body_plain') }}</p>
             <p>{{ $t('keeps') }}</p>
-            <form method="POST" action="{{ route('email.unsubscribe.confirm', ['token' => $token]) }}">
+            <form method="POST" action="{{ route($confirmRoute, ['token' => $token]) }}">
                 <button type="submit" class="btn btn-primary" @disabled($state === 'preview')>{{ $t('button') }}</button>
             </form>
         @endif
     </div>
-    <p class="unsub-lang"><a href="{{ route('email.unsubscribe', ['token' => $token, 'lang' => $other]) }}" lang="{{ $other }}">{{ $t('other_language') }}</a></p>
+    <p class="unsub-lang"><a href="{{ route($pageRoute, ['token' => $token, 'lang' => $other]) }}" lang="{{ $other }}">{{ $t('other_language') }}</a></p>
 </main>
 </body>
 </html>

@@ -26,3 +26,6 @@ Route::prefix('campaigns')->middleware('can:broadcasts.view')->group(function ()
         'Cache-Control' => 'private, max-age=86400',
     ]))->name('hq.campaigns.script');
 });
+
+// Outreach (C2): its own file and permission (outreach.view), so it opens for people without Broadcasts
+require __DIR__ . '/campaigns/outreach.php';

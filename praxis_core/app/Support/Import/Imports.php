@@ -10,6 +10,7 @@ final class Imports
 {
     public const SCHEMAS = [
         'leads' => \App\Support\Leads\LeadImportSchema::class,
+        'prospects' => \App\Support\Campaigns\Outreach\ProspectImportSchema::class,
     ];
 
     public static function schema(string $key): ImportSchema
