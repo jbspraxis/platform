@@ -52,6 +52,30 @@ class MonitorErrorsCheckTest extends TestCase
         $this->assertSame('1 open error type(s) seen, 1 new.', $check['detail']);
     }
 
+    public function test_email_failures_marked_fixed_or_ignored_leave_email_sending_green(): void
+    {
+        // 4 Nov 2026: three alert emails failed during the server outage; marked fixed, the card stayed red for 24 h
+        foreach (['fixed' => 3, 'ignored' => 1] as $status => $times) {
+            DB::table('monitor_error_groups')->insert([
+                'fingerprint' => Str::random(40), 'source' => 'log', 'level' => 'warning', 'message' => "Monitor: alert email failed ({$status})",
+                'occurrences' => $times, 'first_seen_at' => now()->subHours(8), 'last_seen_at' => now()->subHours(7), 'status' => $status,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        $email = collect(HealthChecks::all())->firstWhere('key', 'email');
+        $this->assertSame('ok', $email['state']);
+        $this->assertSame('No email failures in the last 24 hours.', $email['detail']);
+
+        DB::table('monitor_error_groups')->insert([
+            'fingerprint' => Str::random(40), 'source' => 'log', 'level' => 'warning', 'message' => 'Monitor: alert email failed',
+            'occurrences' => 2, 'first_seen_at' => now()->subHour(), 'last_seen_at' => now()->subMinutes(5), 'status' => 'new',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $email = collect(HealthChecks::all())->firstWhere('key', 'email');
+        $this->assertSame('bad', $email['state']);
+        $this->assertSame('Emails failed 2 time(s) recently (enquiry confirmations, alerts or reports).', $email['detail']);
+    }
+
     public function test_more_than_five_new_open_errors_or_a_critical_one_is_a_problem(): void
     {
         $this->errorGroups('new', 6);
