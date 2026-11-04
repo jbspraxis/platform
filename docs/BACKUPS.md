@@ -14,15 +14,19 @@ Every night, every database on the shared cPanel server (account `smartqaq` on N
 
 ## 2. What is backed up
 
-| Site | Databases (`config/backups.php`, `*` = any) | Upload folders (under `/home/smartqaq`) |
-|---|---|---|
-| praxis (HQ, jbspraxis.com, the portal) | `smartqaq_praxis*` | `praxis_core/storage/app/private`, `praxis_core/storage/app/public` |
-| lpc (bureau.lpc.cm) | `smartqaq_lpc*`, `smartqaq_bureau*` | `public_html/bureau.lpc.cm/uploads` |
-| nfelia (nfelia.com) | `smartqaq_nfelia*` | `public_html/nfelia.com/uploads`, `public_html/nfelia.com/storage` (without `release`, `tmp`) |
-| hodlc | `smartqaq_hodlc*`, `smartqaq_hod*` | to be confirmed on the server (`backups:setup --dry-run` lists candidates) |
-| smartls (smartls.cm) | `smartqaq_smartls*`, `smartqaq_sls*` | to be confirmed on the server |
+As found on the server on 4 Nov 2026 (read in cPanel; the account owned exactly these five databases):
 
-Left out of every files backup: any folder or file named `cache`, `sessions`, `logs`, `vendor`, `node_modules`, `*.log`, `error_log`. Never backed up: the scratch database `smartqaq_bkrestore` and anything in `BACKUP_EXCLUDE_DATABASES`.
+| Site | Database (`config/backups.php`) | Size then | Upload folders (under `/home/smartqaq`) |
+|---|---|---|---|
+| praxis (HQ, jbspraxis.com, the portal) | `smartqaq_praxis_core` | ~19 MB | `praxis_core/storage/app/private`, `praxis_core/storage/app/public` |
+| lpc (bureau.lpc.cm) | `smartqaq_lpc_core` | ~23 MB | `public_html/bureau.lpc.cm/uploads` |
+| nfelia (nfelia.com) | `smartqaq_nfelia_core` | ~6 MB | `public_html/nfelia.com/uploads`, `public_html/nfelia.com/storage` (without `framework`, `release`, `tmp`) |
+| hodlc (hodlc.lpc.cm) | `smartqaq_hodlc` | ~20 MB | `public_html/hodlc.lpc.cm/uploads` |
+| smartls (smartls.cm, the account's main domain) | `smartqaq_smartls` | ~5 MB | `public_html/uploads`, `uploads` (the private one in the home) |
+
+smartls.cm's docroot is `public_html` itself, which also holds the other sites and old exports: only its `uploads` folder is backed up. lpc.cm (`public_html/lpc.cm`) is a static site with no database or uploads.
+
+Left out of every files backup: any folder or file named `cache`, `sessions`, `logs`, `vendor`, `node_modules`, `*.log`, `error_log`, and archives and old backup copies (`*.zip`, `*.tar`, `*.tar.gz`, `*.tgz`, `*.bak`, `*_backup_*`), even inside an upload folder. Never backed up: the scratch database `smartqaq_bkrestore` and anything in `BACKUP_EXCLUDE_DATABASES`.
 
 To add a database or a folder to a site, edit its line in `config/backups.php` and merge: the next night picks it up. `backups:setup --dry-run` prints every database with its site and every site's folders (found or not), plus folders that look like uploads.
 
@@ -145,7 +149,7 @@ If the owner's PC is lost, the private key in the password manager opens everyth
 
 ## 10. Testing and local runs
 
-- `tests/Feature/Backups/ServerBackupsTest.php` (13 tests) runs the whole path on the test MySQL server with real `mysqldump`, `mysql` and `tar`: fictional databases standing in for the five sites (`praxis_test_bk_*`, with a view, a trigger, binary data, quotes and parentheses in strings), a throwaway home with fictional uploads, and `Tests\Support\Google\FakeDrive`, HTTP fakes that answer like Drive (folders, resumable chunks with 308 and Range, md5Checksum, copies, the bin). It covers the night, a second night and a same-day rerun, retention on Drive and the server, a resumed upload, checksum mismatches, files with exclusions and a missing folder, no Drive permission, no key, before the setup, the 26-hour bell, System health and Integrations, `backups:setup` through a fake `uapi` that really creates the MySQL user, and a database granted on the night. `tests/Unit/Backups/EnvelopeTest.php` covers the encryption.
+- `tests/Feature/Backups/ServerBackupsTest.php` (13 tests) runs the whole path on the test MySQL server with real `mysqldump`, `mysql` and `tar`: fictional databases standing in for the five sites (`praxis_test_bk_*`, with a view, a trigger, binary data, quotes and parentheses in strings), a throwaway home with fictional uploads, and `Tests\Support\Google\FakeDrive`, HTTP fakes that answer like Drive (folders, resumable chunks with 308 and Range, md5Checksum, copies, the bin). `BackupConfigTest` pins the live mapping (the five databases to their sites, no folder that is a whole docroot or the home, the archive exclusions). The end-to-end tests cover the night, a second night and a same-day rerun, retention on Drive and the server, a resumed upload, checksum mismatches, files with exclusions (caches, sessions, logs, archives, old backup copies; smartls.cm's two folders without the docroot around them) and a missing folder, no Drive permission, no key, before the setup, the 26-hour bell, System health and Integrations, `backups:setup` through a fake `uapi` that really creates the MySQL user, and a database granted on the night. `tests/Unit/Backups/EnvelopeTest.php` covers the encryption.
 - Locally (Laragon): `DB_CONNECTION=mysql DB_HOST=127.0.0.1 DB_PORT=3307 DB_USERNAME=root DB_PASSWORD= DB_DATABASE=praxis_test_… BACKUP_MYSQLDUMP=C:/laragon/bin/mysql/mysql-8.4.3-winx64/bin/mysqldump.exe BACKUP_MYSQL=…/mysql.exe BACKUP_TAR=C:/Windows/System32/tar.exe OPENSSL_CONF=C:/laragon/bin/php/php-8.3.30-Win32-vs16-x64/extras/ssl/openssl.cnf php vendor/bin/phpunit tests/Feature/Backups tests/Unit/Backups`. Without `OPENSSL_CONF`, PHP on Windows can't make keys (`openssl_pkey_new` fails), which is also why the passkey tests fail locally. Git Bash's own `tar` misreads `C:/` paths: use Windows' `tar.exe`.
 - A local run off the server: `BACKUP_DATABASES_FROM=mysql` with `BACKUP_DATABASE_PREFIX`, `BACKUP_HOME`, `BACKUP_MYSQL_CNF` (a client file you write by hand), `BACKUP_PUBLIC_KEY_FILE` and the program paths above.
 

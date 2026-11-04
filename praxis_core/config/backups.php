@@ -44,41 +44,46 @@ return [
     ],
 
     /*
-    | The five sites. A database belongs to the first site with a matching name (* is a wildcard); a database no site
-    | claims is still backed up, under other/<database>, and rings the owner so it can be added here. 'files' are
-    | folders under the home, tarred every Sunday without the 'exclude' names (any folder or file of that name).
+    | The five sites, as found on the server on 4 Nov 2026 (the account owned exactly these five databases). A database
+    | belongs to the first site with a matching name (* is a wildcard); a database no site claims is still backed up,
+    | under other/<database>, and rings the owner so it can be added here. 'files' are folders under the home, tarred
+    | every Sunday without the 'exclude' names (any folder or file of that name, at any depth).
     */
     'sites' => [
         'praxis' => [
             'label' => 'HQ, jbspraxis.com and the portal',
-            'databases' => ['smartqaq_praxis*'],
+            'databases' => ['smartqaq_praxis_core'],
             'files' => ['praxis_core/storage/app/private', 'praxis_core/storage/app/public'],
         ],
         'lpc' => [
             'label' => 'bureau.lpc.cm',
-            'databases' => ['smartqaq_lpc*', 'smartqaq_bureau*'],
+            'databases' => ['smartqaq_lpc_core'],
             'files' => ['public_html/bureau.lpc.cm/uploads'],
         ],
         'nfelia' => [
             'label' => 'nfelia.com',
-            'databases' => ['smartqaq_nfelia*'],
+            'databases' => ['smartqaq_nfelia_core'],
+            // storage/ holds the private records, order proofs, signatures and MoMo receipts; its pdf/ only caches
             'files' => ['public_html/nfelia.com/uploads', 'public_html/nfelia.com/storage'],
-            'exclude' => ['release', 'tmp'],
+            'exclude' => ['framework', 'release', 'tmp'],
         ],
         'hodlc' => [
-            'label' => 'hodlc',
-            'databases' => ['smartqaq_hodlc*', 'smartqaq_hod*'],
-            'files' => [],
+            'label' => 'hodlc.lpc.cm',
+            'databases' => ['smartqaq_hodlc'],
+            'files' => ['public_html/hodlc.lpc.cm/uploads'],
         ],
         'smartls' => [
-            'label' => 'smartls.cm',
-            'databases' => ['smartqaq_smartls*', 'smartqaq_sls*'],
-            'files' => [],
+            'label' => 'smartls.cm (the account’s main domain)',
+            'databases' => ['smartqaq_smartls'],
+            // The docroot is public_html itself: only its uploads folder, never the rest (other sites, old archives)
+            'files' => ['public_html/uploads', 'uploads'],
         ],
     ],
 
-    // Left out of every files backup: caches, logs, sessions and installed packages
-    'exclude' => ['cache', 'sessions', 'logs', 'vendor', 'node_modules', '*.log', 'error_log'],
+    // Left out of every files backup: caches, logs, sessions and installed packages, and archives and old backup
+    // copies (the old .zip and .tar exports kept on the server are not uploaded files)
+    'exclude' => ['cache', 'sessions', 'logs', 'vendor', 'node_modules', '*.log', 'error_log',
+        '*.zip', '*.tar', '*.tar.gz', '*.tgz', '*.bak', '*_backup_*'],
 
     // How many of each Drive keeps (dates, newest first), and how many the server keeps in the backups folder
     'retention' => ['daily' => 30, 'monthly' => 12, 'files' => 8],

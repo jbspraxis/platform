@@ -63,6 +63,8 @@ trait BackupFixtures
             'backups.sites.praxis.files' => ['praxis_core/storage/app/private', 'praxis_core/storage/app/public'],
             'backups.sites.lpc.files' => ['public_html/bureau.lpc.cm/uploads'],
             'backups.sites.nfelia.files' => [],
+            'backups.sites.hodlc.files' => [],
+            'backups.sites.smartls.files' => ['public_html/uploads', 'uploads'],
             'backups.drive.chunk_bytes' => 256 * 1024,
         ]);
 
@@ -131,6 +133,13 @@ trait BackupFixtures
             'praxis_core/storage/app/public/debug.log' => 'a log, left out',
             'public_html/bureau.lpc.cm/uploads/receipts/R-TEST-1.pdf' => '%PDF-1.4 fictional receipt',
             'public_html/bureau.lpc.cm/uploads/sessions/sess_x' => 'a session, left out',
+            'public_html/bureau.lpc.cm/uploads/old_export.zip' => 'an archive, left out',
+            'public_html/bureau.lpc.cm/uploads/receipts_backup_2026/R-OLD.pdf' => 'an old backup copy, left out',
+            // smartls.cm: the docroot is public_html itself, beside the other sites and old exports
+            'public_html/uploads/portfolio/P-TEST-1.jpg' => 'fictional portfolio image',
+            'uploads/quote-TEST-1.pdf' => '%PDF-1.4 fictional private file',
+            'public_html/index.php' => 'the site, never in a files backup',
+            'public_html/site-export.tar.gz' => 'an old export, never in a files backup',
         ];
         foreach ($files as $path => $content) {
             @mkdir(dirname($this->home . '/' . $path), 0700, true);

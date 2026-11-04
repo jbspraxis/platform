@@ -211,13 +211,15 @@ class ServerBackupsTest extends TestCase
         $this->assertSame('bad', collect(Status::sites())->firstWhere('site', 'praxis')['state']);
     }
 
-    public function test_a_weekly_files_backup_tars_each_sites_folders_without_caches_logs_and_sessions(): void
+    public function test_a_weekly_files_backup_tars_each_sites_folders_without_caches_logs_sessions_or_archives(): void
     {
         $this->owner();
         $this->drive = FakeDrive::install();
         $this->night('2026-11-01 03:00');
 
-        $this->artisan('backups:files')->assertSuccessful()->expectsOutputToContain('nfelia: no upload folders in config/backups.php yet');
+        $this->artisan('backups:files')->assertSuccessful()
+            ->expectsOutputToContain('nfelia: no upload folders in config/backups.php yet')
+            ->expectsOutputToContain('hodlc: no upload folders in config/backups.php yet');
 
         $root = 'JBS Praxis – Server backups';
         $tar = $this->open((string) $this->drive->bytes("{$root}/praxis/files/praxis_files_2026-11-01.tar.gz.enc"));
@@ -227,8 +229,11 @@ class ServerBackupsTest extends TestCase
         $this->assertEmpty(preg_grep('#/cache/|\.log$#', $list));
         $lpc = $this->tarList($this->open((string) $this->drive->bytes("{$root}/lpc/files/lpc_files_2026-11-01.tar.gz.enc")));
         $this->assertContains('public_html/bureau.lpc.cm/uploads/receipts/R-TEST-1.pdf', $lpc);
-        $this->assertEmpty(preg_grep('#/sessions/#', $lpc));
-        $this->assertSame(['ok', 'ok'], DB::table('server_backups')->where('kind', 'files')->pluck('status')->all());
+        $this->assertEmpty(preg_grep('#/sessions/|\.zip$|_backup_#', $lpc));
+        // smartls.cm: only its two upload folders, never the docroot around them or the exports in it
+        $smartls = array_values(array_filter($this->tarList($this->open((string) $this->drive->bytes("{$root}/smartls/files/smartls_files_2026-11-01.tar.gz.enc"))), fn ($p) => str_contains(basename($p), '.')));
+        $this->assertSame(['public_html/uploads/portfolio/P-TEST-1.jpg', 'uploads/quote-TEST-1.pdf'], $smartls);
+        $this->assertSame(['ok', 'ok', 'ok'], DB::table('server_backups')->where('kind', 'files')->pluck('status')->all());
         $this->assertSame([], $this->serverFiles('tmp'));
     }
 
