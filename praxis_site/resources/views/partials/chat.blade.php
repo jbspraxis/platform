@@ -10,6 +10,8 @@
     <summary><i data-lucide="sparkles"></i><span>{{ __('site.chat.open') }}</span></summary>
     <div class="chat-panel" data-lenis-prevent>
         <div class="chat-head">
+            {{-- Close (×): shown by app.js, which closes the panel; without JavaScript the launcher closes it --}}
+            <button class="chat-close" type="button" data-chat-close hidden aria-label="{{ __('site.chat.close') }}" title="{{ __('site.chat.close') }}"><i data-lucide="x"></i></button>
             <h2>{{ __('site.chat.title') }}</h2>
             <p>{{ __('site.chat.intro') }}</p>
         </div>

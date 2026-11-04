@@ -123,6 +123,25 @@ class ProofTest extends TestCase
             ->assertSee('href="' . route('company') . '#products"', false);
     }
 
+    public function test_every_client_logo_has_a_transparent_background(): void
+    {
+        // WebP with an alpha channel: an extended header (VP8X) with its alpha flag set
+        foreach (glob(public_path('img/clients/*.webp')) as $file) {
+            $head = (string) file_get_contents($file, false, null, 0, 21);
+            $this->assertSame('VP8X', substr($head, 12, 4), basename($file) . ' has no extended header');
+            $this->assertNotSame(0, ord($head[20]) & 0x10, basename($file) . ' has no alpha');
+        }
+    }
+
+    public function test_ask_praxis_has_a_close_button_in_its_corner(): void
+    {
+        $this->fakeHq();
+
+        $this->get('/company')->assertOk()
+            ->assertSee('<button class="chat-close" type="button" data-chat-close hidden aria-label="Close Ask Praxis" title="Close Ask Praxis">', false);
+        $this->get('/fr/company')->assertOk()->assertSee('aria-label="Fermer Demander à Praxis"', false);
+    }
+
     public function test_the_header_is_sticky_and_the_pages_keep_the_strict_csp(): void
     {
         $this->fakeHq();
