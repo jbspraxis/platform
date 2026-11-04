@@ -471,7 +471,7 @@ return [
             'smart-logistics' => ['text' => 'Chaque dossier, chaque facture, chaque camion vit désormais dans un seul système, en français comme en anglais. Quand je demande où en est un dossier ou ce qu’il nous a coûté, la réponse est déjà là.',
                 'name' => 'Timothee Massomba', 'role' => 'Directeur général', 'org' => 'Smart Logistics and Services'],
             'la-petite-cour' => ['text' => 'Ils ont reconstruit notre système pendant que nous continuions à vendre et à livrer chaque jour. Nos exercices se clôturent et restent clos, et chaque emballage vide est suivi.',
-                'name' => '', 'role' => 'Directeur général', 'org' => 'Un distributeur de produits de grande consommation au Cameroun'],
+                'name' => 'Elombo T.', 'role' => 'Directeur général', 'org' => 'La Petite Cour'],
             'mycity-app' => ['text' => 'JBS Praxis construit comme je voudrais que ma propre équipe le fasse : testé, documenté et livré par étapes. Nous voyons chaque étape et nous possédons chaque ligne.',
                 'name' => 'Bode Oluwasanmi', 'role' => 'Directeur technique', 'org' => 'MyCity App'],
             'pixie-girl-global' => ['text' => 'Du coût de fabrication d’une perruque à ce que nous vendons en ligne et en boutique, tout tient désormais dans les mêmes chiffres. Je vois enfin toute l’entreprise.',

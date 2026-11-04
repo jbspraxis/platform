@@ -71,7 +71,7 @@ return [
             'Pixie Girl Global',
             'Orika Living',
             'A leading pharmaceutical manufacturer, with Tales Consulting',
-            'An FMCG distributor in Cameroon',
+            'La Petite Cour',
             'nfelia, our own product',
         ],
         'calculator_title' => 'What is poor quality costing you?',

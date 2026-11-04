@@ -66,6 +66,14 @@ return [
         'not_covered' => 'Non couvert',
     ],
 
+    'screen' => [
+        'label' => 'Le système construit pour :name',
+        'alt' => 'L’écran de connexion du système construit pour :name.',
+        'caption' => 'L’écran de connexion du système de :name, tel que son équipe le voit chaque matin.',
+        'platforms_title' => 'Les plateformes que nous faisons tourner',
+        'platforms_lead' => 'Chacune est en service, utilisée chaque jour par les personnes qui font tourner l’entreprise. Ouvrez-en une pour voir ce que nous avons construit.',
+    ],
+
     'sector_images' => [
         'logistics' => ['image' => 'logistics', 'alt' => 'Un terminal à conteneurs au petit matin : des conteneurs en longues rangées et des grues le long du quai.'],
         'consumer-goods' => ['image' => 'consumer-goods', 'alt' => 'Un entrepôt de distribution au crépuscule : des camions aux quais de chargement et des palettes alignées.'],
@@ -330,14 +338,14 @@ return [
         ],
 
         'fmcg-distributor-cameroon' => [
-            'name' => 'Un distributeur de biens de consommation au Cameroun',
-            'list_name' => 'Un distributeur de biens de consommation au Cameroun',
-            'title' => "Un distributeur de biens de consommation au Cameroun\u{202F}: un ERP reconstruit en service | JBS Praxis",
-            'description' => "Comment JBS Praxis a audité puis reconstruit l’ERP d’un distributeur de biens de consommation au Cameroun sans l’arrêter\u{202F}: commandes, emballages consignés, flotte, paie et comptabilité OHADA.",
+            'name' => 'La Petite Cour',
+            'list_name' => 'La Petite Cour',
+            'title' => "La Petite Cour\u{202F}: un ERP reconstruit en service | JBS Praxis",
+            'description' => "Comment JBS Praxis a audité puis reconstruit l’ERP de La Petite Cour, distributeur de biens de consommation au Cameroun, sans l’arrêter\u{202F}: commandes, emballages consignés, flotte, paie et comptabilité OHADA.",
             'summary' => "L’ERP du distributeur, reconstruit sans interruption de service\u{202F}: commandes, livraisons, emballages consignés, flotte, paie et comptabilité OHADA.",
             'country' => 'Cameroun',
             'h1' => 'Un ERP reconstruit par étapes, pendant que l’entreprise continuait de s’en servir.',
-            'lead' => 'Un distributeur de biens de consommation au Cameroun gère ses commandes, ses livraisons, ses emballages consignés, sa flotte, sa paie et sa comptabilité dans un seul système. Celui-ci était déjà en service quand nous sommes arrivés. Nous l’avons audité, puis reconstruit sprint après sprint, sans arrêter l’activité.',
+            'lead' => 'La Petite Cour, distributeur de biens de consommation au Cameroun, gère ses commandes, ses livraisons, ses emballages consignés, sa flotte, sa paie et sa comptabilité dans un seul système. Celui-ci était déjà en service quand nous sommes arrivés. Nous l’avons audité, puis reconstruit sprint après sprint, sans arrêter l’activité.',
             'needed' => [
                 "Le système faisait déjà tourner l’entreprise, qui voulait le faire grandir en toute sécurité\u{202F}: des accès par rôle, des écritures toujours équilibrées et des exercices qui restent clos une fois clôturés.",
                 'L’entreprise devait aussi suivre les emballages consignés détenus par ses clients, ainsi que les camions, le carburant et les chauffeurs qui transportent ses marchandises.',

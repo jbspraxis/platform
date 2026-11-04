@@ -69,7 +69,7 @@ return [
             'Pixie Girl Global',
             'Orika Living',
             'Un grand laboratoire pharmaceutique, avec Tales Consulting',
-            'Un distributeur de biens de consommation au Cameroun',
+            'La Petite Cour',
             'nfelia, notre propre produit',
         ],
         'calculator_title' => "Combien vous coûte la non-qualité\u{202F}?",

@@ -1280,7 +1280,7 @@ The owner approves changes. Each change is a new version with a line in the log 
 | 1.1 | 29 Oct 2026 | Revised after independent strategy, visual and language reviews: platform rebuilt around the name, method and descriptor added, claims register, canonical bilingual vocabulary, French typography, logo versions and icons, Praxis rule, accessible colour fixes, Tailwind v4 tokens, email catalogue and greetings |
 | 1.2 | 30 Oct 2026 | The HQ app launch: the logo’s one exception for the installed HQ app (section 6), the launch moment’s storyboard (section 11), HQ’s startup images (section 14), decision 9 |
 | 1.3 | 30 Oct 2026 | The Client Portal app: its launch is the HQ moment with the logo alone (sections 6, 11 and 14), decision 10 |
-| 1.4 | 4 Nov 2026 | The website redesign: the cinematic layer (section 11), the hero moment built in HTML, Ask Praxis, the AI-generated place set (section 10), the primary button; decisions 11 to 16 |
+| 1.4 | 4 Nov 2026 | The website redesign: the cinematic layer (section 11), the hero moment built in HTML, Ask Praxis, the AI-generated place set (section 10), the primary button; decisions 11 to 17 |
 
 ---
 
@@ -1304,6 +1304,7 @@ The owner approves changes. Each change is a new version with a line in the log 
 | 14 | Imagery (4 Nov 2026) | Product crops from the demo company, plus one place image per sector and city, AI-generated to section 10's direction |
 | 15 | Primary button (4 Nov 2026) | "Book a free audit"; the final call to action adds "See it on your operations" |
 | 16 | References (4 Nov 2026) | A blend of Stripe (product precision, data that animates to explain) and McKinsey (editorial authority) |
+| 17 | La Petite Cour (4 Nov 2026) | Named: its case study, the work lists, the logo strip and its platform's sign-in screen use its name. (Earlier it was described as an FMCG distributor in Cameroon.) The pharmaceutical engagement stays described |
 | — | Languages | English and French from launch, including email |
 | — | Email routing | Replies and all site alerts go to intelligence@; everything is sent from system@ |
 

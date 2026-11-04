@@ -479,7 +479,7 @@ return [
             'smart-logistics' => ['text' => 'Every shipment, every invoice, every truck now lives in one system, in English and in French. When I ask where a file stands or what it has cost us, the answer is already there.',
                 'name' => 'Timothee Massomba', 'role' => 'Managing Director', 'org' => 'Smart Logistics and Services'],
             'la-petite-cour' => ['text' => 'They rebuilt our system while we kept selling and delivering every day. Our books close and stay closed, and every empty crate is accounted for.',
-                'name' => '', 'role' => 'Chief Executive', 'org' => 'An FMCG distributor in Cameroon'],
+                'name' => 'Elombo T.', 'role' => 'Chief Executive', 'org' => 'La Petite Cour'],
             'mycity-app' => ['text' => 'JBS Praxis builds the way I would want my own team to build: tested, documented and released in stages. We see every step and own every line.',
                 'name' => 'Bode Oluwasanmi', 'role' => 'Chief Technology Officer', 'org' => 'MyCity App'],
             'pixie-girl-global' => ['text' => 'From what a wig costs to make to what we sell online and in store, it is one set of numbers now. I can finally see the whole business.',

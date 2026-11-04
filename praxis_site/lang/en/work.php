@@ -69,6 +69,15 @@ return [
 
     // Sector names, and one line on what the work there involves
     // Sector images (redesign PR 3, public/img/place): atmosphere for the sector, never a client's site
+    // The platforms' own screens (redesign, 4 Nov 2026)
+    'screen' => [
+        'label' => 'The system we built for :name',
+        'alt' => 'The sign-in screen of the system we built for :name.',
+        'caption' => 'The sign-in screen of :name’s system, as its team sees it each morning.',
+        'platforms_title' => 'The platforms we run',
+        'platforms_lead' => 'Each one is live, signed into every day by the people who run the business. Open one to see what we built.',
+    ],
+
     'sector_images' => [
         'logistics' => ['image' => 'logistics', 'alt' => 'A container port in the early morning: containers in long rows and cranes along the quay.'],
         'consumer-goods' => ['image' => 'consumer-goods', 'alt' => 'A distribution warehouse at dusk: trucks at the loading bays and pallets in straight lines.'],
@@ -335,14 +344,14 @@ return [
         ],
 
         'fmcg-distributor-cameroon' => [
-            'name' => 'An FMCG distributor in Cameroon',
-            'list_name' => 'An FMCG distributor in Cameroon',
-            'title' => 'An FMCG distributor in Cameroon: an ERP rebuilt while live | JBS Praxis',
-            'description' => 'How JBS Praxis audited and rebuilt an FMCG distributor’s ERP in Cameroon while it stayed live: orders, returnable containers, fleet, payroll and OHADA accounts.',
+            'name' => 'La Petite Cour',
+            'list_name' => 'La Petite Cour',
+            'title' => 'La Petite Cour: an ERP rebuilt while live | JBS Praxis',
+            'description' => 'How JBS Praxis audited and rebuilt the ERP of La Petite Cour, an FMCG distributor in Cameroon, while it stayed live: orders, returnable containers, fleet, payroll and OHADA accounts.',
             'summary' => 'The distributor’s ERP, rebuilt while it stayed live: orders, deliveries, returnable containers, fleet, payroll and OHADA accounts.',
             'country' => 'Cameroon',
             'h1' => 'An ERP rebuilt in stages, while the business kept using it.',
-            'lead' => 'An FMCG distributor in Cameroon runs its orders, deliveries, returnable containers, fleet, payroll and accounts on one system. It was already live when we started. We audited it, then rebuilt it sprint by sprint without stopping the business.',
+            'lead' => 'La Petite Cour, an FMCG distributor in Cameroon, runs its orders, deliveries, returnable containers, fleet, payroll and accounts on one system. It was already live when we started. We audited it, then rebuilt it sprint by sprint without stopping the business.',
             'needed' => [
                 'The system was already running the business, and it needed to grow safely: access set by role, entries that must balance, and financial years that stay closed once they are closed.',
                 'The business also needed to account for the returnable containers its customers hold, and for the trucks, fuel and drivers that carry its goods.',
