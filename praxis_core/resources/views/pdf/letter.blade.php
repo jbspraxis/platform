@@ -19,7 +19,7 @@
     <title>{{ $document->reference }}</title>
     <style>
         @page { margin: 48pt 56pt 86pt 56pt; }
-        body { margin: 0; font-family: "DejaVu Sans", sans-serif; font-size: 10pt; line-height: 1.45; color: {{ $slate }}; }
+        body { margin: 0; font-family: "DejaVu Sans", sans-serif; font-size: 10pt; line-height: 1.4; color: {{ $slate }}; }
         .head { width: 100%; border-collapse: collapse; }
         .head td { vertical-align: top; padding: 0; }
         .head .office { text-align: right; font-size: 7.6pt; line-height: 1.5; color: {{ $muted }}; }
@@ -32,17 +32,17 @@
         .meta .date { text-align: right; }
 
         .recipient { margin-top: 18pt; font-size: 10pt; color: {{ $ink }}; line-height: 1.45; }
-        .formal-head { margin-top: 20pt; text-align: center; }
+        .formal-head { margin-top: 14pt; text-align: center; }
         .formal-company { margin: 0; font-family: "DejaVu Serif", serif; font-size: 12pt; letter-spacing: 0.6pt; color: {{ $ink }}; }
         .formal-reg { margin: 2pt 0 0; font-size: 8pt; color: {{ $muted }}; }
-        .formal-rule { width: 70pt; height: 1pt; background: {{ $teal }}; margin: 10pt auto; font-size: 0; line-height: 0; }
+        .formal-rule { width: 70pt; height: 1pt; background: {{ $teal }}; margin: 8pt auto; font-size: 0; line-height: 0; }
         h1.formal-title { margin: 0; font-family: "DejaVu Serif", serif; font-size: 14pt; font-weight: bold; line-height: 1.3; color: {{ $ink }}; }
         .formal-sub { margin: 4pt 0 0; font-size: 10.5pt; color: {{ $slate }}; }
         .subject { margin-top: 16pt; font-weight: bold; color: {{ $ink }}; }
         .salutation { margin-top: 14pt; }
-        p.para { margin: 10pt 0 0; text-align: justify; }
-        ol.clauses { margin: 10pt 0 0; padding-left: 18pt; }
-        ol.clauses li { margin-bottom: 7pt; text-align: justify; }
+        p.para { margin: 8pt 0 0; text-align: justify; }
+        ol.clauses { margin: 8pt 0 0; padding-left: 18pt; }
+        ol.clauses li { margin-bottom: 5pt; text-align: justify; }
         ol.clauses .people { margin: 6pt 0 0; padding-left: 0; list-style: none; }
         ol.clauses .people li { margin: 0 0 2pt; }
         ol.clauses .people strong { color: {{ $ink }}; }
@@ -55,13 +55,14 @@
         .rich a { color: #08707C; }
         .closing { margin-top: 18pt; }
 
-        .signatures { width: 100%; border-collapse: collapse; margin-top: 24pt; page-break-inside: avoid; }
+        .sign-off { page-break-inside: avoid; }
+        .signatures { width: 100%; border-collapse: collapse; margin-top: 18pt; page-break-inside: avoid; }
         .signatures td { vertical-align: bottom; padding: 0 18pt 0 0; width: 50%; }
-        .sig-image { height: 42pt; }
+        .sig-image { height: 38pt; }
         .sig-line { border-top: 0.8pt solid {{ $ink }}; margin-top: 4pt; padding-top: 4pt; }
         .sig-name { font-weight: bold; color: {{ $ink }}; font-size: 9.5pt; }
         .sig-title { font-size: 8.4pt; color: {{ $muted }}; }
-        .sig-blank { height: 46pt; }
+        .sig-blank { height: 34pt; }
 
         .verify { width: 100%; border-collapse: collapse; margin-top: 24pt; page-break-inside: avoid; }
         .verify td { vertical-align: top; padding: 0; }
@@ -161,6 +162,7 @@
     @endswitch
 @endforeach
 
+<div class="sign-off">
 @if ($document->type === 'board_resolution' && ! $signatures->count())
     <p class="para">Signed by the sole director of {{ $details['name'] }}:</p>
 @endif
@@ -189,6 +191,7 @@
         @if ($signatures->count() % 2 === 1)<td></td>@endif
     </tr>
 </table>
+</div>
 
 @if ($qr)
     <table class="verify">
