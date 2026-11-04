@@ -290,6 +290,53 @@ function enhanceHeaderMenus() {
     });
 }
 
+
+/* ---- /verify/{token}: does the reader's own copy match the one that was issued? ----
+ * The file is read and hashed here, in the reader's browser (SHA-256, crypto.subtle). It is never
+ * uploaded, so their copy of the document never reaches JBS Praxis or anybody else. */
+function enhanceVerify() {
+    const panel = document.querySelector('[data-verify-check]');
+    if (!panel) return;
+    const drop = panel.querySelector('[data-verify-drop]');
+    const input = panel.querySelector('[data-verify-input]');
+    const busy = panel.querySelector('[data-verify-busy]');
+    const yours = panel.querySelector('[data-verify-yours]');
+    const hashOut = panel.querySelector('[data-verify-hash]');
+    const results = [...panel.querySelectorAll('[data-verify-result]')];
+    const expected = (panel.dataset.expected || '').toLowerCase();
+
+    const show = (which) => results.forEach((box) => { box.hidden = box.dataset.verifyResult !== which; });
+
+    const check = async (file) => {
+        if (!file) return;
+        show(null);
+        yours.hidden = true;
+        busy.hidden = false;
+        try {
+            const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+            const hash = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+            hashOut.textContent = hash;
+            yours.hidden = false;
+            show(hash === expected ? 'same' : 'different');
+        } catch {
+            show('failed'); // an older browser, or a page served over plain http (crypto.subtle needs https)
+        }
+        busy.hidden = true;
+    };
+
+    input?.addEventListener('change', () => check(input.files[0]));
+    ['dragenter', 'dragover'].forEach((name) => drop?.addEventListener(name, (event) => {
+        event.preventDefault();
+        drop.classList.add('is-over');
+    }));
+    ['dragleave', 'dragend'].forEach((name) => drop?.addEventListener(name, () => drop.classList.remove('is-over')));
+    drop?.addEventListener('drop', (event) => {
+        event.preventDefault();
+        drop.classList.remove('is-over');
+        check(event.dataTransfer?.files[0]);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     drawIcons();
     enhanceHeaderMenus();
@@ -298,4 +345,5 @@ document.addEventListener('DOMContentLoaded', () => {
     enhanceLoop();
     enhanceDemo();
     enhanceConsent();
+    enhanceVerify();
 });

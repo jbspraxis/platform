@@ -365,6 +365,19 @@ return [
         ],
 
         // System › Integrations › Test the Claude key: one tiny Haiku request (a fraction of a cent)
+        // Documents (docs/DOCUMENTS.md section 4): a draft of a formal letter on the company letterhead, from one
+        // sentence saying what it is for. Haiku, low effort, 3000 tokens: a letter is a page, and the author edits
+        // the draft before anything is issued. MATERIAL carries the company's own details and who it is addressed to.
+        'letter_draft' => [
+            'provider' => 'claude', 'model' => 'claude-haiku-5-5', 'effort' => 'low', 'max_tokens' => 3000,
+            'stream' => false, 'sync' => true, 'expected_chars' => 1800,
+            'task' => 'Draft a formal letter for JBS Praxis on its own letterhead, from the purpose the author gives. title is the subject line: a short noun phrase in sentence case, never a sentence and never the word “letter”. body is the letter itself, without the letterhead, the date, the address block, the salutation or the closing, which the document adds: plain paragraphs separated by a blank line, “- ” to start a list item. Three or four short paragraphs at most. Open with what the letter is about, say plainly what is asked or confirmed, and close with what happens next and how to reach us. Formal and plain: no marketing, no praise, no figures, dates, names, amounts or commitments the author did not give, and nothing invented about the company. If the purpose leaves something out, write around it rather than guessing.',
+            'schema' => ['type' => 'object', 'properties' => [
+                'title' => ['type' => 'string', 'description' => 'The subject line: 3 to 10 words, sentence case'],
+                'body' => ['type' => 'string', 'description' => 'Plain paragraphs separated by blank lines; "- " starts a list item'],
+            ], 'required' => ['title', 'body'], 'additionalProperties' => false],
+        ],
+
         'connection_test' => [
             'provider' => 'claude', 'model' => 'claude-haiku-5-5', 'effort' => 'low', 'max_tokens' => 1024,
             'stream' => false, 'sync' => true, 'expected_chars' => 20, 'brief' => false,

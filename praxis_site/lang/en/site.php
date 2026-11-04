@@ -494,4 +494,63 @@ return [
         'invalid_link' => 'We couldn’t use this unsubscribe link. Email us at :email and we’ll remove your address.',
     ],
 
+    // /verify/{token}: the page a QR code on a formal document opens (docs/DOCUMENTS.md section 7)
+    'verify' => [
+        'eyebrow' => 'Document check',
+        'title' => 'Is this document genuine?',
+        'description' => 'Check a document issued by JBS Praxis: its reference, the date it was issued, who signed it, and whether it still stands.',
+        'genuine' => 'Genuine document issued by :company',
+        'state' => [
+            'valid' => 'It is valid: it has not been revoked or replaced.',
+            'revoked' => 'It was revoked on :date and no longer stands.',
+            'replaced' => 'It was replaced on :date by :reference.',
+        ],
+        'revoked_reason' => 'Why it was revoked: :reason',
+        'replaced_note' => 'Ask whoever gave you this document for :reference, the version that replaced it.',
+        'details' => 'What this document is',
+        'fields' => [
+            'reference' => 'Reference',
+            'document' => 'Document',
+            'date' => 'Dated',
+            'issued_on' => 'Issued :date',
+            'issued_by' => 'Issued by',
+            'addressed_to' => 'Addressed to',
+            'signed_by' => 'Signed by',
+            'not_signed' => 'Nobody has signed it.',
+            'replaces' => 'Replaces',
+        ],
+        'kinds' => [
+            'board_resolution' => 'Board resolution',
+            'board_resolution.open_bank_account' => 'Board resolution: opening a corporate bank account',
+            'board_resolution.appoint_signatory' => 'Board resolution: appointing a signatory',
+            'formal_letter' => 'Formal letter',
+            'free_letter' => 'Formal letter',
+            'introduction' => 'Letter of introduction',
+            'employment' => 'Employment letter',
+            'authority' => 'Authority to act',
+        ],
+        'open_copy' => 'Open the document',
+        'no_copy' => 'This document is confidential, so a copy is not shown here. Everything above comes from the record JBS Praxis keeps of it.',
+        'tamper' => [
+            'title' => 'Check your own copy',
+            'explain' => 'Drop the file you were given here. Your browser works out its fingerprint and compares it with the fingerprint of the file we issued. The file stays on your device: it is never uploaded.',
+            'drop' => 'Drop the PDF here',
+            'or_choose' => 'or select it from your device',
+            'working' => 'Working out the fingerprint…',
+            'same' => 'Your copy is the file we issued, down to the last byte. Nothing in it has been changed.',
+            'different' => 'Your copy is not the file we issued. It may have been changed, or saved again by another program. Ask us before you rely on it.',
+            'failed' => 'Your browser could not work out the fingerprint. Try another browser, or email us.',
+            'issued_hash' => 'Fingerprint of the file we issued (SHA-256)',
+            'your_hash' => 'Fingerprint of your copy',
+        ],
+        'unknown' => [
+            'title' => 'We have no record of this document',
+            'body' => 'Nothing was issued with this address. The link may be mistyped, or the code may not be ours. Do not act on the document until you have asked us.',
+        ],
+        'help' => [
+            'title' => 'Something not right?',
+            'body' => 'If a document does not appear here, or what it says differs from the paper in front of you, tell us before you act on it.',
+        ],
+    ],
+
 ];
