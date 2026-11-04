@@ -36,6 +36,8 @@ class Access
                         'module' => $module,
                         'action' => $action,
                         'name' => $def['label'] . ': ' . config("access.actions.{$action}", ucfirst($action)),
+                        // A module the owner keeps to themselves is never swept up by a starter role's "*"
+                        'wildcard' => ($def['wildcard'] ?? true) !== false,
                     ];
                 }
             }
@@ -200,7 +202,12 @@ class Access
         return $created;
     }
 
-    /** "finance.*", "*.view", "*" -> full slugs for the audience. */
+    /**
+     * "finance.*", "*.view", "*" -> full slugs for the audience. A module marked 'wildcard' => false in
+     * config/access.php is only granted when a pattern names it ("letters.view"), never by "*": the owner
+     * decides who else sees it, on Roles and permissions. The Owner role is protected and holds every
+     * permission whatever this says.
+     */
     public static function expandGrant(array $patterns, string $audience): array
     {
         $out = [];
@@ -210,6 +217,9 @@ class Access
             }
             foreach ($patterns as $pattern) {
                 [$m, $a] = array_pad(explode('.', $pattern, 2), 2, '*');
+                if ($m === '*' && ($p['wildcard'] ?? true) === false) {
+                    continue;
+                }
                 if (($m === '*' || $m === $p['module']) && ($a === '*' || $a === $p['action'])) {
                     $out[] = $slug;
                     break;

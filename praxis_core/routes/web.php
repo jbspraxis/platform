@@ -190,6 +190,9 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
         // 9. CAMPAIGNS (docs/CAMPAIGNS.md): Broadcasts, and Outreach from C2; routes/campaigns.php
         require __DIR__ . '/campaigns.php';
 
+        // 10. DOCUMENTS (docs/DOCUMENTS.md): formal documents on the company letterhead; routes/letters.php
+        require __DIR__ . '/letters.php';
+
         // Private uploads (receipts, payment proofs, QA evidence, CVs), checked per file
         Route::get('/files/{path}', [\App\Http\Controllers\SecureFileController::class, 'show'])->where('path', '.*')->name('hq.file');
     });

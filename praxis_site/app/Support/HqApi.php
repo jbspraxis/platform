@@ -170,6 +170,33 @@ final class HqApi
         return $this->data($this->send('GET', '/reports/' . rawurlencode($token)), 'reports.show');
     }
 
+    /**
+     * GET /documents/{token}: one formal document, for /verify/{token} (docs/DOCUMENTS.md section 7).
+     * Never cached here: a document can be revoked or replaced at any moment, and the page must say so.
+     * Throws HqNotFound for a token nobody was given.
+     */
+    public function document(string $token): array
+    {
+        return $this->data($this->send('GET', '/documents/' . rawurlencode($token)), 'documents.show');
+    }
+
+    /**
+     * GET /documents/{token}/file: the issued PDF itself, for the documents whose copy may be shown.
+     * Returns the bytes; HqNotFound when the document keeps its copy to itself.
+     */
+    public function documentFile(string $token): string
+    {
+        $response = $this->send('GET', '/documents/' . rawurlencode($token) . '/file');
+        if ($response->successful() && str_contains((string) $response->header('Content-Type'), 'application/pdf')) {
+            return $response->body();
+        }
+
+        // Not a PDF: the envelope reader raises the right typed exception (404, 429, 503 ...)
+        $this->data($response, 'documents.file');
+
+        throw new HqUnavailable('HQ answered without the document');
+    }
+
     /** True when the last cached read served the saved copy because HQ did not answer. */
     public function lastReadWasStale(): bool
     {

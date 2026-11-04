@@ -486,4 +486,63 @@ return [
         'invalid_link' => 'Ce lien de désabonnement ne fonctionne pas. Écrivez-nous à :email et nous retirerons votre adresse.',
     ],
 
+    // /verify/{token} : la page qu’ouvre le QR code d’un document officiel (docs/DOCUMENTS.md section 7)
+    'verify' => [
+        'eyebrow' => 'Vérification de document',
+        'title' => 'Ce document est-il authentique ?',
+        'description' => 'Vérifiez un document émis par JBS Praxis : sa référence, sa date d’émission, qui l’a signé et s’il est toujours valable.',
+        'genuine' => 'Document authentique émis par :company',
+        'state' => [
+            'valid' => 'Il est valable : il n’a été ni révoqué ni remplacé.',
+            'revoked' => 'Il a été révoqué le :date et n’est plus valable.',
+            'replaced' => 'Il a été remplacé le :date par :reference.',
+        ],
+        'revoked_reason' => 'Motif de la révocation : :reason',
+        'replaced_note' => 'Demandez :reference à la personne qui vous a remis ce document : c’est la version qui l’a remplacé.',
+        'details' => 'Ce qu’est ce document',
+        'fields' => [
+            'reference' => 'Référence',
+            'document' => 'Document',
+            'date' => 'Daté du',
+            'issued_on' => 'Émis le :date',
+            'issued_by' => 'Émis par',
+            'addressed_to' => 'Destinataire',
+            'signed_by' => 'Signé par',
+            'not_signed' => 'Personne ne l’a signé.',
+            'replaces' => 'Remplace',
+        ],
+        'kinds' => [
+            'board_resolution' => 'Résolution du conseil',
+            'board_resolution.open_bank_account' => 'Résolution du conseil : ouverture d’un compte bancaire professionnel',
+            'board_resolution.appoint_signatory' => 'Résolution du conseil : désignation d’un signataire',
+            'formal_letter' => 'Lettre officielle',
+            'free_letter' => 'Lettre officielle',
+            'introduction' => 'Lettre d’introduction',
+            'employment' => 'Attestation d’emploi',
+            'authority' => 'Pouvoir d’agir',
+        ],
+        'open_copy' => 'Ouvrir le document',
+        'no_copy' => 'Ce document est confidentiel ; aucune copie n’est affichée ici. Tout ce qui précède provient du registre que JBS Praxis en tient.',
+        'tamper' => [
+            'title' => 'Vérifiez votre propre exemplaire',
+            'explain' => 'Déposez ici le fichier qui vous a été remis. Votre navigateur en calcule l’empreinte et la compare à celle du fichier que nous avons émis. Le fichier reste sur votre appareil : il n’est jamais envoyé.',
+            'drop' => 'Déposez le PDF ici',
+            'or_choose' => 'ou choisissez-le sur votre appareil',
+            'working' => 'Calcul de l’empreinte…',
+            'same' => 'Votre exemplaire est bien le fichier que nous avons émis, octet pour octet. Rien n’y a été modifié.',
+            'different' => 'Votre exemplaire n’est pas le fichier que nous avons émis. Il a pu être modifié, ou réenregistré par un autre logiciel. Écrivez-nous avant de vous y fier.',
+            'failed' => 'Votre navigateur n’a pas pu calculer l’empreinte. Essayez un autre navigateur ou écrivez-nous.',
+            'issued_hash' => 'Empreinte du fichier que nous avons émis (SHA-256)',
+            'your_hash' => 'Empreinte de votre exemplaire',
+        ],
+        'unknown' => [
+            'title' => 'Nous n’avons aucune trace de ce document',
+            'body' => 'Rien n’a été émis sous cette adresse. Le lien a pu être mal saisi, ou le code n’est pas le nôtre. N’y donnez pas suite avant de nous avoir écrit.',
+        ],
+        'help' => [
+            'title' => 'Quelque chose ne va pas ?',
+            'body' => 'Si un document n’apparaît pas ici, ou si ce qui y figure diffère du papier que vous avez sous les yeux, dites-le-nous avant d’y donner suite.',
+        ],
+    ],
+
 ];

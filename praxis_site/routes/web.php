@@ -11,6 +11,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\ServicesController;
 use App\Http\Controllers\TrackingController;
+use App\Http\Controllers\VerifyController;
 use App\Http\Controllers\WorkController;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -57,6 +58,10 @@ $pages = function () {
     Route::post('/cost-calculator', [CalculatorController::class, 'store'])->middleware(['throttle:forms', 'guard:calculator'])->name('calculator.store');
     // The report: in the language of the calculator page that made it (email links open the English page)
     Route::get('/dossier/{token}', [ReportController::class, 'show'])->where('token', '[A-Za-z0-9-]{6,100}')->name('report');
+
+    // The QR code on a formal document (docs/DOCUMENTS.md section 7): is it genuine, and does it still stand?
+    Route::get('/verify/{token}', [VerifyController::class, 'show'])->where('token', '[A-Za-z0-9]{24,64}')->name('verify');
+    Route::get('/verify/{token}/document.pdf', [VerifyController::class, 'file'])->where('token', '[A-Za-z0-9]{24,64}')->name('verify.file');
 
     Route::get('/kaizen', [KaizenController::class, 'index'])->name('kaizen');
     Route::get('/kaizen/write', [KaizenController::class, 'create'])->name('kaizen.write');

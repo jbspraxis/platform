@@ -3,6 +3,7 @@
 use App\Http\Controllers\SiteApi\BookingController;
 use App\Http\Controllers\SiteApi\CalculatorController;
 use App\Http\Controllers\SiteApi\ChatController;
+use App\Http\Controllers\SiteApi\DocumentsController;
 use App\Http\Controllers\SiteApi\EnquiryController;
 use App\Http\Controllers\SiteApi\FormsController;
 use App\Http\Controllers\SiteApi\KaizenController;
@@ -30,6 +31,11 @@ Route::domain(Hosts::hq())->group(function () {
         Route::get('/kaizen/articles', [KaizenController::class, 'index']);
         Route::get('/kaizen/articles/{slug}', [KaizenController::class, 'show'])->where('slug', '[A-Za-z0-9-]{1,255}');
         Route::get('/portfolio', [FormsController::class, 'portfolio']);
+
+        // Documents (docs/DOCUMENTS.md section 7): the verify page a QR code on a formal document opens.
+        // Both are limited again per token in App\Support\Letters\Verification.
+        Route::get('/documents/{token}', [DocumentsController::class, 'show'])->where('token', '[A-Za-z0-9]{24,64}');
+        Route::get('/documents/{token}/file', [DocumentsController::class, 'file'])->where('token', '[A-Za-z0-9]{24,64}');
 
         // Broadcast email bookkeeping (the site serves the pixel and the confirmation page)
         Route::get('/tracking/open/{campaign_id}/{user_id}', [TrackingController::class, 'open'])
