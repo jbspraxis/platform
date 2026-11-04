@@ -157,15 +157,17 @@ class PlanLimitTest extends TestCase
     public function test_rows_written_after_the_dump_are_shown_and_never_fail_the_check(): void
     {
         $mysql = app(MysqlClient::class);
+        $before = $mysql->rowCounts('praxis_test_bk_praxis_core');   // as the nightly run counts on test nights
         $dump = $this->home . '/praxis.sql.gz';
         Dumper::dump($mysql, 'praxis_test_bk_praxis_core', $dump);
         $this->root('praxis_test_bk_praxis_core')->exec("INSERT INTO clients VALUES (4, 'Later Test', NULL, NULL)");
 
-        $test = RestoreTest::run($mysql, 'praxis_test_bk_praxis_core', $dump);
+        $test = RestoreTest::run($mysql, 'praxis_test_bk_praxis_core', $dump, $before);
 
-        $this->assertTrue($test['ok']);
+        $this->assertTrue($test['ok'], implode('; ', $test['mismatches']));
         $this->assertSame([3, 5], [$test['rows'], $test['live_rows']]);   // the trigger wrote an audit row too
         $this->assertContains('clients: 3 in the dump, 4 live now', $test['differences']);
+        $this->assertContains('audit: 0 in the dump, 1 live now', $test['differences']);   // empty before the dump: no loss
     }
 
     public function test_with_a_scratch_database_a_cut_dump_fails_the_import_test_too(): void
