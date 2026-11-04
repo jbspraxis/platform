@@ -67,7 +67,8 @@ class KeyVaultCryptoTest extends TestCase
         $file = $base . '.html';
         file_put_contents($file, LockedCopy::html($item));
         try {
-            $process = new Process([$node, '--test', base_path('tests/js/key-vault-crypto.test.mjs')], base_path(), [
+            // The TAP reporter always: Node picks spec in a terminal and TAP elsewhere (CI), so name it
+            $process = new Process([$node, '--test', '--test-reporter=tap', base_path('tests/js/key-vault-crypto.test.mjs')], base_path(), [
                 'KEY_VAULT_LOCKED_COPY' => $file,
                 'KEY_VAULT_SECRET' => self::SECRET,
                 'KEY_VAULT_PASSPHRASE' => self::PASSPHRASE,
@@ -80,8 +81,10 @@ class KeyVaultCryptoTest extends TestCase
 
         $out = $process->getOutput() . $process->getErrorOutput();
         $this->assertSame(0, $process->getExitCode(), $out);
-        $this->assertMatchesRegularExpression('/ℹ fail 0/u', $out);
-        $this->assertMatchesRegularExpression('/ℹ skipped 0/u', $out, 'the locked copy test ran');
-        $this->assertMatchesRegularExpression('/ℹ pass (\d+)/u', $out);
+        $this->assertMatchesRegularExpression('/^# fail 0$/m', $out, $out);
+        $this->assertMatchesRegularExpression('/^# skipped 0$/m', $out, 'the locked copy test ran');
+        $this->assertMatchesRegularExpression('/^# pass (\d+)$/m', $out, $out);
+        preg_match('/^# pass (\d+)$/m', $out, $passed);
+        $this->assertGreaterThanOrEqual(11, (int) $passed[1], 'every JS test ran');
     }
 }
