@@ -30,8 +30,10 @@ class GeminiProvider implements AiProvider
                 'x-goog-api-key' => config('services.gemini.api_key'),
             ])->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", [
                 'system_instruction' => ['parts' => array_map(fn ($b) => ['text' => $b], array_values($request->system))],
-                'contents' => [['role' => 'user', 'parts' => [['text' => $request->prompt
-                    . "\n\nAnswer with JSON only, following this JSON schema:\n" . json_encode($request->schema, JSON_UNESCAPED_SLASHES)]]]],
+                'contents' => [['role' => 'user', 'parts' => [
+                    ...array_map(fn (array $a) => ['inline_data' => ['mime_type' => $a['media_type'], 'data' => $a['data']]], $request->attachments),
+                    ['text' => $request->prompt . "\n\nAnswer with JSON only, following this JSON schema:\n" . json_encode($request->schema, JSON_UNESCAPED_SLASHES)],
+                ]]],
                 'generationConfig' => ['maxOutputTokens' => $request->maxTokens, 'responseMimeType' => 'application/json'],
             ]);
         } catch (ConnectionException $e) {

@@ -34,6 +34,7 @@ return [
         'broadcast_translate' => 'Broadcast translation',
         'outreach_email' => 'Outreach email',
         'outreach_reply' => 'Outreach reply sorting',
+        'company_document_read' => 'Company document reading',
         'connection_test' => 'Key test',
     ],
 ];

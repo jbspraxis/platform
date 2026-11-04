@@ -41,10 +41,10 @@ final class Budget
         return self::spent() >= self::cap();
     }
 
-    /** The most a request can cost: its input (about 3.5 characters a token, none of it cached) plus max_tokens of output */
+    /** The most a request can cost: its input (about 3.5 characters a token, none of it cached, plus any attached file) and max_tokens of output */
     public static function worstCase(AiRequest $request): float
     {
-        $input = (int) ceil($request->inputChars() / 3.5);
+        $input = (int) ceil($request->inputChars() / 3.5) + $request->attachmentTokens();
 
         return Pricing::cost([['model' => $request->model, 'input' => $input, 'output' => $request->maxTokens, 'cache_read' => 0, 'cache_write' => 0]]);
     }

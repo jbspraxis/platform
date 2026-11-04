@@ -8,6 +8,7 @@ use App\Models\AiRun;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use LogicException;
 use Throwable;
@@ -150,7 +151,34 @@ final class Ai
             schema: $config['schema'],
             stream: (bool) ($config['stream'] ?? false),
             expectedChars: (int) ($config['expected_chars'] ?? 4000),
+            attachments: self::attachments((array) ($input['files'] ?? [])),
         );
+    }
+
+    /**
+     * $input['files']: files on the private disk for the model to read, [['path' => …, 'media_type' => …]]. Only the
+     * path is stored in ai_runs.input; the file is read when the request is made. PDFs, JPGs and PNGs only.
+     *
+     * @return list<array{media_type: string, data: string, pages: int}>
+     */
+    private static function attachments(array $files): array
+    {
+        $out = [];
+        foreach ($files as $file) {
+            $type = (string) ($file['media_type'] ?? '');
+            if (! in_array($type, ['application/pdf', 'image/jpeg', 'image/png'], true)) {
+                throw new InvalidArgumentException("AI attachments are PDFs, JPGs or PNGs, not '{$type}'");
+            }
+            $bytes = Storage::disk('local')->get((string) ($file['path'] ?? ''));
+            if ($bytes === null) {
+                throw new AiUnavailable('failed');
+            }
+            // A PDF's pages, roughly, for the budget: each page object is "/Type /Page" (the page tree is "/Pages")
+            $pages = $type === 'application/pdf' ? max(1, preg_match_all('#/Type\s*/Page(?![a-zA-Z])#', $bytes)) : 1;
+            $out[] = ['media_type' => $type, 'data' => base64_encode($bytes), 'pages' => $pages];
+        }
+
+        return $out;
     }
 
     public static function languageRule(string $language): string

@@ -221,16 +221,17 @@
             @endcanany
 
             @can('mdm.view')
-                <a href="{{ route('hq.mdm.dictionary') }}" class="rail-link {{ $on('hq.mdm.dictionary', 'hq.mdm.copq', 'hq.mdm.tax', 'hq.mdm.remittance', 'hq.mdm.legal') }}" wire:navigate>
+                <a href="{{ route('hq.mdm.dictionary') }}" class="rail-link {{ $on('hq.mdm.dictionary', 'hq.mdm.copq', 'hq.mdm.tax', 'hq.mdm.remittance', 'hq.mdm.legal', 'hq.mdm.documents*') }}" wire:navigate>
                     <i data-lucide="database"></i> Master data
                 </a>
-                @if (request()->routeIs('hq.mdm.dictionary', 'hq.mdm.copq', 'hq.mdm.tax', 'hq.mdm.remittance', 'hq.mdm.legal'))
+                @if (request()->routeIs('hq.mdm.dictionary', 'hq.mdm.copq', 'hq.mdm.tax', 'hq.mdm.remittance', 'hq.mdm.legal', 'hq.mdm.documents*'))
                     <div class="rail-sub">
                         <a href="{{ route('hq.mdm.dictionary') }}" class="{{ $on('hq.mdm.dictionary') }}" wire:navigate>Financial dictionary</a>
                         <a href="{{ route('hq.mdm.copq') }}" class="{{ $on('hq.mdm.copq') }}" wire:navigate>Cost of poor quality tables</a>
                         <a href="{{ route('hq.mdm.tax') }}" class="{{ $on('hq.mdm.tax') }}" wire:navigate>Tax compliance</a>
                         <a href="{{ route('hq.mdm.remittance') }}" class="{{ $on('hq.mdm.remittance') }}" wire:navigate>Remittance accounts</a>
                         <a href="{{ route('hq.mdm.legal') }}" class="{{ $on('hq.mdm.legal') }}" wire:navigate>Legal entities</a>
+                        <a href="{{ route('hq.mdm.documents') }}" class="{{ $on('hq.mdm.documents*') }}" wire:navigate>Company documents</a>
                     </div>
                 @endif
             @endcan
