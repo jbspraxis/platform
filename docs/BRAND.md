@@ -1,6 +1,6 @@
 # JBS Praxis brand architecture
 
-Version 1.3, 30 October 2026. Status: approved direction, revised after three independent reviews (strategy, visual and language). Decisions still open for the owner are listed in section 16.
+Version 1.4, 4 November 2026. Status: approved direction, revised after three independent reviews (strategy, visual and language). Decisions still open for the owner are listed in section 16.
 
 This is the reference for every word, screen, email, document and campaign JBS Praxis produces. When existing code, copy or design disagrees with this document, this document wins and the other thing gets changed. It replaces the "command centre" language and neon styling the products carry today.
 
@@ -747,6 +747,11 @@ Sector images, one each, chosen with intent:
 
 ### Photography direction
 
+v1.4 (decision 14): the first place set (six images: pharmaceuticals, consumer goods, oil and gas, logistics, Lagos,
+Douala) is AI-generated to this direction and graded to it, in `praxis_site/public/img/place`. Such images are
+atmosphere for a sector or a city, never presented as a client's site or as a named real place of work.
+
+
 - Real African places of operation, photographed or licensed specifically; no generic stock.
 - Never shoot or license images of a client’s site, signage, vehicles, uniforms, packaging or licence plates.
 - No faces and no identifiable people. People, where present, are at a distance, in motion, or from behind.
@@ -839,9 +844,28 @@ The Client Portal’s launch is the same moment without “HQ”: the letters fi
 
 Animate `opacity` and `transform` only (plus `stroke-dashoffset` for drawing lines). Never animate layout properties. Scripts check `matchMedia('(prefers-reduced-motion: reduce)')` and render the final state: lines drawn, numbers at their value, charts at full height.
 
+### The cinematic layer (v1.4, 4 November 2026)
+
+The owner chose a cinematic website (decision 11). It sits on top of the principles above and never replaces them:
+things still settle, motion still explains, and reduced motion still shows the final state at once. What changes is
+that the website may now hold a few scroll scenes per page, not one moment only.
+
+| Layer | Where | What it does |
+|---|---|---|
+| Hero moment | Homepage, every device | The storyboard above, built in HTML with demo data (Ndali Group, labelled "Demo data"): question, rule, settling figure, bars from the baseline, sources. Then the question box goes live and hands its question to Ask Praxis (decision 12) |
+| Quiet flow field | Homepage hero, wide screens only | Fine horizontal lines, Ink to Teal, loose on arrival and converging into ordered rows over 1.6s, then a slow drift; lines lift a little near the pointer. WebGL, at most 30 frames a second, paused off screen; a still drawing without WebGL |
+| Drawing rules | Every page, every device | Praxis rules above sections, domains, steps and rows draw left to right as they come into view (`--motion-story`, `--ease-settle`), siblings 80ms apart |
+| Scroll scenes | Wide screens with a mouse or trackpad | Smooth scrolling (Lenis). A statement's words go from quiet to full ink with the scroll. A sequence (the Praxis Method) holds in place while its rules draw in turn. At most two scenes per page |
+| Page transitions | Every device | Same-site links cross-fade the page under a still header (`--motion-quick` out, `--motion-standard` in) |
+| Ask Praxis | Every page | The question appears at once, three dots hold the assistant's place, then the reply writes in word by word (22ms apart). This is the one place text appears progressively, because it mirrors a reply being written (decision 13) |
+
+Budgets: phones never load the cinematic layer (no WebGL, no smooth scrolling) and keep Lighthouse performance at
+90 or above; the cinematic layer loads after the page as its own file. Motion sets styles from scripts only, so the
+strict Content Security Policy stays (no inline styles in the HTML).
+
 ### Retired motion
 
-Typewriter text effects, the animated logo GIF, the animated slogan GIF, neon glows and pulsing borders, "matrix" boot sequences, numbers counting up from zero, and fade-and-rise on every card are removed.
+Typewriter text effects (Ask Praxis's word-by-word reply, section 11 v1.4, is the one exception), the animated logo GIF, the animated slogan GIF, neon glows and pulsing borders, "matrix" boot sequences, numbers counting up from zero, and fade-and-rise on every card are removed.
 
 ---
 
@@ -1236,7 +1260,7 @@ The metric-matched `@font-face` fallbacks ("Newsreader Fallback" from local Geor
 7. **Service levels**: whether "within one working day" and "within the hour" can be promised.
 8. **Credentials**: confirm the list of sector backgrounds in section 1.
 9. **Horizon Segment**: whether the client can be named.
-10. **Primary button**: "Book a free audit and demo" (the earlier decision, with "and" in place of "&") or the shorter "Book a free audit".
+10. ~~**Primary button**~~: decided 4 November 2026 (decision 15): "Book a free audit", with the demo named in the sentence around it.
 
 ### Work to commission
 
@@ -1256,6 +1280,7 @@ The owner approves changes. Each change is a new version with a line in the log 
 | 1.1 | 29 Oct 2026 | Revised after independent strategy, visual and language reviews: platform rebuilt around the name, method and descriptor added, claims register, canonical bilingual vocabulary, French typography, logo versions and icons, Praxis rule, accessible colour fixes, Tailwind v4 tokens, email catalogue and greetings |
 | 1.2 | 30 Oct 2026 | The HQ app launch: the logo’s one exception for the installed HQ app (section 6), the launch moment’s storyboard (section 11), HQ’s startup images (section 14), decision 9 |
 | 1.3 | 30 Oct 2026 | The Client Portal app: its launch is the HQ moment with the logo alone (sections 6, 11 and 14), decision 10 |
+| 1.4 | 4 Nov 2026 | The website redesign: the cinematic layer (section 11), the hero moment built in HTML, Ask Praxis, the AI-generated place set (section 10), the primary button; decisions 11 to 16 |
 
 ---
 
@@ -1273,6 +1298,12 @@ The owner approves changes. Each change is a new version with a line in the log 
 | 8 | Naming | Plain names: JBS Praxis HQ, Client Portal, everyday words inside |
 | 9 | HQ app launch (30 Oct 2026) | B. Converge: the letters show first, the ten bars arrive from both sides and meet at the split, the Praxis rule draws, then HQ opens (about 1.9s). The one exception to "never animate" and "never separate the bars from the letters" (section 6), for the HQ app launch only |
 | 10 | Client Portal launch (30 Oct 2026) | The same Converge moment as HQ, the logo alone: no app name, so one startup image suits English and French |
+| 11 | Motion on the website (4 Nov 2026) | Cinematic: smooth scrolling, scroll scenes and a WebGL hero on wide screens; phones stay light (mobile Lighthouse 90+) |
+| 12 | The hero (4 Nov 2026) | Both: the live answer in the frame and the quiet flow field behind it; the question box becomes a live "Ask Praxis" field |
+| 13 | The assistant (4 Nov 2026) | "Ask Praxis AI" becomes "Ask Praxis"; a conversation that feels like a modern assistant: Enter sends at once, a typing indicator, the reply writes in |
+| 14 | Imagery (4 Nov 2026) | Product crops from the demo company, plus one place image per sector and city, AI-generated to section 10's direction |
+| 15 | Primary button (4 Nov 2026) | "Book a free audit"; the final call to action adds "See it on your operations" |
+| 16 | References (4 Nov 2026) | A blend of Stripe (product precision, data that animates to explain) and McKinsey (editorial authority) |
 | — | Languages | English and French from launch, including email |
 | — | Email routing | Replies and all site alerts go to intelligence@; everything is sent from system@ |
 
