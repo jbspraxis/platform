@@ -6,7 +6,7 @@
         <div class="footer-grid">
             <div>
                 <a class="footer-logo" href="{{ route('home') }}">
-                    <img src="{{ asset('img/logo/jbs-praxis-horizontal-reversed.svg') }}" alt="{{ __('site.home_link') }}" width="141" height="28" loading="lazy">
+                    <img src="{{ asset('img/logo/jbs-praxis-horizontal-reversed.svg') }}" alt="{{ __('site.home_link') }}" width="141" height="28" loading="lazy" decoding="async" data-load-after-page>
                 </a>
                 <p class="footer-tagline">{{ __('site.footer.tagline') }}</p>
             </div>

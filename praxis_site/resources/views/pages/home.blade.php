@@ -9,7 +9,8 @@
 @endphp
 
 @push('head')
-    <link rel="preload" as="image" href="{{ asset('media/hero-60s-poster.jpg') }}">
+    {{-- The poster is the largest thing on the first screen (LCP): fetched first --}}
+    <link rel="preload" as="image" fetchpriority="high" href="{{ asset('media/hero-60s-poster-1280.webp') }}">
 @endpush
 
 @section('full')
@@ -31,11 +32,11 @@
                     @endif
                 </div>
             </div>
-            {{-- The 60-second demo, silent, captions in the picture (demo/hero-60s-loop.mp4). Muted, no autoplay attribute:
-                 app.js plays it unless the visitor asked for reduced motion, and the button pauses it (WCAG 2.2.2) --}}
+            {{-- The 60-second demo, silent, captions in the picture (demo/hero-60s-loop.mp4). Muted, no autoplay attribute, preload none:
+                 app.js plays it only on wide screens with a fast connection and no reduced motion; the button plays or pauses it (WCAG 2.2.2) --}}
             <figure class="screen" id="answers">
-                <video class="screen-video" data-loop muted loop playsinline preload="metadata" width="1920" height="1080"
-                       poster="{{ asset('media/hero-60s-poster.jpg') }}" aria-label="{{ __('pages.home.video_label') }}">
+                <video class="screen-video" data-loop muted loop playsinline preload="none" width="1920" height="1080"
+                       poster="{{ asset('media/hero-60s-poster-1280.webp') }}" aria-label="{{ __('pages.home.video_label') }}">
                     <source src="{{ asset('media/hero-60s-loop.mp4') }}" type="video/mp4">
                 </video>
                 <button class="screen-toggle" type="button" data-loop-toggle hidden
@@ -55,8 +56,7 @@
 
     <section class="band band-paper" aria-labelledby="build-title">
         <div class="container">
-            <hr class="praxis-rule rule-short">
-            <h2 class="band-title" id="build-title">{{ __('pages.home.build_title') }}</h2>
+            <x-section-head id="build-title" :title="__('pages.home.build_title')" rule />
             <ul class="domains">
                 @foreach (__('pages.domains') as $domain)
                     <li class="domain">

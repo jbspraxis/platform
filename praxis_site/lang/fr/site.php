@@ -18,6 +18,7 @@ return [
 
     'nav' => [
         'label' => 'Principale',
+        'home' => 'Accueil',
         'services' => 'Services',
         'how' => 'Notre méthode',
         'work' => 'Réalisations',

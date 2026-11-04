@@ -17,6 +17,17 @@
     $ogImage = asset('img/og/jbs-praxis-og-' . $locale . '-1200x630.png');
     $nav = ['services' => 'services', 'how-we-work' => 'how', 'work' => 'work', 'company' => 'company', 'kaizen' => 'insights'];
     $ga4 = (string) config('site.ga4_id');
+    // Breadcrumbs for search engines (redesign PR 1): Home, the section a detail page sits in, then this page
+    $crumbName = html_entity_decode(\Illuminate\Support\Str::before($title, ' | '), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $parents = ['work.show' => ['work', 'site.nav.work'], 'kaizen.show' => ['kaizen', 'site.nav.insights'], 'kaizen.write' => ['kaizen', 'site.nav.insights']];
+    $crumbs = [];
+    if ($here !== '' && $here !== 'home') {
+        $crumbs[] = [__('site.nav.home'), route('home')];
+        if (isset($parents[$here])) {
+            $crumbs[] = [__($parents[$here][1]), route($parents[$here][0])];
+        }
+        $crumbs[] = [$crumbName, $canonical];
+    }
     $schema = [
         '@context' => 'https://schema.org',
         '@graph' => [
@@ -45,6 +56,10 @@
                     'availableLanguage' => ['en', 'fr'],
                 ]), $site->phonesFor($office['city'])), $site->offices)),
             ]),
+            ...($crumbs ? [[
+                '@type' => 'BreadcrumbList',
+                'itemListElement' => array_map(fn ($crumb, $i) => ['@type' => 'ListItem', 'position' => $i + 1, 'name' => $crumb[0], 'item' => $crumb[1]], $crumbs, array_keys($crumbs)),
+            ]] : []),
             [
                 '@type' => 'WebSite',
                 '@id' => url('/') . '#website',
