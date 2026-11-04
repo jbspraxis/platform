@@ -77,6 +77,14 @@ return [
         'calculator_title' => 'What is poor quality costing you?',
         'calculator_text' => 'Rework, delays, errors and double entry have a price. Estimate yours in a few minutes, in your currency.',
         'calculator_cta' => 'Use the calculator',
+        // The calculator as a step in the journey (redesign PR 3): its three real steps, from pages/calculator
+        'calculator_counts' => 'It counts three costs: managers checking work by hand, errors fixed inside, and errors that reach your customers.',
+        'calculator_steps' => [
+            ['title' => 'Your organisation', 'text' => 'Sector, the system you use today, where work slows down, and your currency.'],
+            ['title' => 'Your figures', 'text' => 'Staff, managers, turnover, hours of manual checking, rework. Approximate is fine.'],
+            ['title' => 'Your report', 'text' => 'On screen at once, and a copy by email to share with your team.'],
+        ],
+        'chapter_alt' => 'Lagos from above in the late afternoon: roofs, roads and bridges across the lagoon.',
         'final_title' => 'See it on your own operations.',
         'final_text' => 'The free audit and demo takes about an hour. We look at one area of your organisation and show you what a straight answer looks like.',
     ],
@@ -103,6 +111,11 @@ return [
         'h1' => 'Order, made visible.',
         'lead' => 'JBS Praxis is a consulting and engineering firm for Africa’s institutions. We design how organisations run, then build the systems that answer for them, in English and French.',
         'facts_title' => 'The company',
+        'desks_title' => 'Two regional desks',
+        'desks' => [
+            ['image' => 'lagos', 'city' => 'Lagos', 'line' => 'West Africa (ECOWAS)', 'alt' => 'Lagos from above: roofs, roads and bridges across the lagoon.'],
+            ['image' => 'douala', 'city' => 'Douala', 'line' => 'Central Africa (CEMAC)', 'alt' => 'Douala at dusk, where the city meets the Wouri river: the bridge, the port and the first streetlights.'],
+        ],
         'legal_name' => 'Legal name',
         'offices' => 'Offices',
         'registration' => 'Registration',

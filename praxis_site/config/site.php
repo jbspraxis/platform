@@ -86,4 +86,45 @@ return [
     'booking_timezone' => 'Africa/Lagos',
     'booking_days_ahead' => 92,
 
+    /*
+    | Proof (redesign PR 3, Nov 2026)
+    |
+    | clients: the scrolling strip "Organisations we have worked with" on the homepage, in this order. The owner
+    | listed them (4 Nov 2026); each file is public/img/clients/{file}.webp, 96px high. The name is only the
+    | logo's accessible name: no names are shown.
+    */
+    'clients' => [
+        ['file' => 'smart-logistics', 'name' => 'Smart Logistics and Services'],
+        ['file' => 'mtn', 'name' => 'MTN'],
+        ['file' => 'pixie-girl-global', 'name' => 'Pixie Girl Global'],
+        ['file' => 'fmcg-distributor-cameroon', 'name' => 'An FMCG distributor in Cameroon'],
+        ['file' => 'mycity-app', 'name' => 'MyCity App'],
+        ['file' => 'wellsmart-drilling', 'name' => 'Wellsmart Drilling Nigeria'],
+        ['file' => 'orika-living', 'name' => 'Orika Living'],
+        ['file' => 'oil-gas-services', 'name' => 'An oil and gas services company'],
+        ['file' => 'tales-consulting', 'name' => 'Tales Consulting'],
+        ['file' => 'interworks-drill-tech', 'name' => 'Interworks Drill Tech'],
+        ['file' => 'rn-afriluxe', 'name' => 'RN Afriluxe'],
+        ['file' => 'hod', 'name' => 'HOD'],
+        ['file' => 'nfelia', 'name' => 'nfelia'],
+    ],
+
+    /*
+    | quotes_approved: the client quotes (lang site.proof.quotes) that may be shown. A quote goes here only once the
+    | person has approved its wording, name and role in writing. Until then the section is not rendered at all.
+    */
+    'quotes_approved' => [
+        // 'smart-logistics',
+        // 'la-petite-cour', (described, not named: the quote carries no name)
+        // 'mycity-app',
+        // 'pixie-girl-global',
+    ],
+
+    /*
+    | results: confirmed figures for a case study, shown above "What changed" (pages/work/show). Only figures the
+    | client has confirmed in writing (audit/2026-11-redesign/FIGURES_FORM.md). Empty: the block is not rendered.
+    | Shape: 'smart-logistics' => [['value' => '24', 'label' => ['en' => 'months live', 'fr' => 'mois en service']], ...]
+    */
+    'results' => [],
+
 ];

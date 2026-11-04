@@ -65,6 +65,13 @@ return [
         'not_covered' => 'Non couvert',
     ],
 
+    'sector_images' => [
+        'logistics' => ['image' => 'logistics', 'alt' => 'Un terminal à conteneurs au petit matin : des conteneurs en longues rangées et des grues le long du quai.'],
+        'consumer-goods' => ['image' => 'consumer-goods', 'alt' => 'Un entrepôt de distribution au crépuscule : des camions aux quais de chargement et des palettes alignées.'],
+        'pharma' => ['image' => 'pharmaceuticals', 'alt' => 'Un couloir de contrôle qualité dans une usine pharmaceutique, parois vitrées et instruments de chaque côté.'],
+        'oil-gas' => ['image' => 'oil-and-gas', 'alt' => 'Un terminal pétrolier et gazier à l’aube : des réservoirs et un rack de conduites jusqu’à l’horizon.'],
+    ],
+
     'sectors' => [
         'logistics' => ['name' => 'Logistique et fret',
             'line' => 'Les marchandises passent par les ports, la douane, les entrepôts et les camions. Chaque étape a un coût qui doit rejoindre le bon dossier d’expédition, et la comptabilité.'],

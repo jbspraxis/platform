@@ -6,7 +6,8 @@
 return [
 
     'name' => 'JBS Praxis',
-    'cta' => 'Réserver un audit gratuit et une démo',
+    'cta' => 'Réserver un audit gratuit',
+    'cta_note' => 'Voyez-le sur vos propres opérations : chaque audit gratuit se termine par une démo sur un domaine de votre organisation.',
     'cta_short' => 'Réserver un audit',
     'preview' => 'Aperçu',
     'skip' => 'Aller au contenu',
@@ -458,6 +459,26 @@ return [
         'sent_title' => 'Merci pour votre avis',
         'sent_body' => 'Il est transmis à l’équipe qui gère ce site.',
         'send_another' => 'Envoyer un autre avis',
+    ],
+
+    // Preuves (refonte PR 3) : la bande de logos et les citations de clients (affichées une fois approuvées)
+    'proof' => [
+        'clients_title' => 'Des organisations avec lesquelles nous avons travaillé',
+        'clients_pause' => 'Mettre les logos en pause',
+        'clients_play' => 'Relancer les logos',
+        'quotes_title' => 'Ils en parlent',
+        'quotes' => [
+            'smart-logistics' => ['text' => 'Chaque dossier, chaque facture, chaque camion vit désormais dans un seul système, en français comme en anglais. Quand je demande où en est un dossier ou ce qu’il nous a coûté, la réponse est déjà là.',
+                'name' => 'Timothee Massomba', 'role' => 'Directeur général', 'org' => 'Smart Logistics and Services'],
+            'la-petite-cour' => ['text' => 'Ils ont reconstruit notre système pendant que nous continuions à vendre et à livrer chaque jour. Nos exercices se clôturent et restent clos, et chaque emballage vide est suivi.',
+                'name' => '', 'role' => 'Directeur général', 'org' => 'Un distributeur de produits de grande consommation au Cameroun'],
+            'mycity-app' => ['text' => 'JBS Praxis construit comme je voudrais que ma propre équipe le fasse : testé, documenté et livré par étapes. Nous voyons chaque étape et nous possédons chaque ligne.',
+                'name' => 'Bode Oluwasanmi', 'role' => 'Directeur technique', 'org' => 'MyCity App'],
+            'pixie-girl-global' => ['text' => 'Du coût de fabrication d’une perruque à ce que nous vendons en ligne et en boutique, tout tient désormais dans les mêmes chiffres. Je vois enfin toute l’entreprise.',
+                'name' => 'Faitlyn Alex', 'role' => 'Directrice générale', 'org' => 'Pixie Girl Global'],
+        ],
+        'results_title' => 'En chiffres',
+        'results_note' => 'Chiffres confirmés par le client.',
     ],
 
     'chat' => [

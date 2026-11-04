@@ -60,6 +60,10 @@
                         <div>
                             <h2 class="sector-name">{{ __('work.sectors.' . $sector . '.name') }}</h2>
                             <p>{{ __('work.sectors.' . $sector . '.line') }}</p>
+                            @if (is_array(__('work.sector_images.' . $sector)))
+                                <x-picture :name="__('work.sector_images.' . $sector . '.image')" :alt="__('work.sector_images.' . $sector . '.alt')"
+                                           sizes="(min-width: 1000px) 38vw, 100vw" class="sector-image" />
+                            @endif
                         </div>
                         <ul class="sector-work">
                             @foreach ($work['cases'] as $slug)

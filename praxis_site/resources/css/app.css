@@ -852,6 +852,85 @@
     .lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
     .lenis.lenis-stopped { overflow: hidden; }
     .lenis.lenis-smooth iframe { pointer-events: none; }
+
+    /* ==== Redesign PR 3 (Nov 2026): proof and conversion ==== */
+
+    /* ---- The header stays: it slims once the page scrolls, so "Book a free audit" is always one tap away ---- */
+    .site-header { position: sticky; top: 0; transition: box-shadow var(--motion-quick) var(--ease-settle); }
+    .site-header-inner { transition: min-height var(--motion-quick) var(--ease-settle); }
+    .site-header.is-stuck { box-shadow: 0 1px 0 var(--color-line), 0 8px 24px rgba(12, 20, 43, 0.06); }
+    .site-header.is-stuck .site-header-inner { min-height: 60px; }
+    html { scroll-padding-top: 76px; }
+    .header-sentinel { position: absolute; top: 0; left: 0; width: 1px; height: 8px; pointer-events: none; }
+
+    /* ---- Organisations we have worked with: one tone, drifting left to right ---- */
+    .clients { padding: var(--space-7) 0 var(--space-8); background: var(--color-mist); overflow: hidden; }
+    .clients-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-5); }
+    .clients-title { margin: 0; font-size: var(--step-small); line-height: 1.375rem; font-weight: 600; color: var(--color-muted); }
+    .clients-toggle { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 1px solid var(--color-line-strong); border-radius: 50%; background: var(--color-paper); color: var(--color-ink); cursor: pointer; }
+    .clients-toggle:hover { background: var(--color-teal-tint); }
+    .clients-toggle svg, .clients-toggle i[data-lucide] { display: inline-block; width: 16px; height: 16px; }
+    .clients-track { -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent); }
+    .clients-reel { display: flex; width: max-content; animation: clients-drift 60s linear infinite; }
+    .clients-list { display: flex; align-items: center; gap: clamp(40px, 5vw, 72px); margin: 0; padding: 0 clamp(20px, 2.5vw, 36px); list-style: none; }
+    .clients-list img { display: block; height: 40px; width: auto; max-width: 180px; object-fit: contain; filter: grayscale(1) contrast(1.05); mix-blend-mode: multiply; opacity: 0.72; transition: filter var(--motion-standard) var(--ease-settle), opacity var(--motion-standard) var(--ease-settle); }
+    .clients-list img:hover { filter: none; opacity: 1; }
+    @media (min-width: 768px) { .clients-list img { height: 48px; } }
+    /* Left to right: the reel starts shifted by one copy and slides back to zero */
+    @keyframes clients-drift { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+    .clients-track:hover .clients-reel, .clients-track:focus-within .clients-reel, .clients.is-paused .clients-reel { animation-play-state: paused; }
+    @media (prefers-reduced-motion: reduce) {
+        .clients-reel { animation: none; width: auto; }
+        .clients-list[aria-hidden="true"] { display: none; }
+        .clients-list { flex-wrap: wrap; justify-content: center; row-gap: var(--space-6); }
+        .clients-track { -webkit-mask-image: none; mask-image: none; }
+    }
+
+    /* ---- The homepage's one place image: a chapter opener, full bleed ---- */
+    .chapter-image .place { aspect-ratio: 21 / 9; }
+    @media (max-width: 767px) { .chapter-image .place { aspect-ratio: 4 / 3; } }
+
+    /* ---- Quotes: serif, on the rule, no cards ---- */
+    .quotes { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-7) var(--space-8); }
+    @media (min-width: 900px) { .quotes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .quote figure { margin: 0; padding-top: var(--space-5); border-top: 1px solid var(--color-line); }
+    .quote blockquote { margin: 0; }
+    .quote blockquote p { margin: 0; font-family: var(--font-serif); font-size: var(--step-h3); line-height: var(--lh-h3); color: var(--color-ink); text-wrap: pretty; }
+    .quote blockquote p::before { content: "\201C"; } .quote blockquote p::after { content: "\201D"; }
+    html[lang="fr"] .quote blockquote p::before { content: "\00AB\202F"; } html[lang="fr"] .quote blockquote p::after { content: "\202F\00BB"; }
+    .quote figcaption { display: grid; gap: 2px; margin-top: var(--space-4); font-size: var(--step-small); }
+    .quote-name { font-weight: 600; color: var(--color-ink); }
+    .quote-role { color: var(--color-muted); }
+
+    /* ---- Results: confirmed figures only ---- */
+    .results { display: grid; gap: var(--space-6); margin: 0; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
+    .result { padding-top: var(--space-4); border-top: 2px solid var(--color-ink); }
+    .result dt { order: 2; color: var(--color-slate); }
+    .result { display: flex; flex-direction: column; gap: 4px; }
+    .result-value { order: 1; margin: 0; font-family: var(--font-serif); font-size: var(--step-number); line-height: var(--lh-number); color: var(--color-ink); font-variant-numeric: lining-nums tabular-nums; }
+    .results-note { margin: var(--space-5) 0 0; font-size: var(--step-caption); color: var(--color-muted); }
+
+    /* ---- The calculator, a step in the journey ---- */
+    .calculator-band { display: grid; gap: var(--space-7); }
+    @media (min-width: 1000px) { .calculator-band { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: var(--space-9); align-items: start; } }
+    .calculator-band-text .band-text { margin-bottom: var(--space-4); }
+    .calculator-counts { margin: 0 0 var(--space-6); max-width: var(--measure); color: var(--color-slate); }
+    .calculator-steps { list-style: none; margin: 0; padding: 0; counter-reset: calc-step; }
+    .calculator-steps li { counter-increment: calc-step; display: grid; grid-template-columns: 3rem minmax(0, 1fr); gap: 4px 16px; padding: var(--space-5) 0; border-top: 1px solid var(--color-line); }
+    .calculator-steps li:first-child { border-top: 2px solid var(--color-ink); }
+    .calculator-steps li::before { content: counter(calc-step); grid-row: span 2; font-family: var(--font-serif); font-size: var(--step-h2); line-height: 1; color: var(--color-deep-teal); font-variant-numeric: lining-nums; }
+    .calculator-steps h3 { margin: 0; font-size: 1.0625rem; line-height: 1.5rem; font-weight: 600; }
+    .calculator-steps p { margin: 0; }
+
+    /* ---- Industries and Company: place images ---- */
+    .sector-image { margin-top: var(--space-5); }
+    .desks { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-7) var(--space-6); }
+    @media (min-width: 768px) { .desks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .desk h3 { margin: var(--space-4) 0 2px; font-family: var(--font-serif); font-weight: 400; font-size: var(--step-h3); line-height: var(--lh-h3); }
+    .desk p { margin: 0; color: var(--color-muted); }
+
+    /* ---- The final call to action's second line ---- */
+    .final-note { margin: var(--space-4) 0 0; max-width: var(--measure); font-size: var(--step-small); color: var(--color-fg-on-dark-muted); }
 }
 
 /* Page transitions (redesign PR 2): a same-site link cross-fades the page under a still header. Browsers without

@@ -89,6 +89,25 @@
         </div>
     </section>
 
+    @php($results = (array) config('site.results.' . $slug, []))
+    @if ($results)
+        {{-- Confirmed figures only (config site.results, from the client in writing) --}}
+        <section class="band band-paper" aria-labelledby="results-title">
+            <div class="container">
+                <x-section-head id="results-title" :title="__('site.proof.results_title')" rule />
+                <dl class="results">
+                    @foreach ($results as $result)
+                        <div class="result">
+                            <dt>{{ $result['label'][app()->getLocale()] ?? $result['label']['en'] }}</dt>
+                            <dd class="result-value">{{ $result['value'] }}</dd>
+                        </div>
+                    @endforeach
+                </dl>
+                <p class="results-note">{{ __('site.proof.results_note') }}</p>
+            </div>
+        </section>
+    @endif
+
     <section class="band" aria-labelledby="changed-title">
         <div class="container">
             <h2 class="band-title" id="changed-title">{{ __('work.labels.' . $changedTitle) }}</h2>
@@ -118,6 +137,8 @@
             <p class="band-link"><a href="{{ route('work') }}">{{ __('work.labels.all_work') }}</a></p>
         </div>
     </section>
+
+    @include('partials.calculator-band')
 
     @include('partials.final-cta', ['title' => __('work.final_title'), 'text' => __('work.final_text')])
 @endsection

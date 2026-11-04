@@ -398,7 +398,39 @@ function loadAfterPage() {
     if (document.readyState === 'complete') go(); else window.addEventListener('load', go, { once: true });
 }
 
+// The sticky header (redesign PR 3) slims once the page has scrolled: a sentinel at the top of the page tells when
+function enhanceHeaderStick() {
+    const header = document.querySelector('.site-header');
+    if (!header || !('IntersectionObserver' in window)) return;
+    const sentinel = document.createElement('div');
+    sentinel.setAttribute('aria-hidden', 'true');
+    sentinel.className = 'header-sentinel';
+    document.body.prepend(sentinel);
+    new IntersectionObserver(([entry]) => header.classList.toggle('is-stuck', !entry.isIntersecting)).observe(sentinel);
+}
+
+// The logo strip (partials.clients): its button pauses and plays the drift (WCAG 2.2.2). Reduced motion: no drift,
+// so no button.
+function enhanceClients() {
+    const strip = document.querySelector('[data-clients]');
+    const toggle = strip?.querySelector('[data-clients-toggle]');
+    if (!strip || !toggle || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const show = (paused) => {
+        const label = paused ? toggle.dataset.play : toggle.dataset.pause;
+        toggle.setAttribute('aria-label', label);
+        toggle.title = label;
+        const icon = document.createElement('i');
+        icon.setAttribute('data-lucide', paused ? 'play' : 'pause');
+        toggle.replaceChildren(icon);
+        drawIcons();
+    };
+    toggle.hidden = false;
+    toggle.addEventListener('click', () => show(strip.classList.toggle('is-paused')));
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    enhanceHeaderStick();
+    enhanceClients();
     loadAfterPage();
     drawIcons();
     enhanceHeaderMenus();

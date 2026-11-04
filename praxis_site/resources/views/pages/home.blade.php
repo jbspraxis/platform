@@ -92,6 +92,8 @@
         </div>
     </section>
 
+    @include('partials.clients')
+
     <section class="band band-paper" aria-labelledby="build-title">
         <div class="container">
             <x-section-head id="build-title" :title="__('pages.home.build_title')" rule />
@@ -116,6 +118,11 @@
     </section>
 
     {{-- Who we work with: each name opens its case study (App\Support\Work, lang work.cases.*.list_name) --}}
+    {{-- The page's one place image (docs/BRAND.md section 10): a chapter opener for the work --}}
+    <div class="chapter-image">
+        <x-picture name="lagos" :alt="__('pages.home.chapter_alt')" sizes="100vw" class="place-wide" />
+    </div>
+
     <section class="band band-paper" id="work" aria-labelledby="work-title">
         <div class="container split">
             <h2 class="band-title" id="work-title">{{ __('pages.home.work_title') }}</h2>
@@ -130,17 +137,9 @@
         </div>
     </section>
 
-    <section class="band" aria-labelledby="calculator-title">
-        <div class="container">
-            <div class="feature">
-                <div>
-                    <h2 class="band-title" id="calculator-title">{{ __('pages.home.calculator_title') }}</h2>
-                    <p class="band-text">{{ __('pages.home.calculator_text') }}</p>
-                </div>
-                <a class="btn btn-secondary btn-lg" href="{{ route('calculator') }}"><i data-lucide="calculator"></i>{{ __('pages.home.calculator_cta') }}</a>
-            </div>
-        </div>
-    </section>
+    @include('partials.quotes')
+
+    @include('partials.calculator-band')
 
     @include('partials.final-cta', ['title' => __('pages.home.final_title'), 'text' => __('pages.home.final_text')])
 

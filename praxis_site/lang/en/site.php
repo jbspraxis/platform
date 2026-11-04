@@ -8,7 +8,8 @@
 return [
 
     'name' => 'JBS Praxis',
-    'cta' => 'Book a free audit and demo',
+    'cta' => 'Book a free audit',
+    'cta_note' => 'See it on your operations: every free audit ends with a demo on one area of your organisation.',
     'cta_short' => 'Book a free audit',
     'preview' => 'Preview',
     'skip' => 'Skip to content',
@@ -468,6 +469,26 @@ return [
     ],
 
     // Praxis AI, the website assistant (docs/SITE_API.md 6.5)
+    // Proof (redesign PR 3): the logo strip and the client quotes (shown only once approved, config site.quotes_approved)
+    'proof' => [
+        'clients_title' => 'Organisations we have worked with',
+        'clients_pause' => 'Pause the logos',
+        'clients_play' => 'Play the logos',
+        'quotes_title' => 'In their words',
+        'quotes' => [
+            'smart-logistics' => ['text' => 'Every shipment, every invoice, every truck now lives in one system, in English and in French. When I ask where a file stands or what it has cost us, the answer is already there.',
+                'name' => 'Timothee Massomba', 'role' => 'Managing Director', 'org' => 'Smart Logistics and Services'],
+            'la-petite-cour' => ['text' => 'They rebuilt our system while we kept selling and delivering every day. Our books close and stay closed, and every empty crate is accounted for.',
+                'name' => '', 'role' => 'Chief Executive', 'org' => 'An FMCG distributor in Cameroon'],
+            'mycity-app' => ['text' => 'JBS Praxis builds the way I would want my own team to build: tested, documented and released in stages. We see every step and own every line.',
+                'name' => 'Bode Oluwasanmi', 'role' => 'Chief Technology Officer', 'org' => 'MyCity App'],
+            'pixie-girl-global' => ['text' => 'From what a wig costs to make to what we sell online and in store, it is one set of numbers now. I can finally see the whole business.',
+                'name' => 'Faitlyn Alex', 'role' => 'Chief Executive Officer', 'org' => 'Pixie Girl Global'],
+        ],
+        'results_title' => 'In figures',
+        'results_note' => 'Figures confirmed by the client.',
+    ],
+
     'chat' => [
         'open' => 'Ask Praxis',
         'title' => 'Praxis AI',

@@ -67,6 +67,14 @@ return [
     ],
 
     // Sector names, and one line on what the work there involves
+    // Sector images (redesign PR 3, public/img/place): atmosphere for the sector, never a client's site
+    'sector_images' => [
+        'logistics' => ['image' => 'logistics', 'alt' => 'A container port in the early morning: containers in long rows and cranes along the quay.'],
+        'consumer-goods' => ['image' => 'consumer-goods', 'alt' => 'A distribution warehouse at dusk: trucks at the loading bays and pallets in straight lines.'],
+        'pharma' => ['image' => 'pharmaceuticals', 'alt' => 'A quality-control corridor in a pharmaceutical plant, glass walls and instruments on both sides.'],
+        'oil-gas' => ['image' => 'oil-and-gas', 'alt' => 'An oil and gas terminal at first light: storage tanks and a pipe rack running to the horizon.'],
+    ],
+
     'sectors' => [
         'logistics' => ['name' => 'Logistics and freight',
             'line' => 'Goods pass through ports, customs, warehouses and trucks. Every step has a cost that must reach the right shipment file and the books.'],

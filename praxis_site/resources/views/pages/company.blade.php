@@ -47,6 +47,21 @@
         </div>
     </section>
 
+    <section class="band" aria-labelledby="desks-title">
+        <div class="container">
+            <x-section-head id="desks-title" :title="__('pages.company.desks_title')" rule />
+            <ul class="desks">
+                @foreach (__('pages.company.desks') as $desk)
+                    <li class="desk">
+                        <x-picture :name="$desk['image']" :alt="$desk['alt']" sizes="(min-width: 768px) 50vw, 100vw" />
+                        <h3>{{ $desk['city'] }}</h3>
+                        <p>{{ $desk['line'] }}</p>
+                    </li>
+                @endforeach
+            </ul>
+        </div>
+    </section>
+
     <section class="band" aria-labelledby="ourselves-title">
         <div class="container split">
             <h2 class="band-title" id="ourselves-title">{{ __('pages.company.ourselves_title') }}</h2>
