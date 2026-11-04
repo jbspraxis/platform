@@ -9,7 +9,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * A researched prospect (docs/CAMPAIGNS.md section 10). Never a contact or a subscriber: prospects live only here, so
- * no broadcast can reach them. They become a lead only through C3's Make a lead.
+ * no broadcast can reach them. They become a lead only through C3's Make a lead, which keeps this row (its emails
+ * are the history) and links it to the lead (organization_id).
  */
 class OutreachProspect extends Model
 {
@@ -27,6 +28,9 @@ class OutreachProspect extends Model
         'bounced_at' => 'datetime',
         'unsubscribed_at' => 'datetime',
         'complained_at' => 'datetime',
+        'lead_made_at' => 'datetime',
+        'remind_on' => 'date',
+        'reminded_at' => 'datetime',
     ];
 
     protected $hidden = ['website_text'];
@@ -49,6 +53,12 @@ class OutreachProspect extends Model
     public function followUp(): HasOne
     {
         return $this->hasOne(OutreachEmail::class, 'prospect_id')->where('kind', 'follow_up');
+    }
+
+    /** C3: their replies, bounce notices and complaint reports */
+    public function replies(): HasMany
+    {
+        return $this->hasMany(OutreachReply::class, 'prospect_id');
     }
 
     public function fullName(): string

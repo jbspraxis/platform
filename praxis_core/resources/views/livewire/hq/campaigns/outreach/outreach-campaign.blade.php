@@ -54,6 +54,11 @@
         .orc-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 24px; }
         .orc-stats .card { padding: 14px 16px; }
         .orc-stats .stat-value { font-size: 1.25rem; line-height: 1.75rem; }
+        .orc-stats small { display: block; color: var(--color-muted); font-size: 0.8125rem; }
+        .orc-replies { margin-top: -12px; }
+        .orc-toolbar .segmented { max-width: 100%; overflow-x: auto; }
+        .orc-toolbar .segmented-item { white-space: nowrap; }
+        .orc-toolbar .segmented-item .orc-dot { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: var(--color-deep-teal); color: var(--color-paper); font-size: 0.75rem; line-height: 1.125rem; }
         .orc-toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
         .orc-toolbar .segmented-item span { color: var(--color-muted); font-variant-numeric: tabular-nums; }
         .orc-search { max-width: 260px; }
@@ -154,6 +159,16 @@
             <div class="card"><div class="stat-label">{{ $label }}</div><div class="stat-value">{{ number_format($value) }}</div></div>
         @endforeach
     </div>
+    @if ($stats['sent'] > 0 || $stats['replies'] > 0)
+        {{-- C3: what came back (section 12) --}}
+        <div class="orc-stats orc-replies" aria-label="Replies">
+            @foreach ([['Replies', number_format($stats['replies']), $stats['sent'] ? $stats['reply_rate'] . '% reply rate' : null], ['To sort', number_format($stats['to_sort']), null],
+                       ['Interested', number_format($stats['interested']), null], ['Not now', number_format($stats['not_now']), null],
+                       ['Not interested', number_format($stats['not_interested']), null], ['Leads made', number_format($stats['leads']), null]] as [$label, $value, $sub])
+                <div class="card"><div class="stat-label">{{ $label }}</div><div class="stat-value">{{ $value }}</div>@if ($sub)<small>{{ $sub }}</small>@endif</div>
+            @endforeach
+        </div>
+    @endif
 
     @if ($stats['writing'] > 0)
         <div class="alert alert-info mb-4" role="status"><i data-lucide="loader"></i>
@@ -164,10 +179,11 @@
     <div class="orc-toolbar">
         <div class="segmented" role="group" aria-label="Show">
             @foreach (\App\Livewire\Hq\Campaigns\Outreach\OutreachCampaignPage::FILTERS as $key => $label)
-                <button type="button" class="segmented-item" aria-pressed="{{ $filter === $key ? 'true' : 'false' }}" wire:click="$set('filter', '{{ $key }}')">{{ $label }} <span>{{ number_format($counts[$key]) }}</span></button>
+                @continue($key === 'replies' && ! $canReview)
+                <button type="button" class="segmented-item" aria-pressed="{{ $filter === $key ? 'true' : 'false' }}" wire:click="$set('filter', '{{ $key }}')">{{ $label }} <span>{{ number_format($counts[$key]) }}</span>@if ($key === 'replies' && $stats['to_sort'] > 0)<span class="orc-dot" title="{{ $stats['to_sort'] }} to sort">{{ $stats['to_sort'] }} to sort</span>@endif</button>
             @endforeach
         </div>
-        <div class="orc-rest">
+        <div class="orc-rest" @if ($filter === 'replies') style="display: none" @endif>
             <label class="sr-only" for="orc-search">Search prospects</label>
             <input id="orc-search" type="search" class="input orc-search" placeholder="Search company, name or email" wire:model.live.debounce.400ms="search">
             @if ($canReview && $stats['to_review'] > 0)
@@ -182,6 +198,9 @@
         </div>
     </div>
 
+    @if ($filter === 'replies')
+        <livewire:hq.campaigns.outreach.outreach-replies :campaign-id="$campaign->id" :key="'replies-' . $campaign->id" />
+    @else
     <div class="card" style="padding: 0">
         @if ($rows->isEmpty())
             <div class="empty-state">
@@ -219,6 +238,7 @@
                                     <span class="pill {{ $tone }}">{{ $label }}</span>
                                     @if ($e->status === 'sent')<small>{{ $wat($e->sent_at) }}</small>@endif
                                     @if ($f)<small>{{ $f }}</small>@endif
+                                    @if ($p?->reply_label)<small>{{ \App\Models\Campaigns\OutreachReply::labelName($p->reply_label) }}@if ($p->organization_id) · lead made @endif</small>@endif
                                     @if ($e->status === 'draft' && $e->ai_run_id)<small>Rewriting…</small>@endif
                                 </td>
                                 <td class="orc-hide-md"><div class="orc-subject">{{ $e->subject ?: '—' }}</div></td>
@@ -234,6 +254,7 @@
             @endif
         @endif
     </div>
+    @endif
 
     {{-- The email in a small dialog: Approve, Edit, Rewrite, Skip --}}
     @if ($open && $openProspect)

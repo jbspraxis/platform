@@ -33,6 +33,7 @@ return [
         'broadcast_draft' => 'Broadcast draft',
         'broadcast_translate' => 'Broadcast translation',
         'outreach_email' => 'Outreach email',
+        'outreach_reply' => 'Outreach reply sorting',
         'connection_test' => 'Key test',
     ],
 ];

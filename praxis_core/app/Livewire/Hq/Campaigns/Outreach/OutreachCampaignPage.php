@@ -32,7 +32,7 @@ class OutreachCampaignPage extends Component
     #[Locked]
     public string $campaignId;
 
-    /** review, writing, approved, sent, stopped, all */
+    /** review, writing, approved, sent, stopped, all; replies (C3: OutreachReplies, for those who review the campaign) */
     #[Url(as: 'show', except: 'review')]
     public string $filter = 'review';
 
@@ -67,7 +67,14 @@ class OutreachCampaignPage extends Component
 
     public const FILTERS = [
         'review' => 'To review', 'writing' => 'Not ready', 'approved' => 'Approved', 'sent' => 'Sent', 'stopped' => 'Not sent', 'all' => 'All',
+        'replies' => 'Replies',
     ];
+
+    /** The filter, if this person may see it (Replies: only those who review the campaign), else To review */
+    private function allowed(string $filter): string
+    {
+        return isset(self::FILTERS[$filter]) && ($filter !== 'replies' || $this->canReview) ? $filter : 'review';
+    }
 
     public function mount(string $campaign): void
     {
@@ -79,9 +86,7 @@ class OutreachCampaignPage extends Component
             // The import dialog's default campaign
             session([ProspectImportSchema::SESSION_KEY => $model->id]);
         }
-        if (! isset(self::FILTERS[$this->filter])) {
-            $this->filter = 'review';
-        }
+        $this->filter = $this->allowed($this->filter);
     }
 
     private function campaign(): OutreachCampaign
@@ -108,7 +113,7 @@ class OutreachCampaignPage extends Component
 
     public function updatedFilter(): void
     {
-        $this->filter = isset(self::FILTERS[$this->filter]) ? $this->filter : 'review';
+        $this->filter = $this->allowed($this->filter);
         $this->limit = 50;
     }
 
@@ -371,10 +376,12 @@ class OutreachCampaignPage extends Component
         $counts = [
             'review' => $stats['to_review'], 'writing' => $stats['writing'] + $stats['not_written'], 'approved' => $stats['approved'],
             'sent' => $stats['sent'], 'stopped' => $stats['skipped'] + $stats['failed'] + OutreachEmail::where('campaign_id', $campaign->id)->where('kind', 'first')->where('status', 'bounced')->count(),
-            'all' => $stats['prospects'],
+            'all' => $stats['prospects'], 'replies' => $stats['replies'],
         ];
-        $total = (clone $this->rows())->count();
-        $rows = $this->rows()->limit($this->limit)->get();
+        // The Replies tab is its own component (OutreachReplies): no prospects to list here then
+        $replies = $this->filter === 'replies';
+        $total = $replies ? 0 : (clone $this->rows())->count();
+        $rows = $replies ? collect() : $this->rows()->limit($this->limit)->get();
         $followUps = OutreachEmail::whereIn('prospect_id', $rows->pluck('prospect_id'))->where('kind', 'follow_up')->get()->keyBy('prospect_id');
 
         $open = $this->current();

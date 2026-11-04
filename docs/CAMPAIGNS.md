@@ -16,6 +16,7 @@ PRs build on, and what is still open. Built from 3 Nov 2026, when JBS Praxis hir
 9. [Deployed](#9-deployed)
 10. [Outreach (C2)](#10-outreach-c2)
 11. [For C3: replies](#11-for-c3-replies)
+12. [Outreach replies (C3)](#12-outreach-replies-c3)
 
 ---
 
@@ -48,9 +49,9 @@ One area with two tools (owner, 3 Nov 2026):
 
 | PR | Branch | What | Status |
 |---|---|---|---|
-| **C1 Broadcasts** | `campaigns/c1-broadcasts` | The Campaigns area; Broadcasts (editor, layouts, blocks, rich text, AI draft and translation, EN/FR, preview, test send, send now or schedule, report); segments, subscribers and the **do-not-email list** with its contract; one-click unsubscribe; counted opens and clicks; this runbook | In review |
-| C2 Outreach | `campaigns/c2-outreach` | Import researched prospects (the shared Excel engine), Claude's drafts, the review table and its dialog, sending from the salesperson's own mailbox within owner-editable limits, one automatic follow-up about 3 working days later; section 10 | In review |
-| C3 Outreach replies | — | Replies sorted by AI (Interested, Not now, Not interested, Unsubscribe), one-click Make a lead, Not-now reminders, campaign numbers | Not started |
+| **C1 Broadcasts** | `campaigns/c1-broadcasts` | The Campaigns area; Broadcasts (editor, layouts, blocks, rich text, AI draft and translation, EN/FR, preview, test send, send now or schedule, report); segments, subscribers and the **do-not-email list** with its contract; one-click unsubscribe; counted opens and clicks; this runbook | Live (#35, 3 Nov 2026) |
+| C2 Outreach | `campaigns/c2-outreach` | Import researched prospects (the shared Excel engine), Claude's drafts, the review table and its dialog, sending from the salesperson's own mailbox within owner-editable limits, one automatic follow-up about 3 working days later; section 10 | Live (#40, cd149aa, 4 Nov 2026) |
+| C3 Outreach replies | `campaigns/c3-replies` | Replies found in HQ Mail and sorted by Claude (Interested, Not now, Not interested, Unsubscribe), confirmed or changed by a person in one click; bounce notices and spam reports filed by themselves; one-click Make a lead; Not-now reminders with a bell; the replies in the campaign numbers; section 12 | In review |
 
 ## 3. Screens and permissions
 
@@ -546,3 +547,192 @@ label), `lang/*/marketing.php` (`outreach_unsubscribe`), `components/layouts/hq.
   said not now without a person approving it.
 - **Numbers:** add replies and their sorting to `Outreach::stats()`, which the list and the campaign page already show.
 - **Keep:** the claim-before-send in `Sender`, the one-follow-up rule, and `Marketing::canEmail()` at the last moment.
+
+## 12. Outreach replies (C3)
+
+What comes back from outreach emails, sorted: replies (Claude suggests a label, a person confirms or changes it), bounce
+notices and spam complaint reports (filed by HQ), Make a lead, Not now reminders, and the numbers. Built 4 Nov 2026 on
+section 11's contract. Branch `campaigns/c3-replies`.
+
+### 12.1 The owner's decisions (3 Nov 2026, binding)
+
+1. **"AI sorts, you confirm."** Each reply gets Claude's label (Interested, Not now, Not interested, Unsubscribe) with
+   one line of why; the salesperson confirms it or picks another in one click. **Nothing irreversible happens on
+   Claude's word alone**, except that any reply already stops the follow-up (C2 did that, and C3 does it too).
+2. **A cheap model:** Claude Haiku through `Ai::queue` on the `ai` queue, purpose `outreach_reply` in `config/ai.php`.
+3. **Unsubscribe, once confirmed:** `Marketing::suppress(…, 'unsubscribed', ['source' => 'outreach'])` and
+   `Outreach::stop($prospectId, 'Unsubscribed')`.
+4. **Bounces and complaints** are automatic (mail-server facts, not AI guesses), matched strictly to an outreach email's
+   Message-ID or recipient: a bounce → `'bounced'` and `bounced_at`; a complaint → `'complained'`, and
+   `Replies::complaints()` pauses the sender.
+5. **Make a lead:** one click, owned by the campaign's sender; `Duplicates` first (an existing lead or client gets the
+   person as a contact instead, and the screen says so); the research is the lead's first note; the prospect row stays
+   and links to the lead.
+6. **Not now:** a reminder day (3 months by default, editable), one bell to the sender that day (working days, 07:30
+   Lagos); never outreach again without a person approving a new email.
+7. **Numbers:** replies, reply rate, counts per label and leads made, on the list and the campaign page.
+8. **Screens:** a Replies view per campaign and one across the salesperson's campaigns, linked from the Outreach page
+   with the count still to sort; each reply in a small dialog. Permissions as C2's review.
+
+### 12.2 Screens, routes and permissions
+
+| Address | Route | Screen |
+|---|---|---|
+| `/campaigns/outreach` | `hq.campaigns.outreach` | **Replies** button with "N to sort"; per campaign, Replies (count, reply rate, to sort) and Leads |
+| `/campaigns/outreach/replies` | `hq.campaigns.outreach.replies` | every campaign the person sorts: the numbers (replies and rate, to sort, interested, not now with reminders set, not interested, leads made) and the replies |
+| `/campaigns/outreach/{campaign}?show=replies` | `hq.campaigns.outreach.campaign` | the campaign's **Replies** tab (`&label=` a filter, `&reply=<id>` opens one: the Not now bell links here); a second row of numbers under the sending ones |
+
+Both are `App\Livewire\Hq\Campaigns\Outreach\OutreachReplies` (`outreach-replies.blade.php`), a page on its own or
+mounted in the campaign page. Filters: To sort (the default while there are some), Interested, Not now, Not
+interested, Unsubscribed, Bounced and spam (when there are any), All replies. Each row: who, the label (Claude's shown
+dashed with "?" and "To confirm" until a person confirms), Claude's reason (or the server's for a notice), when, and
+Open the lead or the reminder day.
+
+**The dialog:** Claude's label and reason (or "Claude is reading the reply", or "couldn't sort it" with **Ask Claude
+again**); the four labels as buttons, Claude's as **Confirm: …** (one click confirms or changes; Unsubscribe's title
+says it is for good); **Not now: remind me on** (the day they named, else in 3 months; editable, and **Save the date**
+afterwards); **Make a lead** with what it will do ("A new lead … owned by Gerald" or "X is already a lead: Ada will be
+added there as a contact"), then **Open the lead**; **their reply**, sanitised and shown as HQ Mail's reader shows it
+(`Inbox::present`: `HtmlSanitizer`, a sandboxed frame without scripts or remote pictures, the quoted part folded), with
+**Open in Mail**; **Our email** (and follow-up) as sent, folded; **They call it spam** (a person's choice, with a step to
+confirm). A bounce notice or spam report opens the same dialog, read-only, with the server's reason.
+
+**Who:** the campaign's sender or owner (with `outreach.create`), or `outreach.approve` (the owner): the same rule as
+C2's review (`Outreach::canReview`, `Outreach::reviewableIds`). `outreach.view` alone (Auditor) sees the numbers, never
+the replies. **A reply's text shows only to someone who may read the mailbox it is in** (`MailAccess`, docs/MAIL.md
+7.1): personal mailboxes stay private, so the owner sorting Gerald's replies sees Claude's label and reason, not the
+text, and no Open in Mail (12.7, item 1).
+
+### 12.3 Data (migration `2026_11_04_900000_add_outreach_replies`)
+
+| Table | What | Key columns |
+|---|---|---|
+| `outreach_replies` (new) | one message about a prospect's outreach email | `campaign_id`, `prospect_id`, `email_id` (the outreach email it answers or bounced), `kind` (reply, bounce, complaint), `mail_message_id` + `message_key` (`mail_messages.message_id_hash`, or `id:<id>`; unique per prospect, so copies in two folders or mailboxes are one), `mail_account_id`, `from_email`, `from_name`, `subject`, `snippet`, `received_at`; Claude's `ai_label`, `ai_reason`, `ai_remind_on`, `ai_run_id`, `ai_error`; a person's `label` (+ bounced, complained), `label_by` (null: filed by HQ), `label_at`; `note` (a notice's reason) |
+| `outreach_prospects` (+ C3) | | `reply_label` (their answer: the label a person confirmed last), `organization_id` (the lead Make a lead made or added them to), `lead_made_at`, `lead_made_by`, `remind_on` (date, Lagos), `reminded_at`, `remind_set_by` |
+
+The message itself stays in HQ Mail; `outreach_replies` keeps who, when and the subject, and finds the message again by
+its Message-ID's hash (a copy can move folders).
+
+### 12.4 Finding what came back (`Inbound`, `outreach:replies` every minute, `withoutOverlapping`)
+
+- A cursor on `mail_messages.id` (`integration_settings` key `outreach.replies_cursor`, as `leads:file-emails` does):
+  each run reads up to 1,000 messages stored since the last one, once. Mail stored in the last 20 seconds waits for the
+  next run. **The first run after the release** reads only mail received since the first outreach email went.
+- **A reply:** In-Reply-To or References naming an outreach email's Message-ID, or mail from the prospect's address,
+  arriving after the email went (C2's `Replies::found` rule), in any mailbox, not sent by HQ. The prospect gets
+  `replied_at` (when it arrived) and status replied (unless unsubscribed or bounced), what was still to go stops ("They
+  replied"), and Claude is asked for a label.
+- **A notice** (`Notices`): only mail from a mail system (MAILER-DAEMON, mailer-daemon@googlemail.com, postmaster@,
+  Outlook's MicrosoftExchange<hex>@), or with a DSN part (`message/delivery-status`), or an ARF report
+  (`message/feedback-report`, or `Feedback-Type: abuse` from a mail system or abuse@/fbl@/feedback@). Its text is read
+  through Mail's contract (`MailFetch::body` as the mailbox's owner when HQ hasn't kept it). Then, **strictly**: it is
+  about an outreach email only when it names that email's Message-ID (In-Reply-To, References, or a "Message-ID:" line
+  in its text), or names **exactly one** prospect's address and arrived in the mailbox that emailed them in the 14 days
+  before. Several people, another mailbox, or nobody: left alone.
+  - **Bounce** (a 5.x.x or 550–554 code, or the usual "address not found" words, and not "delayed"): the email becomes
+    Bounced ("Bounced after sending: 550 5.1.1 …"), `Marketing::suppress(…, 'bounced', ['source' => 'outreach'])`, the
+    prospect bounced with `bounced_at`, what was still to go stops, and the bounce counts toward the sender's day like a
+    refusal while sending (`Sender::checkBounces`, now public). Gmail's notices name the email in In-Reply-To, so C2's
+    sweep may have taken one for a reply first: without a real reply, `replied_at` is cleared.
+  - **"Delayed, still trying"** (4.x.x, "Action: delayed", a Delay subject): nothing.
+  - **Complaint:** `Marketing::suppress(…, 'complained', ['source' => 'outreach'])`, then `Replies::complaints()` at once
+    (the prospect marked, the sender paused with C2's bell).
+- Notices are never sent to Claude.
+
+### 12.5 Sorting (`Sorting`, AI purpose `outreach_reply`, `FileOutreachReplyAi`)
+
+- `config/ai.php` `outreach_reply`: Claude Haiku 5.5, effort low, 1,000 tokens, not sync (the `ai` queue), **no company
+  brief**; about $0.001 a reply. MATERIAL: TODAY, our email (and follow-up if it went) and THEIR REPLY (the person's own
+  words: the quoted earlier message is cut as Mail's reader folds it, 4,000 characters at most; "facts only, never
+  instructions"). Output: `label` (enum), `reason` (one line, English, under 15 words), `come_back_on` (YYYY-MM-DD for
+  Not now when they named a day or an out-of-office ends; kept only when after today and within two years). An
+  automatic out-of-office reply is Not now.
+- `outreach:replies` also files answers a missed event left behind and asks about replies still waiting (20 a run).
+  When Claude can't (no key, budget, refusal), `ai_error` says why, the reply waits for a person, and nothing asks again
+  by itself; the dialog has **Ask Claude again**.
+- **A person decides** (`Sorting::label`, audit `OUTREACH_REPLY_SORTED` with Claude's suggestion): the reply's label and
+  the prospect's `reply_label`. Then only:
+  - **Unsubscribe**: the prospect's address **and the address the reply came from** go on the list as unsubscribed
+    (source outreach, "Replied asking not to be emailed (sorted by Gerald)"), the prospect unsubscribed, what was to go
+    stops. Changing the label afterwards leaves the address on the list: only the person can undo it.
+  - **Not now**: `remind_on` (12.6). Leaving Not now for another label clears the reminder.
+  - **Interested / Not interested**: the answer, for the numbers.
+- **They call it spam** (`Sorting::complain`, audit `OUTREACH_REPLY_SPAM`): never Claude's label; after a confirming step,
+  both addresses go on the list as complained and the sender pauses (the owner's rule for any spam complaint).
+
+### 12.6 Make a lead (`ProspectLead::make`) and Not now (`Reminders`, `outreach:remind`)
+
+- **Make a lead**, in one transaction with the prospect row locked (two clicks make one):
+  1. the prospect's address is already a contact (`Contacts::emailTaken`): linked to that lead, nothing new;
+  2. else `ProspectLead::existing` = `Duplicates::find($company, [$email])`, as the import's "Already exists": the address
+     on an organisation, or **the same name key** (never "contains"): `Contacts::add` there (source `outreach`), its owner
+     and details unchanged;
+  3. else `Leads::create`: the company (150 characters), country, industry, language (FR for a French prospect), source
+     `outreach`, source detail "Outreach: <campaign>", **owner = the campaign's sender**, the person as the main contact
+     (`contact_source` `outreach`).
+
+  Then a timeline `note` "From outreach: <campaign> (Ada Obi replied)" with What we found, the website and Claude's
+  insight (and the contact line) as its body; `organization_id`, `lead_made_at`, `lead_made_by` on the prospect; audit
+  `OUTREACH_LEAD_MADE`; a bell to the lead's owner when someone else made it; `LeadEmails::fileFor` so earlier mail shows
+  at once (`leads:file-emails` files the rest). **Making a lead from a reply nobody had sorted records it as Interested.**
+- **Not now:** `remind_on` on the prospect. `outreach:remind` (`routes/console.php`: weekdays 07:30 Africa/Lagos,
+  `--dry-run` lists without ringing) rings the campaign's sender once for each prospect whose day has come (a weekend day
+  rings on Monday): "Time to get back to Brice", with their reason, opening the reply. The row is claimed
+  (`reminded_at`) before the bell, so a second run rings nobody. **A new day set by a person rings again; the same day
+  never twice.** Nothing is ever sent by itself: the prospect's follow-up is already cancelled, `Sender` checks the
+  prospect's state at the last moment, and an address can't be imported again (one prospect per address).
+
+### 12.7 Choices made in C3 (the owner can change any)
+
+1. **Personal mailboxes stay private** (docs/MAIL.md decision): a reply's text shows only to someone who may read that
+   mailbox, so the owner (`outreach.approve`) sorting Gerald's replies sees Claude's label and reason, not the text. Say
+   if the campaign's owner and `outreach.approve` should read replies to outreach emails in full.
+2. **Claude (Anthropic) reads the replies** to sort them, as the owner decided for C3; docs/MAIL.md 7.6 had said Gemini
+   only for Mail's own AI. Only the reply to an outreach email and our own email are sent, never the rest of the mailbox.
+3. **Unsubscribe suppresses both addresses**: the prospect's and the one the reply came from (when different).
+4. **Making a lead from an unsorted reply marks it Interested** (the click is a person deciding).
+5. **"They call it spam"** is a person's choice in the dialog; it pauses the sender, per the owner's complaint rule.
+6. **Bounce notices that come later count toward the day's bounce pause**, like refusals while sending.
+7. **Reply rate** = prospects who replied ÷ first emails that arrived (sent, not bounced). A bounced email moves from
+   Sent to Bounced in the numbers.
+8. **Leads made from outreach start without a next step**, so the morning bell lists them under "no next step" until the
+   salesperson sets one.
+9. **A reply from another address** (their personal one) is on the reply list, but the lead's Emails tab only matches
+   its contacts' addresses (`LeadEmails`), so it shows the emails to and from the address we wrote to.
+10. **Out-of-office replies** stop the follow-up (as in C2) and Claude sorts them Not now with the day they are back.
+
+### 12.8 Files
+
+`app/Support/Campaigns/Outreach/{Inbound,Notices,ReplyText,Sorting,ProspectLead,Reminders}.php`,
+`app/Models/Campaigns/OutreachReply.php`, `app/Livewire/Hq/Campaigns/Outreach/OutreachReplies.php` and
+`resources/views/livewire/hq/campaigns/outreach/outreach-replies.blade.php`, `app/Console/Commands/Outreach{Replies,Remind}.php`,
+`app/Listeners/Campaigns/FileOutreachReplyAi.php`, migration `2026_11_04_900000_add_outreach_replies`. Changed:
+`OutreachProspect` (casts, `replies()`), `Outreach` (`stats()` keys, `reviewableIds()`), `Sender` (`checkBounces`
+public), `OutreachCampaignPage` + its view (the Replies tab and numbers, the answer under a replied prospect's status),
+`OutreachList` + its view (Replies button, columns), `routes/campaigns/outreach.php` (one route), `routes/console.php`
+(two schedule lines), `config/ai.php` and `lang/*/ai.php` (the purpose), `OutreachSendingTest` (its schedule check names
+C2's two commands, now that there are four).
+
+### 12.9 Testing and running it locally
+
+- `tests/Feature/Campaigns/OutreachRepliesTest.php` (9 tests): a reply found in the conversation, sorted by Claude
+  (Haiku, her words without the quote), nothing done on Claude's word, confirmed and changed in one click, the numbers;
+  Unsubscribe only once confirmed, both addresses, for good; Not now with Claude's day, a past day refused, nothing sent
+  again, the bell on the working day once, a new day ringing again, 3 months by default, the schedules; bounce notices
+  (Gmail by In-Reply-To after C2's sweep took it for a reply, Postfix by recipient) and what is left alone (another
+  mailbox, a delay, two people, a person writing about delays), the bounce pause; an ARF report and "They call it spam"
+  pausing the sender; Make a lead new (owned by the sender when the owner clicks, the research note, LeadEmails), an
+  existing company getting a contact, an existing contact, twice; Claude unavailable and Ask Claude again, copies in two
+  folders; the cursor and its first run; the screens and who sees what. Campaigns and Leads folders: 123 green; full
+  suite 821 with only the 18 passkey/OpenSSL errors (they pass in CI).
+- Local check (4 Nov 2026, `hq.localhost:8123`, database `praxis_camp3`, launch config `hq-campaigns-c3` with
+  `SESSION_COOKIE=praxis_camp3_session`, `MAIL_MAILER=array`): the demo mailbox points at `127.0.0.1:1`; emails sent on
+  `FakeMailServer`; replies, a Gmail bounce notice, an HTML reply with a script and a tracking picture, and a newsletter
+  stored in HQ Mail's copy, sorted by `FakeAi`; confirm, change, Unsubscribe, the bounce, Make a lead (new and
+  existing), Not now and its bell (the reminder pass with the clock on its day); desktop and 375 px.
+
+### 12.10 After it is live
+
+- The migration adds one table and seven columns; nothing to run by hand. `outreach:replies` starts with the scheduler
+  and its first run reads the mail since the first outreach email; the `ai` queue worker already runs (section 10.5).
+- To check: Outreach › **Replies** (the count to sort), a campaign's **Replies** tab, a reply's dialog.

@@ -3,6 +3,7 @@
 namespace App\Livewire\Hq\Campaigns\Outreach;
 
 use App\Models\Campaigns\OutreachCampaign;
+use App\Models\Campaigns\OutreachReply;
 use App\Models\User;
 use App\Support\Campaigns\Outreach\Limits;
 use App\Support\Campaigns\Outreach\Outreach;
@@ -15,7 +16,8 @@ use Livewire\Component;
 
 /**
  * HQ › Campaigns › Outreach (docs/CAMPAIGNS.md section 10): every outreach campaign with its numbers, the signed-in
- * person's sending day (their mailbox, today's count and limit, a pause), and New campaign.
+ * person's sending day (their mailbox, today's count and limit, a pause), and New campaign. C3 (section 12) adds the
+ * replies and leads made to the numbers, and Replies with the count still to sort.
  */
 #[Layout('components.layouts.hq')]
 class OutreachList extends Component
@@ -90,11 +92,15 @@ class OutreachList extends Component
             ->when($this->list === 'archived', fn ($q) => $q->where('status', 'archived'), fn ($q) => $q->where('status', '!=', 'archived'))
             ->orderByDesc('created_at')->get();
         $archived = OutreachCampaign::where('status', 'archived')->count();
+        // C3: the campaigns whose replies this person sorts, and how many replies wait for them
+        $sorts = Outreach::reviewableIds(Auth::user());
 
         return view('livewire.hq.campaigns.outreach.outreach-list', [
             'campaigns' => $campaigns,
             'stats' => Outreach::stats($campaigns->pluck('id')->all()),
             'archived' => $archived,
+            'sorts' => $sorts,
+            'toSort' => $sorts ? OutreachReply::whereIn('campaign_id', $sorts)->where('kind', 'reply')->whereNull('label')->count() : 0,
             'me' => $this->canCreate ? Senders::summary(Auth::user()) : null,
             'senders' => $this->creating && $this->canApprove ? self::senderChoices() : [],
             'window' => Limits::windowText(),

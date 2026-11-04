@@ -15,6 +15,10 @@ Schedule::command('broadcast:process')->everyFiveMinutes()->withoutOverlapping(1
 // follow-ups when a prospect replies. Each never runs twice at once.
 Schedule::command('outreach:write')->everyMinute()->withoutOverlapping(10);
 Schedule::command('outreach:send')->everyMinute()->withoutOverlapping(10);
+// C3 (section 12): replies, bounce notices and spam complaints found in HQ Mail, and Claude's labels for the replies;
+// on working days at 07:30 Lagos time, a bell to the sender for each prospect who said not now and whose day has come
+Schedule::command('outreach:replies')->everyMinute()->withoutOverlapping(10);
+Schedule::command('outreach:remind')->weekdays()->dailyAt('07:30')->timezone('Africa/Lagos')->withoutOverlapping(10);
 
 // The The 120-Minute Idle Killswitch Command on hours spent working and the The QA SLA Auto-Approver Command from clients.
 Schedule::command('ops:qa-auto-approve')->everyMinute();
