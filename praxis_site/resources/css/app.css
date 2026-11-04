@@ -813,6 +813,18 @@
         transition: background var(--motion-instant), color var(--motion-instant); }
     .chat-close:hover { background: var(--color-mist); color: var(--color-ink); }
     .chat-close svg, .chat-close i[data-lucide] { display: inline-block; width: 20px; height: 20px; }
+    /* The notice behind the (i) next to the title: hover (pointer devices), a tap or a keypress opens it over the log */
+    .chat-head { padding: 16px 60px 16px 20px; }
+    .chat-title { display: flex; align-items: center; gap: 2px; min-height: 28px; }
+    .chat-info-button { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin: -6px 0; border: 0; border-radius: 50%; background: transparent; color: var(--color-muted); cursor: pointer;
+        transition: background var(--motion-instant), color var(--motion-instant); }
+    .chat-info-button:hover, .chat-info-button[aria-expanded="true"] { background: var(--color-mist); color: var(--color-ink); }
+    .chat-info-button svg, .chat-info-button i[data-lucide] { display: inline-block; width: 18px; height: 18px; }
+    .chat-head .chat-info-text { position: absolute; z-index: 2; top: calc(100% - 6px); left: 12px; right: 12px; margin: 0; padding: 12px 14px; background: var(--color-paper); border: 1px solid var(--color-line); border-radius: 12px; box-shadow: 0 12px 32px rgba(12, 20, 43, 0.14);
+        font-size: 0.8125rem; line-height: 1.25rem; color: var(--color-slate); opacity: 0; visibility: hidden; transform: translateY(-4px);
+        transition: opacity var(--motion-quick) var(--ease-enter), transform var(--motion-quick) var(--ease-settle), visibility 0s linear var(--motion-quick); }
+    .chat-info.is-open .chat-info-text, .chat-info:not(.is-ready):focus-within .chat-info-text { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+    @media (hover: hover) { .chat-info:hover .chat-info-text { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; } }
     .chat-log { gap: 14px; padding: 16px 20px; scroll-behavior: smooth; overscroll-behavior: contain; }
     .chat-turn { max-width: 100%; padding: 0; border-radius: 0; font-size: 0.9375rem; line-height: 1.5rem; }
     .chat-turn.is-user { justify-self: end; max-width: 85%; padding: 9px 14px; border-radius: 18px 18px 4px 18px; background: var(--color-mist); color: var(--color-ink); }
@@ -848,6 +860,7 @@
     @media (prefers-reduced-motion: reduce) {
         .chat-word, .chat-turn .chat-links { opacity: 1; animation: none; }
         .chat-dots span { animation: none; opacity: 0.6; }
+        .chat-head .chat-info-text { transform: none; }
     }
 
     /* ---- Lenis (motion/cinematic.js), as its own stylesheet asks ---- */

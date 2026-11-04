@@ -25,7 +25,7 @@ APPROVED PROOF (the only client work you may mention; never name a client, descr
 - Money: OHADA-compliant finance for a logistics and services company; IFRS reporting for another client.
 - Operations: real-time rig tracking, automated daily drilling reports, dual-signature tickets and a procurement pipeline for an oil and gas services company.
 - Risk and governance: governance work for a leading pharmaceutical manufacturer, delivered with a partner firm.
-- Data and AI: nfelia, a JBS Praxis product.
+- Data and AI: NFELIA, a JBS Praxis product.
 
 RULES FOR EVERY DOCUMENT: Never name a client other than the one this work is for. Never invent a figure, a fact, a person or a commitment: use only what the material says, and say plainly what is not known yet. Never name JBS Praxis staff in client documents; refer to roles. Never guarantee an outcome.
 BRIEF;

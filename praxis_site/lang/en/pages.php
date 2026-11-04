@@ -72,7 +72,7 @@ return [
             'Orika Living',
             'A leading pharmaceutical manufacturer, with Tales Consulting',
             'La Petite Cour',
-            'nfelia, our own product',
+            'NFELIA, our own product',
         ],
         'calculator_title' => 'What is poor quality costing you?',
         'calculator_text' => 'Rework, delays, errors and double entry have a price. Estimate yours in a few minutes, in your currency.',
@@ -124,7 +124,7 @@ return [
         'ourselves_title' => 'We run on it ourselves',
         'ourselves_text' => 'We run our own invoicing, payroll, projects and approvals on the same system we build for clients.',
         'products_title' => 'Our products',
-        'nfelia' => 'nfelia, a JBS Praxis product.',
+        'nfelia' => 'NFELIA, a JBS Praxis product.',
         // Our products (redesign PR 3): what each one is as a product, apart from any client's case study
         'hq_caption' => 'JBS Praxis HQ, where we run our own invoicing, payroll, projects and approvals.',
         'hq_alt' => 'The sign-in screen of JBS Praxis HQ.',
@@ -144,7 +144,7 @@ return [
                 'link' => 'See it at work: Smart Logistics and Services',
             ],
             'nfelia' => [
-                'name' => 'nfelia',
+                'name' => 'NFELIA',
                 'line' => 'Our product for small businesses that sell through WhatsApp, Instagram and word of mouth.',
                 'points' => [
                     'A website of its own for each business',
@@ -153,7 +153,7 @@ return [
                     'In plain words, for owners who are not accountants',
                 ],
                 'status' => 'Live in Nigeria, Cameroon, Ghana and Kenya.',
-                'link' => 'Visit nfelia.com',
+                'link' => 'Visit the NFELIA website',
             ],
         ],
         'security_title' => 'Security and data',

@@ -494,6 +494,7 @@ return [
         'title' => 'Praxis AI',
         'close' => 'Close Ask Praxis',
         'intro' => 'Ask about our services, the Praxis Method or the free audit and demo. Answers can contain mistakes, so check important details with our team. Please don’t share passwords or payment details.',
+        'about' => 'About Praxis AI',
         'you' => 'You',
         'assistant' => 'Praxis AI',
         'links' => 'Pages that may help',

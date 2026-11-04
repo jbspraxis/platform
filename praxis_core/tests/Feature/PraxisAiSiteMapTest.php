@@ -17,7 +17,7 @@ class PraxisAiSiteMapTest extends TestCase
         $links = PraxisAi::links(['/work/nfelia', '/industries', '/work/', '/unknown'], 'fr');
 
         $this->assertSame(['/work/nfelia', '/industries', '/work'], array_column($links, 'path'));
-        $this->assertSame(['Découvrir nfelia', 'Voir les secteurs que nous servons', 'Voir nos réalisations'], array_column($links, 'label'));
+        $this->assertSame(['Découvrir NFELIA', 'Voir les secteurs que nous servons', 'Voir nos réalisations'], array_column($links, 'label'));
         $this->assertSame('Read the Smart Logistics case study', PraxisAi::links(['/work/smart-logistics'], 'en')[0]['label']);
     }
 

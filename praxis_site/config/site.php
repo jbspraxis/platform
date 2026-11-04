@@ -109,7 +109,7 @@ return [
         ['file' => 'ok-veggies', 'name' => 'OK Veggies'],
         // Our own products, side by side
         ['file' => 'praxis-ls', 'name' => 'Praxis LS'],
-        ['file' => 'nfelia', 'name' => 'nfelia'],
+        ['file' => 'nfelia', 'name' => 'NFELIA'],
     ],
 
     /*
