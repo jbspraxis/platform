@@ -55,6 +55,15 @@ class MysqlClient
         return $out;
     }
 
+    /** Whether the database exists and this user has rights on it (the scratch database, which the plan may not allow) */
+    public function canUse(string $database): bool
+    {
+        $found = $this->pdo()->prepare('SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?');
+        $found->execute([$database]);
+
+        return (int) $found->fetchColumn() > 0;
+    }
+
     public function countRows(string $database, string $table): int
     {
         return (int) $this->pdo()->query('SELECT COUNT(*) FROM ' . self::quote($database) . '.' . self::quote($table))->fetchColumn();

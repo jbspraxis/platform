@@ -3,6 +3,7 @@
 namespace App\Support\Backups;
 
 use App\Support\Monitor\ErrorMonitor;
+use Illuminate\Support\Str;
 
 /**
  * backups:setup (owner's decision 3; docs/BACKUPS.md 4), run once on the server by a one-shot cron line, and safe to
@@ -10,8 +11,9 @@ use App\Support\Monitor\ErrorMonitor;
  *   1. the backups folder ~/backups (700);
  *   2. the read-only MySQL user, with a random password nobody sees: it goes straight into ~/.backup-my.cnf (600),
  *      never to the screen, a log or the repository (an existing user whose file was lost gets a new password);
- *   3. the scratch database of the restore test, which only the backup user may write to;
- *   4. read access (SELECT, SHOW VIEW, LOCK TABLES, TRIGGER, EVENT) to every database the account owns.
+ *   3. read access (SELECT, SHOW VIEW, LOCK TABLES, TRIGGER, EVENT) to every database the account owns;
+ *   4. the scratch database of the restore test, which only the backup user may write to, when the plan allows one
+ *      more database. When it doesn't (5 of 5 used, 4 Nov 2026) the setup still succeeds and says so plainly.
  * Then it signs in as that user, and lists each database with its site and each site's upload folders.
  */
 class Setup
@@ -24,7 +26,6 @@ class Setup
         if (config('backups.databases_from') !== 'cpanel') {
             throw new BackupFailed('setup', 'backups:setup works through cPanel (BACKUP_DATABASES_FROM=cpanel). Off the server, write the client file by hand (docs/BACKUPS.md, section 9).');
         }
-        $would = $dryRun ? 'Would ' : '';
         $user = (string) config('backups.mysql_user');
         $scratch = (string) config('backups.scratch_database');
         $cnf = $this->mysql->cnf();
@@ -40,7 +41,7 @@ class Setup
                 MysqlClient::writeCnf($cnf, self::client($user, $password));
                 unset($password);
             }
-            $lines[] = $would . "create the read-only MySQL user {$user}; its password is only in {$cnf} (600).";
+            $lines[] = ($dryRun ? 'Would create' : 'Created') . " the read-only MySQL user {$user}; its password is only in {$cnf} (600).";
         } elseif (! is_file($cnf)) {
             if (! $dryRun) {
                 $password = self::password();
@@ -48,22 +49,12 @@ class Setup
                 MysqlClient::writeCnf($cnf, self::client($user, $password));
                 unset($password);
             }
-            $lines[] = $would . "give {$user} a new password (its client file {$cnf} was missing).";
+            $lines[] = ($dryRun ? 'Would give' : 'Gave') . " {$user} a new password (its client file {$cnf} was missing).";
         } else {
             $lines[] = "The MySQL user {$user} and its client file are already in place.";
         }
 
         $databases = $this->cpanel->databases();
-        if (! in_array($scratch, array_column($databases, 'database'), true)) {
-            if (! $dryRun) {
-                $this->cpanel->createDatabase($scratch);
-            }
-            $lines[] = $would . "create the scratch database {$scratch} for the weekly restore test.";
-        }
-        if (! $dryRun) {
-            $this->cpanel->grant($user, $scratch, ['ALL PRIVILEGES']);
-        }
-
         $granted = 0;
         foreach ($databases as $db) {
             if ($db['database'] === $scratch || in_array($db['database'], (array) config('backups.exclude_databases'), true)) {
@@ -74,7 +65,9 @@ class Setup
             }
             $granted++;
         }
-        $lines[] = $would . "give {$user} read access to {$granted} database(s): " . implode(', ', Cpanel::READ_PRIVILEGES) . '.';
+        $lines[] = ($dryRun ? 'Would give' : 'Gave') . " {$user} read access to {$granted} database(s): " . implode(', ', Cpanel::READ_PRIVILEGES) . '.';
+
+        array_push($lines, ...$this->scratch($user, $scratch, in_array($scratch, array_column($databases, 'database'), true), $dryRun));
 
         if (! $dryRun) {
             $this->mysql->pdo();
@@ -88,7 +81,8 @@ class Setup
                 continue;
             }
             $site = Sites::forDatabase($db['database']);
-            $tables = $dryRun ? '' : ' (' . count($this->mysql->objects($db['database'])['tables']) . ' tables)';
+            $count = $dryRun ? 0 : count($this->mysql->objects($db['database'])['tables']);
+            $tables = $dryRun ? '' : " ({$count} " . Str::plural('table', $count) . ')';
             $lines[] = "  {$db['database']} → " . (Sites::isOther($site) ? "{$site}  ← no site claims it: add it in config/backups.php" : $site) . $tables;
         }
         $claimed = array_unique(array_map(fn ($d) => Sites::forDatabase($d['database']), $databases));
@@ -123,6 +117,38 @@ class Setup
         }
 
         return $lines;
+    }
+
+    /**
+     * The restore test's scratch database, if the plan allows one more database. Without it the backups still run:
+     * the weekly test is a dump check (docs/BACKUPS.md 5), and a later backups:setup brings the import test back.
+     */
+    /** @return list<string> */
+    private function scratch(string $user, string $scratch, bool $exists, bool $dryRun): array
+    {
+        if ($dryRun) {
+            return [$exists ? "The scratch database {$scratch} exists: the weekly restore test imports each dump into it."
+                : "Would create the scratch database {$scratch} for the weekly restore test, if the cPanel plan allows one more database (if not, the weekly test is a dump check)."];
+        }
+        if (! $exists) {
+            try {
+                $this->cpanel->createDatabase($scratch);
+            } catch (BackupFailed $e) {
+                $limit = (bool) preg_match('/maximum|allotment|limit|quota/i', $e->getMessage());
+
+                return [
+                    "Could not create the scratch database {$scratch}" . ($limit ? ': the cPanel plan allows no more databases.' : '.')
+                        . ' cPanel said: ' . preg_replace('/^cPanel refused \S+: /', '', $e->getMessage()),
+                    'The backups still run every night. Until there is a scratch database, the weekly restore test is a dump check:'
+                        . ' each dump is decompressed to the end, counted table by table and checked against the live tables and views, but not imported.',
+                    'When the host allows one more database, run backups:setup again: the full import test then comes back by itself.',
+                ];
+            }
+        }
+        $this->cpanel->grant($user, $scratch, ['ALL PRIVILEGES']);
+
+        return [($exists ? "The scratch database {$scratch} is in place" : "Created the scratch database {$scratch}")
+            . ': the weekly restore test imports each dump into it (only the backup user may write to it).'];
     }
 
     /** The [client] section: the user, its password, and where MySQL is (the socket on localhost, on the server) */

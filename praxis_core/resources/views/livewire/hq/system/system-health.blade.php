@@ -82,7 +82,7 @@
                     <h2 id="sh-backups" class="card-title" style="font-size: 0.9375rem;">Server backups</h2>
                     <p class="help" style="margin: 4px 0 0;">
                         {{ $backups['setUp']
-                            ? 'Every database at 02:00 and every site’s uploaded files on Sundays at 03:00 (Lagos time), encrypted with the owner’s key, to Drive › ' . config('backups.drive.root') . '. Restore test on Sundays.'
+                            ? 'Every database at 02:00 and every site’s uploaded files on Sundays at 03:00 (Lagos time), encrypted with the owner’s key, to Drive › ' . config('backups.drive.root') . '. Weekly test on Sundays: an import into a scratch database, or a dump check while the plan allows none.'
                             : 'Not switched on yet: docs/BACKUPS.md, section 4.' }}
                     </p>
                 </div>
@@ -92,7 +92,7 @@
                             <tr>
                                 <th>Site</th>
                                 <th>Last database backup</th>
-                                <th>Restore test</th>
+                                <th>Weekly test</th>
                                 <th>Last files backup</th>
                                 <th>Status</th>
                             </tr>
@@ -111,8 +111,13 @@
                                     </td>
                                     <td>
                                         @if($test = $s['restore_result'])
-                                            <span class="pill {{ $test['ok'] ? 'pill-success' : 'pill-danger' }}">{{ $test['ok'] ? 'Passed' : 'Failed' }}</span>
-                                            <div class="sh-where">{{ $when($s['restore']) }} · {{ number_format($test['tables']) }} {{ \Illuminate\Support\Str::plural('table', $test['tables']) }}, {{ number_format($test['rows']) }} {{ \Illuminate\Support\Str::plural('row', $test['rows']) }}</div>
+                                            {{-- A dump check (no scratch database) never reads as an imported restore test --}}
+                                            @php($checkedOnly = \App\Support\Backups\RestoreTest::isDumpCheck($test))
+                                            <span class="pill {{ ! $test['ok'] ? 'pill-danger' : ($checkedOnly ? 'pill-info' : 'pill-success') }}">{{ \App\Support\Backups\RestoreTest::label($test) }}</span>
+                                            <div class="sh-where">{{ $when($s['restore']) }} · {{ number_format($test['tables']) }} {{ \Illuminate\Support\Str::plural('table', $test['tables']) }}, {{ number_format($test['rows']) }} {{ \Illuminate\Support\Str::plural('row', $test['rows']) }}{{ $checkedOnly ? ' in the dump' : ' imported' }}</div>
+                                            @if($checkedOnly)
+                                                <div class="sh-where" style="word-break: normal;">Not imported: {{ $test['reason'] ?? 'no scratch database' }}.</div>
+                                            @endif
                                         @else
                                             <span class="help">Not yet</span>
                                         @endif

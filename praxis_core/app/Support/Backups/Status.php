@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Proof the backups work (owner's decision 7): per site, the last database backup and the last files backup, with
- * the last restore test, for HQ › System health; and the hourly check that rings the owner when a site's last good
+ * the last weekly test (a restore test, or a dump check while there is no scratch database), for HQ › System health; and the hourly check that rings the owner when a site's last good
  * backup is older than 26 hours. A row still "running" six hours after it started counts as failed (the run died).
  */
 final class Status
@@ -62,9 +62,9 @@ final class Status
                 $bad[] = 'No database backup has worked yet.';
             }
             if ($restoreResult && ! ($restoreResult['ok'] ?? false)) {
-                $bad[] = 'The last restore test failed: ' . implode('; ', array_slice((array) ($restoreResult['mismatches'] ?? []), 0, 2));
+                $bad[] = 'The last ' . lcfirst((string) RestoreTest::label($restoreResult)) . ': ' . implode('; ', array_slice((array) ($restoreResult['mismatches'] ?? []), 0, 2));
             } elseif ($dbOk && (! $restore || Carbon::parse($restore->started_at)->lt(now()->subDays(8)))) {
-                $warn[] = 'No restore test in the last week.';
+                $warn[] = 'No restore test or dump check in the last week.';
             }
             if (! Sites::isOther($site)) {
                 if ($config['files'] === []) {
@@ -113,8 +113,11 @@ final class Status
         $good = count(array_filter($sites, fn ($s) => $s['state'] === 'ok'));
         $problems = array_values(array_filter($sites, fn ($s) => $s['state'] !== 'ok'));
         $last = DB::table('server_backups')->where('kind', 'db')->where('status', 'ok')->max('finished_at');
+        // A dump check is not a restore test: say so, without turning the check amber (the plan limit is no failure)
+        $checkedOnly = collect($sites)->contains(fn ($s) => $s['restore_result'] && RestoreTest::isDumpCheck($s['restore_result']));
         $detail = $good . ' of ' . count($sites) . ' sites fully backed up.'
             . ($last ? ' Last database backup ' . HealthChecks::ago($last) . '.' : '')
+            . ($checkedOnly ? ' The weekly test is a dump check, not an import: there is no scratch database (the cPanel plan’s database limit).' : '')
             . ($problems ? ' ' . implode(' ', array_map(fn ($s) => $s['site'] . ': ' . ($s['notes'][0] ?? 'not backed up yet.'), array_slice($problems, 0, 3))) : '');
 
         return ['label' => $label, 'state' => $state, 'detail' => $detail,

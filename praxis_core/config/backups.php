@@ -53,18 +53,20 @@ return [
         'praxis' => [
             'label' => 'HQ, jbspraxis.com and the portal',
             'databases' => ['smartqaq_praxis_core'],
-            'files' => ['praxis_core/storage/app/private', 'praxis_core/storage/app/public'],
+            // public_html/PRAXIS/storage is not listed: it is storage:link's symlink to praxis_core/storage/app/public
+            'files' => ['praxis_core/storage/app/private', 'praxis_core/storage/app/public', 'praxis_site/storage/app'],
         ],
         'lpc' => [
-            'label' => 'bureau.lpc.cm',
+            'label' => 'bureau.lpc.cm and lpc.cm',
             'databases' => ['smartqaq_lpc_core'],
-            'files' => ['public_html/bureau.lpc.cm/uploads'],
+            'files' => ['public_html/bureau.lpc.cm/uploads', 'public_html/lpc.cm/uploads'],
         ],
         'nfelia' => [
-            'label' => 'nfelia.com',
+            'label' => 'nfelia.com and nfelia.lpc.cm',
             'databases' => ['smartqaq_nfelia_core'],
             // storage/ holds the private records, order proofs, signatures and MoMo receipts; its pdf/ only caches
-            'files' => ['public_html/nfelia.com/uploads', 'public_html/nfelia.com/storage'],
+            'files' => ['public_html/nfelia.com/uploads', 'public_html/nfelia.com/storage',
+                'public_html/nfelia.lpc.cm/uploads', 'public_html/nfelia.lpc.cm/storage'],
             'exclude' => ['framework', 'release', 'tmp'],
         ],
         'hodlc' => [
@@ -75,15 +77,17 @@ return [
         'smartls' => [
             'label' => 'smartls.cm (the account’s main domain)',
             'databases' => ['smartqaq_smartls'],
-            // The docroot is public_html itself: only its uploads folder, never the rest (other sites, old archives)
-            'files' => ['public_html/uploads', 'uploads'],
+            // The docroot is public_html itself: only its upload folders, never the rest (other sites, old archives).
+            // www/uploads is the same folder as public_html/uploads (www is a link to public_html).
+            'files' => ['public_html/uploads', 'public_html/administration/uploads', 'public_html/administration/upload',
+                'public_html/administration/storage', 'public_html/assets/uploads', 'uploads'],
         ],
     ],
 
-    // Left out of every files backup: caches, logs, sessions and installed packages, and archives and old backup
-    // copies (the old .zip and .tar exports kept on the server are not uploaded files)
+    // Left out of every files backup: caches, logs, sessions and installed packages, and archives and old copies
+    // (the old .zip and .tar exports and the .bak, .failed_, .pre_ and _backup_ copies on the server are not uploads)
     'exclude' => ['cache', 'sessions', 'logs', 'vendor', 'node_modules', '*.log', 'error_log',
-        '*.zip', '*.tar', '*.tar.gz', '*.tgz', '*.bak', '*_backup_*'],
+        '*.zip', '*.tar', '*.tar.gz', '*.tgz', '*.bak', '*.failed_*', '*.pre_*', '*_backup_*'],
 
     // How many of each Drive keeps (dates, newest first), and how many the server keeps in the backups folder
     'retention' => ['daily' => 30, 'monthly' => 12, 'files' => 8],
