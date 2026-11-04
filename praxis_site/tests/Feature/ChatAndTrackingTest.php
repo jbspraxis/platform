@@ -29,7 +29,7 @@ class ChatAndTrackingTest extends TestCase
 
         foreach (['/', '/contact', '/feedback'] as $path) {
             $this->get($path)->assertSee('id="chat"', false)
-                ->assertSee('Ask Praxis AI')
+                ->assertSee('Ask Praxis')
                 ->assertSee('<h2>Praxis AI</h2>', false)
                 ->assertSee('action="' . url('/chat') . '"', false)
                 ->assertDontSee('JBS Praxis assistant')

@@ -469,7 +469,7 @@ return [
 
     // Praxis AI, the website assistant (docs/SITE_API.md 6.5)
     'chat' => [
-        'open' => 'Ask Praxis AI',
+        'open' => 'Ask Praxis',
         'title' => 'Praxis AI',
         'intro' => 'Ask about our services, the Praxis Method or the free audit and demo. Answers can contain mistakes, so check important details with our team. Please don’t share passwords or payment details.',
         'you' => 'You',
@@ -478,6 +478,8 @@ return [
         'message' => 'Your question',
         'send' => 'Send question',
         'sending' => 'Writing a reply…',
+        'typing' => 'Praxis AI is writing',
+        'shortcut' => 'Enter to send, Shift and Enter for a new line',
         'required' => 'Type a question first.',
         'too_long' => 'Keep your question under 1,500 characters.',
         'unavailable' => 'Praxis AI isn’t available right now. Try again in a few minutes, or email us at :email.',

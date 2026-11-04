@@ -1,5 +1,6 @@
 import { createIcons } from 'lucide';
 import icons from './icons';
+import { startMotion } from './motion/index';
 
 // Icons are written as <i data-lucide="name"> in the views: one pinned copy of lucide (package.json), only
 // the icons the views use (scripts/icons.mjs), drawn with a 1.5px stroke (docs/BRAND.md section 9).
@@ -54,8 +55,36 @@ function chatLinks(links, label) {
     return [group];
 }
 
-// Praxis AI works as a plain form (POST /chat, then back to the page). With JavaScript the reply is
-// fetched and added in place. Text is always set with textContent, never as HTML.
+// Ask Praxis (Praxis AI) works as a plain form (POST /chat, then back to the page). With JavaScript it feels like a
+// conversation (redesign PR 2): Enter sends at once and the question appears straight away, a typing indicator holds
+// the place, then the reply writes itself in, word by word (all at once with reduced motion). Text is always set
+// with textContent, never as HTML. The hero's question box hands its question over with window.praxisAsk().
+const REDUCED = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Wrap each word of the reply's text nodes in a span that fades in after the one before (at most 160 animated)
+function writeIn(item) {
+    if (REDUCED()) return;
+    let index = 0;
+    const walker = document.createTreeWalker(item, NodeFilter.SHOW_TEXT, {
+        acceptNode: (node) => (node.parentElement?.closest('.who, .chat-links') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+    });
+    const texts = [];
+    while (walker.nextNode()) texts.push(walker.currentNode);
+    for (const node of texts) {
+        const fragment = document.createDocumentFragment();
+        for (const part of node.textContent.split(/(\s+)/)) {
+            if (part === '' || /^\s+$/.test(part) || index > 160) { fragment.append(part); continue; }
+            const word = document.createElement('span');
+            word.className = 'chat-word';
+            word.style.setProperty('--i', String(index++));
+            word.textContent = part;
+            fragment.append(word);
+        }
+        node.replaceWith(fragment);
+    }
+    item.querySelector('.chat-links')?.style.setProperty('--i', String(Math.min(index, 160) + 4));
+}
+
 function enhanceChat() {
     const form = document.querySelector('[data-chat-form]');
     const log = document.querySelector('[data-chat-log]');
@@ -65,18 +94,53 @@ function enhanceChat() {
 
     const textarea = form.querySelector('textarea');
     const button = form.querySelector('button[type="submit"]');
-    const scrollDown = () => { log.scrollTop = log.scrollHeight; };
+    const scrollDown = (smooth = true) => log.scrollTo({ top: log.scrollHeight, behavior: smooth && !REDUCED() ? 'smooth' : 'auto' });
+    let busy = false;
 
-    const addTurn = (role, text, links = []) => {
+    const addTurn = (role, text, links = [], animate = false) => {
         const item = document.createElement('li');
         item.className = 'chat-turn ' + (role === 'user' ? 'is-user' : 'is-assistant');
         const who = document.createElement('span');
         who.className = 'who';
         who.textContent = role === 'user' ? form.dataset.you : form.dataset.assistant;
         item.append(who, ...(role === 'user' ? [document.createTextNode(text)] : [...chatNodes(text), ...chatLinks(links, form.dataset.links)]));
+        if (animate) writeIn(item);
         log.append(item);
         scrollDown();
+        return item;
     };
+
+    // The typing indicator: three dots in the assistant's place (screen readers hear "Praxis AI is writing")
+    const typing = () => {
+        const item = document.createElement('li');
+        item.className = 'chat-turn is-assistant is-typing';
+        const who = document.createElement('span');
+        who.className = 'who';
+        who.textContent = form.dataset.assistant;
+        const dots = document.createElement('span');
+        dots.className = 'chat-dots';
+        dots.setAttribute('role', 'img');
+        dots.setAttribute('aria-label', form.dataset.typing);
+        dots.append(document.createElement('span'), document.createElement('span'), document.createElement('span'));
+        item.append(who, dots);
+        log.append(item);
+        scrollDown();
+        return item;
+    };
+
+    // The box grows with the question, up to about six lines
+    const grow = () => {
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 168) + 'px';
+    };
+    textarea.addEventListener('input', grow);
+    // Enter sends; Shift and Enter (or Enter while an input method is composing) makes a new line
+    textarea.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+            event.preventDefault();
+            form.requestSubmit();
+        }
+    });
 
     // Cloudflare Turnstile (only when its keys are set): a token works once, so ask for a fresh one after each question
     const resetCheck = () => {
@@ -87,19 +151,23 @@ function enhanceChat() {
     };
 
     details?.addEventListener('toggle', () => {
-        if (details.open) { scrollDown(); textarea?.focus(); }
+        if (details.open) { scrollDown(false); textarea?.focus(); }
     });
-    if (details?.open) scrollDown();
+    if (details?.open) scrollDown(false);
 
     form.addEventListener('submit', async (event) => {
         const message = textarea.value.trim();
         if (message === '') return; // the server answers with the message to type a question first
         event.preventDefault();
+        if (busy) return;
+        busy = true;
 
         addTurn('user', message);
         textarea.value = '';
+        grow();
         button.disabled = true;
-        status.textContent = form.dataset.sending;
+        status.textContent = '';
+        const waiting = typing();
 
         try {
             const body = new FormData(form);
@@ -111,24 +179,36 @@ function enhanceChat() {
                 body,
             });
             const data = await response.json().catch(() => ({}));
+            waiting.remove();
             if (response.ok && typeof data.reply === 'string' && data.reply !== '') {
                 // HQ's calm limit text (limited: true) is shown like any other reply
-                addTurn('assistant', data.reply, data.links);
-                status.textContent = '';
+                addTurn('assistant', data.reply, data.links, true);
             } else {
                 // 419: the page's form token expired (the framework's words, not ours); otherwise the site's or HQ's message
                 status.textContent = response.status === 419 ? form.dataset.expired : (data.message || form.dataset.failed);
                 textarea.value = message;
+                grow();
             }
         } catch {
+            waiting.remove();
             status.textContent = form.dataset.failed;
             textarea.value = message;
+            grow();
         } finally {
+            busy = false;
             button.disabled = false;
             resetCheck();
             textarea.focus();
         }
     });
+
+    // The hero's question box (pages/home.blade.php) asks here: open the panel, then send
+    window.praxisAsk = (question) => {
+        if (details && !details.open) details.open = true;
+        textarea.value = question;
+        grow();
+        form.requestSubmit();
+    };
 }
 
 // Show a "something else" field only when its choice is picked (it stays visible without JavaScript)
@@ -141,48 +221,6 @@ function toggleOtherFields() {
         select.addEventListener('change', update);
         update();
     });
-}
-
-// The home page's interface loop (6.4 MB). It downloads only where it can play well: a wide screen, no Data Saver,
-// a fast connection, and only after the page has loaded and the frame is in view. Everywhere else the poster stays
-// and the button offers to play it. Reduced motion: never plays by itself. Off-screen it pauses (and resumes),
-// and the button always pauses it (moving content longer than 5 seconds needs a pause control, WCAG 2.2.2).
-function enhanceLoop() {
-    const video = document.querySelector('[data-loop]');
-    const toggle = document.querySelector('[data-loop-toggle]');
-    if (!video || !toggle) return;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const connection = navigator.connection || {};
-    const slow = connection.saveData === true || /(^|-)(2g|3g)$/.test(connection.effectiveType || '');
-    const autoplay = !reduced && !slow && window.matchMedia('(min-width: 1080px)').matches;
-
-    const show = (playing) => {
-        const label = playing ? toggle.dataset.pause : toggle.dataset.play;
-        toggle.setAttribute('aria-label', label);
-        toggle.title = label;
-        const icon = document.createElement('i');
-        icon.setAttribute('data-lucide', playing ? 'pause' : 'play'); // both listed in pages/home.blade.php for icons.mjs
-        toggle.replaceChildren(icon);
-        drawIcons();
-    };
-    toggle.addEventListener('click', () => {
-        // Remember a pause the visitor chose, so scrolling back or closing the demo dialog doesn't restart the loop
-        if (video.paused) { delete video.dataset.userPaused; video.play().catch(() => {}); } else { video.dataset.userPaused = '1'; video.pause(); }
-    });
-    video.addEventListener('play', () => show(true));
-    video.addEventListener('pause', () => show(false));
-    show(false);
-    toggle.hidden = false;
-    if (!autoplay) { video.dataset.userPaused = '1'; return; }
-
-    const start = () => {
-        if (!('IntersectionObserver' in window)) { video.play().catch(() => show(false)); return; }
-        new IntersectionObserver((entries) => entries.forEach((entry) => {
-            if (video.dataset.userPaused || document.querySelector('[data-demo-dialog][open]')) return;
-            if (entry.isIntersecting) video.play().catch(() => show(false)); else video.pause();
-        }), { threshold: 0.25 }).observe(video);
-    };
-    if (document.readyState === 'complete') start(); else window.addEventListener('load', start, { once: true });
 }
 
 // The narrated demo (partials.demo-dialog): the link opens a dialog and only then adds YouTube's player, with captions
@@ -366,8 +404,8 @@ document.addEventListener('DOMContentLoaded', () => {
     enhanceHeaderMenus();
     enhanceChat();
     toggleOtherFields();
-    enhanceLoop();
     enhanceDemo();
     enhanceConsent();
     enhanceVerify();
+    startMotion();
 });

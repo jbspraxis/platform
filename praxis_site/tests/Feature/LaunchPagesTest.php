@@ -84,7 +84,7 @@ class LaunchPagesTest extends TestCase
 
         config(['site.demo_video' => ['en' => '', 'fr' => '']]);
         $off = $this->get('/');
-        $off->assertOk()->assertDontSee('data-demo-open', false)->assertSee('media/hero-60s-loop.mp4', false);
+        $off->assertOk()->assertDontSee('data-demo-open', false)->assertSee('data-answer', false)->assertDontSee('<video', false);
         $this->assertStringNotContainsString('youtube', $off->headers->get('Content-Security-Policy'));
 
         config(['site.demo_video' => ['en' => 'EnDemo123', 'fr' => 'FrDemo456']]);

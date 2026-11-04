@@ -54,24 +54,14 @@ class FoundationTest extends TestCase
         $this->assertNull($this->breadcrumbs($this->get('/')->assertOk()->getContent()));
     }
 
-    public function test_no_font_is_preloaded_and_the_hero_poster_is_fetched_first(): void
+    public function test_no_font_is_preloaded(): void
     {
-        // Lighthouse (4 Nov 2026): preloading 160 KB of fonts pushed the poster, the largest element on a phone,
-        // back by 0.7 s. The metric-matched fallbacks keep the text still without them.
+        // Lighthouse (4 Nov 2026): preloading 160 KB of fonts delayed the largest element on a phone by 0.7 s.
+        // The metric-matched fallbacks keep the text still without them.
         $this->fakeHq();
 
         $this->get('/industries')->assertOk()->assertDontSee('as="font"', false);
-        $this->get('/')->assertOk()->assertSee('<link rel="preload" as="image" fetchpriority="high" href="' . asset('media/hero-60s-poster-1280.webp') . '">', false);
-    }
-
-    public function test_the_hero_loop_downloads_nothing_until_the_script_chooses_to_play_it(): void
-    {
-        $this->fakeHq();
-
-        $this->get('/')->assertOk()
-            ->assertSee('playsinline preload="none"', false)
-            ->assertDontSee('preload="metadata"', false)
-            ->assertDontSee(' autoplay', false);
+        $this->get('/')->assertOk()->assertDontSee('as="font"', false);
     }
 
     public function test_the_picture_component_offers_avif_and_webp_at_three_widths_with_a_fixed_size(): void
