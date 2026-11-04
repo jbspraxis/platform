@@ -143,13 +143,18 @@ function toggleOtherFields() {
     });
 }
 
-// The home page's interface loop: plays only when the visitor hasn't asked for reduced motion, and the button
-// pauses it (moving content longer than 5 seconds needs a pause control). Without JavaScript the poster shows.
+// The home page's interface loop (6.4 MB). It downloads only where it can play well: a wide screen, no Data Saver,
+// a fast connection, and only after the page has loaded and the frame is in view. Everywhere else the poster stays
+// and the button offers to play it. Reduced motion: never plays by itself. Off-screen it pauses (and resumes),
+// and the button always pauses it (moving content longer than 5 seconds needs a pause control, WCAG 2.2.2).
 function enhanceLoop() {
     const video = document.querySelector('[data-loop]');
     const toggle = document.querySelector('[data-loop-toggle]');
     if (!video || !toggle) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const connection = navigator.connection || {};
+    const slow = connection.saveData === true || /(^|-)(2g|3g)$/.test(connection.effectiveType || '');
+    const autoplay = !reduced && !slow && window.matchMedia('(min-width: 1080px)').matches;
 
     const show = (playing) => {
         const label = playing ? toggle.dataset.pause : toggle.dataset.play;
@@ -161,13 +166,23 @@ function enhanceLoop() {
         drawIcons();
     };
     toggle.addEventListener('click', () => {
-        // Remember a pause the visitor chose, so closing the demo dialog doesn't restart the loop
+        // Remember a pause the visitor chose, so scrolling back or closing the demo dialog doesn't restart the loop
         if (video.paused) { delete video.dataset.userPaused; video.play().catch(() => {}); } else { video.dataset.userPaused = '1'; video.pause(); }
     });
     video.addEventListener('play', () => show(true));
     video.addEventListener('pause', () => show(false));
+    show(false);
     toggle.hidden = false;
-    video.play().catch(() => show(false));
+    if (!autoplay) { video.dataset.userPaused = '1'; return; }
+
+    const start = () => {
+        if (!('IntersectionObserver' in window)) { video.play().catch(() => show(false)); return; }
+        new IntersectionObserver((entries) => entries.forEach((entry) => {
+            if (video.dataset.userPaused || document.querySelector('[data-demo-dialog][open]')) return;
+            if (entry.isIntersecting) video.play().catch(() => show(false)); else video.pause();
+        }), { threshold: 0.25 }).observe(video);
+    };
+    if (document.readyState === 'complete') start(); else window.addEventListener('load', start, { once: true });
 }
 
 // The narrated demo (partials.demo-dialog): the link opens a dialog and only then adds YouTube's player, with captions
@@ -185,7 +200,8 @@ function enhanceDemo() {
         if (dialog.open) dialog.close();
         if (!frame.firstChild) return;
         frame.replaceChildren();
-        if (loop && !reduced && !loop.dataset.userPaused) loop.play().catch(() => {});
+        if (loop && !reduced && !loop.dataset.userPaused && loop.dataset.wasPlaying) loop.play().catch(() => {});
+        if (loop) delete loop.dataset.wasPlaying;
     };
 
     document.querySelectorAll('[data-demo-open]').forEach((link) => link.addEventListener('click', (event) => {
@@ -200,7 +216,7 @@ function enhanceDemo() {
         player.allowFullscreen = true;
         player.referrerPolicy = 'strict-origin-when-cross-origin';
         frame.replaceChildren(player);
-        loop?.pause();
+        if (loop && !loop.paused) { loop.dataset.wasPlaying = '1'; loop.pause(); }
         dialog.showModal();
     }));
 

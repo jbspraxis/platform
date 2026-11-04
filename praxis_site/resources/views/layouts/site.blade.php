@@ -17,6 +17,17 @@
     $ogImage = asset('img/og/jbs-praxis-og-' . $locale . '-1200x630.png');
     $nav = ['services' => 'services', 'how-we-work' => 'how', 'work' => 'work', 'company' => 'company', 'kaizen' => 'insights'];
     $ga4 = (string) config('site.ga4_id');
+    // Breadcrumbs for search engines (redesign PR 1): Home, the section a detail page sits in, then this page
+    $crumbName = html_entity_decode(\Illuminate\Support\Str::before($title, ' | '), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $parents = ['work.show' => ['work', 'site.nav.work'], 'kaizen.show' => ['kaizen', 'site.nav.insights'], 'kaizen.write' => ['kaizen', 'site.nav.insights']];
+    $crumbs = [];
+    if ($here !== '' && $here !== 'home') {
+        $crumbs[] = [__('site.nav.home'), route('home')];
+        if (isset($parents[$here])) {
+            $crumbs[] = [__($parents[$here][1]), route($parents[$here][0])];
+        }
+        $crumbs[] = [$crumbName, $canonical];
+    }
     $schema = [
         '@context' => 'https://schema.org',
         '@graph' => [
@@ -45,6 +56,10 @@
                     'availableLanguage' => ['en', 'fr'],
                 ]), $site->phonesFor($office['city'])), $site->offices)),
             ]),
+            ...($crumbs ? [[
+                '@type' => 'BreadcrumbList',
+                'itemListElement' => array_map(fn ($crumb, $i) => ['@type' => 'ListItem', 'position' => $i + 1, 'name' => $crumb[0], 'item' => $crumb[1]], $crumbs, array_keys($crumbs)),
+            ]] : []),
             [
                 '@type' => 'WebSite',
                 '@id' => url('/') . '#website',
@@ -90,6 +105,13 @@
     <link rel="apple-touch-icon" href="{{ asset('img/icons/apple-touch-icon.png') }}">
     <meta name="theme-color" content="#0C142B">
     <script type="application/ld+json">{!! json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) !!}</script>
+    {{-- The two Latin font files every page paints with first (the headline is set in Newsreader): fetched in parallel with the CSS --}}
+    @foreach (['@fontsource-variable/newsreader/files/newsreader-latin-opsz-normal.woff2', '@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2'] as $font)
+        @php($fontUrl = \Illuminate\Support\Facades\Vite::asset('node_modules/' . $font))
+        @if ($fontUrl !== '')
+            <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ $fontUrl }}">
+        @endif
+    @endforeach
     @stack('head')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @if ($turnstile ?? false)

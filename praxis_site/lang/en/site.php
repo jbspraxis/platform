@@ -20,6 +20,7 @@ return [
 
     'nav' => [
         'label' => 'Main',
+        'home' => 'Home',
         'services' => 'Services',
         'how' => 'How we work',
         'work' => 'Work',
