@@ -267,6 +267,9 @@
                             @can('integrations.manage')
                                 <a href="{{ route('hq.system.integrations') }}" class="{{ $on('hq.system.integrations') }}" wire:navigate>{{ __('integrations.nav') }}</a>
                             @endcan
+                            @can('key-vault')
+                                <a href="{{ route('hq.system.key-vault') }}" class="{{ $on('hq.system.key-vault') }}" wire:navigate>Key vault</a>
+                            @endcan
                         </div>
                     @endif
                 </div>

@@ -37,6 +37,10 @@ class AppServiceProvider extends ServiceProvider
             return \App\Support\Access::isPermission($ability) ? \App\Support\Access::allows($user, $ability) : null;
         });
 
+        // Settings and access › Key vault (docs/KEY_VAULT.md): the protected Owner role only. Deliberately not a
+        // permission in config/access.php, so it is not on Roles and permissions and no role's "*" can reach it.
+        \Illuminate\Support\Facades\Gate::define('key-vault', fn ($user) => \App\Support\KeyVault\KeyVault::allows($user));
+
         // What an AI run is about (ai_runs.subject_type): short names, not class names (docs/OPPORTUNITIES.md 8.3)
         \Illuminate\Database\Eloquent\Relations\Relation::morphMap([
             'opportunity' => \App\Models\Opportunity::class,

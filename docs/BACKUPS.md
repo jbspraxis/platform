@@ -7,7 +7,7 @@ Every night, every database on the shared cPanel server (account `smartqaq` on N
 1. **All five sites, automatically.** At 02:00 Lagos time, every database the cPanel account owns is dumped (`mysqldump --single-transaction --quick --routines --triggers --events`, gzip, lowest CPU and disk priority), so a sixth database is included without anyone remembering. Each database belongs to a site (praxis, lpc, nfelia, hodlc, smartls); one no site claims goes under `other/<database>` and rings the owner.
 2. **Uploaded files weekly**, Sundays at 03:00: one tar per site of its upload folders (HQ's `storage/app` private and public; the other sites' upload folders, listed in `config/backups.php`), without caches, logs, sessions or installed packages.
 3. **A read-only MySQL user**, created by the server itself through cPanel's `uapi` (`backups:setup`), with SELECT, SHOW VIEW, LOCK TABLES, TRIGGER and EVENT on each database and a random password nobody sees: it lives only in `~/.backup-my.cnf` (600).
-4. **Encryption only the owner's PC can open.** The server holds only the public key. The private key is made on the owner's PC and lives there and in the owner's password manager. **No passphrase on it** (the owner's choice): the key file alone opens every backup, so it is kept as carefully as a password.
+4. **Encryption only the owner's PC can open.** The server holds only the public key. The private key is made on the owner's PC and lives there and in the owner's password manager. **No passphrase on it** (the owner's choice): the key file alone opens every backup, so it is kept as carefully as a password. Since 4 Nov 2026 it has three copies off the PC: Bitwarden (the main one), HQ's key vault, and a passphrase-locked file in the jbspraxisllc@gmail.com Drive (docs/KEY_VAULT.md).
 5. **One tidy Drive folder**, nothing loose (section 5). Names start with the site and the date. Drive keeps 30 nights, 12 months and 8 Sundays of files; the server keeps the last 7 in `~/backups` (700, never under `public_html`).
 6. **The owner approves Drive once.** HQ's Google connection asks for one more permission, `drive.file`: HQ sees and touches only the files it creates. Until it is granted, Settings and access › Integrations says "Drive backups: reconnect Google to allow".
 7. **Proof it works.** System health shows each site's last backup (time, size, status), its last files backup and its restore test. The owner's bell rings when a backup fails, when a site's last good backup is older than 26 hours, or when Drive's checksum of an upload doesn't match. Each week, before encryption, each fresh dump is imported into a scratch database and compared table by table and row by row.
@@ -34,7 +34,7 @@ To add a database or a folder to a site, edit its line in `config/backups.php` a
 
 1. In the repository, open `deploy/backups/pc/` and double-click **Make backup key.cmd** (or run `powershell -NoProfile -ExecutionPolicy Bypass -File New-BackupKey.ps1`). It needs nothing installed.
 2. It makes a 4096-bit RSA key in `Documents\JBS Praxis backup key\`:
-   - `backup-private-key.pem`: opens every backup. Only this Windows account may read it. **Save it in the password manager straight away** (attach the file, or paste its whole text). Never send it to anyone, Claude included; never put it on the server, in email, chat or Drive.
+   - `backup-private-key.pem`: opens every backup. Only this Windows account may read it. **Save it in Bitwarden straight away** (attach the file, or paste its whole text): that is the main copy. Then lock it in HQ › Settings and access › **Key vault** with a passphrase, and keep the vault's **locked copy** in the jbspraxisllc@gmail.com Google Drive (docs/KEY_VAULT.md: the three copies, opening the locked copy offline, and what to do if the laptop is lost). Never send the key itself to anyone, Claude included; never put it unlocked on the server, in email, chat or Drive.
    - `backup-public-key.pem`: safe to share.
    - `Restore-Backup.ps1` and **Restore a backup.cmd**: the restore tool, copied next to the key.
    - `READ ME - backup key.txt` with the key's fingerprint (e.g. `56cd 13d1 …`).
@@ -145,7 +145,7 @@ rm -f keys.bin locked.bin
 4. Recreate each site's `.env` from the password manager (database names and users will be new), point the domains' DNS at the new host, and check each site.
 5. Switch the backups on there (section 4): the new account's user and database prefix go into `BACKUP_CPANEL_USER`, `BACKUP_MYSQL_USER`, `BACKUP_SCRATCH_DATABASE` and the patterns in `config/backups.php`.
 
-If the owner's PC is lost, the private key in the password manager opens everything: copy it to `Documents\JBS Praxis backup key\backup-private-key.pem` on any Windows PC and use the restore tool from the repository.
+If the owner's PC is lost, the private key in the password manager opens everything: copy it to `Documents\JBS Praxis backup key\backup-private-key.pem` on any Windows PC and use the restore tool from the repository. Without Bitwarden, the locked copy in the jbspraxisllc@gmail.com Drive opens offline with the passphrase (docs/KEY_VAULT.md sections 5 and 6). HQ's key vault is on the lost server, so it can't help here.
 
 ## 10. Testing and local runs
 

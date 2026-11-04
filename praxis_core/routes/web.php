@@ -175,6 +175,13 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
             Route::get('/health', \App\Livewire\Hq\System\SystemHealth::class)->middleware('can:system.view')->name('hq.system.health');
             // Google connection, Claude key and AI budget (docs/OPPORTUNITIES.md 6)
             Route::get('/integrations', \App\Livewire\Hq\System\Integrations::class)->middleware('can:integrations.manage')->name('hq.system.integrations');
+            // Key vault (docs/KEY_VAULT.md): the owner's own secrets, locked in the owner's browser. The 'key-vault'
+            // gate is the protected Owner role itself, not a permission, so no other role can ever be given it.
+            Route::middleware('can:key-vault')->prefix('key-vault')->group(function () {
+                Route::get('/', \App\Livewire\Hq\System\KeyVaultPage::class)->name('hq.system.key-vault');
+                Route::get('/vault.js', [\App\Http\Controllers\KeyVaultController::class, 'script'])->name('hq.system.key-vault.script');
+                Route::get('/{item}/locked-copy', [\App\Http\Controllers\KeyVaultController::class, 'lockedCopy'])->whereUuid('item')->name('hq.system.key-vault.locked-copy');
+            });
         });
 
         // Google OAuth for praxisjbs@gmail.com. The callback path is registered on the OAuth client in Google Cloud
