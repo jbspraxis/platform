@@ -16,6 +16,7 @@
         .orl-table td a.orl-name:hover { text-decoration: underline; }
         .orl-table td small { display: block; color: var(--color-muted); font-size: 0.8125rem; }
         .orl-modal { max-width: 600px; }
+        .orl-badge { display: inline-block; margin-left: 2px; padding: 0 7px; border-radius: 999px; background: var(--color-deep-teal); color: var(--color-paper); font-size: 0.75rem; line-height: 1.25rem; font-weight: 600; }
         .orl-modal .field + .field { margin-top: 16px; }
         @media (max-width: 767px) {
             .orl-day { grid-template-columns: 1fr; }
@@ -30,6 +31,10 @@
             <p class="page-subtitle">One-to-one emails to researched prospects, written by Claude and read by you before they go. They leave from your own mailbox, a few a day, with one follow-up about {{ $followUpDays }} working days later unless they reply. Prospects never get broadcasts.</p>
         </div>
         <div class="flex flex-wrap gap-2">
+            @if ($canCreate || $canApprove)
+                <a href="{{ route('hq.campaigns.outreach.replies') }}" class="btn btn-secondary" wire:navigate><i data-lucide="message-square-reply"></i> Replies
+                    @if ($toSort > 0)<span class="orl-badge" aria-label="{{ $toSort }} to sort">{{ $toSort }} to sort</span>@endif</a>
+            @endif
             @if ($canApprove)
                 <a href="{{ route('hq.campaigns.outreach.limits') }}" class="btn btn-secondary" wire:navigate><i data-lucide="settings"></i> Sending limits</a>
             @endif
@@ -94,6 +99,8 @@
                             <th class="num">Sent</th>
                             <th class="num orl-hide-sm">Follow-ups</th>
                             <th class="num orl-hide-sm">Bounced</th>
+                            <th class="num">Replies</th>
+                            <th class="num orl-hide-sm">Leads</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -111,6 +118,15 @@
                                 <td class="num">{{ $n($s['sent']) }}</td>
                                 <td class="num orl-hide-sm">{{ $n($s['follow_ups_sent']) }}</td>
                                 <td class="num orl-hide-sm">{{ $n($s['bounced']) }}</td>
+                                <td class="num">
+                                    @if ($s['replies'] && in_array($c->id, $sorts, true))
+                                        <a href="{{ route('hq.campaigns.outreach.campaign', ['campaign' => $c->id, 'show' => 'replies']) }}" wire:navigate>{{ $n($s['replies']) }}</a>
+                                    @else
+                                        {{ $n($s['replies']) }}
+                                    @endif
+                                    @if ($s['sent'])<small>{{ $s['reply_rate'] }}%@if ($s['to_sort']) · {{ $s['to_sort'] }} to sort @endif</small>@endif
+                                </td>
+                                <td class="num orl-hide-sm">{{ $n($s['leads']) }}</td>
                             </tr>
                         @endforeach
                     </tbody>

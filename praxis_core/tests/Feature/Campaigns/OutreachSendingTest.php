@@ -99,7 +99,7 @@ class OutreachSendingTest extends TestCase
         $this->assertSame($b->email, $this->server->sent[1]['email']->getTo()[0]->getAddress());
 
         // The schedule runs both commands every minute, never twice at once
-        $events = collect(app(Schedule::class)->events())->filter(fn ($e) => str_contains($e->command ?? '', 'outreach:'));
+        $events = collect(app(Schedule::class)->events())->filter(fn ($e) => preg_match('/outreach:(write|send)\b/', $e->command ?? ''));
         $this->assertCount(2, $events);
         $this->assertTrue($events->every(fn ($e) => $e->expression === '* * * * *' && $e->withoutOverlapping));
     }

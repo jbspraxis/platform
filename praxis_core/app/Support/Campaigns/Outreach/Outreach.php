@@ -54,6 +54,18 @@ final class Outreach
         return self::canCreate($user) && in_array($user->id, [$campaign->owner_id, $campaign->sender_id], true);
     }
 
+    /** C3: campaigns whose replies this person sorts, archived ones too (their own or sent from their mailbox; all with outreach.approve): ids */
+    public static function reviewableIds(?User $user): array
+    {
+        if (! $user || (! self::canCreate($user) && ! self::canApprove($user))) {
+            return [];
+        }
+
+        return OutreachCampaign::query()
+            ->when(! self::canApprove($user), fn ($q) => $q->where(fn ($q) => $q->where('owner_id', $user->id)->orWhere('sender_id', $user->id)))
+            ->pluck('id')->all();
+    }
+
     /** Campaigns this person may import into, newest first: id => name */
     public static function importable(User $user): array
     {
@@ -222,15 +234,18 @@ final class Outreach
     // ------------------------------------------------------------------ numbers
 
     /**
-     * The campaign page's numbers (owner's scope: drafted, approved, sent, follow-ups, bounces, unsubscribes; replies are
-     * C3's), for one campaign or several (keyed by campaign id).
+     * The campaign page's numbers (owner's scope: drafted, approved, sent, follow-ups, bounces, unsubscribes), for one
+     * campaign or several (keyed by campaign id). C3 adds the replies (section 12): replies (prospects who wrote back),
+     * reply_rate (% of the first emails that arrived: sent, not bounced), to_sort (replies nobody has confirmed),
+     * interested, not_now, not_interested and unsubscribe (prospects by the answer a person confirmed), and leads (made).
      */
     public static function stats(array $campaignIds): array
     {
         $out = [];
         foreach ($campaignIds as $id) {
             $out[$id] = ['prospects' => 0, 'writing' => 0, 'not_written' => 0, 'to_review' => 0, 'approved' => 0, 'sent' => 0, 'follow_ups_sent' => 0,
-                'follow_ups_waiting' => 0, 'bounced' => 0, 'unsubscribed' => 0, 'skipped' => 0, 'failed' => 0, 'replied' => 0];
+                'follow_ups_waiting' => 0, 'bounced' => 0, 'unsubscribed' => 0, 'skipped' => 0, 'failed' => 0, 'replied' => 0,
+                'replies' => 0, 'reply_rate' => 0, 'to_sort' => 0, 'interested' => 0, 'not_now' => 0, 'not_interested' => 0, 'unsubscribe' => 0, 'leads' => 0];
         }
         if (! $campaignIds) {
             return $out;
@@ -249,11 +264,24 @@ final class Outreach
             }
         }
         $prospects = DB::table('outreach_prospects')->whereIn('campaign_id', $campaignIds)->groupBy('campaign_id')
-            ->selectRaw("campaign_id, COUNT(*) AS prospects, SUM(unsubscribed_at IS NOT NULL) AS unsubscribed, SUM(replied_at IS NOT NULL) AS replied")->get();
+            ->selectRaw("campaign_id, COUNT(*) AS prospects, SUM(unsubscribed_at IS NOT NULL) AS unsubscribed, SUM(replied_at IS NOT NULL) AS replied,
+                SUM(reply_label = 'interested') AS interested, SUM(reply_label = 'not_now') AS not_now, SUM(reply_label = 'not_interested') AS not_interested,
+                SUM(reply_label = 'unsubscribe') AS unsubscribe, SUM(organization_id IS NOT NULL) AS leads")->get();
         foreach ($prospects as $row) {
-            $out[$row->campaign_id]['prospects'] = (int) $row->prospects;
-            $out[$row->campaign_id]['unsubscribed'] = (int) $row->unsubscribed;
-            $out[$row->campaign_id]['replied'] = (int) $row->replied;
+            foreach ((array) $row as $key => $value) {
+                if ($key !== 'campaign_id') {
+                    $out[$row->campaign_id][$key] = (int) $value;
+                }
+            }
+        }
+        $replies = DB::table('outreach_replies')->whereIn('campaign_id', $campaignIds)->where('kind', 'reply')->groupBy('campaign_id')
+            ->selectRaw('campaign_id, COUNT(DISTINCT prospect_id) AS replies, SUM(label IS NULL) AS to_sort')->get();
+        foreach ($replies as $row) {
+            $out[$row->campaign_id]['replies'] = (int) $row->replies;
+            $out[$row->campaign_id]['to_sort'] = (int) $row->to_sort;
+        }
+        foreach ($out as $id => $s) {
+            $out[$id]['reply_rate'] = $s['sent'] > 0 ? (int) min(100, round(100 * $s['replies'] / $s['sent'])) : 0;
         }
 
         return $out;

@@ -222,9 +222,9 @@ final class Sender
 
     /**
      * More of today's emails bounced than the limit allows, and at least Senders::MIN_BOUNCES_TO_PAUSE of them: the
-     * sender pauses (once), with a bell to them and the owner
+     * sender pauses (once), with a bell to them and the owner. Also after a bounce notice that came later (C3, Inbound).
      */
-    private static function checkBounces(?string $senderId): void
+    public static function checkBounces(?string $senderId): void
     {
         if (! $senderId) {
             return;

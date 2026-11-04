@@ -33,6 +33,7 @@ return [
         'broadcast_draft' => 'Brouillon de diffusion',
         'broadcast_translate' => 'Traduction de diffusion',
         'outreach_email' => 'E-mail de prospection',
+        'outreach_reply' => 'Tri des réponses de prospection',
         'connection_test' => "Test de la clé",
     ],
 ];
