@@ -26,8 +26,8 @@ class ProofTest extends TestCase
         }
         $this->assertStringContainsString('alt="OK Veggies"', $html);
         $this->assertSame(1, preg_match_all('#<ul class="clients-list"\s+aria-hidden="true"\s*>#', $html));
-        // The two clients the owner keeps described are described here too
-        $this->assertStringContainsString('alt="An FMCG distributor in Cameroon"', $html);
+        // La Petite Cour is named (owner, 4 Nov 2026); Horizon Segment stays described
+        $this->assertStringContainsString('alt="La Petite Cour"', $html);
         $this->assertStringContainsString('alt="An oil and gas services company"', $html);
     }
 
@@ -42,9 +42,8 @@ class ProofTest extends TestCase
         $this->assertStringContainsString('In their words', $html);
         $this->assertStringContainsString('<span class="quote-name">Timothee Massomba</span>', $html);
         $this->assertStringContainsString('Managing Director, Smart Logistics and Services', $html);
-        // The described client's quote carries no name
-        $this->assertStringContainsString('Chief Executive, An FMCG distributor in Cameroon', $html);
-        $this->assertStringNotContainsString('Elombo', $html);
+        $this->assertStringContainsString('<span class="quote-name">Elombo T.</span>', $html);
+        $this->assertStringContainsString('Chief Executive, La Petite Cour', $html);
 
         $this->get('/fr')->assertOk()->assertSee('Ils en parlent')->assertSee('Directeur général, Smart Logistics and Services');
     }

@@ -12,6 +12,26 @@
         </div>
     </section>
 
+    {{-- The platforms we run (redesign, 4 Nov 2026): each client system's sign-in screen, linking to its case study --}}
+    @php($screens = array_values(array_filter(array_keys(\App\Support\Work::CASES), fn ($slug) => is_file(public_path('img/screens/' . $slug . '-800.webp')))))
+    @if ($screens)
+        <section class="band" aria-labelledby="platforms-title">
+            <div class="container">
+                <x-section-head id="platforms-title" :title="__('work.screen.platforms_title')" :lead="__('work.screen.platforms_lead')" rule />
+                <ul class="platforms">
+                    @foreach ($screens as $slug)
+                        <li class="platform">
+                            <a href="{{ route('work.show', ['slug' => $slug]) }}">
+                                <span class="platform-frame"><x-screen :slug="$slug" :alt="__('work.screen.alt', ['name' => __('work.cases.' . $slug . '.name')])" sizes="(min-width: 1000px) 360px, (min-width: 640px) 45vw, 100vw" /></span>
+                                <span class="platform-name">{{ __('work.cases.' . $slug . '.name') }}</span>
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        </section>
+    @endif
+
     <section class="band band-paper" aria-labelledby="clients-title">
         <div class="container">
             <h2 class="band-title" id="clients-title">{{ __('work.index.clients_title') }}</h2>

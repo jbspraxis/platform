@@ -40,6 +40,17 @@
         </div>
     </section>
 
+    @if (is_file(public_path('img/screens/' . $slug . '-1280.webp')))
+        {{-- The platform itself: its sign-in screen, as its team sees it --}}
+        <section class="band band-tight case-screen" aria-label="{{ __('work.screen.label', ['name' => __($key . '.name')]) }}">
+            <div class="container">
+                <x-frame :caption="__('work.screen.caption', ['name' => __($key . '.name')])">
+                    <x-screen :slug="$slug" :alt="__('work.screen.alt', ['name' => __($key . '.name')])" sizes="(min-width: 1200px) 1136px, calc(100vw - 32px)" />
+                </x-frame>
+            </div>
+        </section>
+    @endif
+
     <section class="band band-paper" aria-labelledby="needed-title">
         <div class="container split">
             <h2 class="band-title" id="needed-title">{{ __($ours ? 'work.labels.needed_product' : 'work.labels.needed') }}</h2>

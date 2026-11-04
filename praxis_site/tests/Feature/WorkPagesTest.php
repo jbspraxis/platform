@@ -154,10 +154,9 @@ class WorkPagesTest extends TestCase
         foreach ($paths as $path) {
             foreach ($path === '/sitemap.xml' || $path === '/llms.txt' ? [$path] : [$path, '/fr' . ($path === '/' ? '' : $path)] as $url) {
                 $html = $this->get($url)->assertOk()->getContent();
-                foreach (['Fidson', 'La Petite Cour', 'Petite Cour', 'predictive', 'prédictive', 'prédictif', '™', 'github', 'tomblakeasaah'] as $word) {
+                foreach (['Fidson', 'predictive', 'prédictive', 'prédictif', '™', 'github', 'tomblakeasaah'] as $word) {
                     $this->assertStringNotContainsStringIgnoringCase($word, $html, "$url contains $word");
                 }
-                $this->assertDoesNotMatchRegularExpression('/\bLPC\b/', $html, "$url contains LPC");
             }
         }
     }
@@ -190,6 +189,8 @@ class WorkPagesTest extends TestCase
         // French on the site: a narrow no-break space (U+202F) before every ; : ! ? and inside « », never another space
         array_walk_recursive($fr, function ($text) {
             if (is_string($text)) {
+                // A Laravel placeholder (:name) is not punctuation
+                $text = preg_replace('/(?<![\p{L}\p{N}]):[a-z_]+/u', '', $text);
                 $this->assertDoesNotMatchRegularExpression('/(?<!\x{202F})[;:!?»]|«(?!\x{202F})/u', $text, $text);
             }
         });

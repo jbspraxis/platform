@@ -97,7 +97,7 @@ return [
         ['file' => 'smart-logistics', 'name' => 'Smart Logistics and Services'],
         ['file' => 'mtn', 'name' => 'MTN'],
         ['file' => 'pixie-girl-global', 'name' => 'Pixie Girl Global'],
-        ['file' => 'fmcg-distributor-cameroon', 'name' => 'An FMCG distributor in Cameroon'],
+        ['file' => 'la-petite-cour', 'name' => 'La Petite Cour'],
         ['file' => 'mycity-app', 'name' => 'MyCity App'],
         ['file' => 'wellsmart-drilling', 'name' => 'Wellsmart Drilling Nigeria'],
         ['file' => 'orika-living', 'name' => 'Orika Living'],
@@ -118,7 +118,7 @@ return [
     */
     'quotes_approved' => [
         // 'smart-logistics',
-        // 'la-petite-cour', (described, not named: the quote carries no name)
+        // 'la-petite-cour',
         // 'mycity-app',
         // 'pixie-girl-global',
     ],

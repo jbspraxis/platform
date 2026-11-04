@@ -943,6 +943,21 @@
     .product-status { margin: var(--space-5) 0 var(--space-3); font-size: var(--step-small); color: var(--color-muted); }
     .product-link { font-weight: 500; }
 
+    /* ---- The platforms' own screens ---- */
+    .band-tight { padding: var(--section-y-tight) 0; }
+    .page-hero + .case-screen { padding-top: 0; }
+    .screen-shot { display: block; }
+    .screen-shot img { display: block; width: 100%; height: auto; }
+    .platforms { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-6) var(--space-5); grid-template-columns: minmax(0, 1fr); }
+    @media (min-width: 640px) { .platforms { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (min-width: 1000px) { .platforms { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    .platform a { display: block; color: var(--color-ink); text-decoration: none; }
+    .platform-frame { display: block; overflow: hidden; border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: 0 12px 32px rgba(12, 20, 43, 0.10);
+        transition: transform var(--motion-standard) var(--ease-settle), box-shadow var(--motion-standard) var(--ease-settle); }
+    .platform a:hover .platform-frame { transform: translateY(-3px); box-shadow: 0 20px 44px rgba(12, 20, 43, 0.16); }
+    .platform-name { display: block; margin-top: var(--space-3); font-weight: 600; }
+    .platform a:hover .platform-name { color: var(--color-deep-teal); }
+
     /* ---- The final call to action's second line ---- */
     .final-note { margin: var(--space-4) 0 0; max-width: var(--measure); font-size: var(--step-small); color: var(--color-fg-on-dark-muted); }
 }
