@@ -1,8 +1,8 @@
 # PR 1: Foundation (design tokens, type, spacing, components, speed and accessibility)
 
-Branch `redesign/pr1-foundation`, on `main` (the clean snapshot of `master` 4fc597c that starts the GitHub repo). Deploy the usual cPanel way (`docs/LAUNCH_SET.md`).
+Branch `redesign/pr1-foundation` on `main`. Merging releases it through the pipeline (green run on main → `production` → the server deploys).
 
-**Not deployed. Nothing on jbspraxis.com has changed.**
+Site tests: 190 passed locally on this branch.
 
 ## What changed
 
