@@ -40,8 +40,10 @@ function statement() {
     document.querySelectorAll('[data-chapter="statement"]').forEach((section) => {
         const spans = [...section.querySelectorAll('h2, p')].flatMap(words);
         if (spans.length === 0) return;
-        gsap.fromTo(spans, { opacity: 0.16 }, {
-            opacity: 1,
+        // From Muted (5.3:1 on Mist, AA at every size) to each word's own colour: quiet, never unreadable
+        const own = spans.map((span) => getComputedStyle(span).color);
+        gsap.fromTo(spans, { color: '#5E6679' }, {
+            color: (index) => own[index],
             ease: 'none',
             stagger: 0.05,
             scrollTrigger: { trigger: section, start: 'top 78%', end: 'bottom 52%', scrub: 0.6 },
@@ -54,11 +56,16 @@ function method() {
         const steps = [...section.querySelectorAll('.method-step')];
         if (steps.length === 0) return;
         section.classList.add('is-scrubbed');
-        gsap.set(steps, { '--draw': 0, opacity: 0.32 });
+        // Each step's words wait in Muted (5.3:1 on Mist, readable from the start) and come up to their own colour
+        // as its rule draws
+        const texts = steps.map((step) => [...step.querySelectorAll('.method-number, h3, p')]);
+        const own = texts.map((group) => group.map((element) => getComputedStyle(element).color));
+        gsap.set(steps, { '--draw': 0 });
+        texts.forEach((group) => gsap.set(group, { color: '#5E6679' }));
         const timeline = gsap.timeline({ defaults: { ease: SETTLE } });
         steps.forEach((step, index) => {
             timeline.to(step, { '--draw': 1, duration: 1 }, index * 0.8);
-            timeline.to(step, { opacity: 1, duration: 0.6 }, index * 0.8 + 0.2);
+            timeline.to(texts[index], { color: (i) => own[index][i], duration: 0.6 }, index * 0.8 + 0.2);
         });
         ScrollTrigger.create({
             trigger: section,

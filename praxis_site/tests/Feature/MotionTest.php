@@ -18,7 +18,9 @@ class MotionTest extends TestCase
         $en->assertSee('data-answer', false)
             ->assertSee('Demo data')->assertSee('Ndali Group')
             ->assertSee('Which projects are over budget?')
-            ->assertSee('₦38,204,600')->assertSee('over budget, across 4 of 8 projects')
+            // The sign and the digits apart: the sign is set in the sans (no 85 KB font file for one glyph)
+            ->assertSee('<span class="answer-currency">₦</span><span data-settle>38,204,600</span>', false)
+            ->assertSee('over budget, across 4 of 8 projects')
             ->assertSee('Ibadan cold room')->assertSee('109.0%')->assertSee('Apapa depot expansion')->assertSee('104.8%')
             ->assertSee('Sources: 8 project budgets and their cost lines to 31 October 2026')
             ->assertDontSee('<video', false);
@@ -26,7 +28,7 @@ class MotionTest extends TestCase
         $fr = $this->get('/fr')->assertOk();
         $fr->assertSee('Données de démo')
             ->assertSee("Quels projets dépassent leur budget\u{202F}?")
-            ->assertSee("38\u{202F}204\u{202F}600\u{202F}₦")
+            ->assertSee("<span data-settle>38\u{202F}204\u{202F}600</span><span class=\"answer-currency\">₦</span>", false)
             ->assertSee("109,0\u{202F}%");
     }
 

@@ -49,7 +49,13 @@
                     <p class="answer-question" data-answer-step="question"><i data-lucide="message-square-text"></i>{{ __('pages.home.answer_question') }}</p>
                     <div class="answer-rule" aria-hidden="true"><span data-answer-step="rule"></span></div>
                     <p class="answer-figure" data-answer-step="figure">
-                        <span class="answer-number" data-settle>{{ __('pages.home.answer_figure') }}</span>
+                        @php
+                            // The amount's sign and its digits apart: the sign is set in the sans (.answer-currency)
+                            preg_match('/^(\D*?)(\d[\d\s\x{202F},.]*\d)(\D*)$/u', __('pages.home.answer_figure'), $amount);
+                            $unspace = fn (string $text) => preg_replace('/^[\s\x{202F}\x{00A0}]+|[\s\x{202F}\x{00A0}]+$/u', '', $text);
+                            [$signBefore, $digits, $signAfter] = [$unspace($amount[1] ?? ''), $amount[2] ?? __('pages.home.answer_figure'), $unspace($amount[3] ?? '')];
+                        @endphp
+                        <span class="answer-number">@if ($signBefore !== '')<span class="answer-currency">{{ $signBefore }}</span>@endif<span data-settle>{{ $digits }}</span>@if ($signAfter !== '')<span class="answer-currency">{{ $signAfter }}</span>@endif</span>
                         <span class="answer-figure-label">{{ __('pages.home.answer_figure_label') }}</span>
                     </p>
                     <table class="answer-table" data-answer-step="table">
