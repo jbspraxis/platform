@@ -126,6 +126,9 @@ return [
         'products_title' => 'Our products',
         'nfelia' => 'NFELIA, a JBS Praxis product.',
         // Our products (redesign PR 3): what each one is as a product, apart from any client's case study
+        'hq_caption' => 'JBS Praxis HQ, where we run our own invoicing, payroll, projects and approvals.',
+        'hq_alt' => 'The sign-in screen of JBS Praxis HQ.',
+        'product_screen_alt' => 'The sign-in screen of :name.',
         'products_lead' => 'Two products we design, build and run ourselves, on the same principles as the systems we build for clients.',
         'products' => [
             'praxis-ls' => [

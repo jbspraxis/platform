@@ -8,11 +8,14 @@ use Tests\TestCase;
 /** The platforms' own sign-in screens (4 Nov 2026): on each case study that has one, and as previews on the Work page. */
 class ScreensTest extends TestCase
 {
-    private const WITH_SCREENS = ['smart-logistics', 'mycity-app', 'pixie-girl-global', 'orika-living', 'fmcg-distributor-cameroon'];
+    private const WITH_SCREENS = ['smart-logistics', 'mycity-app', 'pixie-girl-global', 'orika-living', 'fmcg-distributor-cameroon', 'nfelia'];
+
+    /** Our own platforms, captured signed out (no tenant, no names): HQ and Praxis LS have no case study */
+    private const OWN = ['jbs-praxis-hq', 'praxis-ls'];
 
     public function test_every_screen_exists_in_both_formats_and_all_widths(): void
     {
-        foreach (self::WITH_SCREENS as $slug) {
+        foreach ([...self::WITH_SCREENS, ...self::OWN] as $slug) {
             foreach (['avif', 'webp'] as $ext) {
                 foreach ([800, 1280, 1920] as $w) {
                     $this->assertFileExists(public_path("img/screens/{$slug}-{$w}.{$ext}"));
@@ -48,6 +51,20 @@ class ScreensTest extends TestCase
         }
         $this->assertSame(count(self::WITH_SCREENS), substr_count($html, '<li class="platform">'));
         $this->get('/fr/work')->assertOk()->assertSee('Les plateformes que nous faisons tourner');
+    }
+
+    public function test_company_shows_hq_and_each_product_by_its_sign_in_screen(): void
+    {
+        $this->fakeHq();
+
+        $html = $this->get('/company')->assertOk()->getContent();
+        $this->assertStringContainsString(asset('img/screens/jbs-praxis-hq-1280.webp'), $html);
+        $this->assertStringContainsString('alt="The sign-in screen of JBS Praxis HQ."', $html);
+        $this->assertStringContainsString(asset('img/screens/praxis-ls-1280.webp'), $html);
+        $this->assertStringContainsString(asset('img/screens/nfelia-1280.webp'), $html);
+        $this->assertStringContainsString(asset('img/clients/praxis-ls.webp'), $html); // the product card's logo
+        $this->get('/fr/company')->assertOk()->assertSee('L’écran de connexion de JBS Praxis HQ.');
+        $this->get('/')->assertOk()->assertSee('alt="Praxis LS"', false); // the logo strip
     }
 
     public function test_la_petite_cour_is_named_on_its_case_study_and_the_work_pages(): void

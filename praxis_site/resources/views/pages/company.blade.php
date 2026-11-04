@@ -67,6 +67,13 @@
             <h2 class="band-title" id="ourselves-title">{{ __('pages.company.ourselves_title') }}</h2>
             <p class="band-text">{{ __('pages.company.ourselves_text') }}</p>
         </div>
+        @if (is_file(public_path('img/screens/jbs-praxis-hq-1280.webp')))
+            <div class="container ourselves-screen">
+                <x-frame :caption="__('pages.company.hq_caption')">
+                    <x-screen slug="jbs-praxis-hq" :alt="__('pages.company.hq_alt')" sizes="(min-width: 1200px) 1136px, calc(100vw - 32px)" />
+                </x-frame>
+            </div>
+        @endif
     </section>
 
     {{-- Our products (redesign PR 3): each as a product of its own, apart from any client's case study --}}
@@ -86,6 +93,11 @@
                                 <li>{{ $point }}</li>
                             @endforeach
                         </ul>
+                        @if (is_file(public_path('img/screens/' . $key . '-1280.webp')))
+                            <x-frame class="product-screen">
+                                <x-screen :slug="$key" :alt="__('pages.company.product_screen_alt', ['name' => $product['name']])" sizes="(min-width: 900px) 540px, calc(100vw - 32px)" />
+                            </x-frame>
+                        @endif
                         <p class="product-status">{{ $product['status'] }}</p>
                         @if ($key === 'nfelia')
                             <a class="product-link" href="{{ config('site.nfelia_url') }}" rel="noopener">{{ $product['link'] }}</a>
