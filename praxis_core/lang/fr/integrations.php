@@ -14,8 +14,12 @@ return [
     'secret_saved' => "Enregistré. Il n’est plus jamais affiché\u{00A0}: saisissez-en un nouveau uniquement pour le remplacer.",
 
     'google' => [
-        'title' => "Google (Agenda, Meet et Docs)",
-        'intro' => "HQ crée les réunions avec un lien Meet dans l’agenda de :account et récupère leurs transcriptions. Saisissez le client OAuth du projet Google Cloud, enregistrez-le, puis connectez le compte.",
+        'title' => "Google (Agenda, Meet, Docs et sauvegardes Drive)",
+        'intro' => "HQ crée les réunions avec un lien Meet dans l’agenda de :account, récupère leurs transcriptions et dépose les sauvegardes chiffrées du serveur dans son Drive. Saisissez le client OAuth du projet Google Cloud, enregistrez-le, puis connectez le compte.",
+        'drive' => [
+            'allowed' => "Sauvegardes Drive\u{00A0}: autorisées. HQ ne voit que le dossier de sauvegarde qu’il a créé, rien d’autre dans Drive.",
+            'missing' => "Sauvegardes Drive\u{00A0}: reconnectez Google pour les autoriser. Cliquez sur Reconnecter Google et cochez «\u{202F}Afficher, modifier, créer et supprimer uniquement les fichiers Google Drive que vous utilisez avec cette application\u{202F}»\u{202F}; HQ ne voit rien d’autre dans Drive.",
+        ],
         'status' => [
             'connected' => "Connecté en tant que :email",
             'not_connected' => "Non connecté",

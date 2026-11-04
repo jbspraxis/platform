@@ -62,6 +62,9 @@ class GoogleOAuthController extends Controller
             $flash->with('warning', __('integrations.google.flash.missing_scopes'));
         } elseif ($expectedAccount !== '' && strcasecmp($email, $expectedAccount) !== 0) {
             $flash->with('warning', __('integrations.google.flash.other_account', ['email' => $email, 'expected' => $expectedAccount]));
+        } elseif (! $google->canUseDrive()) {
+            // Meetings work; only the server backups (docs/BACKUPS.md) wait for the Drive box to be ticked
+            $flash->with('warning', __('integrations.google.drive.missing'));
         }
 
         return $flash;

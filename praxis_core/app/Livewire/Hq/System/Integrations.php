@@ -187,6 +187,7 @@ class Integrations extends Component
                 'reconnect' => $google->needsReconnect(),
                 'email' => $google->accountEmail(),
                 'missing' => $google->isConnected() ? $google->missingScopes() : [],
+                'drive' => $google->canUseDrive(),
                 'redirectUri' => GoogleWorkspace::redirectUri(),
                 'expected' => (string) config('services.google.account'),
             ],

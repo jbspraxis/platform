@@ -50,6 +50,14 @@
             </div>
         @endif
 
+        {{-- Server backups (docs/BACKUPS.md): Drive needs one more permission, given once by the owner on Google's page --}}
+        @if ($google['connected'])
+            <div @class(['alert', 'alert-success' => $google['drive'], 'alert-warning' => ! $google['drive']]) role="status" style="margin-bottom: 16px">
+                <i data-lucide="{{ $google['drive'] ? 'circle-check' : 'triangle-alert' }}"></i>
+                <span>{{ $google['drive'] ? __('integrations.google.drive.allowed') : __('integrations.google.drive.missing') }}</span>
+            </div>
+        @endif
+
         <div class="field" style="margin-bottom: 16px">
             <span class="label" id="ig-redirect-label">{{ __('integrations.google.redirect_label') }}</span>
             <div class="ig-copy" x-data="{ copied: false }">

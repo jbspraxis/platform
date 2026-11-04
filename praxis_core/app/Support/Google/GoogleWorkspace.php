@@ -11,11 +11,13 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * HQ's Google connection: praxisjbs@gmail.com's Calendar, Meet and Docs (docs/OPPORTUNITIES.md 6.1 and 8.2).
+ * HQ's Google connection: praxisjbs@gmail.com's Calendar, Meet and Docs (docs/OPPORTUNITIES.md 6.1 and 8.2), and the
+ * Drive folder the server backups go to (docs/BACKUPS.md: only files HQ created, through the drive.file scope).
  * Resolve it from the container (app(GoogleWorkspace::class)) so tests can swap in Tests\Support\Google\FakeGoogle.
  *
  * The OAuth client (ID and secret) and the refresh token live in integration_settings (encrypted); the access
@@ -32,7 +34,16 @@ class GoogleWorkspace
         'https://www.googleapis.com/auth/calendar.freebusy',
         'https://www.googleapis.com/auth/meetings.space.readonly',
         'https://www.googleapis.com/auth/documents.readonly',
+        self::DRIVE_SCOPE,
     ];
+
+    /**
+     * Server backups (docs/BACKUPS.md): only the files HQ itself creates in the account's Drive, never the rest of it.
+     * Asked for with the others, but a connection without it still runs meetings: Integrations asks for a reconnect.
+     */
+    public const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+
+    public const FOLDER = 'application/vnd.google-apps.folder';
 
     /** WAT: Lagos and Douala share it */
     public const TIME_ZONE = 'Africa/Lagos';
@@ -43,6 +54,8 @@ class GoogleWorkspace
     private const CALENDAR = 'https://www.googleapis.com/calendar/v3';
     private const MEET = 'https://meet.googleapis.com/v2';
     private const DOCS = 'https://docs.googleapis.com/v1';
+    private const DRIVE = 'https://www.googleapis.com/drive/v3';
+    private const DRIVE_UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
 
     private const TOKEN_CACHE = 'integrations:google:access_token';
 
@@ -81,14 +94,21 @@ class GoogleWorkspace
         return array_values(array_filter(explode(' ', (string) Integrations::get('google.scopes'))));
     }
 
-    /** @return list<string> scopes HQ needs that the connection lacks */
+    /** @return list<string> scopes meetings and transcripts need that the connection lacks (Drive is asked about apart) */
     public function missingScopes(): array
     {
         $granted = $this->grantedScopes();
         // Google reports openid and email as their long names
         $aliases = ['email' => 'https://www.googleapis.com/auth/userinfo.email'];
 
-        return array_values(array_filter(self::SCOPES, fn ($s) => ! in_array($s, $granted, true) && ! in_array($aliases[$s] ?? '', $granted, true)));
+        return array_values(array_filter(self::SCOPES, fn ($s) => $s !== self::DRIVE_SCOPE
+            && ! in_array($s, $granted, true) && ! in_array($aliases[$s] ?? '', $granted, true)));
+    }
+
+    /** Whether the owner allowed the server backups into Drive (connected, with the drive.file scope) */
+    public function canUseDrive(): bool
+    {
+        return $this->isConnected() && in_array(self::DRIVE_SCOPE, $this->grantedScopes(), true);
     }
 
     /** Where Connect Google sends the owner (offline access, consent every time so Google returns a refresh token) */
@@ -359,6 +379,165 @@ class GoogleWorkspace
         } while ($pageToken);
 
         return $events;
+    }
+
+    // ---- Drive (server backups, docs/BACKUPS.md) ---------------------------------------------------------------
+
+    /**
+     * The files and folders HQ created in a folder ('root' = the top of My Drive), oldest first. With drive.file,
+     * Google lists only HQ's own files, so nothing else the owner keeps in Drive is ever seen or touched.
+     *
+     * @return list<array{id: string, name: string, mimeType: string, size?: string, md5Checksum?: string, createdTime: string, appProperties?: array}>
+     */
+    public function driveList(string $parent, ?string $name = null, ?string $mimeType = null): array
+    {
+        $q = ["'" . self::driveQuote($parent) . "' in parents", 'trashed = false'];
+        if ($name !== null) {
+            $q[] = "name = '" . self::driveQuote($name) . "'";
+        }
+        if ($mimeType !== null) {
+            $q[] = "mimeType = '" . self::driveQuote($mimeType) . "'";
+        }
+
+        $files = [];
+        $token = null;
+        do {
+            $page = $this->call('get', self::DRIVE . '/files', array_filter([
+                'q' => implode(' and ', $q),
+                'spaces' => 'drive',
+                'pageSize' => 1000,
+                'orderBy' => 'createdTime',
+                'fields' => 'nextPageToken, files(id, name, mimeType, size, md5Checksum, createdTime, appProperties)',
+                'pageToken' => $token,
+            ]));
+            array_push($files, ...($page['files'] ?? []));
+            $token = $page['nextPageToken'] ?? null;
+        } while ($token);
+
+        return $files;
+    }
+
+    /** The folder of that name in $parent, created when HQ has none yet (the oldest, should there be two) */
+    public function driveFolder(string $name, string $parent = 'root'): string
+    {
+        $found = $this->driveList($parent, $name, self::FOLDER);
+        if ($found) {
+            return (string) $found[0]['id'];
+        }
+
+        return (string) $this->call('post', self::DRIVE . '/files', ['fields' => 'id'], ['name' => $name, 'mimeType' => self::FOLDER, 'parents' => [$parent]])['id'];
+    }
+
+    /** A copy of one of HQ's files in another folder (a month's first backup into monthly/): Google copies it, nothing is sent again */
+    public function driveCopy(string $fileId, string $name, string $parent): array
+    {
+        return $this->call('post', self::DRIVE . '/files/' . rawurlencode($fileId) . '/copy', ['fields' => 'id, name, size, md5Checksum'], ['name' => $name, 'parents' => [$parent]]);
+    }
+
+    /** Moves one of HQ's files to Drive's bin (pruning: Google empties it after 30 days); a file already gone counts */
+    public function driveTrash(string $fileId): void
+    {
+        try {
+            $this->call('patch', self::DRIVE . '/files/' . rawurlencode($fileId), ['fields' => 'id'], ['trashed' => true]);
+        } catch (GoogleUnavailable $e) {
+            if ($e->reason !== 'not_found') {
+                throw $e;
+            }
+        }
+    }
+
+    /**
+     * Uploads a file of any size with Drive's resumable protocol, a chunk at a time, so it never sits in memory. A
+     * dropped connection or a passing Google error resumes from the last byte Drive has, five times in a row at most.
+     *
+     * @return array{id: string, name: string, size: string, md5Checksum: string}
+     */
+    public function driveUpload(string $path, string $name, string $parent, array $properties = []): array
+    {
+        $size = (int) filesize($path);
+        $mime = 'application/octet-stream';
+        $quarter = 256 * 1024;
+        $chunk = max($quarter, intdiv((int) config('backups.drive.chunk_bytes', 8 << 20), $quarter) * $quarter);
+
+        try {
+            $start = $this->driveSend(fn (string $token) => Http::withToken($token)->acceptJson()->timeout(30)->connectTimeout(10)
+                ->withHeaders(['X-Upload-Content-Type' => $mime, 'X-Upload-Content-Length' => (string) $size])
+                ->post(self::DRIVE_UPLOAD . '?uploadType=resumable&fields=id,name,size,md5Checksum',
+                    ['name' => $name, 'parents' => [$parent], 'mimeType' => $mime] + ($properties ? ['appProperties' => $properties] : [])));
+        } catch (ConnectionException $e) {
+            throw new GoogleUnavailable('failed', $e);
+        }
+        $session = (string) $start->header('Location');
+        if (! $start->successful() || $session === '') {
+            throw $this->failure($start, self::DRIVE_UPLOAD);
+        }
+
+        $handle = fopen($path, 'rb');
+        try {
+            $offset = 0;
+            $failures = 0;
+            while (true) {
+                fseek($handle, $offset);
+                $data = $size > $offset ? (string) stream_get_contents($handle, min($chunk, $size - $offset)) : '';
+                $range = $size === 0 ? 'bytes */0' : 'bytes ' . $offset . '-' . ($offset + strlen($data) - 1) . '/' . $size;
+                $response = $this->driveChunk($session, $data, $range, $mime);
+                if ($response?->successful()) {
+                    return $response->json() ?? [];
+                }
+                if ($response?->status() === 308) {
+                    $offset = self::driveReceived($response);
+                    $failures = 0;
+
+                    continue;
+                }
+                if ($response !== null && ! in_array($response->status(), [408, 429, 500, 502, 503, 504], true)) {
+                    throw $this->failure($response, self::DRIVE_UPLOAD);
+                }
+                if (++$failures > 5) {
+                    throw $response !== null ? $this->failure($response, self::DRIVE_UPLOAD) : new GoogleUnavailable('failed');
+                }
+                Sleep::for(min(60, 2 ** $failures))->seconds();
+                // Ask Drive how much it has, and carry on from there
+                $status = $this->driveChunk($session, '', 'bytes */' . $size, $mime);
+                if ($status?->successful()) {
+                    return $status->json() ?? [];
+                }
+                if ($status?->status() === 308) {
+                    $offset = self::driveReceived($status);
+                }
+            }
+        } finally {
+            fclose($handle);
+        }
+    }
+
+    private function driveChunk(string $session, string $data, string $range, string $mime): ?Response
+    {
+        try {
+            return $this->driveSend(fn (string $token) => Http::withToken($token)->timeout(300)->connectTimeout(10)
+                ->withHeaders(['Content-Range' => $range])->withBody($data, $mime)->put($session));
+        } catch (ConnectionException) {
+            return null;
+        }
+    }
+
+    /** Sends with the current access token; a 401 refreshes the token once and sends again */
+    private function driveSend(callable $send): Response
+    {
+        $response = $send($this->accessToken());
+
+        return $response->status() === 401 ? $send($this->accessToken(true)) : $response;
+    }
+
+    /** The next byte Drive wants, from its Range header ("bytes=0-8388607"); nothing received yet = 0 */
+    private static function driveReceived(Response $response): int
+    {
+        return preg_match('/bytes=\d+-(\d+)/', (string) $response->header('Range'), $m) ? (int) $m[1] + 1 : 0;
+    }
+
+    private static function driveQuote(string $value): string
+    {
+        return str_replace(['\\', "'"], ['\\\\', "\\'"], $value);
     }
 
     // ---- Plumbing ---------------------------------------------------------------------------------------------

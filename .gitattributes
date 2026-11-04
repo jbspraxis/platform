@@ -1,2 +1,6 @@
 # Shell scripts run on the Linux server: always LF
 *.sh text eol=lf
+
+# Windows scripts for the owner's PC (deploy/backups/pc): CRLF, as cmd.exe and Windows PowerShell expect
+*.ps1 text eol=crlf
+*.cmd text eol=crlf

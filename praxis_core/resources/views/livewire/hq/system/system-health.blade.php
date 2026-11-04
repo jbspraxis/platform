@@ -70,6 +70,75 @@
                 </div>
             @endforeach
         </div>
+
+        {{-- Server backups (docs/BACKUPS.md): each site's last database and files backup, and the weekly restore test --}}
+        @if($backups)
+            @php
+                $rowPills = ['ok' => ['pill-success', 'OK'], 'failed' => ['pill-danger', 'Failed'], 'running' => ['pill-info', 'Running']];
+                $when = fn ($row) => \Illuminate\Support\Carbon::parse($row->finished_at ?? $row->started_at)->timezone('Africa/Lagos')->format('D j M, H:i');
+            @endphp
+            <section class="card" style="margin-top: 16px; padding: 0; overflow: hidden;" aria-labelledby="sh-backups">
+                <div style="padding: 16px 16px 8px;">
+                    <h2 id="sh-backups" class="card-title" style="font-size: 0.9375rem;">Server backups</h2>
+                    <p class="help" style="margin: 4px 0 0;">
+                        {{ $backups['setUp']
+                            ? 'Every database at 02:00 and every site’s uploaded files on Sundays at 03:00 (Lagos time), encrypted with the owner’s key, to Drive › ' . config('backups.drive.root') . '. Restore test on Sundays.'
+                            : 'Not switched on yet: docs/BACKUPS.md, section 4.' }}
+                    </p>
+                </div>
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Site</th>
+                                <th>Last database backup</th>
+                                <th>Restore test</th>
+                                <th>Last files backup</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($backups['sites'] as $s)
+                                <tr wire:key="backup-{{ $s['site'] }}">
+                                    <td><strong>{{ $s['site'] }}</strong><div class="sh-where">{{ $s['label'] }}</div></td>
+                                    <td>
+                                        @if($row = $s['db'])
+                                            <span class="pill {{ $rowPills[$row->status][0] ?? 'pill-neutral' }}">{{ $rowPills[$row->status][1] ?? $row->status }}</span>
+                                            <div class="sh-where">{{ $when($row) }}{{ $row->size_bytes ? ' · ' . \App\Support\Backups\Backups::size((int) $row->size_bytes) : '' }}{{ $row->drive_file_id ? ' · on Drive' : '' }}</div>
+                                        @else
+                                            <span class="help">Not yet</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if($test = $s['restore_result'])
+                                            <span class="pill {{ $test['ok'] ? 'pill-success' : 'pill-danger' }}">{{ $test['ok'] ? 'Passed' : 'Failed' }}</span>
+                                            <div class="sh-where">{{ $when($s['restore']) }} · {{ number_format($test['tables']) }} tables, {{ number_format($test['rows']) }} rows</div>
+                                        @else
+                                            <span class="help">Not yet</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if($row = $s['files'])
+                                            <span class="pill {{ $rowPills[$row->status][0] ?? 'pill-neutral' }}">{{ $rowPills[$row->status][1] ?? $row->status }}</span>
+                                            <div class="sh-where">{{ $when($row) }}{{ $row->size_bytes ? ' · ' . \App\Support\Backups\Backups::size((int) $row->size_bytes) : '' }}{{ $row->drive_file_id ? ' · on Drive' : '' }}</div>
+                                        @else
+                                            <span class="help">{{ $s['site'] !== 'other' && ! str_starts_with($s['site'], 'other/') ? 'Not yet' : '—' }}</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <span class="pill {{ $statePills[$s['state']] ?? 'pill-neutral' }}">{{ $stateLabels[$s['state']] ?? 'Unknown' }}</span>
+                                        @if($s['notes'])
+                                            <div class="sh-where" style="word-break: normal;">{{ $s['notes'][0] }}</div>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        @endif
+
         <p class="help" style="margin: 16px 0 0;">
             {{ $heartbeat ? 'The monitor last ran ' . \App\Support\Monitor\HealthChecks::ago($heartbeat) . '.' : 'The monitor has not run yet.' }}
             Alerts and the 8am summary go to {{ $alertEmail ?: 'nobody yet (set MONITOR_ALERT_EMAIL on the server)' }}.
