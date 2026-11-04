@@ -8,14 +8,23 @@
     $demoId = (string) (config('site.demo_video.' . app()->getLocale()) ?: config('site.demo_video.en'));
 @endphp
 
-@push('head')
-    {{-- The poster is the largest thing on the first screen (LCP): fetched first --}}
-    <link rel="preload" as="image" fetchpriority="high" href="{{ asset('media/hero-60s-poster-1280.webp') }}">
-@endpush
+
 
 @section('full')
-    {{-- lucide: landmark users truck shield-check message-square-text pause play circle-play arrow-down calculator phone message-circle x --}}
-    <section class="hero" aria-labelledby="hero-title">
+    {{-- lucide: landmark users truck shield-check message-square-text file-check-2 arrow-up circle-play arrow-down calculator phone message-circle x --}}
+    {{-- The hero (redesign PR 2, docs/BRAND.md section 11 "The hero moment"): a framed answer from the demo company.
+         Every final value is in the page from the start; scripts only stage it: the question fades in, the Praxis rule
+         draws to the answer, the figure's last digits settle, the bars grow, then the question box turns into a live
+         "Ask Praxis" field. Reduced motion or no JavaScript: the final frame, still. Behind it on wide screens, the quiet
+         flow field (resources/js/motion/field.js); the drawing in .hero-field is its still fallback. --}}
+    <section class="hero" aria-labelledby="hero-title" data-hero>
+        <div class="hero-field" aria-hidden="true">
+            <svg class="hero-field-still" viewBox="0 0 1200 600" preserveAspectRatio="none" focusable="false">
+                @for ($i = 0; $i < 18; $i++)
+                    <line x1="0" x2="1200" y1="{{ 40 + $i * 30 }}" y2="{{ 40 + $i * 30 + (($i % 3) - 1) * 6 }}" />
+                @endfor
+            </svg>
+        </div>
         <div class="container hero-inner">
             <div class="hero-text">
                 <h1 class="display" id="hero-title">{{ __('pages.home.h1') }}</h1>
@@ -27,27 +36,56 @@
                         <a class="btn btn-ghost" href="https://www.youtube.com/watch?v={{ $demoId }}" rel="noopener" data-demo-open="{{ $demoId }}">
                             <i data-lucide="circle-play"></i>{{ __('pages.home.watch_demo') }}
                         </a>
-                    @else
-                        <a class="btn btn-ghost" href="#answers"><i data-lucide="arrow-down"></i>{{ __('pages.home.see_answers') }}</a>
                     @endif
                 </div>
             </div>
-            {{-- The 60-second demo, silent, captions in the picture (demo/hero-60s-loop.mp4). Muted, no autoplay attribute, preload none:
-                 app.js plays it only on wide screens with a fast connection and no reduced motion; the button plays or pauses it (WCAG 2.2.2) --}}
-            <figure class="screen" id="answers">
-                <video class="screen-video" data-loop muted loop playsinline preload="none" width="1920" height="1080"
-                       poster="{{ asset('media/hero-60s-poster-1280.webp') }}" aria-label="{{ __('pages.home.video_label') }}">
-                    <source src="{{ asset('media/hero-60s-loop.mp4') }}" type="video/mp4">
-                </video>
-                <button class="screen-toggle" type="button" data-loop-toggle hidden
-                        data-pause="{{ __('pages.home.pause') }}" data-play="{{ __('pages.home.play') }}" aria-label="{{ __('pages.home.pause') }}">
-                    <i data-lucide="pause"></i>
-                </button>
+
+            <figure class="answer" id="answers" data-answer aria-label="{{ __('pages.home.answer_label') }}">
+                <div class="answer-bar">
+                    <span class="answer-org"><span class="answer-mark" aria-hidden="true">N</span>{{ __('pages.home.answer_company') }}<span class="answer-place">{{ __('pages.home.answer_place') }}</span></span>
+                    <span class="tag answer-demo">{{ __('pages.home.answer_demo') }}</span>
+                </div>
+                <div class="answer-body">
+                    <p class="answer-question" data-answer-step="question"><i data-lucide="message-square-text"></i>{{ __('pages.home.answer_question') }}</p>
+                    <div class="answer-rule" aria-hidden="true"><span data-answer-step="rule"></span></div>
+                    <p class="answer-figure" data-answer-step="figure">
+                        @php
+                            // The amount's sign and its digits apart: the sign is set in the sans (.answer-currency)
+                            preg_match('/^(\D*?)(\d[\d\s\x{202F},.]*\d)(\D*)$/u', __('pages.home.answer_figure'), $amount);
+                            $unspace = fn (string $text) => preg_replace('/^[\s\x{202F}\x{00A0}]+|[\s\x{202F}\x{00A0}]+$/u', '', $text);
+                            [$signBefore, $digits, $signAfter] = [$unspace($amount[1] ?? ''), $amount[2] ?? __('pages.home.answer_figure'), $unspace($amount[3] ?? '')];
+                        @endphp
+                        <span class="answer-number">@if ($signBefore !== '')<span class="answer-currency">{{ $signBefore }}</span>@endif<span data-settle>{{ $digits }}</span>@if ($signAfter !== '')<span class="answer-currency">{{ $signAfter }}</span>@endif</span>
+                        <span class="answer-figure-label">{{ __('pages.home.answer_figure_label') }}</span>
+                    </p>
+                    <table class="answer-table" data-answer-step="table">
+                        <caption class="sr-only">{{ __('pages.home.answer_share_label') }}</caption>
+                        <tbody>
+                            @foreach (__('pages.home.answer_rows') as $row)
+                                <tr>
+                                    <th scope="row">{{ $row['name'] }}</th>
+                                    <td class="answer-bar-cell" aria-hidden="true"><span class="answer-bar-track"><span class="answer-bar-fill" data-value="{{ $row['value'] }}"></span></span></td>
+                                    <td class="answer-share">{{ $row['share'] }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                    <p class="answer-sources" data-answer-step="sources"><i data-lucide="file-check-2"></i>{{ __('pages.home.answer_sources') }}</p>
+                </div>
+                {{-- The question box: a real form. It hands the question to Ask Praxis (partials.chat) and opens it --}}
+                <form class="answer-ask" action="{{ route('chat') }}" method="POST" data-hero-ask>
+                    @csrf
+                    <x-form-guard form="hero-chat" />
+                    <label class="sr-only" for="hero-ask">{{ __('pages.home.ask_label') }}</label>
+                    <input class="answer-ask-input" id="hero-ask" name="chat_message" type="text" maxlength="1500" autocomplete="off"
+                           placeholder="{{ __('pages.home.ask_placeholder') }}" data-question="{{ __('pages.home.answer_question') }}">
+                    <button class="answer-ask-send" type="submit" aria-label="{{ __('pages.home.ask_button') }}"><i data-lucide="arrow-up"></i></button>
+                </form>
             </figure>
         </div>
     </section>
 
-    <section class="band" aria-labelledby="problem-title">
+    <section class="band" aria-labelledby="problem-title" data-chapter="statement">
         <div class="container split">
             <h2 class="band-title" id="problem-title">{{ __('pages.home.problem_title') }}</h2>
             <p class="band-text">{{ __('pages.home.problem_text') }}</p>
@@ -69,7 +107,7 @@
         </div>
     </section>
 
-    <section class="band" aria-labelledby="method-title">
+    <section class="band" aria-labelledby="method-title" data-chapter="method">
         <div class="container">
             <h2 class="band-title" id="method-title">{{ __('pages.home.method_title') }}</h2>
             @include('partials.method', ['steps' => __('pages.method')])

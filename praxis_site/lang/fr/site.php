@@ -461,7 +461,7 @@ return [
     ],
 
     'chat' => [
-        'open' => 'Demander à Praxis AI',
+        'open' => 'Demander à Praxis',
         'title' => 'Praxis AI',
         'intro' => 'Posez vos questions sur nos services, la méthode Praxis ou l’audit gratuit et la démo. Les réponses peuvent contenir des erreurs : vérifiez les points importants avec notre équipe. Merci de ne pas communiquer de mots de passe ni de données de paiement.',
         'you' => 'Vous',
@@ -469,6 +469,8 @@ return [
         'links' => 'Pages utiles',
         'message' => 'Votre question',
         'send' => 'Envoyer la question',
+        'typing' => 'Praxis AI écrit',
+        'shortcut' => 'Entrée pour envoyer, Maj et Entrée pour un retour à la ligne',
         'sending' => 'Rédaction de la réponse…',
         'required' => 'Saisissez d’abord une question.',
         'too_long' => 'Votre question doit faire moins de 1 500 caractères.',

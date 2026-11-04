@@ -7,8 +7,8 @@
     $chatNeedsCheck = ! \App\Http\Middleware\FormGuard::chatCleared(request());
 @endphp
 <details class="chat" id="chat" @if (session('chat_open') || $chatErrors->any()) open @endif>
-    <summary><i data-lucide="message-circle"></i><span>{{ __('site.chat.open') }}</span></summary>
-    <div class="chat-panel">
+    <summary><i data-lucide="sparkles"></i><span>{{ __('site.chat.open') }}</span></summary>
+    <div class="chat-panel" data-lenis-prevent>
         <div class="chat-head">
             <h2>{{ __('site.chat.title') }}</h2>
             <p>{{ __('site.chat.intro') }}</p>
@@ -17,18 +17,19 @@
         <form class="chat-form" method="POST" action="{{ route('chat') }}" data-chat-form
               data-you="{{ __('site.chat.you') }}" data-assistant="{{ __('site.chat.assistant') }}"
               data-links="{{ __('site.chat.links') }}"
-              data-sending="{{ __('site.chat.sending') }}" data-failed="{{ __('site.chat.unavailable', ['email' => $site->email]) }}"
+              data-sending="{{ __('site.chat.sending') }}" data-typing="{{ __('site.chat.typing') }}" data-failed="{{ __('site.chat.unavailable', ['email' => $site->email]) }}"
               data-expired="{{ __('site.errors.expired_body') }}">
             @csrf
             <x-form-guard form="chat" />
-            <x-textarea name="chat_message" id="chat-message" :label="__('site.chat.message')" bag="chat" maxlength="1500" rows="3" />
+            <div class="chat-composer">
+                <x-textarea name="chat_message" id="chat-message" :label="__('site.chat.message')" bag="chat" maxlength="1500" rows="1" />
+                <button class="chat-send" type="submit" aria-label="{{ __('site.chat.send') }}"><i data-lucide="arrow-up"></i></button>
+            </div>
+            <p class="chat-hint">{{ __('site.chat.shortcut') }}</p>
             <p class="chat-status" data-chat-status role="status"></p>
             @if ($chatNeedsCheck)
                 <x-turnstile />
             @endif
-            <div class="actions">
-                <button class="btn btn-primary btn-sm" type="submit"><i data-lucide="send"></i>{{ __('site.chat.send') }}</button>
-            </div>
         </form>
     </div>
 </details>
