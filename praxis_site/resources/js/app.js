@@ -353,7 +353,15 @@ function enhanceVerify() {
     });
 }
 
+// Small images that must always appear (the footer logo) stay lazy, so they never compete with the first screen,
+// then load once the page has: some browsers never fire a footer image's lazy load when the page is captured whole
+function loadAfterPage() {
+    const go = () => document.querySelectorAll('img[data-load-after-page][loading="lazy"]').forEach((img) => { img.loading = 'eager'; });
+    if (document.readyState === 'complete') go(); else window.addEventListener('load', go, { once: true });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    loadAfterPage();
     drawIcons();
     enhanceHeaderMenus();
     enhanceChat();

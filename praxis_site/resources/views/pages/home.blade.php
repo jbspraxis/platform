@@ -9,7 +9,8 @@
 @endphp
 
 @push('head')
-    <link rel="preload" as="image" href="{{ asset('media/hero-60s-poster.jpg') }}">
+    {{-- The poster is the largest thing on the first screen (LCP): fetched first --}}
+    <link rel="preload" as="image" fetchpriority="high" href="{{ asset('media/hero-60s-poster-1280.webp') }}">
 @endpush
 
 @section('full')
@@ -35,7 +36,7 @@
                  app.js plays it only on wide screens with a fast connection and no reduced motion; the button plays or pauses it (WCAG 2.2.2) --}}
             <figure class="screen" id="answers">
                 <video class="screen-video" data-loop muted loop playsinline preload="none" width="1920" height="1080"
-                       poster="{{ asset('media/hero-60s-poster.jpg') }}" aria-label="{{ __('pages.home.video_label') }}">
+                       poster="{{ asset('media/hero-60s-poster-1280.webp') }}" aria-label="{{ __('pages.home.video_label') }}">
                     <source src="{{ asset('media/hero-60s-loop.mp4') }}" type="video/mp4">
                 </video>
                 <button class="screen-toggle" type="button" data-loop-toggle hidden

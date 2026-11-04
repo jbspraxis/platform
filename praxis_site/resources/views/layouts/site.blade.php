@@ -105,13 +105,6 @@
     <link rel="apple-touch-icon" href="{{ asset('img/icons/apple-touch-icon.png') }}">
     <meta name="theme-color" content="#0C142B">
     <script type="application/ld+json">{!! json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) !!}</script>
-    {{-- The two Latin font files every page paints with first (the headline is set in Newsreader): fetched in parallel with the CSS --}}
-    @foreach (['@fontsource-variable/newsreader/files/newsreader-latin-opsz-normal.woff2', '@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2'] as $font)
-        @php($fontUrl = \Illuminate\Support\Facades\Vite::asset('node_modules/' . $font))
-        @if ($fontUrl !== '')
-            <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ $fontUrl }}">
-        @endif
-    @endforeach
     @stack('head')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @if ($turnstile ?? false)

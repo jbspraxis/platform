@@ -54,17 +54,14 @@ class FoundationTest extends TestCase
         $this->assertNull($this->breadcrumbs($this->get('/')->assertOk()->getContent()));
     }
 
-    public function test_every_page_preloads_the_two_latin_fonts_from_the_build(): void
+    public function test_no_font_is_preloaded_and_the_hero_poster_is_fetched_first(): void
     {
+        // Lighthouse (4 Nov 2026): preloading 160 KB of fonts pushed the poster, the largest element on a phone,
+        // back by 0.7 s. The metric-matched fallbacks keep the text still without them.
         $this->fakeHq();
-        $this->withVite(); // the real manifest in public/build (npm run build)
-        $manifest = json_decode((string) file_get_contents(public_path('build/manifest.json')), true);
 
-        $html = $this->get('/industries')->assertOk()->getContent();
-        foreach (['newsreader/files/newsreader-latin-opsz-normal', 'plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal'] as $font) {
-            $built = $manifest['node_modules/@fontsource-variable/' . $font . '.woff2']['file'];
-            $this->assertStringContainsString('<link rel="preload" as="font" type="font/woff2" crossorigin href="' . asset('build/' . $built) . '">', $html);
-        }
+        $this->get('/industries')->assertOk()->assertDontSee('as="font"', false);
+        $this->get('/')->assertOk()->assertSee('<link rel="preload" as="image" fetchpriority="high" href="' . asset('media/hero-60s-poster-1280.webp') . '">', false);
     }
 
     public function test_the_hero_loop_downloads_nothing_until_the_script_chooses_to_play_it(): void
