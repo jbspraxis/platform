@@ -240,6 +240,40 @@ class DocumentsTest extends TestCase
         $this->assertSame($issued->file_sha256, hash('sha256', (string) $file));
     }
 
+    public function test_someone_who_may_issue_but_not_write_issues_what_is_already_stored(): void
+    {
+        $owner = $this->owner();
+        $this->actingAs($owner);
+        $document = Letters::start('formal_letter', null, $this->company(), $owner);
+        $document->forceFill(['title' => 'Confirmation of our bank details'])->save();
+
+        // A role the owner might make one day: it issues, but it does not write
+        $issuer = $this->staff('issuer', []);
+        $role = DB::table('roles')->insertGetId([
+            'name' => 'Document issuer (test)', 'slug' => 'doc-issuer-' . Str::random(5), 'audience' => 'staff',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('role_permissions')->insert(DB::table('permissions')
+            ->whereIn('slug', ['letters.view', 'letters.manage'])->pluck('id')
+            ->map(fn ($id) => ['role_id' => $role, 'permission_id' => $id])->all());
+        DB::table('staff_roles')->insert(['user_id' => $issuer->id, 'role_id' => $role]);
+        \App\Support\Access::flush();
+
+        Livewire::actingAs($issuer)->test(DocumentPage::class, ['document' => $document->id])
+            // What they typed is ignored: they may not write
+            ->set('title', 'Something they typed')
+            ->call('issue')->assertHasNoErrors();
+
+        $issued = $document->fresh();
+        $this->assertSame(LetterDocument::ISSUED, $issued->status);
+        $this->assertSame('Confirmation of our bank details', $issued->title);
+
+        // And they still cannot write a draft
+        $other = Letters::start('formal_letter', null, $this->company(), $owner);
+        Livewire::actingAs($issuer)->test(DocumentPage::class, ['document' => $other->id])
+            ->set('title', 'Mine now')->call('save')->assertForbidden();
+    }
+
     public function test_revoking_and_replacing_leave_a_trail_the_check_page_can_read(): void
     {
         $owner = $this->owner();

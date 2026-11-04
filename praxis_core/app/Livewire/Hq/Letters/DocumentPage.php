@@ -319,7 +319,11 @@ class DocumentPage extends Component
     public function issue(): void
     {
         $this->authorize('letters.manage');
-        $this->save();
+        // Whatever is on screen goes out, so it is saved first — but only by someone who may write it.
+        // Someone with letters.manage alone issues what is already stored.
+        if (Auth::user()->can('letters.create')) {
+            $this->save();
+        }
         $record = $this->document();
 
         if (trim((string) $record->title) === '') {
