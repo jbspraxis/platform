@@ -35,7 +35,7 @@ class LaunchPagesTest extends TestCase
             ->assertSee('action="' . url('/fr/contact') . '"', false)
             ->assertSee('href="' . url('/fr/services') . '"', false)
             ->assertSee('<link rel="alternate" hreflang="en" href="' . url('/contact') . '">', false)
-            ->assertSee('Réserver un audit gratuit et une démo');
+            ->assertSee('Réserver un audit gratuit');
 
         // The guide form sends visitors back to the page they were on, in their language
         $this->from('/fr/how-we-work')->post('/fr/services', ['email' => 'ada@example.com', 'back' => 'how-we-work'])

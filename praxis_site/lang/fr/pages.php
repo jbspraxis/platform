@@ -26,7 +26,7 @@ return [
 
     'home' => [
         'title' => 'JBS Praxis | Conseil et ingénierie pour les institutions africaines',
-        'description' => "Nous concevons le fonctionnement de votre organisation, puis le système qui en rend compte\u{202F}: finance, équipes, opérations et risques au même endroit. Réservez un audit gratuit et une démo.",
+        'description' => "Nous concevons le fonctionnement de votre organisation, puis le système qui en rend compte\u{202F}: finance, équipes, opérations et risques au même endroit. Réservez un audit gratuit.",
         'h1' => 'Posez toutes vos questions à votre entreprise.',
         'lead' => 'Nous concevons le fonctionnement de votre organisation, puis le système qui en rend compte.',
         'see_answers' => 'Voir ce que répond Praxis AI',
@@ -75,6 +75,13 @@ return [
         'calculator_title' => "Combien vous coûte la non-qualité\u{202F}?",
         'calculator_text' => 'Reprises, retards, erreurs et doubles saisies ont un prix. Estimez le vôtre en quelques minutes, dans votre devise.',
         'calculator_cta' => 'Utiliser le calculateur',
+        'calculator_counts' => 'Il compte trois coûts : les contrôles manuels des managers, les erreurs corrigées en interne et celles qui atteignent vos clients.',
+        'calculator_steps' => [
+            ['title' => 'Votre organisation', 'text' => 'Secteur, système utilisé aujourd’hui, là où le travail ralentit, et votre devise.'],
+            ['title' => 'Vos chiffres', 'text' => 'Effectifs, managers, chiffre d’affaires, heures de contrôle manuel, reprises. Des ordres de grandeur suffisent.'],
+            ['title' => 'Votre rapport', 'text' => 'Affiché aussitôt, et une copie par e-mail à partager avec votre équipe.'],
+        ],
+        'chapter_alt' => 'Lagos vue du ciel en fin d’après-midi : toits, routes et ponts au-dessus de la lagune.',
         'final_title' => 'Voyez-le sur vos propres opérations.',
         'final_text' => 'L’audit gratuit et la démo durent environ une heure. Nous étudions un domaine de votre organisation et vous montrons à quoi ressemble une réponse claire.',
     ],
@@ -100,6 +107,11 @@ return [
         'eyebrow' => 'Entreprise',
         'h1' => 'L’ordre, rendu visible.',
         'lead' => 'JBS Praxis est un cabinet de conseil et d’ingénierie au service des institutions africaines. Nous concevons le fonctionnement des organisations, puis les systèmes qui en rendent compte, en anglais et en français.',
+        'desks_title' => 'Deux bureaux régionaux',
+        'desks' => [
+            ['image' => 'lagos', 'city' => 'Lagos', 'line' => 'Afrique de l’Ouest (CEDEAO)', 'alt' => 'Lagos vue du ciel : toits, routes et ponts au-dessus de la lagune.'],
+            ['image' => 'douala', 'city' => 'Douala', 'line' => 'Afrique centrale (CEMAC)', 'alt' => 'Douala au crépuscule, là où la ville rejoint le Wouri : le pont, le port et les premiers lampadaires.'],
+        ],
         'facts_title' => 'L’entreprise',
         'legal_name' => 'Dénomination sociale',
         'offices' => 'Bureaux',
@@ -110,6 +122,33 @@ return [
         'ourselves_text' => 'Nous gérons notre propre facturation, notre paie, nos projets et nos validations sur le système que nous construisons pour nos clients.',
         'products_title' => 'Nos produits',
         'nfelia' => 'nfelia, un produit JBS Praxis.',
+        'products_lead' => 'Deux produits que nous concevons, construisons et exploitons nous-mêmes, selon les mêmes principes que les systèmes que nous construisons pour nos clients.',
+        'products' => [
+            'praxis-ls' => [
+                'name' => 'Praxis LS',
+                'line' => 'Notre ERP logistique, proposé en service aux transitaires, commissionnaires en douane, entrepôts et flottes de l’espace OHADA.',
+                'points' => [
+                    'Un dossier par expédition, du devis à la douane, à l’entrepôt et au camion, jusqu’à la facture',
+                    'La comptabilité SYSCOHADA en son cœur, en français et en anglais',
+                    'La marque de chaque opérateur sur ses documents, et sa propre adresse',
+                    'Les données de chaque opérateur dans sa propre base : nous détenons le code, il détient les données',
+                ],
+                'status' => 'Fait tourner Smart Logistics and Services au Cameroun aujourd’hui. La version pour plusieurs opérateurs est en construction.',
+                'link' => 'Le voir à l’œuvre : Smart Logistics and Services',
+            ],
+            'nfelia' => [
+                'name' => 'nfelia',
+                'line' => 'Notre produit pour les petites entreprises qui vendent par WhatsApp, Instagram et le bouche-à-oreille.',
+                'points' => [
+                    'Un site web à elle pour chaque entreprise',
+                    'Chaque vente devient une commande, avec sa facture, son reçu et sa dette éventuelle',
+                    'Le stock et les livraisons sur le téléphone',
+                    'En mots simples, pour des gérants qui ne sont pas comptables',
+                ],
+                'status' => 'En service au Nigeria, au Cameroun, au Ghana et au Kenya.',
+                'link' => 'Visiter nfelia.com',
+            ],
+        ],
         'security_title' => 'Sécurité et données',
         'security_text' => "Vos données restent les vôtres. Chaque action dans les systèmes que nous construisons est autorisée selon le rôle et enregistrée dans un journal d’audit. Les fichiers sont stockés de façon privée, jamais sur des liens publics. Nos processus sont alignés sur la norme ISO\u{202F}27001. Nous respectons la loi nigériane sur la protection des données (NDPA) et la loi camerounaise sur la protection des données personnelles\u{202F}; vous pouvez demander à tout moment ce que nous détenons à votre sujet.",
         'security_link' => 'Comment nous protégeons vos données',

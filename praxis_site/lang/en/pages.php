@@ -28,7 +28,7 @@ return [
 
     'home' => [
         'title' => 'JBS Praxis | Consulting and engineering for Africa’s institutions',
-        'description' => 'We design how your organisation runs, then build the system that answers for it: finance, people, operations and risk in one place. Book a free audit and demo.',
+        'description' => 'We design how your organisation runs, then build the system that answers for it: finance, people, operations and risk in one place. Book a free audit.',
         'h1' => 'Ask your company anything.',
         'lead' => 'We design how your organisation runs, then build the system that answers for it.',
         'see_answers' => 'See what Praxis AI answers',
@@ -77,6 +77,14 @@ return [
         'calculator_title' => 'What is poor quality costing you?',
         'calculator_text' => 'Rework, delays, errors and double entry have a price. Estimate yours in a few minutes, in your currency.',
         'calculator_cta' => 'Use the calculator',
+        // The calculator as a step in the journey (redesign PR 3): its three real steps, from pages/calculator
+        'calculator_counts' => 'It counts three costs: managers checking work by hand, errors fixed inside, and errors that reach your customers.',
+        'calculator_steps' => [
+            ['title' => 'Your organisation', 'text' => 'Sector, the system you use today, where work slows down, and your currency.'],
+            ['title' => 'Your figures', 'text' => 'Staff, managers, turnover, hours of manual checking, rework. Approximate is fine.'],
+            ['title' => 'Your report', 'text' => 'On screen at once, and a copy by email to share with your team.'],
+        ],
+        'chapter_alt' => 'Lagos from above in the late afternoon: roofs, roads and bridges across the lagoon.',
         'final_title' => 'See it on your own operations.',
         'final_text' => 'The free audit and demo takes about an hour. We look at one area of your organisation and show you what a straight answer looks like.',
     ],
@@ -103,6 +111,11 @@ return [
         'h1' => 'Order, made visible.',
         'lead' => 'JBS Praxis is a consulting and engineering firm for Africa’s institutions. We design how organisations run, then build the systems that answer for them, in English and French.',
         'facts_title' => 'The company',
+        'desks_title' => 'Two regional desks',
+        'desks' => [
+            ['image' => 'lagos', 'city' => 'Lagos', 'line' => 'West Africa (ECOWAS)', 'alt' => 'Lagos from above: roofs, roads and bridges across the lagoon.'],
+            ['image' => 'douala', 'city' => 'Douala', 'line' => 'Central Africa (CEMAC)', 'alt' => 'Douala at dusk, where the city meets the Wouri river: the bridge, the port and the first streetlights.'],
+        ],
         'legal_name' => 'Legal name',
         'offices' => 'Offices',
         'registration' => 'Registration',
@@ -112,6 +125,34 @@ return [
         'ourselves_text' => 'We run our own invoicing, payroll, projects and approvals on the same system we build for clients.',
         'products_title' => 'Our products',
         'nfelia' => 'nfelia, a JBS Praxis product.',
+        // Our products (redesign PR 3): what each one is as a product, apart from any client's case study
+        'products_lead' => 'Two products we design, build and run ourselves, on the same principles as the systems we build for clients.',
+        'products' => [
+            'praxis-ls' => [
+                'name' => 'Praxis LS',
+                'line' => 'Our logistics ERP, offered as a service to freight forwarders, customs agents, warehouses and fleets in the OHADA region.',
+                'points' => [
+                    'One file per shipment, from the quote through customs, the warehouse and the truck to the invoice',
+                    'SYSCOHADA accounting at its core, in English and French',
+                    'Each operator’s own brand on its documents, and its own address',
+                    'Each operator’s data in its own database: we hold the code, they hold the data',
+                ],
+                'status' => 'Runs Smart Logistics and Services in Cameroon today. The version for many operators is now in build.',
+                'link' => 'See it at work: Smart Logistics and Services',
+            ],
+            'nfelia' => [
+                'name' => 'nfelia',
+                'line' => 'Our product for small businesses that sell through WhatsApp, Instagram and word of mouth.',
+                'points' => [
+                    'A website of its own for each business',
+                    'Every sale becomes an order, with its invoice, receipt and any debt',
+                    'Stock and deliveries on the phone',
+                    'In plain words, for owners who are not accountants',
+                ],
+                'status' => 'Live in Nigeria, Cameroon, Ghana and Kenya.',
+                'link' => 'Visit nfelia.com',
+            ],
+        ],
         'security_title' => 'Security and data',
         'security_text' => 'Your data stays yours. Every action in the systems we build is permissioned by role and recorded in an audit log. Files are stored privately, never on public links. Our processes are aligned with ISO 27001. We work under Nigeria’s Data Protection Act (NDPA) and Cameroon’s data protection law, and you can ask what we hold about you at any time.',
         'security_link' => 'How we protect your data',

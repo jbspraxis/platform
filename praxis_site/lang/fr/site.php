@@ -1,12 +1,13 @@
 <?php
 
 // Tout le texte du site en français (mêmes clés que lang/en/site.php). Règles de docs/BRAND.md : vouvoiement,
-// guillemets « », espace fine insécable (U+202F) avant ; : ! ?, « Réserver un audit gratuit et une démo ».
+// guillemets « », espace fine insécable (U+202F) avant ; : ! ?, « Réserver un audit gratuit ».
 // Les clés des listes envoyées à HQ (étapes, sujets, compétences…) restent exactement celles de l'anglais.
 return [
 
     'name' => 'JBS Praxis',
-    'cta' => 'Réserver un audit gratuit et une démo',
+    'cta' => 'Réserver un audit gratuit',
+    'cta_note' => 'Voyez-le sur vos propres opérations : chaque audit gratuit se termine par une démo sur un domaine de votre organisation.',
     'cta_short' => 'Réserver un audit',
     'preview' => 'Aperçu',
     'skip' => 'Aller au contenu',
@@ -145,7 +146,7 @@ return [
         'flows' => 'Pages et formulaires à tester',
         'links' => [
             'contact' => ['label' => 'Nous contacter', 'text' => 'Envoyez un message.'],
-            'schedule' => ['label' => 'Réserver un audit gratuit et une démo', 'text' => 'Choisissez un jour et une heure (WAT), puis ajoutez vos coordonnées.'],
+            'schedule' => ['label' => 'Réserver un audit gratuit', 'text' => 'Choisissez un jour et une heure (WAT), puis ajoutez vos coordonnées.'],
             'calculator' => ['label' => 'Calculateur du coût de la non-qualité', 'text' => 'Estimez le coût de la non-qualité et recevez le rapport par e-mail.'],
             'kaizen' => ['label' => 'Analyses JBS Praxis', 'text' => 'Lisez les articles publiés.'],
             'kaizen_write' => ['label' => 'Écrire pour les analyses JBS Praxis', 'text' => 'Proposez un article.'],
@@ -217,8 +218,8 @@ return [
     ],
 
     'schedule' => [
-        'title' => 'Réserver un audit gratuit et une démo',
-        'intro' => 'Choisissez un jour, puis une heure. Les heures sont en heure d’Afrique de l’Ouest (WAT), l’heure de Lagos et de Douala.',
+        'title' => 'Réserver un audit gratuit',
+        'intro' => 'L’audit gratuit dure environ une heure et se termine par une démo sur un domaine de votre organisation. Choisissez un jour, puis une heure. Les heures sont en heure d’Afrique de l’Ouest (WAT), l’heure de Lagos et de Douala.',
         'step_day' => 'Choisissez un jour',
         'step_time' => 'Choisissez une heure',
         'step_details' => 'Vos coordonnées',
@@ -247,7 +248,7 @@ return [
         ],
         'custom_focus' => 'Décrivez votre sujet',
         'custom_focus_hint' => '40 caractères au plus.',
-        'send' => 'Réserver un audit gratuit et une démo',
+        'send' => 'Réserver un audit gratuit',
         'slot_taken' => 'Ce créneau vient d’être réservé. Choisissez une autre heure.',
         'already_booked' => 'Vous avez déjà une demande d’audit gratuit et de démo chez nous. Nous la confirmerons par e-mail. Pour la modifier, écrivez-nous à :email.',
         'when' => ':date, :time (WAT)',
@@ -458,6 +459,26 @@ return [
         'sent_title' => 'Merci pour votre avis',
         'sent_body' => 'Il est transmis à l’équipe qui gère ce site.',
         'send_another' => 'Envoyer un autre avis',
+    ],
+
+    // Preuves (refonte PR 3) : la bande de logos et les citations de clients (affichées une fois approuvées)
+    'proof' => [
+        'clients_title' => 'Des organisations avec lesquelles nous avons travaillé',
+        'clients_pause' => 'Mettre les logos en pause',
+        'clients_play' => 'Relancer les logos',
+        'quotes_title' => 'Ils en parlent',
+        'quotes' => [
+            'smart-logistics' => ['text' => 'Chaque dossier, chaque facture, chaque camion vit désormais dans un seul système, en français comme en anglais. Quand je demande où en est un dossier ou ce qu’il nous a coûté, la réponse est déjà là.',
+                'name' => 'Timothee Massomba', 'role' => 'Directeur général', 'org' => 'Smart Logistics and Services'],
+            'la-petite-cour' => ['text' => 'Ils ont reconstruit notre système pendant que nous continuions à vendre et à livrer chaque jour. Nos exercices se clôturent et restent clos, et chaque emballage vide est suivi.',
+                'name' => '', 'role' => 'Directeur général', 'org' => 'Un distributeur de produits de grande consommation au Cameroun'],
+            'mycity-app' => ['text' => 'JBS Praxis construit comme je voudrais que ma propre équipe le fasse : testé, documenté et livré par étapes. Nous voyons chaque étape et nous possédons chaque ligne.',
+                'name' => 'Bode Oluwasanmi', 'role' => 'Directeur technique', 'org' => 'MyCity App'],
+            'pixie-girl-global' => ['text' => 'Du coût de fabrication d’une perruque à ce que nous vendons en ligne et en boutique, tout tient désormais dans les mêmes chiffres. Je vois enfin toute l’entreprise.',
+                'name' => 'Faitlyn Alex', 'role' => 'Directrice générale', 'org' => 'Pixie Girl Global'],
+        ],
+        'results_title' => 'En chiffres',
+        'results_note' => 'Chiffres confirmés par le client.',
     ],
 
     'chat' => [

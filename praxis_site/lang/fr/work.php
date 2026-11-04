@@ -44,7 +44,8 @@ return [
         'lead' => 'Chaque étude de cas part du besoin de l’organisation, cartographie le système que nous avons construit et se termine par ce qui a changé. Lorsqu’un client n’est pas nommé, nous le décrivons par son secteur.',
         'clients_title' => 'Missions clients',
         'products_title' => 'Nos produits',
-        'products_text' => "nfelia nous appartient\u{202F}: nous le concevons, le construisons et l’exploitons.",
+        'products_text' => "nfelia et Praxis LS nous appartiennent\u{202F}: nous les concevons, les construisons et les exploitons.",
+        'products_more' => 'Praxis LS, notre ERP logistique pour l’espace OHADA',
         'other_title' => 'Autres réalisations, par secteur',
         'other_text' => 'Des systèmes construits pour des clients que nous décrivons uniquement par leur secteur.',
         'industries_title' => 'Les secteurs derrière ces réalisations',
@@ -63,6 +64,13 @@ return [
         'coverage_caption' => 'Les domaines couverts par notre travail dans chaque secteur',
         'covered' => 'Couvert',
         'not_covered' => 'Non couvert',
+    ],
+
+    'sector_images' => [
+        'logistics' => ['image' => 'logistics', 'alt' => 'Un terminal à conteneurs au petit matin : des conteneurs en longues rangées et des grues le long du quai.'],
+        'consumer-goods' => ['image' => 'consumer-goods', 'alt' => 'Un entrepôt de distribution au crépuscule : des camions aux quais de chargement et des palettes alignées.'],
+        'pharma' => ['image' => 'pharmaceuticals', 'alt' => 'Un couloir de contrôle qualité dans une usine pharmaceutique, parois vitrées et instruments de chaque côté.'],
+        'oil-gas' => ['image' => 'oil-and-gas', 'alt' => 'Un terminal pétrolier et gazier à l’aube : des réservoirs et un rack de conduites jusqu’à l’horizon.'],
     ],
 
     'sectors' => [

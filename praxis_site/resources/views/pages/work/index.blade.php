@@ -24,6 +24,7 @@
             <h2 class="band-title" id="products-title">{{ __('work.index.products_title') }}</h2>
             <p class="band-text">{{ __('work.index.products_text') }}</p>
             @include('partials.work-register', ['cases' => $products])
+            <p class="band-link"><a href="{{ route('company') }}#products">{{ __('work.index.products_more') }}</a></p>
         </div>
     </section>
 

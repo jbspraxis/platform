@@ -45,7 +45,8 @@ return [
         'lead' => 'Each case study starts with what the organisation needed, maps the system we built, and ends with what changed. Where a client is not named, we describe it by its sector.',
         'clients_title' => 'Client work',
         'products_title' => 'Our products',
-        'products_text' => 'nfelia is ours: we design it, build it and run it.',
+        'products_text' => 'nfelia and Praxis LS are ours: we design them, build them and run them.',
+        'products_more' => 'Praxis LS, our logistics ERP for the OHADA region',
         'other_title' => 'Other work, by sector',
         'other_text' => 'Systems we built for clients we describe by their sector only.',
         'industries_title' => 'The sectors behind the work',
@@ -67,6 +68,14 @@ return [
     ],
 
     // Sector names, and one line on what the work there involves
+    // Sector images (redesign PR 3, public/img/place): atmosphere for the sector, never a client's site
+    'sector_images' => [
+        'logistics' => ['image' => 'logistics', 'alt' => 'A container port in the early morning: containers in long rows and cranes along the quay.'],
+        'consumer-goods' => ['image' => 'consumer-goods', 'alt' => 'A distribution warehouse at dusk: trucks at the loading bays and pallets in straight lines.'],
+        'pharma' => ['image' => 'pharmaceuticals', 'alt' => 'A quality-control corridor in a pharmaceutical plant, glass walls and instruments on both sides.'],
+        'oil-gas' => ['image' => 'oil-and-gas', 'alt' => 'An oil and gas terminal at first light: storage tanks and a pipe rack running to the horizon.'],
+    ],
+
     'sectors' => [
         'logistics' => ['name' => 'Logistics and freight',
             'line' => 'Goods pass through ports, customs, warehouses and trucks. Every step has a cost that must reach the right shipment file and the books.'],

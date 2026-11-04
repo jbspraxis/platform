@@ -29,9 +29,9 @@ class WorkPagesTest extends TestCase
             $this->assertDoesNotMatchRegularExpression('/\sstyle\s*=|<style\b/i', $html, $path);
         }
 
-        $this->get('/work')->assertSee('What we built, and how it runs.')->assertSee('Book a free audit and demo');
+        $this->get('/work')->assertSee('What we built, and how it runs.')->assertSee('Book a free audit');
         $this->get('/fr/work')->assertSee('Ce que nous avons construit, et comment cela fonctionne.')
-            ->assertSee('Réserver un audit gratuit et une démo');
+            ->assertSee('Réserver un audit gratuit');
     }
 
     public function test_the_index_lists_every_case_study_and_the_sector_only_work(): void

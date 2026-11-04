@@ -6,5 +6,6 @@
         <div class="actions">
             <a class="btn btn-on-dark btn-lg" href="{{ route('schedule') }}">{{ __('site.cta') }}</a>
         </div>
+        <p class="final-note">{{ __('site.cta_note') }}</p>
     </div>
 </section>

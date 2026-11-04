@@ -8,7 +8,8 @@
 return [
 
     'name' => 'JBS Praxis',
-    'cta' => 'Book a free audit and demo',
+    'cta' => 'Book a free audit',
+    'cta_note' => 'See it on your operations: every free audit ends with a demo on one area of your organisation.',
     'cta_short' => 'Book a free audit',
     'preview' => 'Preview',
     'skip' => 'Skip to content',
@@ -149,7 +150,7 @@ return [
         'flows' => 'Pages and forms to test',
         'links' => [
             'contact' => ['label' => 'Contact us', 'text' => 'Send a message, with optional questions about your organisation.'],
-            'schedule' => ['label' => 'Book a free audit and demo', 'text' => 'Choose a day and a time (WAT), then add your details.'],
+            'schedule' => ['label' => 'Book a free audit', 'text' => 'Choose a day and a time (WAT), then add your details.'],
             'calculator' => ['label' => 'Cost of poor quality calculator', 'text' => 'Estimate the cost of poor quality and receive the report by email.'],
             'kaizen' => ['label' => 'JBS Praxis Insights', 'text' => 'Read the published articles.'],
             'kaizen_write' => ['label' => 'Write for JBS Praxis Insights', 'text' => 'Send an article for review.'],
@@ -222,8 +223,8 @@ return [
     ],
 
     'schedule' => [
-        'title' => 'Book a free audit and demo',
-        'intro' => 'Choose a day, then a time. Times are in West Africa Time (WAT), the time in Lagos and Douala.',
+        'title' => 'Book a free audit',
+        'intro' => 'The free audit takes about an hour and ends with a demo on one area of your organisation. Choose a day, then a time. Times are in West Africa Time (WAT), the time in Lagos and Douala.',
         'step_day' => 'Choose a day',
         'step_time' => 'Choose a time',
         'step_details' => 'Your details',
@@ -253,7 +254,7 @@ return [
         ],
         'custom_focus' => 'Describe your focus',
         'custom_focus_hint' => 'Up to 40 characters.',
-        'send' => 'Book a free audit and demo',
+        'send' => 'Book a free audit',
         'slot_taken' => 'That time was booked a moment ago. Choose another time.',
         'already_booked' => 'You already have a request for a free audit and demo with us. We’ll confirm it by email. To change it, email us at :email.',
         'when' => ':date, :time (WAT)',
@@ -468,6 +469,26 @@ return [
     ],
 
     // Praxis AI, the website assistant (docs/SITE_API.md 6.5)
+    // Proof (redesign PR 3): the logo strip and the client quotes (shown only once approved, config site.quotes_approved)
+    'proof' => [
+        'clients_title' => 'Organisations we have worked with',
+        'clients_pause' => 'Pause the logos',
+        'clients_play' => 'Play the logos',
+        'quotes_title' => 'In their words',
+        'quotes' => [
+            'smart-logistics' => ['text' => 'Every shipment, every invoice, every truck now lives in one system, in English and in French. When I ask where a file stands or what it has cost us, the answer is already there.',
+                'name' => 'Timothee Massomba', 'role' => 'Managing Director', 'org' => 'Smart Logistics and Services'],
+            'la-petite-cour' => ['text' => 'They rebuilt our system while we kept selling and delivering every day. Our books close and stay closed, and every empty crate is accounted for.',
+                'name' => '', 'role' => 'Chief Executive', 'org' => 'An FMCG distributor in Cameroon'],
+            'mycity-app' => ['text' => 'JBS Praxis builds the way I would want my own team to build: tested, documented and released in stages. We see every step and own every line.',
+                'name' => 'Bode Oluwasanmi', 'role' => 'Chief Technology Officer', 'org' => 'MyCity App'],
+            'pixie-girl-global' => ['text' => 'From what a wig costs to make to what we sell online and in store, it is one set of numbers now. I can finally see the whole business.',
+                'name' => 'Faitlyn Alex', 'role' => 'Chief Executive Officer', 'org' => 'Pixie Girl Global'],
+        ],
+        'results_title' => 'In figures',
+        'results_note' => 'Figures confirmed by the client.',
+    ],
+
     'chat' => [
         'open' => 'Ask Praxis',
         'title' => 'Praxis AI',
