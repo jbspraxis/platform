@@ -19,6 +19,7 @@
             'dash' => 'Overview', 'mdm' => 'Master data', 'hr' => 'Team', 'crm' => 'Leads and proposals',
             'ops' => 'Projects', 'finance' => 'Finance', 'marketing' => 'Marketing', 'system' => 'Settings and access', 'mail' => 'Mail',
             'campaigns' => 'Campaigns',
+            'letters' => 'Documents',
         ][explode('.', (string) request()->route()?->getName())[1] ?? ''] ?? null,
     };
     $user = auth()->user();
@@ -119,6 +120,19 @@
                     </div>
                 @endif
             @endcanany
+
+            {{-- Documents (docs/DOCUMENTS.md): formal documents on the company letterhead, signed and issued here --}}
+            @can('letters.view')
+                <a href="{{ route('hq.letters.register') }}" class="rail-link {{ $on('hq.letters.*') }}" wire:navigate>
+                    <i data-lucide="file-signature"></i> Documents
+                </a>
+                @if (request()->routeIs('hq.letters.*'))
+                    <div class="rail-sub">
+                        <a href="{{ route('hq.letters.register') }}" class="{{ $on('hq.letters.register', 'hq.letters.document') }}" wire:navigate>Register</a>
+                        <a href="{{ route('hq.letters.signature') }}" class="{{ $on('hq.letters.signature') }}" wire:navigate>My signature</a>
+                    </div>
+                @endif
+            @endcan
 
             @canany(['projects.view', 'qa.view', 'timesheets.view', 'signoffs.view'])
                 @php

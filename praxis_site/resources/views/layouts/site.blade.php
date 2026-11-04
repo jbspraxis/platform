@@ -12,6 +12,8 @@
     $fullTitle = trim($__env->yieldContent('page_title'));
     $title = $fullTitle !== '' ? $fullTitle : (trim($__env->yieldContent('title')) !== '' ? trim($__env->yieldContent('title')) . ' | ' . __('site.title_suffix') : __('site.title_suffix'));
     $description = trim($__env->yieldContent('description')) ?: e(__('pages.home.description'));
+    // A page nobody should find in a search engine fills @section('noindex', '1'): /verify/{token} is a private link
+    $noindex = config('site.noindex') || trim($__env->yieldContent('noindex')) === '1';
     $ogImage = asset('img/og/jbs-praxis-og-' . $locale . '-1200x630.png');
     $nav = ['services' => 'services', 'how-we-work' => 'how', 'work' => 'work', 'company' => 'company', 'kaizen' => 'insights'];
     $ga4 = (string) config('site.ga4_id');
@@ -59,7 +61,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    @if (config('site.noindex'))
+    @if ($noindex)
         <meta name="robots" content="noindex, nofollow">
     @endif
     {{-- Sections are escaped when they are stored, so they are printed raw here (no double escaping) --}}
