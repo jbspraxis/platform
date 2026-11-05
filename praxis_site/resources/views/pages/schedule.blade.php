@@ -16,21 +16,25 @@
                 </x-success>
             </div>
         @else
-            <div class="layout-aside">
-                @php
-                    $agent = array_replace_recursive(__('site.agent.common'), __('site.agent.schedule'));
-                    // The calendar inside the conversation names its own weekdays
-                    $agent['weekdays'] = __('site.schedule.weekdays');
-                @endphp
-                {{-- The same booking as a conversation, for anyone who would rather answer that way. The
-                     button only does anything with JavaScript; the form below it is unchanged and remains
-                     the way in, calendar and all. --}}
-                <p class="agent-switch">
-                    <button class="btn btn-secondary" type="button" data-agent-open="schedule" data-agent-reveal hidden>
-                        <i data-lucide="message-square-text"></i>{{ $agent['open'] }}
-                    </button>
-                </p>
+            @php
+                $agent = array_replace_recursive(__('site.agent.common'), __('site.agent.schedule'));
+                // The calendar inside the conversation names its own weekdays
+                $agent['weekdays'] = __('site.schedule.weekdays');
+            @endphp
+            {{-- The same booking as a conversation, for anyone who would rather answer that way. The button
+                 only does anything with JavaScript; the form below it is unchanged and remains the way in,
+                 calendar and all.
 
+                 It sits outside .layout-aside on purpose: that is a two-column grid (the form, then the
+                 callout beside it), so a third child of it would take a column of its own and push the
+                 form into the narrow one. --}}
+            <p class="agent-switch">
+                <button class="btn btn-secondary" type="button" data-agent-open="schedule" data-agent-reveal hidden>
+                    <i data-lucide="message-square-text"></i>{{ $agent['open'] }}
+                </button>
+            </p>
+
+            <div class="layout-aside">
                 <form class="card form" method="POST" action="{{ route('schedule.store') }}" novalidate>
                     @csrf
                     <x-form-guard form="schedule" />
@@ -142,14 +146,15 @@
                     <p>{{ __('site.schedule.next_body') }}</p>
                 </aside>
 
-                <x-agent-dialog
-                    form="schedule"
-                    :action="route('schedule.store')"
-                    :slots="route('schedule.slots')"
-                    :strings="$agent"
-                    :lists="['focuses' => __('site.schedule.focuses')]"
-                    :gate="['name' => 'email', 'kind' => 'email', 'label' => __('site.schedule.email'), 'max' => 100]" />
             </div>
+
+            <x-agent-dialog
+                form="schedule"
+                :action="route('schedule.store')"
+                :slots="route('schedule.slots')"
+                :strings="$agent"
+                :lists="['focuses' => __('site.schedule.focuses')]"
+                :gate="['name' => 'email', 'kind' => 'email', 'label' => __('site.schedule.email'), 'max' => 100]" />
         @endif
     </div>
 @endsection
