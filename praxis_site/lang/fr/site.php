@@ -100,14 +100,6 @@ return [
         'US' => 'États-Unis', 'CA' => 'Canada', 'AE' => 'Émirats arabes unis',
     ],
 
-    'dial_codes' => [
-        '+234' => 'Nigeria (+234)', '+237' => 'Cameroun (+237)', '+229' => 'Bénin (+229)', '+225' => 'Côte d’Ivoire (+225)',
-        '+243' => 'RD Congo (+243)', '+20' => 'Égypte (+20)', '+241' => 'Gabon (+241)', '+233' => 'Ghana (+233)',
-        '+254' => 'Kenya (+254)', '+212' => 'Maroc (+212)', '+242' => 'République du Congo (+242)', '+250' => 'Rwanda (+250)',
-        '+221' => 'Sénégal (+221)', '+27' => 'Afrique du Sud (+27)', '+228' => 'Togo (+228)', '+32' => 'Belgique (+32)',
-        '+33' => 'France (+33)', '+49' => 'Allemagne (+49)', '+41' => 'Suisse (+41)', '+44' => 'Royaume-Uni (+44)',
-        '+971' => 'Émirats arabes unis (+971)', '+1' => 'États-Unis ou Canada (+1)',
-    ],
 
     'form' => [
         // Several countries share one dialling code, so the <select> names the first and counts the rest
@@ -637,6 +629,12 @@ return [
             'send' => 'Envoyer',
             'sending' => 'Envoi…',
 
+            'picker' => [
+                'search' => 'Tapez pour chercher',
+                'none' => 'Rien ne correspond.',
+                'more' => ':n de plus — continuez à taper pour affiner.',
+            ],
+
             'errors' => [
                 'email' => 'Cela ne ressemble pas à une adresse e-mail — pouvez-vous la vérifier ?',
                 'phone' => 'Cela ne ressemble pas à un numéro de téléphone — pouvez-vous le vérifier ?',
@@ -711,6 +709,93 @@ return [
                 'severity' => 'gêne|gravité|impact',
                 'identity' => 'mon nom|nom|qui',
                 'email' => 'e-mail|email|adresse|réponse',
+            ],
+
+            'sent' => 'J’envoie cela à l’équipe.',
+        ],
+
+        // /contact
+        'contact' => [
+            'icon' => 'mail',
+            'title' => 'Contact',
+            'open' => 'Nous le dire sous forme de conversation',
+
+            'gate' => [
+                'heading' => 'Que souhaitez-vous accomplir ?',
+                'lead' => 'Quelques phrases suffisent. Nous demanderons le reste en chemin, et vous pourrez modifier chaque réponse à tout moment.',
+                'start' => 'Commencer',
+                'invalid' => 'Pouvez-vous m’en dire un peu plus ?',
+            ],
+
+            'steps' => [
+                'you' => 'Vous',
+                'organisation' => 'Organisation',
+                'reach' => 'Vous joindre',
+                'situation' => 'Votre situation',
+                'systems' => 'Vos systèmes',
+            ],
+
+            'hello' => 'Merci — c’est utile. Maintenant quelques éléments pour que nous puissions vous répondre correctement.',
+
+            'ask' => [
+                'full_name' => 'À qui ai-je le plaisir de parler ?',
+                'email' => 'Quelle est la meilleure adresse pour vous répondre ?',
+                'title' => 'Et votre fonction ?',
+                'company_name' => 'Pour quelle organisation travaillez-vous ?',
+                'city' => 'Dans quelle ville êtes-vous ?',
+                'country_code' => 'Dans quel pays se trouve votre numéro ?',
+                'phone' => 'Et le numéro lui-même ?',
+                'language' => 'Dans quelle langue devons-nous répondre ?',
+                'start_timing' => 'Quand souhaitez-vous commencer ?',
+                'stage' => 'Où en est l’organisation aujourd’hui ?',
+                'bottleneck' => 'Quel est le principal problème en ce moment ?',
+                'other_bottleneck' => 'Décrivez-le avec vos propres mots.',
+                'tech_reality' => 'À quoi ressemblent vos systèmes aujourd’hui ?',
+                'gov_status' => 'Et comment vos processus sont-ils consignés ?',
+            ],
+
+            'hint' => [
+                'title' => 'Passez si vous préférez ne pas le dire.',
+                'country_code' => 'Cherchez par pays ou par indicatif — « nig » et « 234 » trouvent tous deux le Nigeria.',
+                'phone' => 'Seulement le numéro local ; j’ai déjà l’indicatif.',
+                'start_timing' => 'Une réponse approximative suffit.',
+                'stage' => 'Ces dernières questions sont facultatives et nous aident à préparer.',
+            ],
+
+            'short' => [
+                'message' => 'Votre objectif',
+                'full_name' => 'Nom',
+                'email' => 'E-mail',
+                'title' => 'Fonction',
+                'company_name' => 'Organisation',
+                'city' => 'Ville',
+                'country_code' => 'Indicatif',
+                'phone' => 'Téléphone',
+                'language' => 'Réponse en',
+                'start_timing' => 'Début',
+                'stage' => 'Stade',
+                'bottleneck' => 'Problème principal',
+                'other_bottleneck' => 'Le problème',
+                'tech_reality' => 'Systèmes',
+                'gov_status' => 'Processus',
+            ],
+
+            'words' => [
+                'message' => 'message|mon objectif|ce que je veux|le but',
+                'full_name' => 'mon nom|nom|qui je suis',
+                'email' => 'e-mail|adresse|répondre à',
+                'title' => 'fonction|poste|rôle',
+                'company_name' => 'entreprise|organisation|société|employeur',
+                'city' => 'ville|où je suis|localisation',
+                'country_code' => 'pays|indicatif|code',
+                'phone' => 'numéro|téléphone|portable|mobile',
+                'language' => 'langue de réponse|langue',
+                'start_timing' => 'quand|date de début|calendrier',
+                'stage' => 'taille|maturité|stade',
+                'bottleneck' => 'problème|souci|blocage',
+                'other_bottleneck' => 'le problème|décrire le problème',
+                'tech_reality' => 'systèmes|logiciels|outils',
+                'gov_status' => 'processus|procédures|gouvernance',
             ],
 
             'sent' => 'J’envoie cela à l’équipe.',

@@ -11,6 +11,23 @@
                 <p>{{ __('site.contact.sent_body', ['email' => $site->email]) }}</p>
             </x-success>
         @else
+            @php
+                // The shared chrome plus this form's own words (lang/{en,fr}/site.php)
+                $agent = array_replace_recursive(__('site.agent.common'), __('site.agent.contact'));
+                // Every country, as rows: several share a dialling code, so a map keyed by it would collapse them
+                $agentCountries = array_map(
+                    fn ($c) => ['value' => $c['dial'], 'label' => $c['name']],
+                    \App\Support\Countries::options()
+                );
+            @endphp
+            {{-- The same form as a conversation, for anyone who would rather answer that way. The button only
+                 does anything with JavaScript; the form below it is unchanged and remains the way in. --}}
+            <p class="agent-switch">
+                <button class="btn btn-secondary" type="button" data-agent-open="contact" data-agent-reveal hidden>
+                    <i data-lucide="message-square-text"></i>{{ $agent['open'] }}
+                </button>
+            </p>
+
             <form class="card form" method="POST" action="{{ route('contact.store') }}" novalidate>
                 @csrf
                 <x-form-guard form="contact" />
@@ -27,7 +44,7 @@
                         <x-field name="title" :label="__('site.contact.title_field')" optional autocomplete="organization-title" maxlength="100" />
                     </div>
                     <div class="form-row form-row-phone">
-                        <x-select name="country_code" :label="__('site.contact.country_code')" optional :options="__('site.dial_codes')" value="+234" :placeholder="false" />
+                        <x-select name="country_code" :label="__('site.contact.country_code')" optional :options="\App\Support\Countries::codes()" value="+234" :placeholder="false" />
                         <x-field name="phone" type="tel" :label="__('site.contact.phone')" optional :hint="__('site.form.phone_hint')" autocomplete="tel-national" maxlength="20" />
                     </div>
                     <div class="form-row">
@@ -59,6 +76,21 @@
                     <button class="btn btn-primary" type="submit"><i data-lucide="send"></i>{{ __('site.contact.send') }}</button>
                 </div>
             </form>
+
+            <x-agent-dialog
+                form="contact"
+                :action="route('contact.store')"
+                :strings="$agent"
+                :lists="[
+                    'countries' => $agentCountries,
+                    'languages' => __('site.contact.languages'),
+                    'start_timings' => __('site.contact.start_timings'),
+                    'stages' => __('site.contact.stages'),
+                    'bottlenecks' => __('site.contact.bottlenecks'),
+                    'tech_realities' => __('site.contact.tech_realities'),
+                    'gov_statuses' => __('site.contact.gov_statuses'),
+                ]"
+                :gate="['name' => 'message', 'kind' => 'longtext', 'label' => __('site.contact.message'), 'hint' => __('site.contact.message_hint'), 'max' => 2000]" />
         @endif
     </div>
 @endsection

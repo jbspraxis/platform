@@ -103,15 +103,6 @@ return [
         'US' => 'United States', 'CA' => 'Canada', 'AE' => 'United Arab Emirates',
     ],
 
-    // Phone country codes (value sent to HQ => label)
-    'dial_codes' => [
-        '+234' => 'Nigeria (+234)', '+237' => 'Cameroon (+237)', '+229' => 'Benin (+229)', '+225' => 'Côte d’Ivoire (+225)',
-        '+243' => 'DR Congo (+243)', '+20' => 'Egypt (+20)', '+241' => 'Gabon (+241)', '+233' => 'Ghana (+233)',
-        '+254' => 'Kenya (+254)', '+212' => 'Morocco (+212)', '+242' => 'Republic of the Congo (+242)', '+250' => 'Rwanda (+250)',
-        '+221' => 'Senegal (+221)', '+27' => 'South Africa (+27)', '+228' => 'Togo (+228)', '+32' => 'Belgium (+32)',
-        '+33' => 'France (+33)', '+49' => 'Germany (+49)', '+41' => 'Switzerland (+41)', '+44' => 'United Kingdom (+44)',
-        '+971' => 'United Arab Emirates (+971)', '+1' => 'United States or Canada (+1)',
-    ],
 
     'form' => [
         // Several countries share one dialling code, so the <select> names the first and counts the rest
@@ -643,6 +634,12 @@ return [
             'send' => 'Send',
             'sending' => 'Sending…',
 
+            'picker' => [
+                'search' => 'Type to search',
+                'none' => 'Nothing matches that.',
+                'more' => ':n more — keep typing to narrow it down.',
+            ],
+
             'errors' => [
                 'email' => 'That doesn’t look like an email address — could you check it?',
                 'phone' => 'That doesn’t look like a phone number — could you check it?',
@@ -717,6 +714,93 @@ return [
                 'severity' => 'severity|how much|effect|impact',
                 'identity' => 'my name|name|who',
                 'email' => 'email|e-mail|address|reply',
+            ],
+
+            'sent' => 'Sending that to the team now.',
+        ],
+
+        // /contact
+        'contact' => [
+            'icon' => 'mail',
+            'title' => 'Contact',
+            'open' => 'Tell us in a conversation instead',
+
+            'gate' => [
+                'heading' => 'What would you like to achieve?',
+                'lead' => 'A few sentences are enough. We’ll ask the rest as we go, and you can change any answer at any point.',
+                'start' => 'Start',
+                'invalid' => 'Could you give me a little more to go on?',
+            ],
+
+            'steps' => [
+                'you' => 'You',
+                'organisation' => 'Organisation',
+                'reach' => 'Reaching you',
+                'situation' => 'Your situation',
+                'systems' => 'Your systems',
+            ],
+
+            'hello' => 'Thank you — that helps. Now a few things so we can reply properly.',
+
+            'ask' => [
+                'full_name' => 'Who am I speaking to?',
+                'email' => 'What’s the best email to reply to?',
+                'title' => 'And your job title?',
+                'company_name' => 'Which organisation are you with?',
+                'city' => 'Which city are you in?',
+                'country_code' => 'Which country is your phone number in?',
+                'phone' => 'And the number itself?',
+                'language' => 'Which language should we reply in?',
+                'start_timing' => 'When would you like to start?',
+                'stage' => 'Where is the organisation today?',
+                'bottleneck' => 'What’s the main problem right now?',
+                'other_bottleneck' => 'Tell me about it in your own words.',
+                'tech_reality' => 'What do your systems look like today?',
+                'gov_status' => 'And how are your processes written down?',
+            ],
+
+            'hint' => [
+                'title' => 'Skip it if you’d rather not say.',
+                'country_code' => 'Search by country or by code — “nig” and “234” both find Nigeria.',
+                'phone' => 'Just the local number; I have the country code.',
+                'start_timing' => 'A rough answer is fine.',
+                'stage' => 'These last few are optional, and they help us prepare.',
+            ],
+
+            'short' => [
+                'message' => 'What you want',
+                'full_name' => 'Name',
+                'email' => 'Email',
+                'title' => 'Job title',
+                'company_name' => 'Organisation',
+                'city' => 'City',
+                'country_code' => 'Country code',
+                'phone' => 'Phone',
+                'language' => 'Reply in',
+                'start_timing' => 'Start',
+                'stage' => 'Stage',
+                'bottleneck' => 'Main problem',
+                'other_bottleneck' => 'The problem',
+                'tech_reality' => 'Systems',
+                'gov_status' => 'Processes',
+            ],
+
+            'words' => [
+                'message' => 'message|what i want|what we want|my message|the goal',
+                'full_name' => 'my name|name|who i am',
+                'email' => 'e-mail|address|reply to',
+                'title' => 'role|position|job',
+                'company_name' => 'company|organisation|organization|employer|firm',
+                'city' => 'town|where i am|location',
+                'country_code' => 'country|dialling code|dial code|code',
+                'phone' => 'number|telephone|mobile|cell',
+                'language' => 'reply language|language',
+                'start_timing' => 'timing|when|start date',
+                'stage' => 'size|maturity',
+                'bottleneck' => 'problem|issue|bottleneck|what is wrong',
+                'other_bottleneck' => 'the problem|describe the problem',
+                'tech_reality' => 'systems|software|tools|tech',
+                'gov_status' => 'processes|procedures|governance|documentation',
             ],
 
             'sent' => 'Sending that to the team now.',

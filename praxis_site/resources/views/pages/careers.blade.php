@@ -23,7 +23,7 @@
                         <x-field name="email" type="email" :label="__('site.careers.email')" autocomplete="email" maxlength="100" />
                     </div>
                     <div class="form-row form-row-phone">
-                        <x-select name="country_code" :label="__('site.careers.country_code')" :options="__('site.dial_codes')" value="+234" :placeholder="false" />
+                        <x-select name="country_code" :label="__('site.careers.country_code')" :options="\App\Support\Countries::codes()" value="+234" :placeholder="false" />
                         <x-field name="phone" type="tel" :label="__('site.careers.phone')" :hint="__('site.form.phone_hint')" autocomplete="tel-national" maxlength="20" />
                     </div>
                     <x-field name="city" :label="__('site.careers.city')" autocomplete="address-level2" maxlength="255" />
