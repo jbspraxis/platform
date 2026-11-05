@@ -15,6 +15,7 @@ Run on a machine with Pillow and fontTools; the server never runs this, the outp
 
 Writes, under praxis_core/resources/company-profile/:
   logos/*.jpg      client logos, greyscale, flattened on Paper, so the wall reads as one wall
+  screens/*.jpg    each client's own platform sign-in screen, in that client's brand
   img/*-page.jpg   place imagery cropped to a full A4 landscape bleed
   img/*-band.jpg   the same, cropped to the cinematic band across a page
   brand/*.jpg      the logo lockups, flattened on Paper and on Ink
@@ -36,12 +37,10 @@ BRAND = ROOT / "praxis_core" / "resources" / "brand"
 PAPER = (255, 255, 255)
 INK = (12, 20, 43)  # #0C142B
 
-# The page the imagery bleeds across, and the band it runs in: A4 landscape is 841.89 x 595.28pt.
+# The page the imagery bleeds across: A4 landscape is 841.89 x 595.28pt.
 PAGE_RATIO = 841.89 / 595.28
-BAND_RATIO = 841.89 / 232.0
 
 # Place imagery: the sector and city photographs, graded to the brand direction (BRAND.md section 10).
-# The horizon sits above centre in all six, so the band crop is taken from 38% down rather than centred.
 PLACE = {
     "pharmaceuticals": "pharmaceuticals-2400.webp",
     "consumer-goods": "consumer-goods-2400.webp",
@@ -118,7 +117,7 @@ def logos() -> None:
 
 
 def place() -> None:
-    """Place imagery, cropped at build time to the two bleed shapes the pages use."""
+    """Place imagery, cropped at build time to the page it bleeds across, so no page squashes one."""
     dest = OUT / "img"
     dest.mkdir(parents=True, exist_ok=True)
     for name, filename in PLACE.items():
@@ -127,13 +126,29 @@ def place() -> None:
             print(f"  skip  {filename} (missing)", file=sys.stderr)
             continue
         im = Image.open(src).convert("RGB")
-        for suffix, ratio, vertical, width in (("page", PAGE_RATIO, 0.5, 1700), ("band", BAND_RATIO, 0.38, 1800)):
-            cropped = _crop_to(im, ratio, vertical)
-            if cropped.width > width:
-                cropped = cropped.resize((width, round(cropped.height * width / cropped.width)), Image.LANCZOS)
-            out = dest / f"{name}-{suffix}.jpg"
-            cropped.save(out, "JPEG", quality=82, optimize=True, progressive=False)
-            print(f"  place {out.relative_to(ROOT)}  {cropped.width}x{cropped.height}  {out.stat().st_size // 1024} KB")
+        cropped = _crop_to(im, PAGE_RATIO)
+        if cropped.width > 1700:
+            cropped = cropped.resize((1700, round(cropped.height * 1700 / cropped.width)), Image.LANCZOS)
+        out = dest / f"{name}-page.jpg"
+        cropped.save(out, "JPEG", quality=82, optimize=True, progressive=False)
+        print(f"  place {out.relative_to(ROOT)}  {cropped.width}x{cropped.height}  {out.stat().st_size // 1024} KB")
+
+
+def screens() -> None:
+    """The platforms as their teams see them: each client's own sign-in screen, in its own brand.
+
+    These are the website's screens (praxis_site/public/img/screens), already public, and they are
+    sign-in screens, so they carry no client records. 2:1 as they were captured; nothing is cropped."""
+    dest = OUT / "screens"
+    dest.mkdir(parents=True, exist_ok=True)
+    source = SITE / "screens"
+    for src in sorted(source.glob("*-1920.webp")):
+        im = Image.open(src).convert("RGB")
+        if im.width > 1400:
+            im = im.resize((1400, round(im.height * 1400 / im.width)), Image.LANCZOS)
+        out = dest / (src.stem.replace("-1920", "") + ".jpg")
+        im.save(out, "JPEG", quality=86, optimize=True)
+        print(f"  screen {out.relative_to(ROOT)}  {im.width}x{im.height}  {out.stat().st_size // 1024} KB")
 
 
 def brand() -> None:
@@ -236,6 +251,7 @@ if __name__ == "__main__":
     print("company profile assets ->", OUT)
     logos()
     place()
+    screens()
     brand()
     devices()
     fonts()

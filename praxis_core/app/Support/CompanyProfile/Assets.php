@@ -62,15 +62,52 @@ final class Assets
     }
 
     /**
-     * A place photograph, in one of the two shapes the pages bleed it across: a whole A4 landscape page,
-     * or the band that runs across one. build_assets.py cut both to an exact ratio, so a page never has
-     * to squash an image or rely on dompdf cropping one.
+     * A place photograph, cut to the shape it bleeds across: a whole A4 landscape page. build_assets.py
+     * cut it to that exact ratio, so a page never has to squash an image or rely on dompdf cropping one.
      */
     public static function place(string $name, string $shape = 'page'): ?string
     {
         $path = self::root()."/img/{$name}-{$shape}.jpg";
 
         return is_file($path) ? self::path('img', "{$name}-{$shape}.jpg") : null;
+    }
+
+    /**
+     * A client's own platform, as its team signs in to it. These are the website's screens, so they are
+     * already public, and they are sign-in screens, so they carry no client records.
+     *
+     * The match is on the client's name, which is the same proper noun in both languages, because the
+     * content has no field that names a screen: `work.items[].image` is null throughout. When the engine
+     * lets the owner choose one, that is what should decide this, and this list can go.
+     */
+    public static function screenForClient(string $client): ?string
+    {
+        $haystack = mb_strtolower($client);
+        $screens = [
+            'smart-logistics' => ['smart logistics'],
+            'pixie-girl-global' => ['pixie girl'],
+            'fmcg-distributor-cameroon' => ['petite cour'],
+            'orika-living' => ['orika'],
+            'mycity-app' => ['mycity', 'my city'],
+            'nfelia' => ['nfelia'],
+        ];
+
+        foreach ($screens as $name => $needles) {
+            foreach ($needles as $needle) {
+                if (str_contains($haystack, $needle)) {
+                    return self::screen($name);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public static function screen(string $name): ?string
+    {
+        $path = self::root()."/screens/{$name}.jpg";
+
+        return is_file($path) ? self::path('screens', "{$name}.jpg") : null;
     }
 
     /**

@@ -238,9 +238,7 @@ final class PdfRenderer implements CompanyProfileRenderer
 
     /**
      * Where the reference goes on the pages where Muted on Paper at the foot would not do: quiet grey on
-     * the Ink page, white on a page a photograph bleeds across, and on the page whose foot is a band of
-     * imagery, up onto the Paper above the band, where it stays legible whatever the picture does.
-     * Keyed the way dompdf numbers pages.
+     * the Ink page, and white on a page a photograph bleeds across. Keyed the way dompdf numbers pages.
      *
      * @param  list<array{view: string, surface: string, data: array<string, mixed>}>  $pages
      * @return array<int, array{colour: list<float>, y: float}>
@@ -252,12 +250,7 @@ final class PdfRenderer implements CompanyProfileRenderer
             $number = $index + 1;
             $footer = $page['footer'] ?? '';
 
-            if ($footer === 'band') {
-                $placement[$number] = [
-                    'colour' => [0.369, 0.400, 0.475],
-                    'y' => Layout::PAGE_HEIGHT - Layout::WORK_BAND - 16.0,
-                ];
-            } elseif ($footer === 'light' || ($page['surface'] ?? '') === 'bleed') {
+            if ($footer === 'light' || ($page['surface'] ?? '') === 'bleed') {
                 $placement[$number] = ['colour' => [1.0, 1.0, 1.0], 'y' => self::FOOTER_BASELINE];
             } elseif (($page['surface'] ?? '') === 'ink') {
                 $placement[$number] = ['colour' => [0.604, 0.631, 0.698], 'y' => self::FOOTER_BASELINE];
@@ -295,6 +288,10 @@ final class PdfRenderer implements CompanyProfileRenderer
                 'credentials' => 'Credentials held',
                 'published' => 'Published',
                 'speak' => 'Let us look at one part of your organisation.',
+                // The platforms page has no copy of its own in the contract, so these two lines live
+                // here until the content carries them. They are the lead chat's to rewrite.
+                'platforms' => 'The platforms, as their teams see them.',
+                'platforms_lead' => 'Every system we build carries the organisation’s own name, its own sign-in and its own rules. These are live.',
             ],
             'fr' => [
                 'continued' => 'suite',
@@ -307,6 +304,8 @@ final class PdfRenderer implements CompanyProfileRenderer
                 'credentials' => 'Certifications détenues',
                 'published' => 'Publié le',
                 'speak' => 'Examinons ensemble une partie de votre organisation.',
+                'platforms' => 'Les plateformes, telles que leurs équipes les voient.',
+                'platforms_lead' => 'Chaque système que nous construisons porte le nom de l’organisation, sa connexion et ses règles. Tous sont en service.',
             ],
         ];
 

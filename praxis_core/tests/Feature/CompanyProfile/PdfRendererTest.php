@@ -41,7 +41,7 @@ class PdfRendererTest extends TestCase
         $this->assertInstanceOf(CompanyProfileRenderer::class, new PdfRenderer);
     }
 
-    public function test_the_book_is_a4_landscape_and_between_ten_and_fourteen_pages(): void
+    public function test_the_book_is_a4_landscape_and_the_length_the_design_allows(): void
     {
         foreach (['en', 'fr'] as $locale) {
             $pdf = (new PdfRenderer)->pdf($this->content($locale));
@@ -57,7 +57,7 @@ class PdfRendererTest extends TestCase
             preg_match('/\/Type \/Pages\b.*?\/Count (\d+)/s', $pdf, $match);
             $pages = (int) ($match[1] ?? 0);
             $this->assertGreaterThanOrEqual(10, $pages, "{$locale} is shorter than the design allows");
-            $this->assertLessThanOrEqual(14, $pages, "{$locale} is longer than the design allows");
+            $this->assertLessThanOrEqual(16, $pages, "{$locale} is longer than the design allows");
         }
     }
 
@@ -131,8 +131,35 @@ class PdfRendererTest extends TestCase
         $this->assertSame('cover', $views[0]);
         $this->assertSame('back', $views[count($views) - 1]);
         $this->assertContains('problems', $views);
+        $this->assertContains('work-feature', $views);
+        $this->assertContains('platforms', $views);
         $this->assertContains('clients', $views);
         $this->assertContains('facts', $views);
+    }
+
+    public function test_the_platforms_page_shows_only_the_clients_whose_system_we_can_show(): void
+    {
+        $renderer = new PdfRenderer;
+        $content = $this->content('en');
+        $pages = Layout::pages($renderer->prepare($content));
+
+        $platforms = [];
+        foreach ($pages as $page) {
+            if ($page['view'] === 'platforms') {
+                $platforms = array_merge($platforms, $page['data']['items']);
+            }
+        }
+
+        $this->assertNotEmpty($platforms, 'no platform has a screen of its own');
+        foreach ($platforms as $item) {
+            $this->assertFileExists($item['screen']);
+            $this->assertStringEndsWith('.jpg', $item['screen'], 'dompdf cannot read a PNG without gd');
+        }
+
+        // A client the copy describes rather than names has no screen to show, and must not be there.
+        $clients = array_column($platforms, 'client');
+        $this->assertNotContains('A leading pharmaceutical manufacturer', $clients);
+        $this->assertNotContains('An oil and gas company', $clients);
     }
 
     public function test_french_spacing_never_leaves_a_glyph_the_brand_fonts_do_not_have(): void

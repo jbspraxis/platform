@@ -34,9 +34,6 @@ final class Layout
     /** The split in the problem pages: the rule turns teal where the answer starts. */
     public const PROBLEM_COLUMNS = 4;
 
-    /** The band of place imagery that bleeds off the foot of the second page of selected work. */
-    public const WORK_BAND = 172.0;
-
     /**
      * The width of n columns, gutters included, always rounded down. Columns are set as inline blocks,
      * and a row whose widths add up to a hundredth of a point more than the row is wide wraps every
@@ -92,12 +89,7 @@ final class Layout
         }
 
         foreach (self::workPages($data['work'] ?? []) as $page) {
-            $pages[] = [
-                'view' => $page['view'],
-                'surface' => $page['surface'],
-                'footer' => $page['footer'] ?? 'default',
-                'data' => $page,
-            ];
+            $pages[] = $page;
         }
 
         foreach (self::clientPages($data['clients'] ?? []) as $page) {
@@ -238,7 +230,7 @@ final class Layout
 
         return match ($page['view']) {
             'problems' => self::shrinkProblems($pages, $index),
-            'teams', 'work-grid' => self::shrinkItems($pages, $index),
+            'teams', 'work-grid', 'platforms' => self::shrinkItems($pages, $index),
             'clients' => self::shrinkClients($pages, $index),
             'practices' => self::shrinkPractices($pages, $index),
             default => null,
@@ -534,9 +526,14 @@ final class Layout
     }
 
     /**
-     * Selected work. The first case is the feature: a whole page bleeding a place photograph, with the
-     * story on a Paper panel. The rest set as short entries under a band of the same imagery, three to a
-     * row, which is how a reader takes in breadth.
+     * Selected work, over three kinds of page.
+     *
+     * The first case is the feature: a whole page bleeding a place photograph, with the story on a Paper
+     * panel, which is the only thing the brand allows on top of a photograph. The rest set as short
+     * entries, three to a row, which is how a reader takes in breadth. Then the platforms: each client's
+     * own system as its team signs in to it, every one in that client's brand. That page is the proof —
+     * a logo wall says who hired us, these say what they got — so it replaces the band of place imagery
+     * that used to close the section, which was only atmosphere.
      *
      * @return list<array<string, mixed>>
      */
@@ -552,38 +549,59 @@ final class Layout
             'view' => 'work-feature',
             'surface' => 'bleed',
             'footer' => 'light',
-            'title' => $work['title'] ?? '',
-            'lead' => $work['lead'] ?? '',
-            'item' => $feature,
-            'image' => Assets::placeForSector((string) ($feature['sector'] ?? ''), $feature['image'] ?? null),
+            'data' => [
+                'title' => $work['title'] ?? '',
+                'lead' => $work['lead'] ?? '',
+                'item' => $feature,
+                'image' => Assets::placeForSector((string) ($feature['sector'] ?? ''), $feature['image'] ?? null),
+            ],
         ]];
 
         foreach (array_chunk($items, 6) as $chunk) {
             $pages[] = [
                 'view' => 'work-grid',
                 'surface' => 'paper',
-                'footer' => 'band',
-                'title' => $work['title'] ?? '',
-                'items' => $chunk,
-                'band' => self::bandFor($chunk),
+                'data' => ['title' => $work['title'] ?? '', 'items' => $chunk],
             ];
+        }
+
+        foreach (self::platformPages(array_merge([$feature], $items)) as $page) {
+            $pages[] = $page;
         }
 
         return $pages;
     }
 
-    /** The band above the shorter entries takes its image from the first of them. */
-    private static function bandFor(array $items): ?string
+    /**
+     * The cases that have a screen of their own, six to a page. A case whose client is described rather
+     * than named has none, which is right: there is no screen to show without naming the client.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function platformPages(array $items): array
     {
+        $platforms = [];
         foreach ($items as $item) {
-            $sector = (string) ($item['sector'] ?? '');
-            $page = Assets::placeForSector($sector, null);
-            if ($page !== null) {
-                return str_replace('-page.jpg', '-band.jpg', $page);
+            $screen = Assets::screenForClient((string) ($item['client'] ?? ''));
+            if ($screen !== null) {
+                $platforms[] = $item + ['screen' => $screen];
             }
         }
 
-        return null;
+        if ($platforms === []) {
+            return [];
+        }
+
+        $pages = [];
+        foreach (array_chunk($platforms, 6) as $index => $chunk) {
+            $pages[] = [
+                'view' => 'platforms',
+                'surface' => 'paper',
+                'data' => ['items' => $chunk, 'first' => $index === 0],
+            ];
+        }
+
+        return $pages;
     }
 
     /**

@@ -56,16 +56,24 @@ diagonal like the logo's, Ink left of the split and Teal right of it.
 8. **Teams and credentials** — by discipline. Never a name.
 9. **Selected work** — the first case across a whole page of place photography, with the story on a
    Paper panel, which is the only thing the brand allows on top of a photograph.
-10. **Selected work, continued** — the rest as an index, three to a row, with a band of imagery bleeding
-    off the foot of the page.
-11. **Clients** — the logo wall.
-12. **Security and company facts** — the one Ink page.
-13. **Back cover** — the call to action, where to find us, and the closing line.
+10. **Selected work, continued** — the rest as an index, three to a row.
+11. **The platforms** — each client's own system, as that client's team signs in to it, every one in the
+    client's own brand. A logo wall says who hired us; this says what they got. The screens are the
+    website's own, already public, and they are sign-in screens, so none carries a client's records. A
+    case whose client the copy describes rather than names has no screen here, which is right: there is
+    nothing to show without naming them.
+12. **Clients** — the logo wall.
+13. **Security and company facts** — the one Ink page.
+14. **Back cover** — the call to action, where to find us, and the closing line.
 
-The approved content of 6 November 2026 sets as **13 pages in English and 14 in French**. The brief
-asked for 10 to 12; six problem domains with eighteen problems in them, and six case stories, do not fit
-in twelve at a size anyone would want to read. Cutting three problems brings English to twelve, and the
-renderer re-flows on its own: nothing here is page-numbered by hand.
+The approved content of 6 November 2026 sets as **14 pages in English and 15 in French**. The brief
+asked for 10 to 12; six problem domains with fifteen problems in them, six case stories and four
+platforms do not fit in twelve at a size anyone would want to read. Cutting three problems takes two
+pages off, and dropping the platforms page takes another; the renderer re-flows on its own, because
+nothing here is page-numbered by hand.
+
+The platforms page has no copy of its own in the contract, so its title and its lead sit in
+`PdfRenderer::words()` until the content carries them.
 
 ## How the pages are decided
 
