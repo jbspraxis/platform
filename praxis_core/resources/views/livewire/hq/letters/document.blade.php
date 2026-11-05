@@ -142,6 +142,16 @@
                                 @endforeach
                                 <button type="button" class="btn btn-secondary btn-sm mt-3" wire:click="addPerson('{{ $key }}')"><i data-lucide="plus"></i> Add a signatory</button>
                             </div>
+                        @elseif (($definition['type'] ?? 'text') === 'select')
+                            <div class="field" wire:key="field-{{ $key }}">
+                                <label class="label" for="{{ $id }}">{{ $definition['label'] }}</label>
+                                <select id="{{ $id }}" class="input" wire:model.live="fields.{{ $key }}">
+                                    @foreach ($definition['options'] as $value => $option)
+                                        <option value="{{ $value }}">{{ $option }}</option>
+                                    @endforeach
+                                </select>
+                                @if (! empty($definition['help']))<p class="help">{{ $definition['help'] }}</p>@endif
+                            </div>
                         @elseif (($definition['type'] ?? 'text') === 'textarea')
                             <div class="field" wire:key="field-{{ $key }}">
                                 <label class="label" for="{{ $id }}">{{ $definition['label'] }}</label>

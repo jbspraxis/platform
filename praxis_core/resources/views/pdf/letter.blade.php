@@ -11,15 +11,20 @@
     $ink = \App\Support\Letters\Letterhead::INK;
     $muted = \App\Support\Letters\Letterhead::MUTED;
     $slate = \App\Support\Letters\Letterhead::SLATE;
+    // Every template but the introduction letter writes English; that one follows the author's choice
+    $locale = $locale ?? 'en';
+    $fr = $locale === 'fr';
+    // The introduction letter is written to hold one page in both languages; it is set a little tighter
+    $compact = $compact ?? false;
 @endphp
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ $locale }}">
 <head>
     <meta charset="utf-8">
     <title>{{ $document->reference }}</title>
     <style>
-        @page { margin: 48pt 56pt 86pt 56pt; }
-        body { margin: 0; font-family: "DejaVu Sans", sans-serif; font-size: 10pt; line-height: 1.4; color: {{ $slate }}; }
+        @page { margin: {{ $compact ? '40pt' : '48pt' }} 56pt {{ $compact ? '78pt' : '86pt' }} 56pt; }
+        body { margin: 0; font-family: "DejaVu Sans", sans-serif; font-size: {{ $compact ? '9.3pt' : '10pt' }}; line-height: {{ $compact ? '1.33' : '1.4' }}; color: {{ $slate }}; }
         .head { width: 100%; border-collapse: collapse; }
         .head td { vertical-align: top; padding: 0; }
         .head .office { text-align: right; font-size: 7.6pt; line-height: 1.5; color: {{ $muted }}; }
@@ -31,21 +36,23 @@
         .meta td { padding: 0; vertical-align: top; }
         .meta .date { text-align: right; }
 
-        .recipient { margin-top: 18pt; font-size: 10pt; color: {{ $ink }}; line-height: 1.45; }
+        .recipient { margin-top: {{ $compact ? '12pt' : '18pt' }}; font-size: {{ $compact ? '9.3pt' : '10pt' }}; color: {{ $ink }}; line-height: {{ $compact ? '1.35' : '1.45' }}; }
         .formal-head { margin-top: 14pt; text-align: center; }
         .formal-company { margin: 0; font-family: "DejaVu Serif", serif; font-size: 12pt; letter-spacing: 0.6pt; color: {{ $ink }}; }
         .formal-reg { margin: 2pt 0 0; font-size: 8pt; color: {{ $muted }}; }
         .formal-rule { width: 70pt; height: 1pt; background: {{ $teal }}; margin: 8pt auto; font-size: 0; line-height: 0; }
         h1.formal-title { margin: 0; font-family: "DejaVu Serif", serif; font-size: 14pt; font-weight: bold; line-height: 1.3; color: {{ $ink }}; }
         .formal-sub { margin: 4pt 0 0; font-size: 10.5pt; color: {{ $slate }}; }
-        .subject { margin-top: 16pt; font-weight: bold; color: {{ $ink }}; }
-        .salutation { margin-top: 14pt; }
-        p.para { margin: 8pt 0 0; text-align: justify; }
+        .subject { margin-top: {{ $compact ? '12pt' : '16pt' }}; font-weight: bold; color: {{ $ink }}; }
+        .salutation { margin-top: {{ $compact ? '10pt' : '14pt' }}; }
+        p.para { margin: {{ $compact ? '6pt' : '8pt' }} 0 0; text-align: justify; }
         ol.clauses { margin: 8pt 0 0; padding-left: 18pt; }
         ol.clauses li { margin-bottom: 5pt; text-align: justify; }
         ol.clauses .people { margin: 6pt 0 0; padding-left: 0; list-style: none; }
         ol.clauses .people li { margin: 0 0 2pt; }
         ol.clauses .people strong { color: {{ $ink }}; }
+        ul.points { margin: {{ $compact ? '6pt' : '8pt' }} 0 0; padding-left: 14pt; }
+        ul.points li { margin-bottom: {{ $compact ? '3pt' : '4pt' }}; text-align: left; }
         .rich { margin-top: 11pt; }
         .rich p { margin: 0 0 10pt; text-align: justify; }
         .rich ul, .rich ol { margin: 0 0 10pt; padding-left: 18pt; }
@@ -53,18 +60,18 @@
         .rich h2 { font-family: "DejaVu Serif", serif; font-size: 12pt; color: {{ $ink }}; margin: 14pt 0 6pt; }
         .rich h3 { font-size: 10.5pt; color: {{ $ink }}; margin: 12pt 0 4pt; }
         .rich a { color: #08707C; }
-        .closing { margin-top: 18pt; }
+        .closing { margin-top: {{ $compact ? '12pt' : '18pt' }}; }
 
         .sign-off { page-break-inside: avoid; }
-        .signatures { width: 100%; border-collapse: collapse; margin-top: 18pt; page-break-inside: avoid; }
+        .signatures { width: 100%; border-collapse: collapse; margin-top: {{ $compact ? '10pt' : '18pt' }}; page-break-inside: avoid; }
         .signatures td { vertical-align: bottom; padding: 0 18pt 0 0; width: 50%; }
         .sig-image { height: 38pt; }
         .sig-line { border-top: 0.8pt solid {{ $ink }}; margin-top: 4pt; padding-top: 4pt; }
         .sig-name { font-weight: bold; color: {{ $ink }}; font-size: 9.5pt; }
         .sig-title { font-size: 8.4pt; color: {{ $muted }}; }
-        .sig-blank { height: 34pt; }
+        .sig-blank { height: {{ $compact ? '24pt' : '34pt' }}; }
 
-        .verify { width: 100%; border-collapse: collapse; margin-top: 24pt; page-break-inside: avoid; }
+        .verify { width: 100%; border-collapse: collapse; margin-top: {{ $compact ? '14pt' : '24pt' }}; page-break-inside: avoid; }
         .verify td { vertical-align: top; padding: 0; }
         .verify .qr-cell { width: 70pt; }
         .verify .words { padding-left: 12pt; font-size: 7.6pt; color: {{ $muted }}; line-height: 1.5; }
@@ -122,13 +129,15 @@
 
 <table class="meta">
     <tr>
-        <td>Our reference: {{ $document->reference }}</td>
+        <td>{{ $fr ? 'Notre référence :' : 'Our reference:' }} {{ $document->reference }}</td>
         <td class="date">{{ $issuedDate }}</td>
     </tr>
 </table>
 
 @if (! $final)
-    <div class="draft">Draft, not yet issued. The reference, the date and every word can still be changed.</div>
+    <div class="draft">{{ $fr
+        ? 'Brouillon, pas encore émis. La référence, la date et chaque mot peuvent encore changer.'
+        : 'Draft, not yet issued. The reference, the date and every word can still be changed.' }}</div>
 @endif
 
 @foreach ($blocks as $block)
@@ -192,6 +201,14 @@
 
         @case('html')
             <div class="rich">{!! $block['html'] !!}</div>
+            @break
+
+        @case('points')
+            <ul class="points">
+                @foreach ($block['items'] as $item)
+                    <li>{{ $item }}</li>
+                @endforeach
+            </ul>
             @break
 
         @case('closing')
@@ -287,10 +304,17 @@
         <tr>
             <td class="qr-cell"><img src="{{ $qr }}" style="width: 62pt; height: 62pt;" alt=""></td>
             <td class="words">
-                <strong>Check that this document is genuine</strong>
-                Scan the code, or go to {{ $verifyUrl }}.<br>
-                The page names the reference, the date it was issued and who signed it, and says whether it is still
-                valid. You can drop your copy of this PDF on it to check that nothing in it has been changed.
+                @if ($fr)
+                    <strong>Vérifiez que ce document est authentique</strong>
+                    Scannez le code, ou allez sur {{ $verifyUrl }}.<br>
+                    La page indique la référence, la date d’émission et les signataires, et dit si le document est
+                    toujours valable. Vous pouvez y déposer votre copie de ce PDF pour vérifier que rien n’y a été changé.
+                @else
+                    <strong>Check that this document is genuine</strong>
+                    Scan the code, or go to {{ $verifyUrl }}.<br>
+                    The page names the reference, the date it was issued and who signed it, and says whether it is still
+                    valid. You can drop your copy of this PDF on it to check that nothing in it has been changed.
+                @endif
             </td>
         </tr>
     </table>

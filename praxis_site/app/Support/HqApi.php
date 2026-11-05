@@ -158,6 +158,33 @@ final class HqApi
         return $this->cachedGet('kaizen.article.' . md5($slug), $this->ttl('kaizen'), '/kaizen/articles/' . rawurlencode($slug));
     }
 
+    /**
+     * GET /clients: the logo strip, from the HQ client logo library (docs/COMPANY_PROFILE.md section 4).
+     * Cached 10 minutes, with the last good copy kept for a day, so a logo added in HQ appears here by itself
+     * and the strip never breaks when HQ cannot be reached.
+     */
+    public function clients(): array
+    {
+        return $this->cachedGet('clients', $this->ttl('clients'), '/clients');
+    }
+
+    /**
+     * GET /clients/{key}.webp: one logo's bytes. Asked for once per version and then kept on this server
+     * (App\Support\Clients), never on every page.
+     */
+    public function clientLogo(string $key): string
+    {
+        $response = $this->send('GET', '/clients/' . rawurlencode($key) . '.webp');
+        if ($response->successful() && str_contains((string) $response->header('Content-Type'), 'image/webp')) {
+            return $response->body();
+        }
+
+        // Not an image: the envelope reader raises the right typed exception (404, 429, 503 ...)
+        $this->data($response, 'clients.file');
+
+        throw new HqUnavailable('HQ answered without the logo');
+    }
+
     /** GET /booking/slots?month=YYYY-MM (not cached: free times change). */
     public function bookingSlots(string $month): array
     {

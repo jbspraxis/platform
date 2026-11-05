@@ -7,6 +7,7 @@ use Dompdf\Dompdf;
 use Dompdf\FontMetrics;
 use Dompdf\Options;
 use Illuminate\Support\Facades\File;
+use Throwable;
 
 /**
  * The company profile as a PDF: A4 landscape, ten to twelve pages, one template for English and French
@@ -38,16 +39,50 @@ final class PdfRenderer implements CompanyProfileRenderer
     public function pdf(array $data): string
     {
         $prepared = $this->prepare($data);
+        $cache = $this->cache();
+        $roots = Assets::chroot($prepared);
+        $pages = Layout::pages($prepared);
 
-        $pages = $this->fit($prepared, Layout::pages($prepared));
+        // The book is rendered to find out whether the plan was right, and when it was - which is the
+        // usual case, because Layout counts the pages from the same font metrics dompdf sets them with
+        // - those are the bytes to send. Rendering it again to say the same thing is the difference
+        // between a download that takes a second and one that takes three.
+        $book = $this->book($prepared, $pages, $cache, $roots);
 
-        return $this->fromHtml(
+        if ($book['pages'] === count($pages)) {
+            $balanced = $this->balance($prepared, $pages, $cache, $roots);
+            if ($balanced === $pages) {
+                return $book['pdf'];
+            }
+            $pages = $balanced;
+        } else {
+            $pages = $this->balance($prepared, $this->reflow($prepared, $pages, $cache, $roots), $cache, $roots);
+        }
+
+        return $this->book($prepared, $pages, $cache, $roots)['pdf'];
+    }
+
+    /**
+     * The whole book, and how many pages it came out at. One sheet sets as one page only if it fitted,
+     * so the count is also the answer to whether the plan held.
+     *
+     * @param  list<array{view: string, surface: string, data: array<string, mixed>}>  $pages
+     * @return array{pdf: string, pages: int}
+     */
+    private function book(array $prepared, array $pages, string $cache, array $roots): array
+    {
+        $pdf = $this->fromHtml(
             $this->render($prepared, $pages),
             $this->footer($prepared),
             $this->footerPlacement($pages),
-            $this->cache(),
-            Assets::chroot($prepared)
+            $cache,
+            $roots
         );
+
+        // The page tree's own count, not the outline's, which is also written as /Count.
+        preg_match('/\/Type \/Pages\b.*?\/Count (\d+)/s', $pdf, $match);
+
+        return ['pdf' => $pdf, 'pages' => (int) ($match[1] ?? 0)];
     }
 
     /**
@@ -62,11 +97,19 @@ final class PdfRenderer implements CompanyProfileRenderer
     {
         $data = Typography::prepare($data, (string) ($data['meta']['locale'] ?? 'en'));
 
-        // Profile::data() fills the wall from the engine's logo library. Content that has not been
-        // through it — a preview straight off the seed, or a test — gets the same library here, so
-        // there is one answer to what is on the wall and PR 3 changes it in one place.
+        // Profile::data() fills the wall from the engine's logo library, which is where the wall comes
+        // from. Content that has not been through it — a preview rendered straight off the seed files, a
+        // test — asks the same library here, so there is one answer to what is on the wall.
+        //
+        // The library is a database table, and a preview run without one would otherwise fail on a page
+        // of logos. That, and only that, falls back to the folder PR 1 read: a wall of the right shape
+        // to look at, never what HQ would actually publish.
         if (($data['clients']['logos'] ?? []) === []) {
-            $data['clients']['logos'] = app(ClientLogos::class)->all();
+            try {
+                $data['clients']['logos'] = app(ClientLogos::class)->all();
+            } catch (Throwable $e) {
+                $data['clients']['logos'] = (new DirectoryClientLogos)->all();
+            }
         }
 
         return $data;
@@ -118,13 +161,36 @@ final class PdfRenderer implements CompanyProfileRenderer
     {
         $cache = $this->cache();
         $roots = Assets::chroot($prepared);
+
+        // One render of the whole book answers whether the plan held: it comes out at exactly as many
+        // pages as were planned only if every sheet fitted. Checking sheet by sheet costs a render
+        // each, so it is kept for the times the book disagrees.
+        if ($this->book($prepared, $pages, $cache, $roots)['pages'] === count($pages)) {
+            return $this->balance($prepared, $pages, $cache, $roots);
+        }
+
+        return $this->balance($prepared, $this->reflow($prepared, $pages, $cache, $roots), $cache, $roots);
+    }
+
+    /**
+     * Sheet by sheet: a page that does not fit gives its last item to the page after it, until all of
+     * them do.
+     *
+     * @param  list<array{view: string, surface: string, data: array<string, mixed>}>  $pages
+     * @return list<array{view: string, surface: string, data: array<string, mixed>}>
+     */
+    private function reflow(array $prepared, array $pages, string $cache, array $roots): array
+    {
         $checked = [];
 
         for ($pass = 0; $pass < 24; $pass++) {
             $moved = false;
 
             foreach ($pages as $index => $page) {
-                $key = $index.':'.md5(serialize($page));
+                // Keyed on what the page carries, not where it sits: moving an item shifts every later
+                // page along, and a page that has already been proved to fit still fits at its new
+                // number. Keying on the position would re-render the whole book after every move.
+                $key = md5(serialize($page));
                 if (($checked[$key] ?? false) === true) {
                     continue;
                 }
@@ -145,14 +211,11 @@ final class PdfRenderer implements CompanyProfileRenderer
                 }
 
                 $pages = $shrunk;
-                $checked = [];
                 $moved = true;
                 break;
             }
 
             if (! $moved) {
-                $pages = $this->balance($prepared, $pages, $cache, $roots);
-
                 break;
             }
         }
@@ -173,6 +236,9 @@ final class PdfRenderer implements CompanyProfileRenderer
      */
     private function balance(array $prepared, array $pages, string $cache, array $roots = []): array
     {
+        $before = $pages;
+        $moved = false;
+
         foreach ($this->runs($pages) as [$from, $to]) {
             for ($pass = 0; $pass < 12; $pass++) {
                 $move = null;
@@ -199,10 +265,15 @@ final class PdfRenderer implements CompanyProfileRenderer
                 }
 
                 $pages = $shifted;
+                $moved = true;
             }
         }
 
-        return $pages;
+        if (! $moved) {
+            return $before;
+        }
+
+        return $this->book($prepared, $pages, $cache, $roots)['pages'] === count($pages) ? $pages : $before;
     }
 
     /**
@@ -306,9 +377,9 @@ final class PdfRenderer implements CompanyProfileRenderer
             'isPhpEnabled' => false,
             'isJavascriptEnabled' => false,
             'isFontSubsettingEnabled' => true,
-            'fontDir' => $cache,
-            'fontCache' => $cache,
-            'tempDir' => $cache,
+            'fontDir' => $cache.'/fonts',
+            'fontCache' => $cache.'/fonts',
+            'tempDir' => $cache.'/tmp',
             'chroot' => array_values(array_unique(array_merge([$cache], $roots ?: [Assets::root()]))),
         ]);
     }
@@ -354,7 +425,10 @@ final class PdfRenderer implements CompanyProfileRenderer
     private function cache(): string
     {
         $cache = storage_path('framework/cache/dompdf');
-        File::ensureDirectoryExists($cache);
+        // The fonts dompdf registers and the files it works in are kept apart: sharing one folder made
+        // it fail to open its own font file part way through a run of renders.
+        File::ensureDirectoryExists($cache.'/fonts');
+        File::ensureDirectoryExists($cache.'/tmp');
 
         return str_replace(DIRECTORY_SEPARATOR, '/', realpath($cache) ?: $cache);
     }

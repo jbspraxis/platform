@@ -56,11 +56,14 @@ Templates live in `App\Support\Letters\LetterTypes` (what each one is called, th
 | Formal letter | `LET` | a rich-text body you write (or Claude drafts) |
 | Free letter | `LET` | the same, with nothing filled in |
 | Letter of introduction | `INT` | who is introduced, their role, what they are there to do, good until |
+| Introduction letter | `INT` | the language (EN/FR), a contact person and their email; everything it says comes from the published company profile (docs/COMPANY_PROFILE.md section 3) |
 | Employment letter | `EMP` | employee, job title, basis, started on, pay (left out when empty), what the letter is for |
 | Authority to act | `AUT` | who is authorised, their role, what they may do (a line each), what they may not, from, until |
 | Agreement | `AGR` | the other party (name, role, email, address, and their company and its number when they sign for one), and a rich-text body with headings, numbered clauses, lists and tables. Section 12. |
 
 Every kind also has: the organisation it is addressed to and their address, a salutation and a closing.
+
+The **introduction letter** is the only template that is not English: it follows the language the author picks, all the way through the date, the reference line, the salutation, the closing, the draft notice, the QR words and "Page 1 sur 2" in the footer. It is also set tighter than the others so that it holds one page in both languages. Everything else in Documents is unchanged.
 
 A board resolution prints a centred title block — the company, its RC number, a short teal rule, "Written resolution of the sole director" and what it is for — then the date and place, the legal basis, the numbered `RESOLVED` clauses and the signature block. A bank asks for exactly this.
 

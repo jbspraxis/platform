@@ -4,6 +4,7 @@ namespace App\Support\Letters;
 
 use App\Models\Letters\LetterDocument;
 use App\Support\Campaigns\RichText;
+use App\Support\CompanyProfile\ProfileCopy;
 use Carbon\CarbonImmutable;
 
 /**
@@ -11,12 +12,16 @@ use Carbon\CarbonImmutable;
  * body from the few fields the author filled; a free letter and a Claude draft carry a rich-text body, cleaned by
  * App\Support\Campaigns\RichText so nothing but paragraphs, lists, bold, italics and links survives.
  *
- * Blocks: recipient, reference, subject, salutation, para, clauses (numbered "RESOLVED that ..."), list, html,
- * closing. The same blocks are drawn on screen and in the PDF, so the preview is the document.
+ * Blocks: recipient, reference, subject, salutation, para, clauses (numbered "RESOLVED that ..."), points (a
+ * short bulleted list), list, html, closing. The same blocks are drawn on screen and in the PDF, so the
+ * preview is the document.
  *
  * An agreement (docs/DOCUMENTS.md section 12) prints a title block — the title, the reference and the date —
  * and then nothing but the body the author wrote, so a contract reads exactly as it was drafted, parties and
  * all. Who the other party is prints under their signature at the end, not twice.
+ *
+ * Every template but one writes English. The introduction letter (company_introduction) writes English or
+ * French, following the language the author picked, and takes its words from the published company profile.
  */
 final class LetterBody
 {
@@ -24,7 +29,7 @@ final class LetterBody
     public static function blocks(LetterDocument $document, array $details): array
     {
         $f = (array) $document->fields;
-        $date = CarbonImmutable::parse($document->document_date)->locale('en');
+        $date = CarbonImmutable::parse($document->document_date)->locale(self::locale($document));
         $blocks = [];
 
         if (! in_array($document->type, ['board_resolution', 'agreement'], true)) {
@@ -34,6 +39,7 @@ final class LetterBody
         $blocks = array_merge($blocks, match ($document->type) {
             'board_resolution' => self::resolution($document, $details, $f, $date),
             'introduction' => self::introduction($document, $details, $f),
+            'company_introduction' => self::companyIntroduction($document, $details, $f),
             'employment' => self::employment($document, $details, $f),
             'authority' => self::authority($document, $details, $f),
             'agreement' => self::agreement($document, $date),
@@ -43,11 +49,28 @@ final class LetterBody
         return array_values(array_filter($blocks));
     }
 
+    /** The language one document is written in: 'fr' only where the template offers it, otherwise 'en' */
+    public static function locale(LetterDocument $document): string
+    {
+        $locale = trim((string) (((array) $document->fields)['locale'] ?? ''));
+
+        return $locale === 'fr' ? 'fr' : 'en';
+    }
+
     private static function recipientLines(LetterDocument $document): array
     {
         $lines = [];
         if (filled($document->addressed_to)) {
             $lines[] = (string) $document->addressed_to;
+        }
+        if ($document->type === 'company_introduction') {
+            // The contact and their email belong in the address block, as on any letter to a named person
+            foreach (['contact_person', 'contact_email'] as $key) {
+                $value = trim((string) (((array) $document->fields)[$key] ?? ''));
+                if ($value !== '') {
+                    $lines[] = $value;
+                }
+            }
         }
         foreach (preg_split('/\r\n|\r|\n/', (string) $document->addressed_to_address) as $line) {
             if (trim($line) !== '') {
@@ -170,6 +193,67 @@ final class LetterBody
             . ($until ? 'This letter is good until ' . $until->format('j F Y') . '. ' : '')
             . 'If you would like to confirm it, please write to ' . $details['email'] . ' or call ' . ($details['phone'] ?: $details['email']) . '.'];
         $blocks[] = ['kind' => 'closing', 'text' => self::text($f, 'closing') ?: 'Yours faithfully,'];
+
+        return $blocks;
+    }
+
+    /**
+     * The one-page introduction of the firm to a company we would like to work with (docs/COMPANY_PROFILE.md
+     * section 3). Everything but the greeting comes from the published company profile, so the letter and the
+     * profile never drift apart; App\Support\CompanyProfile\ProfileCopy reads it in the right language.
+     *
+     * The shape, agreed with the lead chat on 5 November 2026, and built to hold one page in both languages:
+     * the salutation, a short paragraph naming the company and why we write, a paragraph on what we build,
+     * three proof lines, the call to action with the link, and the firm's own sign-off.
+     */
+    private static function companyIntroduction(LetterDocument $document, array $details, array $f): array
+    {
+        $locale = self::locale($document);
+        $fr = $locale === 'fr';
+        $copy = ProfileCopy::forLetter($locale);
+        $person = self::text($f, 'contact_person');
+        $company = trim((string) $document->addressed_to);
+        $us = $details['name'];
+
+        // 1. the salutation
+        $salutation = self::text($f, 'salutation');
+        if ($salutation === '') {
+            $salutation = $fr
+                ? 'Madame, Monsieur,'
+                : ($person !== '' ? 'Dear ' . $person . ',' : 'Dear Sir or Madam,');
+        }
+
+        // 2. who we are, who we are writing to, and why
+        $descriptor = rtrim($copy['descriptor'], '.');
+        $opening = $fr
+            ? 'Je vous écris au nom de ' . $us . ' — ' . self::lcfirst($descriptor) . ' — pour vous présenter notre maison'
+                . ($company !== '' ? ' et ce que nous pourrions construire avec ' . $company : '') . '.'
+            : 'I am writing on behalf of ' . $us . ' — ' . self::lcfirst($descriptor) . ' — to introduce the firm'
+                . ($company !== '' ? ', and what we could build with ' . $company : '') . '.';
+
+        $proofLead = $fr ? 'Trois systèmes qui tournent aujourd’hui :' : 'Three systems running today:';
+
+        // 5. the call to action, with the link and a reply address
+        $close = $fr
+            ? $copy['cta'] . ' Vous pouvez prendre rendez-vous sur ' . $copy['cta_url']
+                . ', ou simplement répondre à ' . $copy['email'] . ' et nous trouverons une heure qui vous convient.'
+            : $copy['cta'] . ' You can book a time at ' . $copy['cta_url']
+                . ', or simply reply to ' . $copy['email'] . ' and we will find one that suits you.';
+
+        $blocks = [
+            ['kind' => 'subject', 'text' => $copy['headline']],
+            ['kind' => 'salutation', 'text' => $salutation],
+            ['kind' => 'para', 'text' => $opening],
+            ['kind' => 'para', 'text' => $copy['build']],
+        ];
+
+        if ($copy['proof'] !== []) {
+            $blocks[] = ['kind' => 'para', 'text' => $proofLead];
+            $blocks[] = ['kind' => 'points', 'items' => array_slice($copy['proof'], 0, ProfileCopy::PROOF_LINES)];
+        }
+
+        $blocks[] = ['kind' => 'para', 'text' => $close];
+        $blocks[] = ['kind' => 'closing', 'text' => self::text($f, 'closing') ?: $copy['closing']];
 
         return $blocks;
     }

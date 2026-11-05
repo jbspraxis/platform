@@ -3,6 +3,7 @@
 use App\Http\Controllers\SiteApi\BookingController;
 use App\Http\Controllers\SiteApi\CalculatorController;
 use App\Http\Controllers\SiteApi\ChatController;
+use App\Http\Controllers\SiteApi\ClientsController;
 use App\Http\Controllers\SiteApi\DocumentsController;
 use App\Http\Controllers\SiteApi\EnquiryController;
 use App\Http\Controllers\SiteApi\FormsController;
@@ -31,6 +32,11 @@ Route::domain(Hosts::hq())->group(function () {
         Route::get('/kaizen/articles', [KaizenController::class, 'index']);
         Route::get('/kaizen/articles/{slug}', [KaizenController::class, 'show'])->where('slug', '[A-Za-z0-9-]{1,255}');
         Route::get('/portfolio', [FormsController::class, 'portfolio']);
+
+        // The logo strip (docs/COMPANY_PROFILE.md section 4): the list, then one WebP at a time. The site
+        // caches both and serves its last good copy when HQ cannot be reached, so the strip never breaks.
+        Route::get('/clients', [ClientsController::class, 'index']);
+        Route::get('/clients/{key}.webp', [ClientsController::class, 'file'])->where('key', '[a-z0-9-]{1,80}');
 
         // Documents (docs/DOCUMENTS.md section 7): the verify page a QR code on a formal document opens.
         // Both are limited again per token in App\Support\Letters\Verification.

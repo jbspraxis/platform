@@ -19,10 +19,11 @@
         : 0.0;
 @endphp
 {{--
-    The logo wall. Every mark is greyscale on Paper, and each one is sized by its area rather than its
-    height, so a wide wordmark does not shout over a square mark: the wall reads as one wall. Rows are
-    separated by hairlines, never by a box, and each mark is centred in its cell by the margin its own
-    proportions ask for, because an inline block cannot centre its contents vertically by itself.
+    The logo wall, from the library HQ manages: the artwork as the owner approved it, which is the
+    library's to decide and not this page's to recolour. Each mark is sized by its area rather than its
+    height, so a wide wordmark does not shout over a square mark. Rows are separated by hairlines, never
+    by a box, and each mark is centred in its cell by the margin its own proportions ask for, because an
+    inline block cannot centre its contents vertically by itself.
 
     The platforms close the page, and the book's proof: each client's own system, as that client's team
     signs in to it, every one in the client's own brand. A logo wall says who hired us; this says what

@@ -34,6 +34,9 @@ final class Layout
     /** The split in the problem pages: the rule turns teal where the answer starts. */
     public const PROBLEM_COLUMNS = 4;
 
+    /** What a row of inline blocks costs beyond its tallest column, measured against dompdf. */
+    private const ROW_ALLOWANCE = 10.0;
+
     /**
      * The width of n columns, gutters included, always rounded down. Columns are set as inline blocks,
      * and a row whose widths add up to a hundredth of a point more than the row is wide wraps every
@@ -171,7 +174,7 @@ final class Layout
         // running head on a later page, the domain label that sits above the first problem of its group
         // in the problem column, the air before a new domain, and the hairline between two problems.
         $head = self::headHeight((string) ($problems['lead'] ?? ''));
-        $runningHead = 28.0;
+        $runningHead = 40.0;
         $label = 16.0;
         $groupGap = 12.0;
         $separator = 19.5;
@@ -377,7 +380,10 @@ final class Layout
         $problem = self::serif((string) ($item['problem'] ?? ''), self::columnWidth(self::PROBLEM_COLUMNS)) * 15.0;
         $answer = self::body((string) ($item['answer'] ?? ''), self::answerWidth()) * 13.0;
 
-        return max($problem, $answer);
+        // A row of inline blocks comes out a little taller than its tallest column, measured against
+        // what dompdf actually lays out. Ten points a row is what the difference turned out to be, and
+        // counting it here is what keeps the plan and the page the same length.
+        return max($problem, $answer) + self::ROW_ALLOWANCE;
     }
 
     /** The column the answers and the team details are set in: everything the problem column leaves. */

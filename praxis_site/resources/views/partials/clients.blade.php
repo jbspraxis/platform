@@ -3,8 +3,10 @@
      drifting slowly left to right. No names are shown; each logo's name is its accessible name. The list is drawn twice
      so the drift loops without a gap; the second copy is hidden from screen readers. It stops on hover and focus,
      the button pauses it (WCAG 2.2.2), and with reduced motion it is a still, wrapped row. --}}
-{{-- A logo listed before its file is added is simply left out (public/img/clients/{file}.webp) --}}
-@php($clients = array_values(array_filter((array) config('site.clients', []), fn ($client) => is_file(public_path('img/clients/' . $client['file'] . '.webp')))))
+{{-- The list comes from the client logo library in HQ (docs/COMPANY_PROFILE.md section 4), so a logo added
+     there and ticked for the website appears here without a code change. When HQ has never answered on this
+     server, App\Support\Clients falls back to the logos shipped with the site, and the strip is unchanged. --}}
+@php($clients = \App\Support\Clients::strip())
 @if ($clients)
     <section class="clients" aria-labelledby="clients-title" data-clients>
         <div class="container clients-head">
@@ -19,7 +21,7 @@
                 @foreach ([false, true] as $copy)
                     <ul class="clients-list" @if ($copy) aria-hidden="true" @endif>
                         @foreach ($clients as $client)
-                            <li><img src="{{ asset('img/clients/' . $client['file'] . '.webp') }}" alt="{{ $copy ? '' : $client['name'] }}" height="48" loading="lazy" decoding="async"></li>
+                            <li><img src="{{ $client['url'] }}" alt="{{ $copy ? '' : $client['name'] }}" height="48" loading="lazy" decoding="async"></li>
                         @endforeach
                     </ul>
                 @endforeach
