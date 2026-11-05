@@ -93,6 +93,10 @@ final class MessageBuilder
             $text = HtmlCleaner::toText($body['html']);
         }
         $text = mb_substr($text, 0, 100_000);
+        if ($kind !== 'forward') {
+            // A quoted calendar invitation reads as phishing to the recipient's spam filter (CalendarInvites)
+            $text = CalendarInvites::stripFromQuote($text);
+        }
         $when = self::when($original->sent_at ?? $original->received_at);
         $from = Recipients::format(['name' => $original->from_name, 'email' => (string) $original->from_email]);
 
