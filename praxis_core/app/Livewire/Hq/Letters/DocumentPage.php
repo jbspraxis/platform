@@ -6,6 +6,7 @@ use App\Models\Letters\LetterDocument;
 use App\Support\Ai\Ai;
 use App\Support\Ai\AiUnavailable;
 use App\Support\Campaigns\RichText;
+use App\Support\Letters\Agreements;
 use App\Support\Letters\Letterhead;
 use App\Support\Letters\Letters;
 use App\Support\Letters\LetterTypes;
@@ -26,6 +27,10 @@ use Throwable;
  * Signing needs three things at once: the letters.sign permission, a signature of your own, and a sign-in less
  * than ten minutes old (App\Support\SignIn\SignIn::isFresh, docs/SIGN_IN.md section 2), so a session left open
  * on someone's desk cannot put their signature on a document. Typing the password again opens that window.
+ *
+ * An agreement (docs/DOCUMENTS.md section 12) has one thing more: the other party, and the private link that is
+ * emailed to them once it has been signed here and issued. Sending it, sending it again and taking it back all
+ * need letters.sign, because what they do is put the firm's signature in front of somebody for countersigning.
  */
 #[Layout('components.layouts.hq')]
 class DocumentPage extends Component
@@ -45,6 +50,9 @@ class DocumentPage extends Component
     public array $fields = [];
 
     public string $body = '';
+
+    /** An agreement's other party, as the form holds them before they are written to letter_counterparties */
+    public array $counterparty = ['name' => '', 'role_title' => '', 'email' => '', 'address' => '', 'company' => '', 'registration' => ''];
 
     public bool $showQr = false;
 
@@ -85,6 +93,12 @@ class DocumentPage extends Component
             'showQr' => (bool) $record->show_qr,
             'copyPublic' => (bool) $record->copy_public,
         ]);
+
+        if ($record->isAgreement() && ($party = Agreements::first($record))) {
+            foreach (array_keys($this->counterparty) as $key) {
+                $this->counterparty[$key] = (string) ($party->{$key} ?? '');
+            }
+        }
     }
 
     private function document(): LetterDocument
@@ -143,6 +157,21 @@ class DocumentPage extends Component
             'addressedTo' => ['nullable', 'string', 'max:200'],
             'addressedToAddress' => ['nullable', 'string', 'max:500'],
         ], [], ['documentDate' => 'date', 'addressedTo' => 'addressed to']);
+
+        if ($record->isAgreement()) {
+            $this->validate([
+                'counterparty.name' => ['nullable', 'string', 'max:150'],
+                'counterparty.role_title' => ['nullable', 'string', 'max:150'],
+                'counterparty.email' => ['nullable', 'email', 'max:150'],
+                'counterparty.address' => ['nullable', 'string', 'max:500'],
+                'counterparty.company' => ['nullable', 'string', 'max:200'],
+                'counterparty.registration' => ['nullable', 'string', 'max:100'],
+            ], [], [
+                'counterparty.name' => 'name', 'counterparty.role_title' => 'role',
+                'counterparty.email' => 'email address', 'counterparty.address' => 'address',
+            ]);
+            Agreements::saveCounterparty($record, $this->counterparty);
+        }
 
         $record->forceFill([
             'title' => trim($this->title),
@@ -314,6 +343,49 @@ class DocumentPage extends Component
         $this->resetErrorBag();
     }
 
+    // ------------------------------------------------------------------ sending an agreement to be countersigned
+
+    /**
+     * Emails the other party their private link. letters.sign, not letters.manage: this puts the firm's
+     * signature in front of somebody to countersign, which is a signing act, not a filing one.
+     */
+    public function sendForSignature(): void
+    {
+        $this->authorize('letters.sign');
+        $this->resetErrorBag();
+        $record = $this->document();
+
+        try {
+            $party = Agreements::send($record, Auth::user());
+        } catch (Throwable $e) {
+            $this->flash = null;
+            $this->addError('signing', $e->getMessage());
+
+            return;
+        }
+
+        $this->previewVersion++;
+        $this->flash = 'Sent to ' . $party->email . '. The link works until '
+            . $party->token_expires_at?->timezone('Africa/Lagos')->format('j M Y') . '.';
+    }
+
+    /** Takes the link back: it stops working at once */
+    public function cancelSigning(): void
+    {
+        $this->authorize('letters.sign');
+        $this->resetErrorBag();
+
+        try {
+            Agreements::cancel($this->document(), Auth::user());
+        } catch (Throwable $e) {
+            $this->addError('signing', $e->getMessage());
+
+            return;
+        }
+
+        $this->flash = 'The signing link has been taken back. Nobody can sign with it now.';
+    }
+
     // ------------------------------------------------------------------ issuing and what comes after
 
     public function issue(): void
@@ -382,8 +454,17 @@ class DocumentPage extends Component
         $company = Letterhead::company($record->legal_entity_id) ?? Letterhead::defaultCompany() ?? [];
         $user = Auth::user();
 
+        $isAgreement = $record->isAgreement();
+        $party = $isAgreement ? Agreements::first($record) : null;
+
         return view('livewire.hq.letters.document', [
             'document' => $record,
+            'isAgreement' => $isAgreement,
+            'counterpartyDefs' => LetterTypes::counterpartyFields(),
+            'party' => $party,
+            'cannotSend' => $isAgreement ? Agreements::cannotSend($record) : 'not an agreement',
+            'canSend' => $isAgreement && $user->can('letters.sign'),
+            'signingUrl' => $party && $party->linkIsLive() ? Agreements::signingUrl($party) : null,
             'details' => Letterhead::details($company),
             'definitions' => LetterTypes::fields($record->type, $record->subtype),
             'common' => LetterTypes::common(),
@@ -392,6 +473,7 @@ class DocumentPage extends Component
             'mySignature' => Signatures::forUser($user),
             'signedByMe' => $record->signatures->firstWhere('user_id', $user->id),
             'canEdit' => $record->isDraft() && $user->can('letters.create'),
+            'hasSignedFile' => $record->signed_file_path !== null,
             'canSign' => $record->isDraft() && $user->can('letters.sign'),
             'canManage' => $user->can('letters.manage'),
             'canFile' => $user->can('mdm.create'),

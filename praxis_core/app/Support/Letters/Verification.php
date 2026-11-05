@@ -33,7 +33,8 @@ final class Verification
         }
 
         return LetterDocument::query()->where('verify_token', $token)
-            ->whereIn('status', [LetterDocument::ISSUED, LetterDocument::REVOKED, LetterDocument::REPLACED])
+            ->whereIn('status', [LetterDocument::ISSUED, LetterDocument::SENT_FOR_SIGNATURE, LetterDocument::FULLY_SIGNED,
+                LetterDocument::REVOKED, LetterDocument::REPLACED])
             ->first();
     }
 
@@ -61,7 +62,7 @@ final class Verification
     {
         $company = Letterhead::company($document->legal_entity_id) ?? Letterhead::defaultCompany() ?? [];
         $details = Letterhead::details($company);
-        $document->loadMissing('signatures', 'replacedBy', 'replaces');
+        $document->loadMissing('signatures', 'replacedBy', 'replaces', 'counterparties');
 
         return [
             'reference' => $document->reference,
@@ -77,7 +78,11 @@ final class Verification
             'signatories' => $document->signatures->map(fn ($signature) => [
                 'name' => $signature->signatory_name,
                 'title' => $signature->signatory_title,
-            ])->values()->all(),
+            ])->concat($document->counterparties->where('status', 'signed')->map(fn ($party) => [
+                // An agreement's other party, named exactly as the document prints them
+                'name' => (string) ($party->signed_name ?: $party->name),
+                'title' => (string) $party->role_title,
+            ]))->values()->all(),
             'status' => $document->status,
             'revoked_at' => $document->revoked_at?->timezone('Africa/Lagos')->toDateString(),
             'revoked_reason' => $document->revoked_reason ?: null,
@@ -86,6 +91,11 @@ final class Verification
             'replaces' => $document->replaces?->reference,
             'file_sha256' => $document->file_sha256,
             'file_bytes' => $document->file_bytes,
+            // An agreement signed by both sides has a second file; a reader may hold either, so the page checks
+            // a dropped copy against both fingerprints. The issued file itself is never touched.
+            'countersigned' => $document->status === LetterDocument::FULLY_SIGNED,
+            'signed_file_sha256' => $document->signed_file_sha256,
+            'signed_at' => $document->fully_signed_at?->timezone('Africa/Lagos')->toDateString(),
             'copy_available' => (bool) $document->copy_public && $document->file_path !== null,
         ];
     }

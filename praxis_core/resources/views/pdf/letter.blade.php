@@ -70,6 +70,36 @@
         .verify .words { padding-left: 12pt; font-size: 7.6pt; color: {{ $muted }}; line-height: 1.5; }
         .verify .words strong { display: block; color: {{ $ink }}; font-size: 8.4pt; font-weight: bold; }
         .draft { margin-top: 20pt; padding: 6pt 8pt; border: 0.8pt solid #D8DEE6; background: #F2F5F7; font-size: 8pt; color: {{ $muted }}; }
+
+        /* An agreement (docs/DOCUMENTS.md section 12): a title block, schedules as tables, and two signature boxes */
+        .agr-head { margin-top: 18pt; text-align: center; }
+        h1.agr-title { margin: 0; font-family: "DejaVu Serif", serif; font-size: 16pt; font-weight: bold; line-height: 1.3; color: {{ $ink }}; }
+        .agr-rule { width: 70pt; height: 1pt; background: {{ $teal }}; margin: 8pt auto; font-size: 0; line-height: 0; }
+        .agr-sub { margin: 0; font-size: 8.4pt; color: {{ $muted }}; }
+        /* dompdf has no page-break-after: avoid, so LetterBody wraps a heading and its text in one of these */
+        .keep { page-break-inside: avoid; }
+        .rich table { width: 100%; border-collapse: collapse; margin: 10pt 0; font-size: 9pt; }
+        .rich table p { margin: 0; text-align: left; }
+        .rich th, .rich td { border: 0.5pt solid #D8DEE6; padding: 4pt 6pt; text-align: left; vertical-align: top; }
+        .rich th { background: #F2F5F7; color: {{ $ink }}; font-weight: bold; }
+        .rich tr { page-break-inside: avoid; }
+        .agr-parties { margin-top: 20pt; page-break-inside: avoid; }
+        /* Both boxes start at the same height, so the two signature lines sit level whoever has signed */
+        .agr-parties .signatures td { vertical-align: top; }
+        .agr-parties .sig-image, .agr-parties .sig-blank { height: 38pt; }
+        .agr-parties .sig-line { border-top: 0.8pt solid {{ $ink }}; margin-top: 4pt; padding-top: 4pt; }
+        .sig-party { display: block; font-size: 8pt; color: {{ $muted }}; margin-bottom: 2pt; }
+        .sig-extra { display: block; font-size: 8pt; color: {{ $muted }}; }
+        .sig-date { display: block; margin-top: 3pt; font-size: 8.4pt; color: {{ $muted }}; }
+
+        .record { page-break-before: always; }
+        h2.record-title { margin: 14pt 0 0; font-family: "DejaVu Serif", serif; font-size: 13pt; color: {{ $ink }}; }
+        .record-intro { margin: 6pt 0 0; font-size: 9pt; color: {{ $slate }}; }
+        table.record-table { width: 100%; border-collapse: collapse; margin-top: 12pt; font-size: 8.8pt; }
+        table.record-table th { width: 32%; padding: 4pt 6pt; border-bottom: 0.5pt solid #D8DEE6; text-align: left; vertical-align: top; color: {{ $muted }}; font-weight: normal; }
+        table.record-table td { padding: 4pt 6pt; border-bottom: 0.5pt solid #D8DEE6; text-align: left; vertical-align: top; color: {{ $ink }}; }
+        .record-group { margin-top: 14pt; font-weight: bold; color: {{ $ink }}; font-size: 9.4pt; }
+        .record-hash { margin-top: 14pt; padding: 6pt 8pt; border: 0.5pt solid #D8DEE6; background: #F7F9FB; font-size: 7.6pt; color: {{ $muted }}; word-wrap: break-word; }
     </style>
 </head>
 <body>
@@ -123,6 +153,14 @@
             </div>
             @break
 
+        @case('agreement_head')
+            <div class="agr-head">
+                <h1 class="agr-title">{{ $block['title'] }}</h1>
+                <div class="agr-rule"></div>
+                <p class="agr-sub">{{ $block['reference'] }} · {{ $block['date'] }}</p>
+            </div>
+            @break
+
         @case('subject')
             <p class="subject">{{ $block['text'] }}</p>
             @break
@@ -162,6 +200,56 @@
     @endswitch
 @endforeach
 
+@if ($isAgreement)
+{{--
+    An agreement is signed by both sides: JBS Praxis in HQ, and the other party online (docs/DOCUMENTS.md
+    section 12). Each box prints the name and the role whether or not it has been signed, so an unsigned copy can
+    be signed with a pen and still says who signs what.
+--}}
+@php
+    $jbs = $signatures->first();
+    $signedDay = fn ($at) => $at ? \Carbon\Carbon::parse($at)->timezone('Africa/Lagos')->format('j F Y') : null;
+@endphp
+<div class="sign-off agr-parties">
+    <p class="para">Signed by the parties on the dates shown.</p>
+    <table class="signatures">
+        <tr>
+            <td>
+                @if ($jbs)
+                    <img class="sig-image" src="{{ $jbs->dataUri() }}" alt="">
+                @else
+                    <div class="sig-blank"></div>
+                @endif
+                <div class="sig-line">
+                    <span class="sig-party">For and on behalf of {{ $details['name'] }}</span>
+                    <span class="sig-name">{{ $jbs->signatory_name ?? $blankSignatory['name'] }}</span><br>
+                    <span class="sig-title">{{ $jbs->signatory_title ?? $blankSignatory['title'] }}</span>
+                    <span class="sig-date">Date: {{ $signedDay($jbs?->signed_at) ?: '........................' }}</span>
+                </div>
+            </td>
+            @foreach ($counterparties as $party)
+                <td>
+                    @if ($countersigned && $party->dataUri())
+                        <img class="sig-image" src="{{ $party->dataUri() }}" alt="">
+                    @else
+                        <div class="sig-blank"></div>
+                    @endif
+                    <div class="sig-line">
+                        @if ($party->company)<span class="sig-party">For and on behalf of {{ $party->company }}</span>@endif
+                        <span class="sig-name">{{ $countersigned && $party->signed_name ? $party->signed_name : $party->name }}</span><br>
+                        <span class="sig-title">{{ $party->role_title }}</span>
+                        @if ($party->company && $party->registration)
+                            <span class="sig-extra">{{ $party->registration }}</span>
+                        @endif
+                        <span class="sig-date">Date: {{ ($countersigned ? $signedDay($party->signed_at) : null) ?: '........................' }}</span>
+                    </div>
+                </td>
+                @if ($loop->iteration % 1 === 0 && ! $loop->last)</tr><tr><td></td>@endif
+            @endforeach
+        </tr>
+    </table>
+</div>
+@else
 <div class="sign-off">
 @if ($document->type === 'board_resolution' && ! $signatures->count())
     <p class="para">Signed by the sole director of {{ $details['name'] }}:</p>
@@ -192,6 +280,7 @@
     </tr>
 </table>
 </div>
+@endif
 
 @if ($qr)
     <table class="verify">
@@ -205,6 +294,47 @@
             </td>
         </tr>
     </table>
+@endif
+
+@if ($countersigned)
+{{--
+    The last page of the signed version (docs/DOCUMENTS.md section 12): who signed, when, from where, and when
+    the code emailed to them was accepted. It also prints the fingerprint of the document as it was issued, which
+    is how this version points back at the one that went out: that file never changes.
+--}}
+<div class="record">
+    <h2 class="record-title">Signature record</h2>
+    <p class="record-intro">
+        This page records how {{ $document->reference }} was signed. It is part of the signed version only; the
+        document issued on {{ $issuedDate }} is unchanged and keeps its own fingerprint, printed below.
+    </p>
+
+    <p class="record-group">{{ $details['name'] }}</p>
+    @foreach ($signatures as $signature)
+        <table class="record-table">
+            <tr><th>Signed by</th><td>{{ $signature->signatory_name }}{{ $signature->signatory_title ? ', ' . $signature->signatory_title : '' }}</td></tr>
+            <tr><th>Signed on</th><td>{{ \Carbon\Carbon::parse($signature->signed_at)->timezone('Africa/Lagos')->format('j F Y, H:i') }} (Lagos time)</td></tr>
+            <tr><th>Signed in</th><td>JBS Praxis HQ, signed in and with the password confirmed{{ $signature->ip_address ? ', from ' . $signature->ip_address : '' }}</td></tr>
+        </table>
+    @endforeach
+
+    @foreach ($counterparties as $party)
+        <p class="record-group">{{ $party->company ?: $party->name }}</p>
+        <table class="record-table">
+            <tr><th>Signed by</th><td>{{ $party->signed_name ?: $party->name }}{{ $party->role_title ? ', ' . $party->role_title : '' }}</td></tr>
+            <tr><th>Named on the agreement as</th><td>{{ $party->name }}</td></tr>
+            <tr><th>Email address</th><td>{{ $party->email }}</td></tr>
+            <tr><th>Signed on</th><td>{{ $party->signed_at ? \Carbon\Carbon::parse($party->signed_at)->timezone('Africa/Lagos')->format('j F Y, H:i') . ' (Lagos time)' : '—' }}</td></tr>
+            <tr><th>Code verified</th><td>{{ $party->code_verified_at ? \Carbon\Carbon::parse($party->code_verified_at)->timezone('Africa/Lagos')->format('j F Y, H:i') . ' (Lagos time)' : '—' }}</td></tr>
+            <tr><th>From</th><td>{{ $party->ip_address ?: '—' }}</td></tr>
+            <tr><th>How</th><td>A private link sent to the address above, then a one-time code emailed to it and entered on the signing page.</td></tr>
+        </table>
+    @endforeach
+
+    <p class="record-hash">
+        Fingerprint of the document as issued (SHA-256): {{ $document->file_sha256 ?: 'not recorded' }}
+    </p>
+</div>
 @endif
 
 </body>

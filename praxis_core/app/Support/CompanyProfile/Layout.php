@@ -594,9 +594,14 @@ final class Layout
      */
     public static function clientPages(array $clients, array $platforms = []): array
     {
+        // Only what dompdf can draw: a JPEG it carries as it is, an SVG php-svg-lib draws. A PNG would
+        // need gd, which the live PHP has not got, so it is left off the wall rather than drawn broken.
         $logos = array_values(array_filter(
             $clients['logos'] ?? [],
-            fn ($logo) => is_array($logo) && is_string($logo['path'] ?? null) && is_file($logo['path'])
+            fn ($logo) => is_array($logo)
+                && is_string($logo['path'] ?? null)
+                && is_file($logo['path'])
+                && in_array(strtolower(pathinfo($logo['path'], PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'svg'], true)
         ));
 
         if ($logos === []) {

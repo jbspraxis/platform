@@ -17,6 +17,11 @@ class AppServiceProvider extends ServiceProvider
             require_once app_path('Support/Polyfill/fileinfo.php');
         }
         $this->app->singleton('filesystem', fn ($app) => new \App\Support\FilesystemManager($app));
+
+        // Company profile (docs/COMPANY_PROFILE.md). Two seams the other two company-profile PRs replace:
+        // PR 3 binds the logo library over DirectoryClientLogos. PR 2's designed renderer is bound here.
+        $this->app->bind(\App\Support\CompanyProfile\ClientLogos::class, \App\Support\CompanyProfile\DirectoryClientLogos::class);
+        $this->app->bind(\App\Support\CompanyProfile\CompanyProfileRenderer::class, \App\Support\CompanyProfile\PdfRenderer::class);
     }
 
     /**
@@ -56,6 +61,6 @@ class AppServiceProvider extends ServiceProvider
 
         // Uploads wait in Livewire's temporary folder before a screen keeps them: up to 20 MB (Company documents takes
         // scans that large; Livewire's own default is 12 MB). Each screen still checks its own limit and file types.
-        config(['livewire.temporary_file_upload.rules' => ['required', 'file', 'max:' . \App\Support\CompanyDocuments\Documents::MAX_KB]]);
+        config(['livewire.temporary_file_upload.rules' => ['required', 'file', 'max:'.\App\Support\CompanyDocuments\Documents::MAX_KB]]);
     }
 }

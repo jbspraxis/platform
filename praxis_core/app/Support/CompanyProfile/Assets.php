@@ -16,9 +16,6 @@ namespace App\Support\CompanyProfile;
  */
 final class Assets
 {
-    /** Where a client logo comes from while PR 3's logo library is not there yet. */
-    public const LOGO_DIRECTORY = 'logos';
-
     /**
      * A path dompdf will accept: absolute, with forward slashes. Windows backslashes survive the font and
      * image resolvers, but the chroot comparison is cleaner on one separator, and a path relative to the
@@ -137,25 +134,6 @@ final class Assets
         }
 
         return self::place('lagos');
-    }
-
-    /**
-     * The client logos on disk, for a profile whose content carries none yet (PR 3 brings the library
-     * HQ manages; until then the wall is this folder). The name is the file's, title-cased, which the
-     * logo library will replace with the name the owner types.
-     *
-     * @return list<array{name: string, path: string}>
-     */
-    public static function logoLibrary(): array
-    {
-        $directory = self::root().'/'.self::LOGO_DIRECTORY;
-        $files = is_dir($directory) ? glob($directory.'/*.jpg') : [];
-        sort($files);
-
-        return array_values(array_map(fn (string $file) => [
-            'name' => ucwords(str_replace('-', ' ', pathinfo($file, PATHINFO_FILENAME))),
-            'path' => str_replace(DIRECTORY_SEPARATOR, '/', $file),
-        ], $files ?: []));
     }
 
     /**

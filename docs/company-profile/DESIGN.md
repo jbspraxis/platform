@@ -4,7 +4,8 @@ PR 2 of the company profile (the data, the editor and the versions are PR 1; the
 intro letter are PR 3). This is the part a client actually sees: a ten to fourteen page A4 landscape
 monograph, one template for English and French, rendered by dompdf.
 
-Fold this into `docs/COMPANY_PROFILE.md` as its design section once PR 1's document exists.
+`docs/COMPANY_PROFILE.md` is the engine: the content, the versions, the editor, the download. This is the
+design that engine renders, and section 8 of that document points here.
 
 ## The format
 
@@ -136,6 +137,9 @@ Two more things dompdf made us do, both worth knowing before touching the templa
 php artisan company-profile:preview          # both languages into storage/app/company-profile
 php artisan company-profile:preview fr --html
 ```
+
+The preview reads `praxis_core/database/seeders/company-profile/content.{en,fr}.json`, the engine's own seed,
+so a preview is the same copy a published version carries and there is one place for that copy to live.
 
 `docs/company-profile/previews/` holds every page as an image, and a contact sheet per language. They
 are rebuilt by rendering the two PDFs and rasterising them; a PDF rasteriser is not part of the app.

@@ -7,7 +7,9 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
 /**
- * Render the company profile from the approved content on disk, without HQ, a database or a signed link.
+ * Render the company profile from the seeded content on disk, without HQ, a database or a signed link.
+ * The content is the engine's own seed (database/seeders/company-profile), so a preview is the same copy
+ * the published version carries.
  * It is how the design is proofed: render both languages, turn the pages into images and look at every
  * one of them (docs/company-profile/DESIGN.md).
  *
@@ -21,7 +23,7 @@ class CompanyProfilePreview extends Command
         {--html : write the HTML beside the PDF}
         {--path= : write into this folder instead of storage/app/company-profile}';
 
-    protected $description = 'Render the company profile PDF from resources/company-profile/content';
+    protected $description = 'Render the company profile PDF from the seeded content';
 
     public function handle(): int
     {
@@ -32,7 +34,7 @@ class CompanyProfilePreview extends Command
         $renderer = new PdfRenderer;
 
         foreach ($locales as $locale) {
-            $source = resource_path("company-profile/content/content.{$locale}.json");
+            $source = database_path("seeders/company-profile/content.{$locale}.json");
             if (! is_file($source)) {
                 $this->error("No content for {$locale}: {$source}");
 

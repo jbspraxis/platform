@@ -407,7 +407,9 @@ function enhanceVerify() {
     const yours = panel.querySelector('[data-verify-yours]');
     const hashOut = panel.querySelector('[data-verify-hash]');
     const results = [...panel.querySelectorAll('[data-verify-result]')];
-    const expected = (panel.dataset.expected || '').toLowerCase();
+    // Either file counts: the document as it was issued, and (an agreement) the countersigned version of it
+    const expected = [panel.dataset.expected, panel.dataset.expectedSigned]
+        .map((value) => (value || '').toLowerCase()).filter(Boolean);
 
     const show = (which) => results.forEach((box) => { box.hidden = box.dataset.verifyResult !== which; });
 
@@ -421,7 +423,7 @@ function enhanceVerify() {
             const hash = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
             hashOut.textContent = hash;
             yours.hidden = false;
-            show(hash === expected ? 'same' : 'different');
+            show(expected.includes(hash) ? 'same' : 'different');
         } catch {
             show('failed'); // an older browser, or a page served over plain http (crypto.subtle needs https)
         }

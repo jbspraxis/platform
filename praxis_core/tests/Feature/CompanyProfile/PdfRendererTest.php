@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\CompanyProfile;
 
+use App\Support\CompanyProfile\Assets;
+use App\Support\CompanyProfile\ClientLogos;
 use App\Support\CompanyProfile\CompanyProfileRenderer;
 use App\Support\CompanyProfile\Layout;
 use App\Support\CompanyProfile\Measure;
@@ -174,7 +176,7 @@ class PdfRendererTest extends TestCase
         $this->assertStringContainsString(Typography::NBSP.':', (string) $flat);
     }
 
-    public function test_the_logo_wall_falls_back_to_the_logos_on_disk(): void
+    public function test_the_logo_wall_comes_from_the_engines_logo_library(): void
     {
         $content = $this->content('en');
         $content['clients']['logos'] = [];
@@ -182,16 +184,45 @@ class PdfRendererTest extends TestCase
         $prepared = (new PdfRenderer)->prepare($content);
 
         $this->assertNotEmpty($prepared['clients']['logos']);
-        foreach ($prepared['clients']['logos'] as $logo) {
-            $this->assertFileExists($logo['path']);
-            $this->assertStringEndsWith('.jpg', $logo['path'], 'dompdf cannot read a PNG without gd');
+        $this->assertSame(app(ClientLogos::class)->all(), $prepared['clients']['logos']);
+    }
+
+    public function test_the_wall_places_only_what_dompdf_can_draw(): void
+    {
+        // Without gd dompdf cannot read a PNG at all, so one on the wall must be left off rather than
+        // drawn as a broken image. The library lists it; the page does not place it.
+        $content = $this->content('en');
+        $content['clients']['logos'] = [
+            ['name' => 'Drawable', 'path' => Assets::path('logos', 'tales-consulting.jpg')],
+            ['name' => 'Not drawable', 'path' => Assets::path('brand', 'horizontal-colour.jpg')],
+            ['name' => 'A png', 'path' => resource_path('brand/jbs-praxis-stacked-colour-1200.png')],
+        ];
+
+        $pages = Layout::pages((new PdfRenderer)->prepare($content));
+        $names = [];
+        foreach ($pages as $page) {
+            if ($page['view'] === 'clients') {
+                foreach ($page['data']['rows'] as $row) {
+                    foreach ($row as $logo) {
+                        $names[] = $logo['name'];
+                    }
+                }
+            }
         }
+
+        $this->assertContains('Drawable', $names);
+        $this->assertNotContains('A png', $names);
+    }
+
+    public function test_the_designed_renderer_is_what_the_engine_resolves(): void
+    {
+        $this->assertInstanceOf(PdfRenderer::class, app(CompanyProfileRenderer::class));
     }
 
     /** @return array<string, mixed> */
     private function content(string $locale): array
     {
-        $path = resource_path("company-profile/content/content.{$locale}.json");
+        $path = database_path("seeders/company-profile/content.{$locale}.json");
         $this->assertFileExists($path);
 
         $data = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);

@@ -61,10 +61,11 @@ final class PdfRenderer implements CompanyProfileRenderer
     {
         $data = Typography::prepare($data, (string) ($data['meta']['locale'] ?? 'en'));
 
-        // A profile whose content carries no logos yet falls back to the folder on disk, which is what
-        // the engine reads until PR 3's logo library lands.
+        // Profile::data() fills the wall from the engine's logo library. Content that has not been
+        // through it — a preview straight off the seed, or a test — gets the same library here, so
+        // there is one answer to what is on the wall and PR 3 changes it in one place.
         if (($data['clients']['logos'] ?? []) === []) {
-            $data['clients']['logos'] = Assets::logoLibrary();
+            $data['clients']['logos'] = app(ClientLogos::class)->all();
         }
 
         return $data;
