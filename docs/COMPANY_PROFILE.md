@@ -158,6 +158,17 @@ landscape, twelve pages, one template for English and French, rendered by dompdf
 **`docs/company-profile/DESIGN.md`** has the grid, the type, the device, the page plan, and what the live
 server's missing `gd` forces on the design. Nothing else about the download changed.
 
+### The deck
+
+`GET /company-profile/deck?locale=en&version=3` - route name **`company-profile.deck`** - is the same profile
+as **twenty-four animated slides**, in English and French, from the same version and behind the same
+permission. The two downloads share the code that resolves the version, so a draft cannot leak through one of
+them and not the other, and the filename is the PDF's with its own extension. The button sits beside Download
+on the editor and on a version's preview; the versions list carries PDF EN / PDF FR / Deck EN / Deck FR.
+
+**`docs/company-profile/DECK.md`** has the slide list, the template, the motion, the two faces it is set in
+and why it embeds none, and what the live server's missing `ext-zip` forces on it.
+
 ## 9. The logo wall: the client logo library
 
 `clients.logos` comes from the `ClientLogos` provider, never from the editor. **PR 3 binds the HQ logo
@@ -263,6 +274,17 @@ PR 3 adds, in the same folder:
   own details, the words coming from the published profile, the banned words, the sign-off following the
   language, one page in both languages, the copy budget, issuing and downloading it, and what the letter says
   when nothing is published.
+
+PR 4 adds:
+
+- `DeckRendererTest` - the .pptx opening without `ext-zip`, twenty-four well-formed slide parts, the 16:9
+  slide and every relationship a slide names, that every slide builds itself and the sections morph with a
+  fade under them, the held and enabled rules in the slide text, nobody named and no banned word, the
+  pharmaceutical client unnamed and no price, every slide fitting in both languages with no autofit anywhere,
+  no reading text below the floor, the two faces, French spacing, and the same profile rendering to the same
+  bytes twice. It needs no database.
+- `ProfileDownloadDeckTest` - the route, the permission, both languages, the filename, the published copy, and
+  a draft needing edit or approve.
 
 They need MySQL (`tests/Feature/UsesThrowawayDatabase`):
 

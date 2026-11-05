@@ -68,8 +68,10 @@
                 </div>
                 <div class="cpv-tools">
                     <a class="btn btn-sm btn-quiet" href="{{ route('hq.company-profile.preview', $v) }}" wire:navigate><i data-lucide="eye"></i> Preview</a>
-                    <a class="btn btn-sm btn-quiet" href="{{ route('company-profile.download', ['locale' => 'en', 'version' => $v->number]) }}">EN</a>
-                    <a class="btn btn-sm btn-quiet" href="{{ route('company-profile.download', ['locale' => 'fr', 'version' => $v->number]) }}">FR</a>
+                    <a class="btn btn-sm btn-quiet" href="{{ route('company-profile.download', ['locale' => 'en', 'version' => $v->number]) }}" title="The PDF in English">PDF EN</a>
+                    <a class="btn btn-sm btn-quiet" href="{{ route('company-profile.download', ['locale' => 'fr', 'version' => $v->number]) }}" title="The PDF in French">PDF FR</a>
+                    <a class="btn btn-sm btn-quiet" href="{{ route('company-profile.deck', ['locale' => 'en', 'version' => $v->number]) }}" title="The deck in English">Deck EN</a>
+                    <a class="btn btn-sm btn-quiet" href="{{ route('company-profile.deck', ['locale' => 'fr', 'version' => $v->number]) }}" title="The deck in French">Deck FR</a>
                     @if ($v->isOpen() && $canApprove)
                         <button type="button" class="btn btn-sm btn-primary" wire:click="publish('{{ $v->id }}')"
                                 wire:confirm="Publish {{ $v->label() }}? It becomes what every download and share link carries.">Publish</button>

@@ -6,6 +6,7 @@ monograph, one template for English and French, rendered by dompdf.
 
 `docs/COMPANY_PROFILE.md` is the engine: the content, the versions, the editor, the download. This is the
 design that engine renders, and section 8 of that document points here.
+**`docs/company-profile/DECK.md`** is this design's sibling: the same profile as twenty-four animated slides.
 
 ## The format
 
