@@ -178,28 +178,45 @@ final class Clients
     }
 
     /**
+     * The files this server holds for **one** key, oldest first.
+     *
+     * One key's files are named here and nowhere else, because a looser match belongs to the wrong logo: the
+     * folder holds "acme-<version>.webp" beside "acme-corp-<version>.webp", and anything that merely starts
+     * with "acme-" matches both. So the version is spelled out — a hyphen, then hex, then the extension, to
+     * the end of the name — and both reading and deleting go through here.
+     *
+     * @return list<string>
+     */
+    private static function filesFor($disk, string $key): array
+    {
+        $pattern = '#^' . preg_quote(self::FOLDER . '/' . $key, '#')
+            . '-[a-f0-9]{1,' . self::VERSION_LENGTH . '}\.webp$#';
+
+        return array_values(array_filter(
+            $disk->files(self::FOLDER),
+            fn (string $file) => preg_match($pattern, $file) === 1,
+        ));
+    }
+
+    /**
      * Whatever version of one key this server kept last, or null when it has none. Reads only; it never calls
      * HQ, so it is what a made-up version and an HQ outage are both answered from.
      */
     private static function lastKept($disk, string $key): ?string
     {
-        $pattern = '#^' . self::FOLDER . '/' . preg_quote($key, '#') . '-[a-f0-9]{1,' . self::VERSION_LENGTH . '}\.webp$#';
-        $mine = array_values(array_filter(
-            $disk->files(self::FOLDER),
-            fn (string $file) => preg_match($pattern, $file) === 1,
-        ));
+        $mine = self::filesFor($disk, $key);
 
         return $mine === [] ? null : (string) $disk->get(end($mine));
     }
 
-    /** Keep one file per key: the version the list names, and nothing it has superseded */
+    /** Keep one file per key: the version the list names, and nothing of that key it has superseded */
     private static function keep($disk, string $key, string $current, string $bytes): void
     {
         $path = self::path($key, $current);
         $disk->put($path, $bytes);
 
-        foreach ($disk->files(self::FOLDER) as $file) {
-            if ($file !== $path && str_starts_with($file, self::FOLDER . '/' . $key . '-')) {
+        foreach (self::filesFor($disk, $key) as $file) {
+            if ($file !== $path) {
                 $disk->delete($file);
             }
         }
