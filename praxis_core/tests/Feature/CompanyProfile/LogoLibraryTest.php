@@ -201,6 +201,138 @@ class LogoLibraryTest extends TestCase
         LogoFiles::decode($this->webp(), LogoLibrary::RENDITIONS['print']);
     }
 
+    // ------------------------------------------------------------------ the modal
+
+    /**
+     * Adding and editing happen in one modal over the list (the owner, 5 Nov 2026), so the page never scrolls
+     * away from the row being worked on.
+     */
+    public function test_edit_opens_the_modal_on_that_row_and_add_opens_it_empty(): void
+    {
+        $this->actingAs($this->staff('owner', ['owner']));
+        $logo = $this->add('Pixie Girl Global (test)', [], ['sector' => 'Manufacturing and global brands']);
+
+        $page = Livewire::test(LogoLibraryScreen::class);
+        $this->assertFalse($page->instance()->open, 'the modal is shut until something opens it');
+
+        $page->call('edit', $logo->id)
+            ->assertSet('editing', $logo->id)
+            ->assertSet('editingName', 'Pixie Girl Global (test)')
+            ->assertSet('name', 'Pixie Girl Global (test)')
+            ->assertSet('sector', 'Manufacturing and global brands')
+            ->assertSee('Edit Pixie Girl Global (test)')
+            ->assertSeeHtml('role="dialog"')
+            ->assertSeeHtml('aria-modal="true"')
+            ->assertSeeHtml('aria-labelledby="logo-modal-title"');
+        $this->assertTrue($page->instance()->open);
+
+        // Add opens the same modal with nothing in it
+        $page->call('add')
+            ->assertSet('editing', '')
+            ->assertSet('editingName', '')
+            ->assertSet('name', '')
+            ->assertSee('Add a logo');
+        $this->assertTrue($page->instance()->open);
+    }
+
+    public function test_cancel_closes_the_modal_and_changes_nothing(): void
+    {
+        $this->actingAs($this->staff('owner', ['owner']));
+        $logo = $this->add('Before (test)', [], ['sector' => 'Logistics']);
+
+        $page = Livewire::test(LogoLibraryScreen::class)
+            ->call('edit', $logo->id)
+            ->set('name', 'Typed but not saved')
+            ->set('sector', 'Nonsense')
+            ->call('cancel');
+
+        $this->assertFalse($page->instance()->open);
+        $page->assertSet('editing', '')->assertSet('name', '');
+
+        $logo->refresh();
+        $this->assertSame('Before (test)', $logo->name);
+        $this->assertSame('Logistics', $logo->sector);
+    }
+
+    public function test_saving_closes_the_modal_and_the_row_updates_where_it_sits(): void
+    {
+        $this->actingAs($this->staff('owner', ['owner']));
+        $first = $this->add('First (test)');
+        $logo = $this->add('Pixie Girl Global (test)', [], ['sector' => 'Retail']);
+        $last = $this->add('Last (test)');
+
+        $page = Livewire::test(LogoLibraryScreen::class)
+            ->call('edit', $logo->id)
+            ->set('sector', 'Manufacturing and global brands')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        // The modal is shut, and the row is marked so the eye finds it again
+        $this->assertFalse($page->instance()->open);
+        $page->assertSet('highlight', $logo->id)->assertSeeHtml('is-fresh');
+
+        // It updated in place: same position, new sector
+        $this->assertSame(
+            ['First (test)', 'Pixie Girl Global (test)', 'Last (test)'],
+            LogoLibrary::live()->pluck('name')->all(),
+        );
+        $this->assertSame('Manufacturing and global brands', $logo->fresh()->sector);
+        $this->assertSame([$first->position, $logo->position, $last->position], [1, 2, 3]);
+
+        // Another action clears the mark, so the fade is not replayed on an unrelated redraw
+        $page->call('moveUp', $last->id)->assertSet('highlight', '');
+    }
+
+    public function test_a_new_logo_arrives_at_the_end_of_the_list_marked(): void
+    {
+        $this->actingAs($this->staff('owner', ['owner']));
+        $this->add('Already here (test)');
+
+        $page = Livewire::test(LogoLibraryScreen::class)
+            ->call('add')
+            ->set('name', 'Brand new (test)')
+            ->call('setFiles', ['print' => $this->jpeg(), 'png' => $this->png(), 'web' => $this->webp()])
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertFalse($page->instance()->open);
+        $names = LogoLibrary::live()->pluck('name')->all();
+        $this->assertSame(['Already here (test)', 'Brand new (test)'], $names);
+        $page->assertSet('highlight', ClientLogo::query()->where('name', 'Brand new (test)')->value('id'));
+    }
+
+    public function test_an_error_keeps_the_modal_open_with_the_message_in_it(): void
+    {
+        $this->actingAs($this->staff('owner', ['owner']));
+
+        // No name: the modal stays open and says so, rather than closing and losing the typing
+        $page = Livewire::test(LogoLibraryScreen::class)->call('add')->call('save')->assertHasErrors('name');
+        $this->assertTrue($page->instance()->open);
+
+        // A file that is not what it claims: the same
+        $page->set('name', 'Bad file (test)')
+            ->call('setFiles', ['print' => 'data:image/jpeg;base64,' . base64_encode('not a jpeg')])
+            ->call('save')
+            ->assertHasErrors('printUri');
+        $this->assertTrue($page->instance()->open);
+        $this->assertSame(0, ClientLogo::query()->count());
+    }
+
+    public function test_a_viewer_is_offered_no_way_into_the_modal(): void
+    {
+        $this->actingAs($this->staff('owner', ['owner']));
+        $logo = $this->add('Read only (test)');
+
+        // Sales & Marketing may read the library (the engine's grant migration), and nothing more
+        $sales = $this->staff('sales', ['sales']);
+        $this->actingAs($sales)->get($this->hq('/company-profile/logos'))
+            ->assertOk()->assertDontSee('Add a logo')->assertDontSee('>Edit<', false);
+
+        Livewire::actingAs($sales)->test(LogoLibraryScreen::class)->call('add')->assertForbidden();
+        Livewire::actingAs($sales)->test(LogoLibraryScreen::class)->call('edit', $logo->id)->assertForbidden();
+        Livewire::actingAs($sales)->test(LogoLibraryScreen::class)->call('save')->assertForbidden();
+    }
+
     // ------------------------------------------------------------------ order, retiring, restoring
 
     public function test_logos_keep_the_order_they_are_put_in(): void
