@@ -6,7 +6,8 @@
             <h2 class="band-title" id="calculator-title">{{ __('pages.home.calculator_title') }}</h2>
             <p class="band-text">{{ __('pages.home.calculator_text') }}</p>
             <p class="calculator-counts">{{ __('pages.home.calculator_counts') }}</p>
-            <a class="btn btn-secondary btn-lg" href="{{ route('calculator') }}"><i data-lucide="calculator"></i>{{ __('pages.home.calculator_cta') }}</a>
+            {{-- With JavaScript this opens the calculator as a conversation; without it, the page form as before --}}
+            <a class="btn btn-secondary btn-lg" href="{{ route('calculator') }}" data-calc-open><i data-lucide="calculator"></i>{{ __('pages.home.calculator_cta') }}</a>
         </div>
         <ol class="calculator-steps">
             @foreach (__('pages.home.calculator_steps') as $step)
@@ -18,3 +19,4 @@
         </ol>
     </div>
 </section>
+@include('partials.calculator-dialog')

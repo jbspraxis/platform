@@ -293,6 +293,158 @@ return [
         'company' => 'Organisation name',
         'send' => 'See your report',
         'no_lists' => 'The lists for this calculator aren’t available yet.',
+
+        // The calculator as a conversation (partials/calculator-dialog): the agent asks, the visitor taps or
+        // types, and every answer stays editable at the top. Keys match resources/js/calculator.
+        'chat' => [
+            'title' => 'Cost of poor quality',
+            'open' => 'Answer in a conversation instead',
+            'close' => 'Close',
+            'agent' => 'Praxis',
+            'you' => 'You',
+            'unit' => ['hours' => 'h'],
+
+            'gate' => [
+                'heading' => 'What is poor quality costing you?',
+                'lead' => 'A few questions and we’ll show you the figure, in your currency. It takes about two minutes, and you can change any answer as we go.',
+                'hint' => 'We send the report here.',
+                'start' => 'Start',
+                'invalid' => 'That doesn’t look like an email address — could you check it?',
+            ],
+
+            'steps' => [
+                'you' => 'You',
+                'organisation' => 'Organisation',
+                'scale' => 'Scale',
+                'flow' => 'Flow',
+                'quality' => 'Quality',
+                'money' => 'Money',
+            ],
+
+            'hello' => 'Thank you — I’ll send the report there. Let’s work out your figures.',
+
+            'ask' => [
+                'name' => 'First — who am I speaking to?',
+                'company' => 'And which organisation are we looking at?',
+                'industry' => 'Which sector does it work in?',
+                'tool' => 'What is the main system the work runs on today?',
+                'headcount' => 'Roughly how many people work there?',
+                'mgmt_nodes' => 'And how many of them check or approve other people’s work?',
+                'bottleneck' => 'Where does the work slow down most?',
+                'manual_hrs' => 'How long does one of those managers spend checking work by hand?',
+                'error_rate' => 'Roughly what share of the work has to be done again?',
+                'acv' => 'What is one customer contract worth in a year, on average?',
+                'currency' => 'Which currency should I work in?',
+                'hourly_cost' => 'What does one of those managers cost?',
+                'turnover' => 'Last one — what is the annual turnover or budget?',
+            ],
+
+            'hint' => [
+                'mgmt_nodes' => 'If you’re not sure, a fifth of staff is the usual shape.',
+                'manual_hrs' => 'Per manager. “2 hours a day” works as well as “10 a week”.',
+                'acv' => 'Skip this one if you don’t sell contracts.',
+                'hourly_cost' => 'Say it however you think of it — “600,000 FCFA a month” is fine. I’ll work out the hourly figure.',
+                'turnover' => 'A round number is fine.',
+            ],
+
+            'short' => [
+                'email' => 'Email',
+                'name' => 'Name',
+                'company' => 'Organisation',
+                'industry' => 'Sector',
+                'tool' => 'System',
+                'headcount' => 'Staff',
+                'mgmt_nodes' => 'Managers',
+                'bottleneck' => 'Bottleneck',
+                'manual_hrs' => 'Manual checks',
+                'error_rate' => 'Rework',
+                'acv' => 'Contract value',
+                'currency' => 'Currency',
+                'hourly_cost' => 'Manager cost',
+                'turnover' => 'Turnover',
+            ],
+
+            'shown' => ['hours' => ':n h a week'],
+            'period' => [
+                'hour' => 'an hour',
+                'shift' => 'a shift',
+                'day' => 'a day',
+                'week' => 'a week',
+                'month' => 'a month',
+                'year' => 'a year',
+            ],
+
+            // The sum, shown so the assumption behind it can be argued with
+            'working' => [
+                'divide' => '÷ :divisor :unit :period',
+                'times' => '× :factor',
+                'split' => '÷ :people people',
+            ],
+            'derived' => [
+                'pay' => ':said :sum = :rate an hour. I’ll use that.',
+                'already' => 'Good — :rate an hour.',
+                'assumed' => 'I’ve read that as a monthly figure — say so if it isn’t.',
+                'hours' => ':sum — that’s :n hours a week.',
+                'annual' => ':sum = :total a year.',
+            ],
+
+            'week' => [
+                'button' => 'Our week isn’t :hours h',
+                'day' => 'Hours a day',
+                'days' => 'Days a week',
+                'apply' => 'Use this week',
+                'done' => 'Updated to a :hours-hour week. I’ve redone :fields.',
+                'noted' => 'Updated to a :hours-hour week.',
+            ],
+
+            // FCFA is two currencies: we ask rather than be quietly wrong about every figure
+            'cfa' => [
+                'ask' => 'FCFA is two currencies — which one is yours?',
+                'xof' => 'XOF — West Africa',
+                'xaf' => 'XAF — Central Africa',
+            ],
+
+            'pills' => [
+                'fifth' => 'About a fifth (:n)',
+                'noncommercial' => 'We don’t sell contracts',
+                'hours' => ':n h a week',
+            ],
+
+            'skip' => 'Skip',
+            'skipped' => 'Not given',
+            'fine' => 'No problem.',
+            'more' => 'Show the full list',
+            'all' => 'Here are all :n:',
+
+            'errors' => [
+                'email' => 'That doesn’t look like an email address — could you check it?',
+                'blank' => 'Sorry, I didn’t catch that.',
+                'number' => 'I need a number for that one. A rough one is fine.',
+                'list' => 'That isn’t on my list. Tap one below, or skip it.',
+                'near' => 'Did you mean one of these?',
+            ],
+
+            'edit' => [
+                'ok' => 'Of course — :field is :value just now. What should it be?',
+                'which' => 'Which answer would you like to change?',
+                'chip' => 'Change :field, currently :value',
+            ],
+
+            'confirm' => [
+                'heading' => 'Here is everything I have. Tap any line to change it.',
+                'run' => 'Run my report',
+                'change' => 'Change something',
+                'which' => 'Which one?',
+                'ask' => 'Shall I run it?',
+                'changed' => 'Done — :field is now :value.',
+            ],
+
+            'sending' => 'Running your figures…',
+            'sent' => 'Running your figures now — your report opens in a moment.',
+            'say' => 'Your reply',
+            'placeholder' => 'Type your answer…',
+            'send' => 'Send',
+        ],
     ],
 
     'report' => [

@@ -7,6 +7,14 @@
         <x-page-head :title="__('site.calculator.title')" :lead="__('site.calculator.intro')" />
         <x-stale :show="$stale" />
 
+        {{-- The same calculator as a conversation, for anyone who would rather answer that way. The button
+             only does anything with JavaScript; the form below it is unchanged and remains the way in. --}}
+        <p class="calculator-switch">
+            <button class="btn btn-secondary" type="button" data-calc-open hidden data-calc-reveal>
+                <i data-lucide="message-square-text"></i>{{ __('site.calculator.chat.open') }}
+            </button>
+        </p>
+
         <form class="card form" method="POST" action="{{ route('calculator.store') }}" novalidate>
             @csrf
             <x-form-guard form="calculator" />
@@ -57,4 +65,5 @@
             </div>
         </form>
     </div>
+    @include('partials.calculator-dialog')
 @endsection
