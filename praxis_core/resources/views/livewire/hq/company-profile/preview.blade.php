@@ -35,6 +35,7 @@
                 </select>
             </label>
             <a class="btn btn-quiet" href="{{ route('company-profile.download', ['locale' => $locale, 'version' => $version->number]) }}"><i data-lucide="download"></i> Download</a>
+            <a class="btn btn-quiet" href="{{ route('company-profile.deck', ['locale' => $locale, 'version' => $version->number]) }}"><i data-lucide="presentation"></i> Download deck</a>
             <a class="btn btn-quiet" href="{{ route('hq.company-profile.versions') }}" wire:navigate>Versions</a>
         </div>
     </div>

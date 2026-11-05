@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 |   /company-profile/versions                        every version, who wrote it, who approved it
 |   /company-profile/versions/{version}/preview      a version exactly as the renderers read it
 |   /company-profile/download                        the PDF (route name: company-profile.download)
+|   /company-profile/deck                            the 24-slide deck (route name: company-profile.deck)
 |   /company-profile/shares                          tracked share links: make one, see its opens, revoke it
 |   /company-profile/logos                           the client logo library: upload, name, sector, order, where it shows
 |   /company-profile/logos/{logo}/{kind}             the bytes of one logo (web, png or print), for HQ only
@@ -26,6 +27,9 @@ Route::prefix('company-profile')->middleware('can:company_profile.view')->group(
     // The name the three company-profile PRs agreed on in company-profile/CONTRACT.md; it keeps the plain
     // name on purpose, so PR 2 and PR 3 link to it without knowing it is mounted under HQ.
     Route::get('/download', [CompanyProfileController::class, 'download'])->name('company-profile.download');
+
+    // The same profile as slides (docs/company-profile/DECK.md). Same guard, same version, same filename.
+    Route::get('/deck', [CompanyProfileController::class, 'deck'])->name('company-profile.deck');
 
     Route::get('/versions/{version}/preview', \App\Livewire\Hq\CompanyProfile\ProfilePreview::class)
         ->whereUuid('version')->name('hq.company-profile.preview');

@@ -68,6 +68,9 @@
                 <a class="btn btn-quiet" href="{{ route('company-profile.download', ['locale' => $lang === 'fr' ? 'fr' : 'en', 'version' => $version->number]) }}">
                     <i data-lucide="download"></i> Download
                 </a>
+                <a class="btn btn-quiet" href="{{ route('company-profile.deck', ['locale' => $lang === 'fr' ? 'fr' : 'en', 'version' => $version->number]) }}">
+                    <i data-lucide="presentation"></i> Download deck
+                </a>
                 <a class="btn btn-quiet" href="{{ route('hq.company-profile.preview', $version) }}" wire:navigate>
                     <i data-lucide="eye"></i> Preview
                 </a>
