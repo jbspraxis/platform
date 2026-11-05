@@ -8,6 +8,7 @@ use App\Support\CompanyProfile\Editor;
 use App\Support\CompanyProfile\Profile;
 use App\Support\CompanyProfile\Sections;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
@@ -190,6 +191,20 @@ class ProfileEditor extends Component
 
         Editor::remove($this->structure, $this->en, $this->fr, $this->section, $this->path($path), $id);
         $this->save(quiet: true);
+    }
+
+    /** Tick or untick every switch in one list at once (a team's credentials, the company facts) */
+    public function setAll(string $path, bool $value): void
+    {
+        if (! $this->editable) {
+            return;
+        }
+
+        $changed = Editor::setGate($this->structure, $this->section, $this->path($path), $value);
+        $this->save(quiet: true);
+        $this->flash = $changed === 0
+            ? 'Nothing to change.'
+            : $changed . ' ' . Str::plural('switch', $changed) . ' turned ' . ($value ? 'on' : 'off') . '.';
     }
 
     public function moveItem(string $path, string $id, int $delta): void

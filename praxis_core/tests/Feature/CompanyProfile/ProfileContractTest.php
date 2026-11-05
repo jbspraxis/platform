@@ -46,7 +46,7 @@ class ProfileContractTest extends TestCase
             $this->assertSame(['title', 'items'], array_keys($data['security']));
             $this->assertSame(['title', 'items'], array_keys($data['facts']));
             $this->assertSame(
-                ['cta', 'cta_url', 'email', 'sales_email', 'phone', 'website', 'offices'],
+                ['cta', 'cta_url', 'email', 'sales_email', 'phone', 'website', 'offices', 'closing'],
                 array_keys($data['contact']),
             );
 
@@ -54,7 +54,10 @@ class ProfileContractTest extends TestCase
                 ['name', 'summary', 'disciplines', 'experience', 'credentials'],
                 array_keys($data['teams']['items'][0]),
             );
-            $this->assertSame(['name', 'issuer', 'held'], array_keys($data['teams']['items'][0]['credentials'][0]));
+            // Most credentials are not held yet, so take the first one that is actually rendered
+            $credential = collect($data['teams']['items'])->flatMap(fn ($team) => $team['credentials'])->first();
+            $this->assertNotNull($credential, 'at least one credential should be held');
+            $this->assertSame(['name', 'issuer', 'held'], array_keys($credential));
             $this->assertSame(['domain', 'items'], array_keys($data['problems']['groups'][0]));
             $this->assertSame(['problem', 'answer'], array_keys($data['problems']['groups'][0]['items'][0]));
             $this->assertSame(['name', 'summary', 'capabilities'], array_keys($data['practices']['items'][0]));
@@ -115,16 +118,36 @@ class ProfileContractTest extends TestCase
         }
     }
 
+    public function test_the_brand_sign_off_is_the_last_thing_in_the_contact_section(): void
+    {
+        $this->assertSame('Order, made visible.', Profile::data('en')['contact']['closing']);
+        $this->assertSame('closing', array_key_last(Profile::data('fr')['contact']));
+        $this->assertNotSame('', Profile::data('fr')['contact']['closing']);
+    }
+
+    public function test_the_written_copy_keeps_the_client_naming_rules(): void
+    {
+        foreach (['en', 'fr'] as $locale) {
+            $clients = collect(Profile::data($locale)['work']['items'])->pluck('client')->implode(' | ');
+
+            $this->assertStringNotContainsStringIgnoringCase('fidson', $clients, 'Fidson is never named');
+            $this->assertStringContainsString('La Petite Cour', $clients, 'La Petite Cour may be named');
+        }
+    }
+
     public function test_the_cameroon_entity_is_off_by_default(): void
     {
-        $facts = collect(Profile::editorData('en')['facts']['items']);
-        $cameroon = $facts->first(fn ($f) => str_contains(strtolower($f['value']), 'cameroon'));
+        foreach (['en' => 'cameroon', 'fr' => 'cameroun'] as $locale => $word) {
+            $facts = collect(Profile::editorData($locale)['facts']['items']);
+            $cameroon = $facts->first(fn ($f) => str_contains(strtolower($f['label'] . ' ' . $f['value']), $word));
 
-        $this->assertNotNull($cameroon, 'the seed should carry the Cameroon entity as a fact');
-        $this->assertFalse($cameroon['enabled']);
+            $this->assertNotNull($cameroon, "the seed should carry the Cameroon entity as a {$locale} fact");
+            $this->assertFalse($cameroon['enabled']);
 
-        $rendered = collect(Profile::data('en')['facts']['items'])->pluck('value')->implode(' | ');
-        $this->assertStringNotContainsStringIgnoringCase('cameroon', $rendered);
+            // It is the switch that keeps it out, not the wording: its value is nowhere in what is rendered
+            $rendered = collect(Profile::data($locale)['facts']['items'])->pluck('value')->all();
+            $this->assertNotContains($cameroon['value'], $rendered);
+        }
     }
 
     public function test_the_editor_query_carries_the_ids_the_renderers_never_see(): void

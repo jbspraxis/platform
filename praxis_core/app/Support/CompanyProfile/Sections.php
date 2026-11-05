@@ -185,7 +185,12 @@ final class Sections
             'contact' => [
                 'label' => 'Contact',
                 'blurb' => 'The last page. Addresses and links are the same in both languages.',
-                'fields' => ['cta' => ['label' => 'Call to action', 'long' => true]],
+                'shape' => ['cta', 'cta_url', 'email', 'sales_email', 'phone', 'website', 'offices', 'closing'],
+                'fields' => [
+                    'cta' => ['label' => 'Call to action', 'long' => true],
+                    // docs/BRAND.md: the brand's sign-off, on the last page and nowhere else
+                    'closing' => ['label' => 'Closing line'],
+                ],
                 'shared' => [
                     'cta_url' => ['label' => 'Call-to-action link'],
                     'email' => ['label' => 'Email'],

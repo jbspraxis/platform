@@ -84,6 +84,31 @@ class Editor
     }
 
     /**
+     * Put every switch in one list the same way — the owner ticking a team's credentials in one go, rather
+     * than one round trip each. The switch is on the structure, so both languages move together.
+     */
+    public static function setGate(array &$structure, string $sectionKey, array $path, bool $value): int
+    {
+        $spec = self::spec($sectionKey, $path);
+        $gate = $spec['gate'] ?? null;
+
+        if ($gate === null) {
+            return 0;
+        }
+
+        $list = &self::structureList($structure, $path);
+        $changed = 0;
+        foreach ($list as $index => $item) {
+            if (($item['shared'][$gate] ?? null) !== $value) {
+                $list[$index]['shared'][$gate] = $value;
+                $changed++;
+            }
+        }
+
+        return $changed;
+    }
+
+    /**
      * Every list item the section holds, flat, so a screen can ask "is this id still there?" without walking
      * the tree itself.
      *

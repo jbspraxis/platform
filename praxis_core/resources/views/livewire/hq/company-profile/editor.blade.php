@@ -23,6 +23,7 @@
         .cp-list .cp-list { background: var(--color-mist); }
         .cp-list-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
         .cp-list-title { font-size: 0.8125rem; line-height: 1.25rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-muted); margin: 0; }
+        .cp-count { font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--color-slate); margin-left: 6px; }
         .cp-item { border-top: 1px solid var(--color-line); padding: 14px 0 4px; }
         .cp-item:first-of-type { border-top: 0; padding-top: 2px; }
         .cp-item-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }

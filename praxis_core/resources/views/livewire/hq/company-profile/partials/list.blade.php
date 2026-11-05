@@ -15,19 +15,35 @@
 
 <div class="cp-list">
     <div class="cp-list-head">
-        <h3 class="cp-list-title">{{ $spec['label'] }}</h3>
-        @if ($editable)
-            <button type="button" class="btn btn-sm btn-quiet" wire:click="addItem('{{ $op }}')">
-                <i data-lucide="plus"></i> Add {{ $singular }}
-            </button>
-        @endif
+        <h3 class="cp-list-title">
+            {{ $spec['label'] }}
+            @if ($gate = $spec['gate'] ?? null)
+                <span class="cp-count">{{ collect($items)->where("shared.{$gate}", true)->count() }} of {{ count($items) }} on</span>
+            @endif
+        </h3>
+        <div class="cp-item-tools">
+            @if ($editable && ($spec['gate'] ?? null) && count($items) > 1)
+                {{-- The owner ticks a whole team at once, then unticks the odd one --}}
+                <button type="button" class="btn btn-sm btn-quiet" wire:click="setAll('{{ $op }}', true)">All on</button>
+                <button type="button" class="btn btn-sm btn-quiet" wire:click="setAll('{{ $op }}', false)">All off</button>
+            @endif
+            @if ($editable)
+                <button type="button" class="btn btn-sm btn-quiet" wire:click="addItem('{{ $op }}')">
+                    <i data-lucide="plus"></i> Add {{ $singular }}
+                </button>
+            @endif
+        </div>
     </div>
 
     @forelse ($items as $i => $item)
-        @php $id = $item['id']; @endphp
+        @php
+            $id = $item['id'];
+            // A list with no words of its own (credentials) names each row by its first shared value
+            $named = $isString ? '' : trim((string) ($item['shared'][array_key_first($spec['shared'] ?? []) ?? ''] ?? ''));
+        @endphp
         <div class="cp-item" wire:key="item-{{ $id }}">
             <div class="cp-item-bar">
-                <span class="cp-item-no">{{ $singular }} {{ $i + 1 }}</span>
+                <span class="cp-item-no">{{ ($spec['text'] ?? false) || $named === '' ? $singular . ' ' . ($i + 1) : $named }}</span>
                 <div class="cp-item-tools">
                     @foreach ($spec['shared'] ?? [] as $field => $fieldSpec)
                         @if (($fieldSpec['type'] ?? 'line') === 'switch')

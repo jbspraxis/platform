@@ -214,6 +214,46 @@ class ProfileWorkflowTest extends TestCase
         }
     }
 
+    public function test_one_click_ticks_a_whole_teams_credentials_in_both_languages(): void
+    {
+        $this->actingAs($this->person(['view', 'edit']));
+
+        $component = Livewire::test(ProfileEditor::class)->call('startDraft')->call('openSection', 'teams');
+        $team = $component->get('structure')['lists']['items'][0];
+        $path = 'items:' . $team['id'] . ':credentials';
+        $this->assertGreaterThan(1, count($team['lists']['credentials']), 'the seed should carry several credentials');
+
+        $component->call('setAll', $path, true);
+        $draft = Profile::open();
+        foreach (['en', 'fr'] as $locale) {
+            $credentials = Profile::dataFor($draft, $locale)['teams']['items'][0]['credentials'];
+            $this->assertCount(count($team['lists']['credentials']), $credentials, "all held in {$locale}");
+        }
+
+        $component->call('setAll', $path, false);
+        $draft = Profile::open();
+        foreach (['en', 'fr'] as $locale) {
+            $this->assertSame([], Profile::dataFor($draft, $locale)['teams']['items'][0]['credentials']);
+        }
+
+        // Every other team is untouched
+        $others = Profile::dataFor($draft, 'en', forRender: false)['teams']['items'];
+        $this->assertNotSame([], array_slice($others, 1), 'there are other teams to leave alone');
+        $this->assertGreaterThan(0, collect(array_slice($others, 1))->flatMap(fn ($t) => $t['credentials'])->count());
+    }
+
+    public function test_the_bulk_switch_does_nothing_to_a_list_with_no_switch(): void
+    {
+        $this->actingAs($this->person(['view', 'edit']));
+
+        $component = Livewire::test(ProfileEditor::class)->call('startDraft')->call('openSection', 'work');
+        $before = $component->get('structure');
+
+        $component->call('setAll', 'items', true);
+
+        $this->assertSame($before, $component->get('structure'));
+    }
+
     public function test_what_changed_since_the_published_version(): void
     {
         $this->actingAs($this->person(['view', 'edit']));

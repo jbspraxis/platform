@@ -1,6 +1,6 @@
 # The company profile
 
-How the firm's own profile is written, approved and sent. Version 1, 5 November 2026.
+How the firm's own profile is written, approved and sent. Version 2, 5 November 2026.
 
 The profile is one document in two languages, English and French, 10–12 pages, A4 landscape. There is one
 profile — there is no separate client version and no separate tender version. It is written in HQ, approved in
@@ -105,6 +105,10 @@ Lists — teams, case stories, problems and the lists inside them — have **Add
 **Remove**, and each of those acts on both languages at once. A credential has a **Held** switch and a company
 fact has a **Show** switch; the editor shows all of them, and only the ones that are on are ever rendered.
 
+A list of switches also has **All on** / **All off** and says how many are on (`3 of 9 on`), because the
+written profile arrives with twenty-one credentials and only one held: the owner ticks a team in one go and
+unticks the odd one. Each credential row is named after the credential, not numbered.
+
 A published version opens read-only, with **Start a new version** next to it.
 
 ## 6. Reading the profile
@@ -136,8 +140,9 @@ guessed at.
 The seeder leaves a database that already has a version alone — that version may be the one the firm is
 sending out.
 
-> PR 1 ships a **placeholder** pair of content files so the screens and the download work. The lead chat
-> replaces them with the written profile.
+The written profile is in those two files as of 5 November 2026 (the lead chat's copy, imported unchanged).
+It arrives with **one credential held of twenty-one** — the owner ticks the rest in the editor — the Cameroon
+entity fact **off**, and `contact.phone` **empty** for the owner to fill in.
 
 ## 8. The download
 
@@ -165,13 +170,15 @@ wall, never an error. **PR 3 rebinds the interface** with the logo library manag
 - No prices anywhere.
 - Banned words: "squad", "deployed", "buy"/"sell" for our systems ("we build"), "leverage", "cutting-edge",
   "solutions provider", "one-stop shop".
-- Fidson is never named ("a leading pharmaceutical manufacturer, with Tales Consulting"); LPC is "an FMCG
-  distributor, Cameroon".
+- Fidson is never named ("a leading pharmaceutical manufacturer"); the oil and gas client is "an oil and gas
+  company". **La Petite Cour may be named**, because the website names it.
+- `contact.closing` is the brand's sign-off ("Order, made visible." / « L'ordre, rendu visible. »), on the
+  last page and nowhere else.
 - The Cameroon entity is a company fact that is **off by default**.
 
 ## 11. Tests
 
-`praxis_core/tests/Feature/CompanyProfile/` — 45 tests:
+`praxis_core/tests/Feature/CompanyProfile/` — 51 tests:
 
 - `ProfileContractTest` — the contract shape for both locales, key by key; the gating; the editor query; the
   logo provider; a missing section still returning its whole shape.
