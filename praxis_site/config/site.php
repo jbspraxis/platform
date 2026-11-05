@@ -30,7 +30,7 @@ return [
     // The narrated 3-minute demo on YouTube (video ids), played on the home page only after a click
     // (partials.demo-dialog); empty = the button is not shown and no YouTube address is allowed by the CSP
     'demo_video' => [
-        'en' => env('DEMO_VIDEO_EN', 'XPqfJZ32jvc'),   // "Ask your company anything: a COO’s morning in 3 minutes"
+        'en' => env('DEMO_VIDEO_EN', '3HaH4L0z7AA'),   // "Ask your company anything: a COO’s morning in 3 minutes" (new voice, 5 Nov 2026)
         'fr' => env('DEMO_VIDEO_FR', 'nhx9HYZkIq4'),   // the same, narrated in French
     ],
 
