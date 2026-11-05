@@ -127,7 +127,7 @@ class InvoicePdfTest extends TestCase
 
         Livewire::test(InvoiceLedger::class)->set('showCreateModal', true)->set('new_project_id', $this->project)
             ->set('new_amount_due', 100000)->set('new_description', 'M2')->call('draftSubsequentInvoice')->assertHasNoErrors()
-            ->assertSee('Emailed with its PDF to ada@city.test, fin@city.test.');
+            ->assertDispatched('praxis-toast', $this->toast('Emailed with its PDF to ada@city.test, fin@city.test.'));
         $new = DB::table('invoices')->where('project_id', $this->project)->where('invoice_type', 'Tax Invoice - Phase Milestone')->first();
         $sent = Mail::sent(InvoiceMail::class);
         $this->assertEqualsCanonicalizing(['ada@city.test', 'fin@city.test'], $sent->map(fn ($m) => $m->to[0]['address'])->all());
@@ -142,7 +142,7 @@ class InvoicePdfTest extends TestCase
         // Nobody to send to: said plainly
         ClientUser::where('organization_id', $this->org)->update(['status' => 'Suspended']);
         Access::flush();
-        Livewire::test(InvoiceLedger::class)->call('emailInvoice', $new->id)->assertSee('Nobody at the client was emailed');
+        Livewire::test(InvoiceLedger::class)->call('emailInvoice', $new->id)->assertDispatched('praxis-toast', $this->toast('Nobody at the client was emailed'));
         Mail::assertSentCount(4);
     }
 }

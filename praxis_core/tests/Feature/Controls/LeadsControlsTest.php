@@ -152,7 +152,7 @@ class LeadsControlsTest extends TestCase
         // A colleague's "Assign to me" sent from an old page doesn't take it over, from the list or the lead's page
         $this->actingAs($this->staff('sales2', ['sales']));
         Livewire::test(LeadsRegister::class)->call('claimLead', $this->orgId);
-        $this->page()->call('claim')->assertSee('Someone took this lead a moment ago.');
+        $this->page()->call('claim')->assertDispatched('praxis-toast', $this->toast('Someone took this lead a moment ago.'));
         $this->assertSame($first->id, DB::table('organizations')->where('id', $this->orgId)->value('assigned_to'));
 
         $log = DB::table('system_audit_logs')->where('action', 'LEAD_CLAIMED')->get();

@@ -102,7 +102,7 @@ class PortalProposalTest extends TestCase
             ->call('openComment', 'nowhere')->assertSet('commenting', '')
             ->call('openComment', 'approach')->assertSet('commenting', 'approach')
             ->set('body', str_repeat('x', Proposals::MAX_COMMENT + 1))->call('comment')->assertHasErrors(['body'])
-            ->set('body', 'Can phase one start in January?')->call('comment')->assertSet('done', 'commented')
+            ->set('body', 'Can phase one start in January?')->call('comment')->assertDispatched('praxis-toast', $this->toast('votre commentaire a été transmis'))
             ->assertSee('Can phase one start in January?');
 
         $c = ProposalComment::sole();
@@ -130,13 +130,13 @@ class PortalProposalTest extends TestCase
         $page->set('email', 'ngozi@kilo.test')->call('comment')->assertSee('Trop d’adresses ont été essayées');
         $this->assertSame(0, ProposalComment::count());
         RateLimiter::clear(ProposalReview::unknownKey($p->id, '127.0.0.1'));
-        $page->call('comment')->assertSet('done', 'commented');
+        $page->call('comment')->assertDispatched('praxis-toast', $this->toast('votre commentaire a été transmis'));
 
         // Guesses from another IP don't lock the client out
         foreach (range(1, ProposalReview::MAX_UNKNOWN + 2) as $i) {
             RateLimiter::hit(ProposalReview::unknownKey($p->id, '203.0.113.9'), 900);
         }
-        $this->page($p)->call('openComment', 'general')->set('body', 'Still here')->call('comment')->assertSet('done', 'commented');
+        $this->page($p)->call('openComment', 'general')->set('body', 'Still here')->call('comment')->assertDispatched('praxis-toast', $this->toast('votre commentaire a été transmis'));
     }
 
     public function test_comments_are_limited_per_person_per_hour_and_per_version(): void
@@ -144,14 +144,14 @@ class PortalProposalTest extends TestCase
         $p = $this->sent();
         $page = $this->page($p)->call('openComment', 'general');
         foreach (range(1, Proposals::COMMENTS_PER_HOUR) as $i) {
-            $page->call('openComment', 'general')->set('body', "Comment {$i}")->call('comment')->assertSet('done', 'commented');
+            $page->call('openComment', 'general')->set('body', "Comment {$i}")->call('comment')->assertDispatched('praxis-toast', $this->toast('votre commentaire a été transmis'));
         }
         $page->call('openComment', 'general')->set('body', 'One too many')->call('comment')->assertHasErrors(['body']);
         $this->assertSame(Proposals::COMMENTS_PER_HOUR, ProposalComment::count());
         // Another person HQ knows still comments: the limit is per person
         $this->guest('cfo@kilo.test');
         $this->page($p, [])->call('openComment', 'general')->set('name', 'Bola Ade')->set('email', 'cfo@kilo.test')->set('body', 'My turn')
-            ->call('comment')->assertSet('done', 'commented');
+            ->call('comment')->assertDispatched('praxis-toast', $this->toast('votre commentaire a été transmis'));
 
         // The version's cap holds whatever the limiter says
         RateLimiter::clear('portal-proposal-comments:' . $p->id . ':' . sha1('ngozi@kilo.test'));
@@ -168,7 +168,7 @@ class PortalProposalTest extends TestCase
         // A meeting guest reads and comments, but doesn't approve
         $this->guest('cfo@kilo.test');
         $this->page($p, [])->call('openComment', 'general')->set('name', 'Bola Ade')->set('email', 'cfo@kilo.test')->set('body', 'Looks right')
-            ->call('comment')->assertSet('done', 'commented');
+            ->call('comment')->assertDispatched('praxis-toast', $this->toast('votre commentaire a été transmis'));
         $this->page($p, [])->call('choose', 'approve')->set('name', 'Bola Ade')->set('email', 'cfo@kilo.test')->set('jobTitle', 'CFO')
             ->call('approve')->assertHasErrors(['email'])->assertSee('Seul un contact de Kilo Pharma');
         $this->assertFalse(Proposals::approveForClient($p, ['name' => 'Bola Ade', 'email' => 'cfo@kilo.test'], 'CFO'));
@@ -191,7 +191,7 @@ class PortalProposalTest extends TestCase
         $page()->assertDontSee('Approuver la proposition')->assertSee('L’approbation revient aux personnes qui approuvent pour Kilo Pharma')
             ->call('choose', 'approve')->assertSet('mode', '')
             ->set('jobTitle', 'Ops')->call('approve')->assertHasErrors(['email']);
-        $page()->call('openComment', 'general')->set('body', 'Can we start in January?')->call('comment')->assertSet('done', 'commented');
+        $page()->call('openComment', 'general')->set('body', 'Can we start in January?')->call('comment')->assertDispatched('praxis-toast', $this->toast('votre commentaire a été transmis'));
         $this->assertFalse(Proposals::approveForClient($p, ['name' => 'Cyn Okafor', 'email' => 'cyn@kilo.test'], 'Ops'));
         $this->assertSame(Proposal::SENT, $p->fresh()->status);
 
@@ -202,7 +202,7 @@ class PortalProposalTest extends TestCase
         // Made a Client Approver (no team or branding), the same link approves
         DB::table('client_users')->where('id', $member)->update(['role_id' => DB::table('roles')->where('slug', 'client-approver')->value('id')]);
         \App\Support\Access::flush();
-        $page()->assertSee('Approuver la proposition')->call('choose', 'approve')->set('jobTitle', 'Ops')->call('approve')->assertSet('done', 'approved');
+        $page()->assertSee('Approuver la proposition')->call('choose', 'approve')->set('jobTitle', 'Ops')->call('approve')->assertDispatched('praxis-toast', $this->toast('la proposition est approuvée'));
         $this->assertSame([Proposal::CLIENT_APPROVED, 'cyn@kilo.test'], [$p->fresh()->status, $p->fresh()->client_approved_email]);
         $this->assertEqualsCanonicalizing(['portal.projects.view', 'portal.projects.approve', 'portal.qa.view', 'portal.qa.create', 'portal.documents.view',
             'portal.documents.export', 'portal.support.create'], \App\Support\Access::permissionsFor(\App\Models\ClientUser::find($member)));
@@ -225,7 +225,7 @@ class PortalProposalTest extends TestCase
         // A link without a contact: typing an approver's address approves nothing; the code goes to that address
         $page = $this->page($p, [])->call('choose', 'approve')->assertSee('Nous vous envoyons ensuite un code')
             ->set('name', 'Someone Else')->set('email', 'ngozi@kilo.test')->set('jobTitle', 'CFO')->call('approve')
-            ->assertHasNoErrors()->assertSet('step', 'code')->assertSet('done', '');
+            ->assertHasNoErrors()->assertSet('step', 'code')->assertNotDispatched('praxis-toast');
         $this->assertSame(Proposal::SENT, $p->fresh()->status);
         Mail::assertSent(SigningCode::class, fn (SigningCode $m) => $m->hasTo('ngozi@kilo.test') && $m->purpose === SigningCode::APPROVAL);
         $code = Mail::sent(SigningCode::class)->last()->code;
@@ -236,7 +236,7 @@ class PortalProposalTest extends TestCase
         // Another approver asks for a code: Ngozi's no longer approves; Ade's does, as Ade
         $other = $this->page($p, [])->call('choose', 'approve')->set('name', 'Ade Bello')->set('email', 'ade@kilo.test')->set('jobTitle', 'COO')->call('approve')->assertSet('step', 'code');
         $page->set('code', $code)->call('verifyApproval')->assertHasErrors('code');
-        $other->set('code', Mail::sent(SigningCode::class)->last()->code)->call('verifyApproval')->assertHasNoErrors()->assertSet('done', 'approved');
+        $other->set('code', Mail::sent(SigningCode::class)->last()->code)->call('verifyApproval')->assertHasNoErrors()->assertDispatched('praxis-toast', $this->toast('la proposition est approuvée'));
         $p->refresh();
         $this->assertSame([Proposal::CLIENT_APPROVED, 'ade@kilo.test', 'Ade Bello', 'COO', null], [$p->status, $p->client_approved_email, $p->client_approved_name, $p->client_approved_title, $p->auth_otp]);
     }
@@ -270,7 +270,7 @@ class PortalProposalTest extends TestCase
         $this->o->forceFill(['stage' => 'proposal_sent'])->save();
 
         $page = $this->page($p)->call('choose', 'approve')->set('jobTitle', '')->call('approve')->assertHasErrors(['jobTitle'])
-            ->set('jobTitle', 'Finance director')->call('approve')->assertSet('done', 'approved')->assertSee('Merci');
+            ->set('jobTitle', 'Finance director')->call('approve')->assertDispatched('praxis-toast', $this->toast('la proposition est approuvée'));
         $p->refresh();
         $this->assertSame([Proposal::CLIENT_APPROVED, 'Ngozi Eze', 'Finance director', 'ngozi@kilo.test'],
             [$p->status, $p->client_approved_name, $p->client_approved_title, $p->client_approved_email]);
@@ -302,7 +302,7 @@ class PortalProposalTest extends TestCase
         $this->o->forceFill(['stage' => 'proposal_sent'])->save();
 
         $this->page($p)->call('choose', 'changes')->set('changeNote', 'Please add two training days.')->call('requestChanges')
-            ->assertSet('done', 'changes')->assertSee('Please add two training days.');
+            ->assertDispatched('praxis-toast', $this->toast('nous revenons vers vous avec une nouvelle version'))->assertSee('Please add two training days.');
         $this->assertSame(Proposal::CHANGES_REQUESTED, $p->fresh()->status);
         $this->assertSame('proposal', $this->o->fresh()->stage);
         $this->assertSame(['general', 'Please add two training days.'], [ProposalComment::sole()->section_key, ProposalComment::sole()->body]);

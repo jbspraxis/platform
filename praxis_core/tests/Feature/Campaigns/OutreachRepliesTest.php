@@ -397,7 +397,7 @@ class OutreachRepliesTest extends TestCase
         $this->actingAs($owner);
         $page = Livewire::test(OutreachReplies::class)->call('openReply', $this->replyOf($a)->id)
             ->assertSee('A new lead, Kilo Haulage Ltd (test), owned by Gerald Test')->call('makeLead')->assertHasNoErrors()
-            ->assertSee('Lead made: Kilo Haulage Ltd (test), owned by Gerald Test.')->assertSee('Open the lead');
+            ->assertDispatched('praxis-toast', $this->toast('Lead made: Kilo Haulage Ltd (test), owned by Gerald Test.'))->assertSee('Open the lead');
         $org = Organization::findOrFail($a->fresh()->organization_id);
         // Making the lead is a person's decision: the unsorted reply is now Interested
         $this->assertSame(['interested', $owner->id, 'interested'], [$this->replyOf($a)->label, $this->replyOf($a)->label_by, $a->fresh()->reply_label]);
@@ -425,7 +425,7 @@ class OutreachRepliesTest extends TestCase
         $this->actingAs($gerald);
         Livewire::test(OutreachReplies::class, ['campaignId' => $campaign->id])->call('openReply', $this->replyOf($b)->id)
             ->assertSee('is already a lead')->call('makeLead')
-            ->assertSee('Delta Oil Services (test) is already a lead owned by Kemi Test, so Chidi Okafor was added there as a contact.');
+            ->assertDispatched('praxis-toast', $this->toast('Delta Oil Services (test) is already a lead owned by Kemi Test, so Chidi Okafor was added there as a contact.'));
         $this->assertSame($delta->id, $b->fresh()->organization_id);
         $this->assertSame($kemi->id, $delta->fresh()->assigned_to);
         $this->assertSame('outreach', ClientUser::where('organization_id', $delta->id)->where('email', $b->email)->sole()->source);

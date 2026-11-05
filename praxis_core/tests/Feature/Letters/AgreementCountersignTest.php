@@ -74,7 +74,7 @@ class AgreementCountersignTest extends TestCase
         $this->assertSame(LetterDocument::SENT_FOR_SIGNATURE, $document->fresh()->status);
 
         // 4. The right one does
-        $page->set('code', $code)->call('verify')->assertHasNoErrors()->assertSet('done', true);
+        $page->set('code', $code)->call('verify')->assertHasNoErrors()->assertDispatched('praxis-toast', $this->toast('Signed. Thank you.'));
 
         $party->refresh();
         $document->refresh();

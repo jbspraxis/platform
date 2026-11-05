@@ -227,7 +227,7 @@ class ProjectPageTest extends TestCase
         $this->assertSame(['Completed', '2026-10-22', 'Oyebode, CTO'], array_values((array) DB::table('project_phases')->where('id', $this->phases[2])->first(['status', 'accepted_at', 'accepted_by_name'])));
 
         // Delivery has no finance.create: told who can, nothing changes
-        $page->call('moveMilestone', $this->phases[2], 'invoiced')->assertNoRedirect()->assertSee('Invoices are raised in Finance');
+        $page->call('moveMilestone', $this->phases[2], 'invoiced')->assertNoRedirect()->assertDispatched('praxis-toast', $this->toast('Invoices are raised in Finance'));
 
         // Paid follows Finance; an invoiced card stays where its invoice puts it
         $page->call('moveMilestone', $this->phases[2], 'paid');

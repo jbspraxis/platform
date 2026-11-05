@@ -165,7 +165,7 @@ class OwnerDecisionsTest extends TestCase
             $this->member($org, $n);
         }
         $portal->set('inviteFirstName', 'Eleventh')->set('inviteLastName', 'Person')->set('inviteEmail', 'eleventh@city.test')
-            ->call('inviteTeamMember')->assertSee('the maximum of 10 Client Portal accounts');
+            ->call('inviteTeamMember')->assertDispatched('praxis-toast', $this->toast('the maximum of 10 Client Portal accounts'));
         $this->assertDatabaseMissing('client_users', ['email' => 'eleventh@city.test']);
     }
 }

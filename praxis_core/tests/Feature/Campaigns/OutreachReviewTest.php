@@ -45,7 +45,7 @@ class OutreachReviewTest extends TestCase
             ->assertSee('To Ada Obi')->assertSee('Congratulations on the new warehouse in Onne.')->assertSee('One more thought on Onne.')
             ->assertSee('Opened a second warehouse in Onne in September.')->assertSee('kilo.test')->assertSee('Approve')->assertSee('Rewrite')->assertSee('Skip this prospect');
 
-        $page->call('approve')->assertSet('openId', $this->firstOf($b)->id)->assertSee('To Bola Obi')->assertSee('Approved.');
+        $page->call('approve')->assertSet('openId', $this->firstOf($b)->id)->assertSee('To Bola Obi')->assertDispatched('praxis-toast', $this->toast('Approved.'));
         $first = $this->firstOf($a);
         $this->assertSame(['approved', 'hand', $gerald->id], [$first->status, $first->approval, $first->approved_by]);
         $this->assertSame('approved', $this->followUpOf($a)->status);
@@ -107,7 +107,7 @@ class OutreachReviewTest extends TestCase
         $page = Livewire::test(OutreachCampaignPage::class, ['campaign' => $campaign->id]);
 
         $page->assertSee('Unlocks after 10 approved by hand (0 of 10)')->call('askApproveRest')->assertSet('confirmingRest', false)
-            ->call('approveRest')->assertSee('Approve 10 emails one by one first.');
+            ->call('approveRest')->assertDispatched('praxis-toast', $this->toast('Approve 10 emails one by one first.'));
         $this->assertSame(0, Outreach::approveRest($campaign, $gerald));
 
         foreach ($prospects->take(9) as $p) {
@@ -118,7 +118,7 @@ class OutreachReviewTest extends TestCase
         $page->call('openEmail', $this->firstOf($prospects[9])->id)->call('approve')->call('closeEmail')
             ->assertDontSee('Unlocks after')->call('askApproveRest')->assertSet('confirmingRest', true)
             ->assertSee('Approve the other 4 emails?')->assertSee('without anyone reading them first')
-            ->call('approveRest')->assertSee('4 emails approved.');
+            ->call('approveRest')->assertDispatched('praxis-toast', $this->toast('4 emails approved.'));
 
         $firsts = $prospects->map(fn ($p) => $this->firstOf($p));
         $this->assertSame(array_fill(0, 10, 'hand'), $firsts->take(10)->pluck('approval')->all());
@@ -172,8 +172,8 @@ class OutreachReviewTest extends TestCase
         Senders::pause($gerald->id, 'bounces', '2 of 10 bounced.');
         $this->actingAs($owner);
         Livewire::test(OutreachLimits::class)->assertSee('Paused')->set('values.window_end', '08:00')->call('save')->assertHasErrors('values.window_end')
-            ->set('values.window_end', '16:00')->set('values.first_weeks_limit', '10')->call('save')->assertHasNoErrors()->assertSee('Saved.')
-            ->call('resumeSender', $gerald->id)->assertSee('Resumed');
+            ->set('values.window_end', '16:00')->set('values.first_weeks_limit', '10')->call('save')->assertHasNoErrors()->assertDispatched('praxis-toast', $this->toast('Saved.'))
+            ->call('resumeSender', $gerald->id)->assertDispatched('praxis-toast', $this->toast('Resumed'));
         Limits::flush();
         $this->assertSame(['16:00', 10], [Limits::get('window_end'), Limits::get('first_weeks_limit')]);
         $this->assertTrue(DB::table('system_audit_logs')->where('action', 'OUTREACH_LIMITS_CHANGED')->exists());

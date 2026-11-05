@@ -45,7 +45,7 @@ class FreeAuditDeclineTest extends TestCase
         Livewire::test(LiveConsultation::class)
             ->call('declineRequest', $request['appt'], 'Test booking from the website check', true)
             ->assertSet('requestedAppointments', fn ($list) => collect($list)->where('id', $request['appt'])->isEmpty())
-            ->assertSee("Request declined. We emailed {$request['email']} to offer another time.");
+            ->assertDispatched('praxis-toast', $this->toast("Request declined. We emailed {$request['email']} to offer another time."));
 
         $this->assertSame('Cancelled', DB::table('appointments')->where('id', $request['appt'])->value('status'));
 
@@ -72,7 +72,7 @@ class FreeAuditDeclineTest extends TestCase
         $this->actingAs($this->staff('sales', ['sales']));
 
         Livewire::test(LiveConsultation::class)->call('declineRequest', $request['appt'], 'Spam', false)
-            ->assertSee('Request declined. The time is free again on the website, and the client wasn’t emailed.');
+            ->assertDispatched('praxis-toast', $this->toast('Request declined. The time is free again on the website, and the client wasn’t emailed.'));
 
         $this->assertSame('Cancelled', DB::table('appointments')->where('id', $request['appt'])->value('status'));
         Mail::assertNothingSent();
@@ -87,12 +87,12 @@ class FreeAuditDeclineTest extends TestCase
 
         $this->actingAs($this->staff('sales', ['sales']));
         Livewire::test(LiveConsultation::class)->call('declineRequest', $request['appt'], '   ', true)
-            ->assertSee('Give a reason for declining, so the team knows why.');
+            ->assertDispatched('praxis-toast', $this->toast('Give a reason for declining, so the team knows why.'));
         $this->assertSame('Requested', DB::table('appointments')->where('id', $request['appt'])->value('status'));
 
         $this->actingAs($this->staff('auditor', ['auditor']));
         Livewire::test(LiveConsultation::class)->call('declineRequest', $request['appt'], 'No', true)
-            ->assertSee('You don’t have permission to decline free audits. Ask an administrator to change your role.');
+            ->assertDispatched('praxis-toast', $this->toast('You don’t have permission to decline free audits. Ask an administrator to change your role.'));
         $this->assertSame('Requested', DB::table('appointments')->where('id', $request['appt'])->value('status'));
 
         Mail::assertNothingSent();
@@ -107,7 +107,7 @@ class FreeAuditDeclineTest extends TestCase
         $this->actingAs($this->staff('sales', ['sales']));
 
         Livewire::test(LiveConsultation::class)->call('declineRequest', $request['appt'], 'Too late', true)
-            ->assertSee('This request was already approved or declined, so nothing changed. The list is up to date now.');
+            ->assertDispatched('praxis-toast', $this->toast('This request was already approved or declined, so nothing changed. The list is up to date now.'));
 
         $this->assertSame('Scheduled', DB::table('appointments')->where('id', $request['appt'])->value('status'));
         Mail::assertNothingSent();

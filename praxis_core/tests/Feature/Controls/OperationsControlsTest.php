@@ -183,7 +183,7 @@ class OperationsControlsTest extends TestCase
         DB::table('tasks')->where('id', $this->ownTask)->delete();
 
         $hub->set('newCommentText', 'Looking into it')->call('postComment')
-            ->assertSee('We couldn’t find that issue. Refresh the list and open it again.');
+            ->assertDispatched('praxis-toast', $this->toast('We couldn’t find that issue. Refresh the list and open it again.'));
         $this->assertSame(0, DB::table('qa_comments')->where('ticket_id', $this->ownTicket)->count());
     }
 }

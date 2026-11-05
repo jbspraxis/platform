@@ -73,13 +73,13 @@ class LiveConsultationGoogleTest extends TestCase
         $open = $this->opportunityFor($org, ['title' => 'Existing work']);
 
         $google->fail('quota', 'createMeeting');
-        Livewire::test(LiveConsultation::class)->call('approveMeeting', $appt)->assertSee('The free audit wasn’t approved');
+        Livewire::test(LiveConsultation::class)->call('approveMeeting', $appt)->assertDispatched('praxis-toast', $this->toast('The free audit wasn’t approved'));
         $this->assertSame('Requested', DB::table('appointments')->where('id', $appt)->value('status'));
         $this->assertSame(['requested', null], [Meeting::sole()->status, Meeting::sole()->google_event_id]);   // the booking's lead meeting waits too
         Mail::assertNothingSent();
 
         FakeGoogle::install();
-        Livewire::test(LiveConsultation::class)->call('approveMeeting', $appt)->assertSee('Free audit approved');
+        Livewire::test(LiveConsultation::class)->call('approveMeeting', $appt)->assertDispatched('praxis-toast', $this->toast('Free audit approved'));
         $this->assertSame([null, 'scheduled'], [Meeting::sole()->opportunity_id, Meeting::sole()->status]);
         $this->assertSame(0, Meeting::where('opportunity_id', $open->id)->count());
         $this->assertSame(1, Opportunity::count());
@@ -93,8 +93,8 @@ class LiveConsultationGoogleTest extends TestCase
 
         Livewire::test(LiveConsultation::class)
             ->assertSee('Paste the meeting link')
-            ->call('approveMeeting', $appt, '')->assertSee('Add the meeting link')
-            ->call('approveMeeting', $appt, 'meet.google.com/abc-defg-hij')->assertSee('Free audit approved');
+            ->call('approveMeeting', $appt, '')->assertDispatched('praxis-toast', $this->toast('Add the meeting link'))
+            ->call('approveMeeting', $appt, 'meet.google.com/abc-defg-hij')->assertDispatched('praxis-toast', $this->toast('Free audit approved'));
         $this->assertSame('https://meet.google.com/abc-defg-hij', DB::table('appointments')->where('id', $appt)->value('meeting_link'));
         $m = Meeting::sole();
         $this->assertSame([null, 'scheduled', 'https://meet.google.com/abc-defg-hij', 'abc-defg-hij'], [$m->opportunity_id, $m->status, $m->meet_link, $m->meet_code]);

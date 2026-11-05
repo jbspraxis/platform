@@ -90,7 +90,7 @@ class InsightsPublishTest extends TestCase
             ->assertSeeHtml('aria-describedby="kz-confirm-name kz-confirm-text" x-trap.noscroll="true"')
             ->call('publishArticle', $draft['id'])
             ->assertSet('confirmArticleId', null)
-            ->assertSee('Published ‘Why month-end takes three weeks’. It appears on the website within 10 minutes.')
+            ->assertDispatched('praxis-toast', $this->toast('Published ‘Why month-end takes three weeks’. It appears on the website within 10 minutes.'))
             ->assertDontSee('HQ doesn’t email contributors');
 
         $row = $this->row($draft['id']);
@@ -129,7 +129,7 @@ class InsightsPublishTest extends TestCase
             ->assertSee('Waiting for review')
             ->assertSee('Ada Okafor')
             ->call('publishArticle', $pending->id)
-            ->assertSee('Published ‘Closing the books in five days’. It appears on the website within 10 minutes. HQ doesn’t email contributors, so let Ada Okafor know yourself (ada.okafor@example.test).');
+            ->assertDispatched('praxis-toast', $this->toast('Published ‘Closing the books in five days’. It appears on the website within 10 minutes. HQ doesn’t email contributors, so let Ada Okafor know yourself (ada.okafor@example.test).'));
 
         $this->assertSame('Published', $this->row($pending->id)->status);
         $this->assertEquals(['status' => 'Pending Moderation', 'is_public' => false],
@@ -150,7 +150,7 @@ class InsightsPublishTest extends TestCase
             ->assertSee('Unpublish this article?')
             ->assertSee('Keep published')
             ->call('unpublishArticle', $live['id'])
-            ->assertSee('Unpublished ‘Five signs your ERP is costing you’. It’s a draft again and leaves the website within 10 minutes.');
+            ->assertDispatched('praxis-toast', $this->toast('Unpublished ‘Five signs your ERP is costing you’. It’s a draft again and leaves the website within 10 minutes.'));
 
         $row = $this->row($live['id']);
         $this->assertSame('Draft', $row->status);
@@ -180,8 +180,8 @@ class InsightsPublishTest extends TestCase
         $rejected = $this->article('Rejected');
         $component = $this->ledger($this->staff('partner', ['partner']));
 
-        $component->call('publishArticle', $published['id'])->assertSee('This article is already published, so nothing changed. The list is up to date now.');
-        $component->call('unpublishArticle', $draft['id'])->assertSee('This article isn’t published, so nothing changed.');
+        $component->call('publishArticle', $published['id'])->assertDispatched('praxis-toast', $this->toast('This article is already published, so nothing changed. The list is up to date now.'));
+        $component->call('unpublishArticle', $draft['id'])->assertDispatched('praxis-toast', $this->toast('This article isn’t published, so nothing changed.'));
         $component->call('unpublishArticle', $pending['id'])->assertSee('This article isn’t published, so nothing changed.');
         $component->call('publishArticle', $rejected['id'])->assertSee('Only a draft or an article waiting for review can be published, so nothing changed.');
         $component->call('askArticleChange', $rejected['id'], 'publish')->assertSet('confirmArticleId', null)

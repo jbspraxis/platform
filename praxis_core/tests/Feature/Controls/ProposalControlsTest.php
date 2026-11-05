@@ -95,7 +95,7 @@ class ProposalControlsTest extends TestCase
         $token = DB::table('proposals')->where('id', $draft)->value('token_hash');
         $this->actingAs($this->staff('sales', ['sales']));
 
-        Livewire::test(ProposalBuilder::class, ['id' => $draft])->call('unlockProposal')->assertSee('This proposal is already a draft.');
+        Livewire::test(ProposalBuilder::class, ['id' => $draft])->call('unlockProposal')->assertDispatched('praxis-toast', $this->toast('This proposal is already a draft.'));
 
         // Same signing link, and nothing in the audit log
         $this->assertSame($token, DB::table('proposals')->where('id', $draft)->value('token_hash'));

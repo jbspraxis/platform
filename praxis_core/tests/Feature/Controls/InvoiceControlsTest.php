@@ -55,8 +55,8 @@ class InvoiceControlsTest extends TestCase
         $cancelled = $this->invoice('Cancelled');
         $this->actingAs($this->staff('finance', ['finance']));
 
-        Livewire::test(InvoiceLedger::class)->call('cancelInvoice', $paid)->assertSee('is paid, so it can’t be cancelled.');
-        Livewire::test(InvoiceLedger::class)->call('cancelInvoice', $cancelled)->assertSee('is already cancelled.');
+        Livewire::test(InvoiceLedger::class)->call('cancelInvoice', $paid)->assertDispatched('praxis-toast', $this->toast('is paid, so it can’t be cancelled.'));
+        Livewire::test(InvoiceLedger::class)->call('cancelInvoice', $cancelled)->assertDispatched('praxis-toast', $this->toast('is already cancelled.'));
 
         $this->assertSame('Paid', $this->invoiceStatus($paid));
         $this->assertSame('Cancelled', $this->invoiceStatus($cancelled));
@@ -70,7 +70,7 @@ class InvoiceControlsTest extends TestCase
         $finance = $this->staff('finance', ['finance']);
         $this->actingAs($finance);
 
-        Livewire::test(InvoiceLedger::class)->call('cancelInvoice', $pending)->assertSee('cancelled.');
+        Livewire::test(InvoiceLedger::class)->call('cancelInvoice', $pending)->assertDispatched('praxis-toast', $this->toast('cancelled.'));
         Livewire::test(InvoiceLedger::class)->call('cancelInvoice', $overdue);
         $this->assertSame('Cancelled', $this->invoiceStatus($pending));
         $this->assertSame('Cancelled', $this->invoiceStatus($overdue));
@@ -98,7 +98,7 @@ class InvoiceControlsTest extends TestCase
         $paid = $this->invoice('Paid');
         $this->actingAs($this->staff('finance', ['finance']));
 
-        Livewire::test(InvoiceLedger::class)->call('enforceGuillotineProtocol')->assertSee('1 invoice was marked overdue.');
+        Livewire::test(InvoiceLedger::class)->call('enforceGuillotineProtocol')->assertDispatched('praxis-toast', $this->toast('1 invoice was marked overdue.'));
         $this->assertSame('Overdue', $this->invoiceStatus($pending));
         $this->assertSame('Paid', $this->invoiceStatus($paid));
 
