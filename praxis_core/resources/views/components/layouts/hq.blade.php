@@ -20,6 +20,7 @@
             'ops' => 'Projects', 'finance' => 'Finance', 'marketing' => 'Marketing', 'system' => 'Settings and access', 'mail' => 'Mail',
             'campaigns' => 'Campaigns',
             'letters' => 'Documents',
+            'company-profile' => 'Company profile',
         ][explode('.', (string) request()->route()?->getName())[1] ?? ''] ?? null,
     };
     $user = auth()->user();
@@ -130,6 +131,19 @@
                     <div class="rail-sub">
                         <a href="{{ route('hq.letters.register') }}" class="{{ $on('hq.letters.register', 'hq.letters.document') }}" wire:navigate>Register</a>
                         <a href="{{ route('hq.letters.signature') }}" class="{{ $on('hq.letters.signature') }}" wire:navigate>My signature</a>
+                    </div>
+                @endif
+            @endcan
+
+            {{-- Company profile (docs/COMPANY_PROFILE.md): the firm's own profile, in English and French --}}
+            @can('company_profile.view')
+                <a href="{{ route('hq.company-profile.editor') }}" class="rail-link {{ $on('hq.company-profile.*') }}" wire:navigate>
+                    <i data-lucide="book-open"></i> Company profile
+                </a>
+                @if (request()->routeIs('hq.company-profile.*'))
+                    <div class="rail-sub">
+                        <a href="{{ route('hq.company-profile.editor') }}" class="{{ $on('hq.company-profile.editor') }}" wire:navigate>Sections</a>
+                        <a href="{{ route('hq.company-profile.versions') }}" class="{{ $on('hq.company-profile.versions', 'hq.company-profile.preview') }}" wire:navigate>Versions</a>
                     </div>
                 @endif
             @endcan

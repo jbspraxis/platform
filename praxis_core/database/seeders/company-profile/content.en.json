@@ -1,0 +1,165 @@
+{
+  "_note": "PLACEHOLDER. The lead chat replaces this file and content.fr.json with the written profile; the shape is fixed by company-profile/CONTRACT.md and must not change.",
+  "cover": {
+    "headline": "Order, made visible.",
+    "descriptor": "Consulting and engineering for Africa's institutions."
+  },
+  "pov": {
+    "title": "Our point of view",
+    "paragraphs": [
+      "Every institution has a picture of how it is meant to run, and a way it really runs. The gap between the two is where the cost sits.",
+      "We close that gap in two moves. First we make the order: how money, people, operations and risk should flow. Then we make it visible: the system that shows, every day, whether they do."
+    ]
+  },
+  "system": {
+    "title": "What we build",
+    "lead": "One system, assembled from parts that already fit each other.",
+    "pillars": [
+      { "title": "A single record", "body": "One place where each number is produced, and one definition of what it means." },
+      { "title": "Work that moves", "body": "Approvals, hand-offs and deadlines that run on their own, and say when they do not." },
+      { "title": "An answer on demand", "body": "A question asked in plain language, answered from the institution's own data." }
+    ]
+  },
+  "problems": {
+    "title": "Problems we answer",
+    "lead": "A selection, not a list. If yours is not here, it is the kind of thing we take on.",
+    "groups": [
+      {
+        "domain": "Finance",
+        "items": [
+          { "problem": "The month-end is rebuilt by hand every month.", "answer": "We build the close once, and run it on a schedule anyone can see." },
+          { "problem": "Two reports disagree and nobody can say which is right.", "answer": "We settle the definitions, then make one of them the source." }
+        ]
+      },
+      {
+        "domain": "Operations",
+        "items": [
+          { "problem": "An approval lives in one person's inbox.", "answer": "We put the rule in the system, with a record of who decided what, and when." }
+        ]
+      }
+    ],
+    "closing": "The set is open. Bring us the one that costs you most."
+  },
+  "practices": {
+    "title": "Practices",
+    "lead": "Four disciplines, run as one team.",
+    "items": [
+      { "name": "Software engineering", "summary": "The systems the institution runs on, built to be held for years.", "capabilities": ["Platform and web systems", "Integration between systems that were never meant to meet", "Data migration"] },
+      { "name": "AI, data and cloud", "summary": "The data layer, and the answers drawn from it.", "capabilities": ["Data platforms and reporting", "Assistants answering from the institution's own records", "Cloud and infrastructure"] },
+      { "name": "Management consulting", "summary": "How the institution is meant to run, written down and agreed.", "capabilities": ["Operating model and process design", "Policy and controls", "Change and adoption"] },
+      { "name": "Finance and modelling", "summary": "The numbers behind a decision, built so they can be checked.", "capabilities": ["Financial models and forecasts", "Budgeting and the close", "Investment and feasibility cases"] }
+    ]
+  },
+  "method": {
+    "title": "How we work",
+    "lead": "Four stages. Nothing is built before it is understood.",
+    "stages": [
+      { "name": "See", "body": "We map how the institution really runs today, from its own records, not from its chart." },
+      { "name": "Design", "body": "We agree how it should run, and write it down in words the people doing the work recognise." },
+      { "name": "Build", "body": "We build it in pieces that each stand on their own, and are in use before the next one starts." },
+      { "name": "Hold", "body": "We stay on it: the system is watched, improved and handed over properly." }
+    ],
+    "principles": [
+      { "title": "Foundation and floors", "body": "The foundation is laid once and carries everything after it. Floors go up one at a time." },
+      { "title": "Continuous improvement", "body": "A system that is finished starts dying. Ours get a little better every month." },
+      { "title": "Ownership", "body": "The institution owns what we build: the code, the data and the knowledge to run it." }
+    ]
+  },
+  "teams": {
+    "title": "Who does the work",
+    "lead": "Teams are described by discipline and credentials. We do not put names in a profile.",
+    "items": [
+      {
+        "name": "Software engineering",
+        "summary": "Builds and holds the systems the institution runs on.",
+        "disciplines": ["Backend and platform", "Web and interface", "Quality and release"],
+        "experience": "Collectively over a decade of production systems in regulated industries.",
+        "credentials": [
+          { "name": "AWS Certified Solutions Architect", "issuer": "Amazon Web Services", "held": true },
+          { "name": "Certified Kubernetes Administrator", "issuer": "CNCF", "held": false }
+        ]
+      },
+      {
+        "name": "AI, data and cloud",
+        "summary": "Builds the data layer and the assistants that answer from it.",
+        "disciplines": ["Data engineering", "Applied AI", "Cloud and infrastructure"],
+        "experience": "Data platforms in manufacturing, distribution and public institutions.",
+        "credentials": [
+          { "name": "Google Professional Data Engineer", "issuer": "Google Cloud", "held": true }
+        ]
+      },
+      {
+        "name": "Management consulting",
+        "summary": "Designs how the institution should run, and sees the change through.",
+        "disciplines": ["Operating model", "Process and controls", "Change management"],
+        "experience": "Operating model and process work across West and Central Africa.",
+        "credentials": [
+          { "name": "Project Management Professional", "issuer": "PMI", "held": true },
+          { "name": "Lean Six Sigma Black Belt", "issuer": "IASSC", "held": false }
+        ]
+      },
+      {
+        "name": "Finance and modelling",
+        "summary": "Builds the numbers a board can rely on.",
+        "disciplines": ["Financial modelling", "Budgeting and the close", "Investment cases"],
+        "experience": "Models and close processes for manufacturing and distribution.",
+        "credentials": [
+          { "name": "FMVA", "issuer": "CFI", "held": true },
+          { "name": "ACCA", "issuer": "ACCA", "held": false }
+        ]
+      }
+    ]
+  },
+  "work": {
+    "title": "Work",
+    "lead": "A few engagements, described as our clients allow.",
+    "items": [
+      {
+        "client": "A leading pharmaceutical manufacturer, with Tales Consulting",
+        "sector": "Pharmaceutical manufacturing",
+        "title": "A close that runs itself",
+        "problem": "The month-end was rebuilt by hand, and the board saw the numbers late.",
+        "built": "One record for the close, with the steps scheduled and the exceptions raised as they happen.",
+        "outcome": "The close now lands on a date the board can plan around.",
+        "image": null
+      },
+      {
+        "client": "An FMCG distributor, Cameroon",
+        "sector": "Distribution",
+        "title": "One view of the depots",
+        "problem": "Stock and sales were counted differently in every depot.",
+        "built": "A single record of stock and sales, with the daily position visible to the head office.",
+        "outcome": "Head office sees the same numbers the depots do, on the same day.",
+        "image": null
+      }
+    ]
+  },
+  "clients": { "title": "Who we work with" },
+  "security": {
+    "title": "Security and confidentiality",
+    "items": [
+      { "title": "Your data stays yours", "body": "We work inside your systems where we can, and hand back everything we hold at the end." },
+      { "title": "Access is named", "body": "Every person who touches your data is named, and their access ends when the work does." },
+      { "title": "Written down", "body": "Confidentiality, retention and hand-back are in the engagement letter, not in a conversation." }
+    ]
+  },
+  "facts": {
+    "title": "The firm",
+    "items": [
+      { "label": "Founded", "value": "2024", "enabled": true },
+      { "label": "Registered", "value": "JBS Praxis Limited, Nigeria", "enabled": true },
+      { "label": "Registered", "value": "JBS Praxis, Cameroon", "enabled": false },
+      { "label": "Head office", "value": "Lagos, Nigeria", "enabled": true },
+      { "label": "Working languages", "value": "English and French", "enabled": true }
+    ]
+  },
+  "contact": {
+    "cta": "Tell us the one thing that costs you most. We will tell you what it would take to fix it.",
+    "cta_url": "https://jbspraxis.com/schedule",
+    "email": "hello@jbspraxis.com",
+    "sales_email": "sales@jbspraxis.com",
+    "phone": "+234 000 000 0000",
+    "website": "jbspraxis.com",
+    "offices": ["Lagos, Nigeria"]
+  }
+}

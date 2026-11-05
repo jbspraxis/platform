@@ -76,6 +76,13 @@ return [
             // Owner decision, 4 Nov 2026: the Owner role only until the owner ticks it for other roles on Roles and
             // permissions, so 2026_11_04_960001_grant_letters_permissions grants no other role anything.
             'letters' => ['label' => 'Documents', 'actions' => ['view', 'create', 'sign', 'manage'], 'wildcard' => false],
+            // Company profile (docs/COMPANY_PROFILE.md): the firm's own profile, in English and French.
+            // view = read it and download the published PDF; edit = write a draft; approve = approve and
+            // publish a version; manage = throw a draft away and look after the logo library.
+            // It carries the teams' credentials, so 'wildcard' => false keeps a starter role's "*" off it; the
+            // migration 2026_11_05_900001_grant_company_profile_permissions grants only Sales & Marketing the
+            // view, and the owner ticks the rest on Roles and permissions.
+            'company_profile' => ['label' => 'Company profile', 'actions' => ['view', 'edit', 'approve', 'manage'], 'wildcard' => false],
             'access' => ['label' => 'Accounts, roles & permissions', 'actions' => ['view', 'create', 'edit', 'delete']],
             'system' => ['label' => 'System health', 'actions' => ['view']],
             // System › Integrations: the Google connection, the Claude key and the AI budget (owner only unless granted)
@@ -115,7 +122,7 @@ return [
             // marketing.delete also opens the social-account password vault, so it stays with Owner/Partner
             'sales' => ['name' => 'Sales & Marketing', 'description' => 'Leads, proposals, broadcasts, campaigns and website settings.', 'grant' => [
                 'dashboard.view', 'crm.*', 'broadcasts.*', 'outreach.view', 'outreach.create', 'marketing.view', 'marketing.create', 'marketing.edit', 'marketing.approve',
-                'website.*', 'kaizen.*', 'projects.view', 'expenses.create', 'mail.view',
+                'website.*', 'kaizen.*', 'projects.view', 'expenses.create', 'mail.view', 'company_profile.view',
                 'opportunities.view', 'opportunities.create', 'opportunities.manage', 'opportunities.transcripts',
             ]],
             'hr' => ['name' => 'HR', 'description' => 'People records, attendance, contracts and appraisals.', 'grant' => [

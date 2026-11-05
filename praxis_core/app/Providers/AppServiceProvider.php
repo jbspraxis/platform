@@ -17,6 +17,11 @@ class AppServiceProvider extends ServiceProvider
             require_once app_path('Support/Polyfill/fileinfo.php');
         }
         $this->app->singleton('filesystem', fn ($app) => new \App\Support\FilesystemManager($app));
+
+        // Company profile (docs/COMPANY_PROFILE.md). Two seams the other two company-profile PRs replace:
+        // PR 3 binds the logo library over DirectoryClientLogos, PR 2 binds the designed renderer over the stub.
+        $this->app->bind(\App\Support\CompanyProfile\ClientLogos::class, \App\Support\CompanyProfile\DirectoryClientLogos::class);
+        $this->app->bind(\App\Support\CompanyProfile\CompanyProfileRenderer::class, \App\Support\CompanyProfile\StubProfileRenderer::class);
     }
 
     /**

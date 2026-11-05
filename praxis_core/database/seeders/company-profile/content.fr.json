@@ -1,0 +1,154 @@
+{
+  "_note": "ESPACE RÉSERVÉ. Le chat principal remplace ce fichier et content.en.json par le profil rédigé ; la forme est fixée par company-profile/CONTRACT.md et ne doit pas changer.",
+  "cover": {
+    "headline": "L'ordre, rendu visible.",
+    "descriptor": "Conseil et ingénierie pour les institutions africaines."
+  },
+  "pov": {
+    "title": "Notre point de vue",
+    "paragraphs": [
+      "Chaque institution a une image de la façon dont elle doit fonctionner, et une façon dont elle fonctionne réellement. L'écart entre les deux coûte cher.",
+      "Nous réduisons cet écart en deux temps. D'abord nous créons l'ordre : comment l'argent, les personnes, les opérations et le risque doivent circuler. Ensuite nous le rendons visible : le système qui montre, chaque jour, si c'est bien le cas."
+    ]
+  },
+  "system": {
+    "title": "Ce que nous construisons",
+    "lead": "Un seul système, assemblé à partir de pièces qui s'emboîtent déjà.",
+    "pillars": [
+      { "title": "Un enregistrement unique", "body": "Un seul endroit où chaque chiffre est produit, et une seule définition de ce qu'il signifie." },
+      { "title": "Un travail qui avance", "body": "Des approbations, des transmissions et des échéances qui tournent seules, et qui signalent quand ce n'est pas le cas." },
+      { "title": "Une réponse à la demande", "body": "Une question posée en langage courant, et la réponse tirée des données de l'institution." }
+    ]
+  },
+  "problems": {
+    "title": "Les problèmes que nous traitons",
+    "lead": "Une sélection, et non une liste. Si le vôtre n'y figure pas, c'est le genre de sujet que nous prenons.",
+    "groups": [
+      {
+        "domain": "Finance",
+        "items": [
+          { "problem": "La clôture mensuelle est refaite à la main chaque mois.", "answer": "Nous construisons la clôture une fois, et nous la faisons tourner selon un calendrier visible de tous." },
+          { "problem": "Deux rapports se contredisent et personne ne peut dire lequel a raison.", "answer": "Nous tranchons les définitions, puis nous faisons de l'un d'eux la source." }
+        ]
+      },
+      {
+        "domain": "Opérations",
+        "items": [
+          { "problem": "Une approbation vit dans la boîte de réception d'une seule personne.", "answer": "Nous inscrivons la règle dans le système, avec la trace de qui a décidé quoi, et quand." }
+        ]
+      }
+    ],
+    "closing": "L'ensemble reste ouvert. Apportez-nous celui qui vous coûte le plus."
+  },
+  "practices": {
+    "title": "Nos métiers",
+    "lead": "Quatre disciplines, menées comme une seule équipe.",
+    "items": [
+      { "name": "Ingénierie logicielle", "summary": "Les systèmes sur lesquels l'institution tourne, conçus pour durer des années.", "capabilities": ["Plateformes et systèmes web", "Intégration entre des systèmes qui n'étaient pas faits pour se parler", "Migration de données"] },
+      { "name": "IA, données et cloud", "summary": "La couche de données, et les réponses qu'on en tire.", "capabilities": ["Plateformes de données et reporting", "Assistants répondant à partir des données de l'institution", "Cloud et infrastructure"] },
+      { "name": "Conseil en management", "summary": "La façon dont l'institution doit fonctionner, écrite et validée.", "capabilities": ["Modèle opérationnel et conception des processus", "Politiques et contrôles", "Conduite du changement"] },
+      { "name": "Finance et modélisation", "summary": "Les chiffres derrière une décision, construits pour être vérifiés.", "capabilities": ["Modèles et prévisions financières", "Budget et clôture", "Dossiers d'investissement et de faisabilité"] }
+    ]
+  },
+  "method": {
+    "title": "Notre façon de travailler",
+    "lead": "Quatre étapes. Rien n'est construit avant d'être compris.",
+    "stages": [
+      { "name": "Voir", "body": "Nous cartographions le fonctionnement réel de l'institution, à partir de ses propres données, et non de son organigramme." },
+      { "name": "Concevoir", "body": "Nous convenons de son fonctionnement cible, et nous l'écrivons dans les mots de ceux qui font le travail." },
+      { "name": "Construire", "body": "Nous construisons par pièces qui tiennent chacune seule, et qui sont en service avant que la suivante ne commence." },
+      { "name": "Tenir", "body": "Nous restons dessus : le système est surveillé, amélioré et transmis correctement." }
+    ],
+    "principles": [
+      { "title": "Fondations et étages", "body": "Les fondations se posent une fois et portent tout le reste. Les étages montent un par un." },
+      { "title": "Amélioration continue", "body": "Un système terminé commence à mourir. Les nôtres s'améliorent un peu chaque mois." },
+      { "title": "Propriété", "body": "L'institution est propriétaire de ce que nous construisons : le code, les données et le savoir pour les faire tourner." }
+    ]
+  },
+  "teams": {
+    "title": "Qui fait le travail",
+    "lead": "Les équipes sont décrites par discipline et par certifications. Nous ne mettons pas de noms dans un profil.",
+    "items": [
+      {
+        "name": "Ingénierie logicielle",
+        "summary": "Construit et tient les systèmes sur lesquels l'institution tourne.",
+        "disciplines": ["Backend et plateforme", "Web et interface", "Qualité et mise en production"],
+        "experience": "Ensemble, plus de dix ans de systèmes en production dans des secteurs réglementés.",
+        "credentials": []
+      },
+      {
+        "name": "IA, données et cloud",
+        "summary": "Construit la couche de données et les assistants qui y répondent.",
+        "disciplines": ["Ingénierie des données", "IA appliquée", "Cloud et infrastructure"],
+        "experience": "Plateformes de données dans l'industrie, la distribution et les institutions publiques.",
+        "credentials": []
+      },
+      {
+        "name": "Conseil en management",
+        "summary": "Conçoit le fonctionnement cible de l'institution, et accompagne le changement jusqu'au bout.",
+        "disciplines": ["Modèle opérationnel", "Processus et contrôles", "Conduite du changement"],
+        "experience": "Travaux de modèle opérationnel et de processus en Afrique de l'Ouest et centrale.",
+        "credentials": []
+      },
+      {
+        "name": "Finance et modélisation",
+        "summary": "Construit les chiffres sur lesquels un conseil peut s'appuyer.",
+        "disciplines": ["Modélisation financière", "Budget et clôture", "Dossiers d'investissement"],
+        "experience": "Modèles et processus de clôture pour l'industrie et la distribution.",
+        "credentials": []
+      }
+    ]
+  },
+  "work": {
+    "title": "Nos travaux",
+    "lead": "Quelques missions, décrites dans les termes que nos clients autorisent.",
+    "items": [
+      {
+        "client": "Un grand fabricant pharmaceutique, avec Tales Consulting",
+        "sector": "Industrie pharmaceutique",
+        "title": "Une clôture qui tourne seule",
+        "problem": "La clôture mensuelle était refaite à la main, et le conseil voyait les chiffres en retard.",
+        "built": "Un enregistrement unique pour la clôture, avec les étapes planifiées et les écarts signalés au fil de l'eau.",
+        "outcome": "La clôture tombe désormais à une date sur laquelle le conseil peut compter.",
+        "image": null
+      },
+      {
+        "client": "Un distributeur de biens de grande consommation, Cameroun",
+        "sector": "Distribution",
+        "title": "Une seule vue des dépôts",
+        "problem": "Les stocks et les ventes étaient comptés différemment dans chaque dépôt.",
+        "built": "Un enregistrement unique des stocks et des ventes, avec la position du jour visible depuis le siège.",
+        "outcome": "Le siège voit les mêmes chiffres que les dépôts, le même jour.",
+        "image": null
+      }
+    ]
+  },
+  "clients": { "title": "Avec qui nous travaillons" },
+  "security": {
+    "title": "Sécurité et confidentialité",
+    "items": [
+      { "title": "Vos données restent les vôtres", "body": "Nous travaillons dans vos systèmes quand c'est possible, et nous restituons tout ce que nous détenons à la fin." },
+      { "title": "Des accès nominatifs", "body": "Chaque personne qui touche à vos données est nommée, et son accès prend fin avec la mission." },
+      { "title": "Écrit noir sur blanc", "body": "Confidentialité, conservation et restitution figurent dans la lettre de mission, pas dans une conversation." }
+    ]
+  },
+  "facts": {
+    "title": "Le cabinet",
+    "items": [
+      { "label": "Création", "value": "2024", "enabled": true },
+      { "label": "Immatriculation", "value": "JBS Praxis Limited, Nigeria", "enabled": true },
+      { "label": "Immatriculation", "value": "JBS Praxis, Cameroun", "enabled": false },
+      { "label": "Siège", "value": "Lagos, Nigeria", "enabled": true },
+      { "label": "Langues de travail", "value": "Anglais et français", "enabled": true }
+    ]
+  },
+  "contact": {
+    "cta": "Dites-nous ce qui vous coûte le plus. Nous vous dirons ce qu'il faudrait pour y remédier.",
+    "cta_url": "https://jbspraxis.com/schedule",
+    "email": "hello@jbspraxis.com",
+    "sales_email": "sales@jbspraxis.com",
+    "phone": "+234 000 000 0000",
+    "website": "jbspraxis.com",
+    "offices": ["Lagos, Nigeria"]
+  }
+}
