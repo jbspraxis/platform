@@ -33,7 +33,7 @@ class ClientLogoSeeder extends Seeder
     private const LOGOS = [
         ['smart-logistics', 'Smart Logistics and Services', 'Logistics', true],
         ['mtn', 'MTN', 'Telecoms', true],
-        ['pixie-girl-global', 'Pixie Girl Global', 'Retail', true],
+        ['pixie-girl-global', 'Pixie Girl Global', 'Manufacturing and global brands', true],
         ['la-petite-cour', 'La Petite Cour', null, true],
         ['mycity-app', 'MyCity App', 'Digital', true],
         ['wellsmart-drilling', 'Wellsmart Drilling Nigeria', 'Oil and gas', true],
