@@ -4,11 +4,11 @@ namespace Tests\Feature\CompanyProfile;
 
 use App\Livewire\Hq\CompanyProfile\LogoLibrary as LogoLibraryScreen;
 use App\Models\CompanyProfile\ClientLogo;
+use App\Services\Site\SiteSignature;
 use App\Support\CompanyProfile\ClientLogos;
 use App\Support\CompanyProfile\LogoFiles;
 use App\Support\CompanyProfile\LogoLibrary;
 use App\Support\Hosts;
-use App\Services\Site\SiteSignature;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use RuntimeException;
@@ -40,7 +40,7 @@ class LogoLibraryTest extends TestCase
 
     private function hq(string $path): string
     {
-        return 'https://' . Hosts::hq() . $path;
+        return 'https://'.Hosts::hq().$path;
     }
 
     private function add(string $name, array $renditions = [], array $attributes = []): ClientLogo
@@ -94,11 +94,11 @@ class LogoLibraryTest extends TestCase
         $this->actingAs($this->staff('owner', ['owner']));
         $logo = $this->add('Foxtrot Foods (test)');
 
-        $this->get($this->hq('/company-profile/logos/' . $logo->id . '/web'))
+        $this->get($this->hq('/company-profile/logos/'.$logo->id.'/web'))
             ->assertOk()->assertHeader('Content-Type', 'image/webp');
 
         $this->actingAs($this->staff('delivery', ['delivery']))
-            ->get($this->hq('/company-profile/logos/' . $logo->id . '/web'))->assertForbidden();
+            ->get($this->hq('/company-profile/logos/'.$logo->id.'/web'))->assertForbidden();
     }
 
     // ------------------------------------------------------------------ the library itself
@@ -127,7 +127,7 @@ class LogoLibraryTest extends TestCase
         $this->assertSame(220, $logo->width);
 
         foreach ([$logo->print_path, $logo->png_path, $logo->web_path] as $path) {
-            $this->assertTrue(Storage::disk('local')->exists($path), $path . ' is on the private disk');
+            $this->assertTrue(Storage::disk('local')->exists($path), $path.' is on the private disk');
             $this->assertStringStartsWith('company-profile/logos/', $path, 'never a public path');
         }
     }
@@ -192,7 +192,7 @@ class LogoLibraryTest extends TestCase
     public function test_a_file_that_is_not_what_it_claims_is_refused(): void
     {
         $this->expectException(RuntimeException::class);
-        LogoFiles::decode('data:image/png;base64,' . base64_encode('not a png at all'), ['image/png']);
+        LogoFiles::decode('data:image/png;base64,'.base64_encode('not a png at all'), ['image/png']);
     }
 
     public function test_a_webp_may_not_go_in_the_slot_the_pdf_reads(): void
@@ -311,8 +311,8 @@ class LogoLibraryTest extends TestCase
         $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $body[0]['sha256']);
 
         $this->signedGet('/clients/shown-test.webp')->assertOk()->assertHeader('Content-Type', 'image/webp');
-        $this->signedGet('/clients/' . $hidden->key . '.webp')->assertNotFound();
-        $this->signedGet('/clients/' . $retired->key . '.webp')->assertNotFound();
+        $this->signedGet('/clients/'.$hidden->key.'.webp')->assertNotFound();
+        $this->signedGet('/clients/'.$retired->key.'.webp')->assertNotFound();
     }
 
     public function test_the_client_list_is_signed_like_every_other_site_read(): void
@@ -332,13 +332,13 @@ class LogoLibraryTest extends TestCase
 
     private function signedGet(string $path, string $locale = 'en')
     {
-        $full = '/api/site/v1' . $path;
+        $full = '/api/site/v1'.$path;
         $timestamp = (string) time();
         $nonce = bin2hex(random_bytes(12));
         $ip = '203.0.113.5';
         $canonical = SiteSignature::canonical('GET', $full, $timestamp, $nonce, $ip, $locale, self::KEY_ID, '', hash('sha256', ''));
 
-        return $this->call('GET', 'https://' . Hosts::hq() . $full, [], [], [], [
+        return $this->call('GET', 'https://'.Hosts::hq().$full, [], [], [], [
             'HTTP_X_SITE_KEY' => self::KEY_ID,
             'HTTP_X_SITE_TIMESTAMP' => $timestamp,
             'HTTP_X_SITE_NONCE' => $nonce,

@@ -4,16 +4,16 @@ namespace Tests\Feature\CompanyProfile;
 
 use App\Livewire\Hq\Letters\DocumentPage;
 use App\Livewire\Hq\Letters\DocumentRegister;
+use App\Models\CompanyProfile\ProfileVersion;
 use App\Models\Letters\LetterDocument;
+use App\Support\CompanyProfile\ProfileCopy;
+use App\Support\Hosts;
 use App\Support\Letters\LetterBody;
 use App\Support\Letters\Letterhead;
 use App\Support\Letters\LetterPdf;
 use App\Support\Letters\Letters;
 use App\Support\Letters\LetterTypes;
-use App\Support\Hosts;
 use Livewire\Livewire;
-use App\Models\CompanyProfile\ProfileVersion;
-use App\Support\CompanyProfile\ProfileCopy;
 use Tests\Feature\Letters\LetterFixtures;
 use Tests\Feature\UsesThrowawayDatabase;
 use Tests\TestCase;
@@ -34,7 +34,7 @@ class IntroductionLetterTest extends TestCase
 
     private function hq(string $path): string
     {
-        return 'https://' . Hosts::hq() . $path;
+        return 'https://'.Hosts::hq().$path;
     }
 
     private function letter(string $locale, array $fields = []): LetterDocument
@@ -163,7 +163,7 @@ class IntroductionLetterTest extends TestCase
         foreach (['en', 'fr'] as $locale) {
             $html = strtolower(LetterPdf::html($this->letter($locale), Letterhead::details($this->company())));
             foreach (['squad', 'leverage', 'cutting-edge', 'solutions provider', 'one-stop shop'] as $banned) {
-                $this->assertStringNotContainsString($banned, $html, $banned . ' in the ' . $locale . ' letter');
+                $this->assertStringNotContainsString($banned, $html, $banned.' in the '.$locale.' letter');
             }
         }
     }
@@ -177,7 +177,7 @@ class IntroductionLetterTest extends TestCase
             $pdf = LetterPdf::render($document, final: true);
 
             $this->assertStringStartsWith('%PDF-', $pdf);
-            $this->assertSame(1, $this->pages($pdf), 'the ' . $locale . ' introduction letter is one page');
+            $this->assertSame(1, $this->pages($pdf), 'the '.$locale.' introduction letter is one page');
         }
     }
 
@@ -236,17 +236,17 @@ class IntroductionLetterTest extends TestCase
 
         foreach (['en', 'fr'] as $locale) {
             $copy = ProfileCopy::forLetter($locale);
-            $this->assertFalse($copy['published'], $locale . ': nothing is published');
-            $this->assertSame([], $copy['proof'], $locale . ': no proof lines');
+            $this->assertFalse($copy['published'], $locale.': nothing is published');
+            $this->assertSame([], $copy['proof'], $locale.': no proof lines');
             $this->assertNotSame('', $copy['headline']);
 
             $document = $this->letter($locale);
             $html = LetterPdf::html($document, Letterhead::details($this->company()));
             foreach (['Smart Logistics', 'Pixie Girl', 'La Petite Cour', 'pharmaceutical', 'pharmaceutique'] as $client) {
-                $this->assertStringNotContainsString($client, $html, $locale . ': ' . $client . ' is not ours to claim here');
+                $this->assertStringNotContainsString($client, $html, $locale.': '.$client.' is not ours to claim here');
             }
 
-            $this->assertSame(1, $this->pages(LetterPdf::render($document, final: true)), $locale . ': still one page');
+            $this->assertSame(1, $this->pages(LetterPdf::render($document, final: true)), $locale.': still one page');
         }
     }
 
@@ -260,14 +260,14 @@ class IntroductionLetterTest extends TestCase
         foreach (['en', 'fr'] as $locale) {
             $copy = ProfileCopy::forLetter($locale);
 
-            $this->assertLessThanOrEqual(90, mb_strlen($copy['headline']), $locale . ': the headline');
-            $this->assertLessThanOrEqual(90, mb_strlen($copy['descriptor']), $locale . ': the descriptor');
-            $this->assertLessThanOrEqual(320, mb_strlen($copy['build']), $locale . ': what we build');
-            $this->assertCount(3, $copy['proof'], $locale . ': three proof lines');
+            $this->assertLessThanOrEqual(90, mb_strlen($copy['headline']), $locale.': the headline');
+            $this->assertLessThanOrEqual(90, mb_strlen($copy['descriptor']), $locale.': the descriptor');
+            $this->assertLessThanOrEqual(320, mb_strlen($copy['build']), $locale.': what we build');
+            $this->assertCount(3, $copy['proof'], $locale.': three proof lines');
             foreach ($copy['proof'] as $line) {
-                $this->assertLessThanOrEqual(220, mb_strlen($line), $locale . ': a proof line');
+                $this->assertLessThanOrEqual(220, mb_strlen($line), $locale.': a proof line');
             }
-            $this->assertLessThanOrEqual(120, mb_strlen($copy['cta']), $locale . ': the call to action');
+            $this->assertLessThanOrEqual(120, mb_strlen($copy['cta']), $locale.': the call to action');
         }
     }
 
@@ -284,7 +284,7 @@ class IntroductionLetterTest extends TestCase
         $this->assertSame(hash('sha256', (string) Letters::file($issued)), $issued->file_sha256);
         $this->assertNotNull($issued->verify_token);
 
-        $this->actingAs($owner)->get($this->hq('/documents/' . $issued->id . '/pdf'))
+        $this->actingAs($owner)->get($this->hq('/documents/'.$issued->id.'/pdf'))
             ->assertOk()->assertHeader('Content-Type', 'application/pdf');
     }
 }

@@ -159,7 +159,7 @@ final class LogoLibrary implements ClientLogos
 
         $written = [];
         foreach ($files as $slot => $file) {
-            $path = self::FOLDER . '/' . $key . '.' . self::extension($file['media']);
+            $path = self::FOLDER.'/'.$key.'.'.self::extension($file['media']);
             Storage::disk(self::DISK)->put($path, $file['bytes']);
             $written[$slot] = ['path' => $path, 'media' => $file['media'], 'bytes' => $file['bytes']];
         }
@@ -227,7 +227,7 @@ final class LogoLibrary implements ClientLogos
             }
         });
 
-        self::audit('PROFILE_LOGOS_REORDERED', count($ids) . ' logos put in a new order');
+        self::audit('PROFILE_LOGOS_REORDERED', count($ids).' logos put in a new order');
     }
 
     /** Move one logo one place up or down, which is how the screen reorders it without dragging */
@@ -295,7 +295,7 @@ final class LogoLibrary implements ClientLogos
         $key = $base;
         $n = 2;
         while (ClientLogo::query()->where('key', $key)->exists()) {
-            $key = $base . '-' . $n++;
+            $key = $base.'-'.$n++;
         }
 
         return $key;

@@ -151,10 +151,12 @@ name, agreed in the contract, so PR 2 and PR 3 link to it without knowing where 
 optional and is the version number; without it you get the published one. A version that is not published can
 only be downloaded by someone who may edit or approve.
 
-The route hands `Profile::data()` to `CompanyProfileRenderer::pdf()`. PR 1 binds `StubProfileRenderer`, which
-writes one plain A4 landscape page by hand — no PDF library, no font files, no `gd`, `imagick` or `zip`, the
-same ground `docs/DOCUMENTS.md` had to cover. **PR 2 rebinds the interface in `AppServiceProvider`; nothing
-else changes.**
+The route hands `Profile::data()` to `CompanyProfileRenderer::pdf()`. `StubProfileRenderer` is still here and
+still works — one plain A4 landscape page written by hand, no PDF library and no font files — but
+`AppServiceProvider` now binds **`App\Support\CompanyProfile\PdfRenderer`**, the designed profile: A4
+landscape, twelve pages, one template for English and French, rendered by dompdf.
+**`docs/company-profile/DESIGN.md`** has the grid, the type, the device, the page plan, and what the live
+server's missing `gd` forces on the design. Nothing else about the download changed.
 
 ## 9. The logo wall: the client logo library
 
@@ -218,6 +220,11 @@ and NFELIA, are our own products: the strip shows them, the profile does not cou
 nobody has on record are left empty for the owner to fill, rather than guessed.
 
 Re-seeding never overwrites a logo somebody replaced in HQ: a key that is already there is left alone.
+
+JPEG is on that list because of the renderer. The live web PHP has no `gd`, and without it dompdf cannot read
+a PNG at all, while a JPEG needs nothing but `getimagesize()`. The library lists a PNG as it always did, and
+the PDF leaves it off the wall rather than drawing a broken image, so a logo that will not appear is a logo in
+the wrong format rather than a bug. Put a JPEG or an SVG in that folder.
 
 ## 10. Rules that do not bend
 

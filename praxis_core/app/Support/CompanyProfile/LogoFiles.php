@@ -74,12 +74,12 @@ final class LogoFiles
             throw new RuntimeException('That image is larger than 1.5 MB.');
         }
         if (! self::looksLike($media, $bytes)) {
-            throw new RuntimeException('That file is not really ' . $media . '.');
+            throw new RuntimeException('That file is not really '.$media.'.');
         }
         if ($media === 'image/svg+xml' && self::hasLiveText($bytes)) {
             throw new RuntimeException(
                 'That SVG draws its lettering with a font, which a PDF cannot do, so the words would be lost. '
-                . 'Outline the text in your drawing program, or upload a PNG instead.'
+                .'Outline the text in your drawing program, or upload a PNG instead.'
             );
         }
 
@@ -128,7 +128,7 @@ final class LogoFiles
             throw new RuntimeException('That SVG could not be read.');
         }
 
-        return '<?xml version="1.0" encoding="UTF-8"?>' . "\n" . $out;
+        return '<?xml version="1.0" encoding="UTF-8"?>'."\n".$out;
     }
 
     private static function scrub(DOMElement $element): void

@@ -220,7 +220,7 @@ class ProfileWorkflowTest extends TestCase
 
         $component = Livewire::test(ProfileEditor::class)->call('startDraft')->call('openSection', 'teams');
         $team = $component->get('structure')['lists']['items'][0];
-        $path = 'items:' . $team['id'] . ':credentials';
+        $path = 'items:'.$team['id'].':credentials';
         $this->assertGreaterThan(1, count($team['lists']['credentials']), 'the seed should carry several credentials');
 
         $component->call('setAll', $path, true);

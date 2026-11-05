@@ -139,7 +139,7 @@ class ProfileContractTest extends TestCase
     {
         foreach (['en' => 'cameroon', 'fr' => 'cameroun'] as $locale => $word) {
             $facts = collect(Profile::editorData($locale)['facts']['items']);
-            $cameroon = $facts->first(fn ($f) => str_contains(strtolower($f['label'] . ' ' . $f['value']), $word));
+            $cameroon = $facts->first(fn ($f) => str_contains(strtolower($f['label'].' '.$f['value']), $word));
 
             $this->assertNotNull($cameroon, "the seed should carry the Cameroon entity as a {$locale} fact");
             $this->assertFalse($cameroon['enabled']);

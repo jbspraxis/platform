@@ -96,7 +96,7 @@ final class ProfileCopy
             if ($client === '' || $outcome === '' || self::isOurOwn((string) ($item['sector'] ?? ''))) {
                 continue;
             }
-            $lines[] = $client . ' — ' . $outcome;
+            $lines[] = $client.' — '.$outcome;
             if (count($lines) === self::PROOF_LINES) {
                 break;
             }
@@ -145,7 +145,7 @@ final class ProfileCopy
                 'headline' => 'Pilotez tout. Interrogez tout.',
                 'descriptor' => 'Des systèmes de pilotage intelligents pour les organisations.',
                 'build' => 'Nous concevons le fonctionnement de l’organisation, puis le système unique qui la fait '
-                    . 'fonctionner ainsi et qui en rend compte. Posez-lui toutes vos questions : il répond.',
+                    .'fonctionner ainsi et qui en rend compte. Posez-lui toutes vos questions : il répond.',
                 'cta' => 'Réservez un audit et une démonstration gratuits.',
                 'cta_url' => 'https://jbspraxis.com/fr/schedule',
                 'email' => 'sales@jbspraxis.com',
@@ -157,7 +157,7 @@ final class ProfileCopy
             'headline' => 'Run everything. Ask anything.',
             'descriptor' => 'Intelligent operating systems for organisations.',
             'build' => 'We design how the organisation should run, then build the one system that runs it that way '
-                . 'and answers for it. Ask it anything, and it answers.',
+                .'and answers for it. Ask it anything, and it answers.',
             'cta' => 'Book a free audit and demo.',
             'cta_url' => 'https://jbspraxis.com/schedule',
             'email' => 'sales@jbspraxis.com',

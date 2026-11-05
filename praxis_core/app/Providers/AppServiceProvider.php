@@ -19,10 +19,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton('filesystem', fn ($app) => new \App\Support\FilesystemManager($app));
 
         // Company profile (docs/COMPANY_PROFILE.md). The logo wall is the library managed in HQ (PR 3,
-        // docs/COMPANY_PROFILE.md section 9), in place of PR 1's DirectoryClientLogos, which read a folder;
-        // PR 2 binds the designed renderer over the stub below.
+        // section 9), in place of PR 1's DirectoryClientLogos, which read a folder; the renderer is PR 2's
+        // designed profile (docs/company-profile/DESIGN.md), in place of the stub below.
         $this->app->bind(\App\Support\CompanyProfile\ClientLogos::class, \App\Support\CompanyProfile\LogoLibrary::class);
-        $this->app->bind(\App\Support\CompanyProfile\CompanyProfileRenderer::class, \App\Support\CompanyProfile\StubProfileRenderer::class);
+        $this->app->bind(\App\Support\CompanyProfile\CompanyProfileRenderer::class, \App\Support\CompanyProfile\PdfRenderer::class);
     }
 
     /**
@@ -62,6 +62,6 @@ class AppServiceProvider extends ServiceProvider
 
         // Uploads wait in Livewire's temporary folder before a screen keeps them: up to 20 MB (Company documents takes
         // scans that large; Livewire's own default is 12 MB). Each screen still checks its own limit and file types.
-        config(['livewire.temporary_file_upload.rules' => ['required', 'file', 'max:' . \App\Support\CompanyDocuments\Documents::MAX_KB]]);
+        config(['livewire.temporary_file_upload.rules' => ['required', 'file', 'max:'.\App\Support\CompanyDocuments\Documents::MAX_KB]]);
     }
 }
