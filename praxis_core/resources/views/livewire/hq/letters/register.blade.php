@@ -45,7 +45,6 @@
         @endif
     </div>
 
-    <x-flash class="mb-6" />
 
     <div class="card mb-6">
         <h2 class="card-title">A blank letterhead</h2>

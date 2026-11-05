@@ -16,7 +16,6 @@
         @endcan
     </div>
 
-    <x-flash class="mb-6" />
 
     @if(! $hasAccounts)
         <div class="card">

@@ -354,7 +354,7 @@ public $paymentSchedule = '40_30_30';
                 $this->p3Content = $aiPayload['phases'][2]['body'] ?? ''; $this->w3 = (float) ($aiPayload['phases'][2]['weight'] ?? 1.5);
                 $this->p4Content = $aiPayload['phases'][3]['body'] ?? ''; $this->w4 = (float) ($aiPayload['phases'][3]['weight'] ?? 0.5);
 
-                session()->flash('ai_success', 'Draft written. Review each section before you continue.');
+                session()->flash('ai_info', 'Draft written. Review each section before you continue.');
             } else {
                 session()->flash('error', "We couldn’t reach the writing assistant. Try again in a minute, or write the narrative yourself.");
             }
@@ -375,7 +375,7 @@ public $paymentSchedule = '40_30_30';
             $this->p3Content = $this->previousAiState['p3']; $this->w3 = $this->previousAiState['w3'];
             $this->p4Content = $this->previousAiState['p4']; $this->w4 = $this->previousAiState['w4'];
             $this->previousAiState = null;
-            session()->flash('ai_success', 'Previous text restored.');
+            session()->flash('ai_info', 'Previous text restored.');
         }
     }
 

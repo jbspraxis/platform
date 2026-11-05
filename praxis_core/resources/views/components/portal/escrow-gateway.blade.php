@@ -17,7 +17,6 @@
         </div>
     </nav>
 
-    <x-flash :keys="['warning', 'success', 'error']" />
 
     <main class="max-w-6xl mx-auto px-6 py-12">
         

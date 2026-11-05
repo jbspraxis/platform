@@ -74,7 +74,7 @@ class PortalMeetingsTest extends TestCase
             ->call('pick', '2026-11-06T08:00:00+00:00')   // 09:00 WAT
             ->set('note', 'The year-end close')
             ->call('book')->assertHasNoErrors()
-            ->assertSee('Booked.');
+            ->assertDispatched('praxis-toast', $this->toast('Booked.'));
 
         $m = Meeting::with('attendees')->sole();
         $this->assertSame(['client', 'scheduled', null], [$m->kind, $m->status, $m->created_by]);
@@ -111,7 +111,7 @@ class PortalMeetingsTest extends TestCase
             ->set('proposed.1.date', '2026-11-10')->set('proposed.1.time', '15:00')
             ->call('propose')->assertHasErrors(['proposed.0'])->assertSee('at least two hours from now')
             ->set('proposed.0.date', '')->set('proposed.0.time', '')
-            ->call('propose')->assertHasNoErrors()->assertSee('We’ll confirm one of your times by email.')
+            ->call('propose')->assertHasNoErrors()->assertDispatched('praxis-toast', $this->toast('We’ll confirm one of your times by email.'))
             ->assertSee('Waiting for us to confirm a time');
 
         $m = Meeting::with('attendees')->where('status', '!=', 'cancelled')->sole();

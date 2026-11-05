@@ -67,7 +67,6 @@
             @endif
         </div>
 
-        <x-flash style="margin-bottom: 16px;" />
 
         <div class="card" style="margin-bottom: 24px;">
             <dl class="doc-facts">

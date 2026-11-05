@@ -45,7 +45,6 @@
         @endforeach
     </div>
 
-    <x-flash style="margin-bottom: 16px;" />
     @if ($errors->any())
         <div class="alert alert-danger" role="alert" style="margin-bottom: 16px;">
             <i data-lucide="circle-alert"></i>

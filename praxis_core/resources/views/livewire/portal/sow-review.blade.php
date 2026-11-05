@@ -76,11 +76,11 @@
         </div>
 
         <div class="pr-stack">
-            @if ($done === 'signed' || ($s->status === 'signed' && $done === ''))
-                <div class="alert alert-success" role="status"><i data-lucide="badge-check"></i>
-                    <span>{{ $done === 'signed' ? __('sow.portal.done_signed') : __('sow.portal.signed', ['name' => $s->signed_by_name, 'date' => $day($s->signed_at)]) }}</span></div>
-            @elseif ($done === 'changes')
-                <div class="alert alert-success" role="status"><i data-lucide="circle-check"></i><span>{{ __('sow.portal.done_changes') }}</span></div>
+            {{-- What just happened arrives as a toast (resources/views/components/flash.blade.php); what the page
+                 keeps saying is the record below, so the answer to "did that go through?" survives the toast. --}}
+            @if ($s->status === 'signed')
+                <div class="alert alert-success" role="note"><i data-lucide="badge-check"></i>
+                    <span>{{ __('sow.portal.signed', ['name' => $s->signed_by_name, 'date' => $day($s->signed_at)]) }}</span></div>
             @elseif ($s->status === 'changes_requested')
                 <div class="callout" role="note" style="margin: 0"><span>{{ __('sow.portal.changes_requested') }}</span></div>
             @elseif ($s->status === 'superseded')

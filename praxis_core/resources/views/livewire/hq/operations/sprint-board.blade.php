@@ -29,7 +29,6 @@
         </div>
     </div>
 
-    <x-flash class="mb-4" />
 
     @if(empty($milestones))
         <div class="alert alert-info mb-4"><i data-lucide="info"></i> <span>{{ __('projects.board.no_milestones') }}</span></div>

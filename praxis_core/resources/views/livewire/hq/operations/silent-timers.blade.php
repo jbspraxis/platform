@@ -9,7 +9,6 @@
         <p class="help">Updates every 60 seconds.</p>
     </div>
 
-    <x-flash class="mb-4" />
 
     <div class="tabs" role="tablist">
         @if($canSeeAll)

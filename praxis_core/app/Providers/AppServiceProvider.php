@@ -37,6 +37,10 @@ class AppServiceProvider extends ServiceProvider
             \App\Http\Middleware\ClientActive::class,
         ]);
 
+        // Every flash message becomes a toast in the corner, on a Livewire update as well as on a page load
+        // (App\Support\Flash\Toasts, resources/views/components/flash.blade.php).
+        \Livewire\Livewire::componentHook(\App\Support\Flash\ToastBridge::class);
+
         // Permissions from config/access.php: $user->can('finance.view'), @can, can: middleware.
         // Anything that isn't a catalogue permission falls through to normal gates/policies.
         \Illuminate\Support\Facades\Gate::before(function ($user, string $ability) {

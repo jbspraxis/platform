@@ -79,7 +79,6 @@
         @endif
     </div>
 
-    <x-flash class="mb-6" />
 
     <div class="tabs" role="tablist" aria-label="{{ __('opportunities.page.sections') }}">
         @foreach ($tabs as $key => $label)

@@ -29,7 +29,7 @@ class AudiencesScreenTest extends TestCase
             ->set('addLines', "Ada@Example.test\nBrice Ngono <brice@example.test>\nchantal@example.test, Chantal, Mbida, Beta Santé (demo)\nalready@example.test\nstopped@example.test\nnot an address\n\n")
             ->set('addCountry', 'Cameroon')->set('addLanguage', '')->set('addConsent', 'Signed up at the Douala breakfast (test)')
             ->call('addSubscribers')->assertHasNoErrors()
-            ->assertSee('3 subscribers added; 1 already on the list; 1 skipped because they are on the do-not-email list; 1 line wasn’t an email address.')
+            ->assertDispatched('praxis-toast', $this->toast('3 subscribers added; 1 already on the list; 1 skipped because they are on the do-not-email list; 1 line wasn’t an email address.'))
             ->assertSee('Brice Ngono')->assertSee('Beta Santé (demo)')->assertSee('Signed up at the Douala breakfast (test)');
 
         $brice = DB::table('marketing_subscribers')->where('email', 'brice@example.test')->first();
@@ -44,7 +44,7 @@ class AudiencesScreenTest extends TestCase
         Livewire::test(Audiences::class)->set('tab', 'suppressed')
             ->set('blockEmail', 'not-an-email')->call('block')->assertHasErrors('blockEmail')
             ->set('blockEmail', ' Asked.By.Phone@Example.test ')->set('blockNote', 'Asked by phone (test)')->call('block')
-            ->assertSee('asked.by.phone@example.test will get no more marketing')
+            ->assertDispatched('praxis-toast', $this->toast('asked.by.phone@example.test will get no more marketing'))
             ->assertDontSee('Take off the list');
         $this->assertSame('manual', Marketing::entry('asked.by.phone@example.test')->reason);
         $id = DB::table('marketing_suppressions')->value('id');
@@ -54,8 +54,8 @@ class AudiencesScreenTest extends TestCase
         Marketing::suppress('gone@example.test', 'unsubscribed');
         $gone = DB::table('marketing_suppressions')->where('email', 'gone@example.test')->value('id');
         Livewire::test(Audiences::class)->set('tab', 'suppressed')
-            ->call('unblock', $gone)->assertSee('only they can change that')
-            ->call('unblock', $id)->assertSee('can receive marketing again');
+            ->call('unblock', $gone)->assertDispatched('praxis-toast', $this->toast('only they can change that'))
+            ->call('unblock', $id)->assertDispatched('praxis-toast', $this->toast('can receive marketing again'));
         $this->assertTrue(Marketing::canEmail('asked.by.phone@example.test'));
         $this->assertFalse(Marketing::canEmail('gone@example.test'));
     }
@@ -70,11 +70,11 @@ class AudiencesScreenTest extends TestCase
         $scheduled = Broadcasts::create($sales, 'letter');
         $scheduled->forceFill(['segment_id' => $segment->id, 'status' => 'Scheduled', 'scheduled_at' => now()->addDay()])->save();
 
-        Livewire::test(Audiences::class)->assertSee('Leads (test)')->call('deleteSegment', $segment->id)->assertSee('a scheduled broadcast goes to it');
+        Livewire::test(Audiences::class)->assertSee('Leads (test)')->call('deleteSegment', $segment->id)->assertDispatched('praxis-toast', $this->toast('a scheduled broadcast goes to it'));
         $this->assertNotNull($segment->fresh());
 
         $scheduled->forceFill(['status' => 'Draft'])->save();
-        Livewire::test(Audiences::class)->call('deleteSegment', $segment->id)->assertSee('Segment “Leads (test)” deleted');
+        Livewire::test(Audiences::class)->call('deleteSegment', $segment->id)->assertDispatched('praxis-toast', $this->toast('Segment “Leads (test)” deleted'));
         $this->assertNull($segment->fresh());
         $this->assertNull(Broadcast::find($draft->id)->segment_id);
     }

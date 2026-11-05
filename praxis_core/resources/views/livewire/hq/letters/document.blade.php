@@ -87,7 +87,6 @@
         <a class="btn btn-secondary" href="{{ route('hq.letters.register') }}" wire:navigate><i data-lucide="arrow-left"></i> Register</a>
     </div>
 
-    <x-flash class="mb-6" />
     @if ($flash)<div class="alert alert-success mb-6">{{ $flash }}</div>@endif
 
     <div class="doc-grid">

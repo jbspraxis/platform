@@ -77,7 +77,6 @@
     </div>
 
     {{-- Messages --}}
-    <x-flash :keys="['success', 'ai_success', 'error', 'dispatch_success']" :tones="['ai_success' => 'info']" style="margin-bottom: 16px;" />
 
     @if($isLocked && $activeTab !== 'ledger')
         <div class="alert alert-warning" style="margin-bottom: 16px; justify-content: space-between; align-items: center; flex-wrap: wrap;">

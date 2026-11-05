@@ -36,7 +36,6 @@
         </div>
     </div>
 
-    <x-flash class="mb-4" />
 
     @if($filterProject !== '')
         @php $filteredProject = \Illuminate\Support\Facades\DB::table('projects')->where('id', $filterProject)->value('title'); @endphp

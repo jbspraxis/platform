@@ -31,7 +31,6 @@
         <button type="button" role="tab" wire:click="setTab('inspector')" class="tab {{ $activeTab === 'inspector' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'inspector' ? 'true' : 'false' }}">Payslips</button>
     </div>
 
-    <x-flash class="mb-6" />
 
     @if($activeTab === 'ledger')
 

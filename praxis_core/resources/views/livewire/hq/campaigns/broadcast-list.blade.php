@@ -35,7 +35,6 @@
         @endif
     </div>
 
-    <x-flash class="mb-6" />
 
     @if ($queued > 0)
         <div class="alert alert-info mb-6" role="status"><i data-lucide="send"></i>

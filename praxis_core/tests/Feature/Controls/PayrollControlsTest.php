@@ -53,17 +53,17 @@ class PayrollControlsTest extends TestCase
         $draft = $this->payrollRun([]);
         $this->actingAs($this->maker);
         Livewire::test(PayrollManager::class)->call('submitForReview', $draft)
-            ->assertSee('You prepared this payroll run, so someone else must check it.');
+            ->assertDispatched('praxis-toast', $this->toast('You prepared this payroll run, so someone else must check it.'));
         $this->assertSame('Draft', $this->runStatus($draft));
 
         $checked = $this->payrollRun(['status' => 'Pending_Review', 'checker_id' => $this->checker->id, 'pay_period_start' => '2026-08-01']);
         Livewire::test(PayrollManager::class)->call('approveRun', $checked)
-            ->assertSee('You prepared this payroll run, so you can’t approve it. Ask another approver to approve it.');
+            ->assertDispatched('praxis-toast', $this->toast('You prepared this payroll run, so you can’t approve it. Ask another approver to approve it.'));
         $this->assertSame('Pending_Review', $this->runStatus($checked));
 
         $this->actingAs($this->checker);
         Livewire::test(PayrollManager::class)->call('approveRun', $checked)
-            ->assertSee('You checked this payroll run, so you can’t approve it. Ask another approver to approve it.');
+            ->assertDispatched('praxis-toast', $this->toast('You checked this payroll run, so you can’t approve it. Ask another approver to approve it.'));
         $this->assertSame('Pending_Review', $this->runStatus($checked));
         $this->assertSame(0, DB::table('system_audit_logs')->where('target_id', $checked)->count());
     }
@@ -96,17 +96,17 @@ class PayrollControlsTest extends TestCase
         // A draft nobody has checked can't be approved or marked as paid
         $draft = $this->payrollRun([]);
         Livewire::test(PayrollManager::class)->call('approveRun', $draft)
-            ->assertSee('This payroll run hasn’t been checked yet, so it can’t be approved.');
+            ->assertDispatched('praxis-toast', $this->toast('This payroll run hasn’t been checked yet, so it can’t be approved.'));
         Livewire::test(PayrollManager::class)->call('disburseRun', $draft)
-            ->assertSee('Only an approved payroll run can be marked as paid.');
+            ->assertDispatched('praxis-toast', $this->toast('Only an approved payroll run can be marked as paid.'));
         $this->assertSame('Draft', $this->runStatus($draft));
 
         // A paid run stays paid
         $paid = $this->payrollRun(['status' => 'Disbursed', 'checker_id' => $this->checker->id, 'pay_period_start' => '2026-07-01']);
         Livewire::test(PayrollManager::class)->call('approveRun', $paid)
-            ->assertSee('This payroll run has already been approved or paid, so it wasn’t changed.');
+            ->assertDispatched('praxis-toast', $this->toast('This payroll run has already been approved or paid, so it wasn’t changed.'));
         Livewire::test(PayrollManager::class)->call('rejectRun', $paid)
-            ->assertSee('Only a run awaiting approval or approved (not yet paid) can be returned to draft.');
+            ->assertDispatched('praxis-toast', $this->toast('Only a run awaiting approval or approved (not yet paid) can be returned to draft.'));
         $this->assertSame('Disbursed', $this->runStatus($paid));
         $this->assertSame(0, DB::table('system_audit_logs')->where('target_table', 'payroll_runs')->count());
     }
@@ -121,7 +121,7 @@ class PayrollControlsTest extends TestCase
             ->assertSee('You prepared this run, so someone else marks it as paid.')
             ->assertDontSee('Mark as paid</button>', false)
             ->call('disburseRun', $run)
-            ->assertSee('You prepared this payroll run, so someone else must mark it as paid.');
+            ->assertDispatched('praxis-toast', $this->toast('You prepared this payroll run, so someone else must mark it as paid.'));
         $this->assertSame('Approved', $this->runStatus($run));
 
         $this->actingAs($this->approver);
@@ -140,13 +140,13 @@ class PayrollControlsTest extends TestCase
         Livewire::test(PayrollManager::class)
             ->set('draftPeriodMonth', '9')->set('draftPeriodYear', '2026')->set('targetRegion', 'NG')
             ->call('generateDraftRun')
-            ->assertSee('A payroll run for September 2026 that covers Nigeria already exists.');
+            ->assertDispatched('praxis-toast', $this->toast('A payroll run for September 2026 that covers Nigeria already exists.'));
 
         // October has a Cameroon run, so a run for every country would pay Cameroon twice
         Livewire::test(PayrollManager::class)
             ->set('draftPeriodMonth', '10')->set('draftPeriodYear', '2026')->set('targetRegion', 'ALL')
             ->call('generateDraftRun')
-            ->assertSee('A payroll run for October 2026 that covers all countries already exists.');
+            ->assertDispatched('praxis-toast', $this->toast('A payroll run for October 2026 that covers all countries already exists.'));
 
         $this->assertSame(2, DB::table('payroll_runs')->count());
     }

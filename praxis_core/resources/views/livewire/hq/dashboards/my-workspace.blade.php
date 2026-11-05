@@ -35,7 +35,6 @@
     </nav>
     @endcanany
 
-    <x-flash style="margin-bottom: 16px;" />
 
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4" style="margin-bottom: 24px;">
         <div class="card">

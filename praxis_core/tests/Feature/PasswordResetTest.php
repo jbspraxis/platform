@@ -240,7 +240,7 @@ class PasswordResetTest extends TestCase
             Livewire::actingAs($owner)->test(RoleManagement::class)->call('sendPasswordReset', $who->id)->assertSet('showSuccessModal', false);
         }
         Livewire::actingAs($partner)->test(RoleManagement::class)->call('sendPasswordReset', $owner->id)
-            ->assertSet('showSuccessModal', false)->assertSee('You can’t send a reset link to an account that has more access than yours.');
+            ->assertSet('showSuccessModal', false)->assertDispatched('praxis-toast', $this->toast('You can’t send a reset link to an account that has more access than yours.'));
 
         // The Auditor sees Accounts but changes nothing
         $auditor = $this->staff('aud', ['auditor']);

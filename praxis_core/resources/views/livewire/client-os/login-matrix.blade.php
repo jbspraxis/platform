@@ -129,7 +129,6 @@
             @else
                 <p class="mb-4 text-sm text-slate">{{ __('portal.sos.intro') }}</p>
 
-                <x-flash :keys="['redline_error']" class="mb-4" />
 
                 <form wire:submit.prevent="submitRedlineSos" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div class="field">

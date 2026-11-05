@@ -31,4 +31,16 @@ abstract class TestCase extends BaseTestCase
     {
         return ! in_array($driver, ['mysql', 'mariadb'], true) || (bool) preg_match('/^praxis_(test|pr\d)[a-z0-9_]*$/', $name);
     }
+
+    /**
+     * "The screen told the person this." Confirmations and errors are toasts (docs/BRAND.md section 12): a screen
+     * flashes its message and App\Support\Flash\ToastBridge dispatches it to the browser, so the words are in the
+     * praxis-toast event rather than in the screen's own HTML. Use in place of assertSee for a flashed message:
+     *
+     *     $page->call('approve')->assertDispatched('praxis-toast', $this->toast('Booked.'));
+     */
+    protected function toast(string $text): \Closure
+    {
+        return fn ($event, $params) => str_contains((string) ($params['message'] ?? ''), $text);
+    }
 }

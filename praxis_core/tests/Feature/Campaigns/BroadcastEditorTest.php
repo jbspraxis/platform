@@ -137,7 +137,7 @@ class BroadcastEditorTest extends TestCase
             ->set('brief', 'short')->call('writeWithAi')->assertHasErrors('brief')
             ->set('brief', 'Breakfast for finance directors in Douala on 20 November about cash visibility.')
             ->call('writeWithAi')->assertHasNoErrors()
-            ->assertSee('Draft written');
+            ->assertDispatched('praxis-toast', $this->toast('Draft written'));
 
         $ai->assertRan('broadcast_draft', fn (AiRequest $r) => str_contains($r->prompt, 'Breakfast for finance directors') && str_contains($r->prompt, 'French') && str_contains($r->prompt, 'Event invite'));
         $fr = $broadcast->fresh()->content['fr'];
@@ -187,7 +187,7 @@ class BroadcastEditorTest extends TestCase
         $broadcast = $this->readyDraft($me);
 
         Livewire::test(BroadcastEditor::class, ['broadcast' => $broadcast->id])->set('step', 'send')
-            ->assertSee('Send a test to me')->call('sendTest')->assertSee('The English and French versions are on the way');
+            ->assertSee('Send a test to me')->call('sendTest')->assertDispatched('praxis-toast', $this->toast('The English and French versions are on the way'));
 
         Mail::assertSent(BroadcastEmail::class, 2);
         foreach (['en' => 'Test: We have opened in Douala', 'fr' => "Test\u{00A0}: Nous ouvrons à Douala"] as $locale => $subject) {
@@ -254,7 +254,7 @@ class BroadcastEditorTest extends TestCase
 
         Livewire::test(BroadcastEditor::class, ['broadcast' => $broadcast->id])->set('step', 'send')
             ->assertSee('English: Add a subject.')->assertSee('French: Add a subject.')->assertSee('Choose who gets it: pick a segment.')
-            ->call('sendNow')->assertSee('It isn’t ready yet');
+            ->call('sendNow')->assertDispatched('praxis-toast', $this->toast('It isn’t ready yet'));
         $this->assertSame('Draft', $broadcast->fresh()->status);
 
         // English only: no French version needed

@@ -61,10 +61,6 @@ class ProposalReview extends Component
 
     public string $changeNote = '';
 
-    /** commented | approved | changes, once done */
-    #[Locked]
-    public string $done = '';
-
     /** Approving from a link without a contact: details (name, title, address), then code (the one emailed) */
     #[Locked]
     public string $step = 'details';
@@ -108,7 +104,6 @@ class ProposalReview extends Component
     public function openComment(string $section): void
     {
         $this->resetErrorBag();
-        $this->done = '';
         $this->mode = '';
         $this->commenting = Proposals::hasSection($this->proposal(), $section) ? $section : '';
         $this->body = '';
@@ -124,7 +119,6 @@ class ProposalReview extends Component
     public function choose(string $mode): void
     {
         $this->resetErrorBag();
-        $this->done = '';
         $this->commenting = '';
         $this->step = 'details';
         $this->code = '';
@@ -175,7 +169,7 @@ class ProposalReview extends Component
         }
         $this->commenting = '';
         $this->body = '';
-        $this->done = 'commented';
+        session()->flash('success', __('proposals.portal.done_commented'));
     }
 
     public function approve(): void
@@ -282,7 +276,7 @@ class ProposalReview extends Component
         $this->step = 'details';
         $this->code = '';
         $this->pending = [];
-        $this->done = 'approved';
+        session()->flash('success', __('proposals.portal.done_approved'));
     }
 
     private function minutes(int $minutes): string
@@ -308,7 +302,7 @@ class ProposalReview extends Component
         }
         $this->mode = '';
         $this->changeNote = '';
-        $this->done = 'changes';
+        session()->flash('success', __('proposals.portal.done_changes'));
     }
 
     /**
@@ -319,7 +313,6 @@ class ProposalReview extends Component
     private function open(Proposal $p): bool
     {
         $this->resetErrorBag();
-        $this->done = '';
         if ($this->linkExpiresAt > 0 && now()->getTimestamp() > $this->linkExpiresAt) {
             $this->addError('mode', __('proposals.portal.errors.link_expired'));
 

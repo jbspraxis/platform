@@ -21,7 +21,6 @@
         </div>
     </div>
 
-    <x-flash />
     @if ($notice)
         <div @class(['alert', 'alert-success' => $noticeTone === 'success', 'alert-danger' => $noticeTone === 'error']) role="{{ $noticeTone === 'error' ? 'alert' : 'status' }}">
             <i data-lucide="{{ $noticeTone === 'error' ? 'circle-alert' : 'circle-check' }}"></i>

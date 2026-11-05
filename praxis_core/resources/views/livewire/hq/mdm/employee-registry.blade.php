@@ -39,7 +39,6 @@
         @endforeach
     </div>
 
-    <x-flash class="mb-6" />
 
     <div class="grid grid-cols-1 items-start gap-6 xl:grid-cols-[400px_minmax(0,1fr)]">
 
@@ -226,7 +225,6 @@
                                 <i data-lucide="calculator" style="width: 18px; height: 18px;"></i> Pay calculator
                             </div>
 
-                            <x-flash :keys="['gross_up_success']" style="margin: 0;" />
 
                             <div class="grid items-end gap-3 sm:grid-cols-[1fr_auto] xl:grid-cols-1">
                                 <div class="field">

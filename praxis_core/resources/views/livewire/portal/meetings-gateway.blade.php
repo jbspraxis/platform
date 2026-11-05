@@ -53,11 +53,8 @@
             </div>
         </div>
 
-        @if ($done)
-            <div class="alert alert-success" role="status" style="margin-bottom: 24px"><i data-lucide="circle-check"></i>
-                <span>{{ $done === 'booked' ? __('meetings.portal.done_booked', ['email' => $email]) : __('meetings.portal.done_requested') }}</span></div>
-        @endif
-
+        {{-- What just happened arrives as a toast (resources/views/components/flash.blade.php); the meeting
+             itself then shows in the lists below, so the booking is still there once the toast has gone. --}}
         <section class="mg-section" aria-labelledby="mg-upcoming">
             <h2 id="mg-upcoming">{{ __('meetings.portal.upcoming') }}</h2>
             @if ($upcoming->isEmpty() && $requested->isEmpty())

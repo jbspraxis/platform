@@ -92,7 +92,7 @@ class FreeAuditExpiryTest extends TestCase
         $this->artisan('crm:expire-audit-requests')->assertSuccessful();
 
         $hub->call('approveMeeting', $passed, 'https://meet.google.com/abc-defg-hij')
-            ->assertSee('This request was already approved, declined or closed because its time passed, so nothing changed. The list is up to date now.');
+            ->assertDispatched('praxis-toast', $this->toast('This request was already approved, declined or closed because its time passed, so nothing changed. The list is up to date now.'));
 
         $this->assertSame('Cancelled', DB::table('appointments')->where('id', $passed)->value('status'));
         $this->assertNull(DB::table('appointments')->where('id', $passed)->value('meeting_link'));

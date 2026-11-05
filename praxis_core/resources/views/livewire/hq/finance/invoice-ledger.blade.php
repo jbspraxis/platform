@@ -44,7 +44,6 @@
         </div>
     </div>
 
-    <x-flash :tones="['error' => 'warning']" class="mb-6" />
 
     <div class="tabs" role="tablist">
         <button type="button" role="tab" wire:click="setTab('Pending')" class="tab {{ $activeTab === 'Pending' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'Pending' ? 'true' : 'false' }}">Sent</button>

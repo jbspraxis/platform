@@ -76,7 +76,6 @@
         @endif
     </div>
 
-    <x-flash class="mb-4" />
 
     <!-- Tab 1: active projects -->
     @if($activeTab === 'matrix')

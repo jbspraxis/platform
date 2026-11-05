@@ -96,7 +96,6 @@
         @endif
     </div>
 
-    <x-flash style="margin-bottom: 20px;" />
 
     @if($activeView === 'lobby')
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">

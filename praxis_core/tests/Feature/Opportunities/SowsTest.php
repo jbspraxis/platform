@@ -134,7 +134,7 @@ class SowsTest extends TestCase
         $page = Livewire::test(SowReview::class, ['sow' => $sow->id])->call('choose', 'sign')
             ->set('name', 'Ngozi Eze')->set('email', $email)->set('jobTitle', 'CFO')->set('signature', self::PNG)
             ->call('requestCode')->assertHasNoErrors()->assertSet('step', 'code');
-        $page->set('code', Mail::sent(SigningCode::class)->last()->code)->call('verify')->assertHasNoErrors()->assertSet('done', 'signed');
+        $page->set('code', Mail::sent(SigningCode::class)->last()->code)->call('verify')->assertHasNoErrors()->assertDispatched('praxis-toast', $this->toast('the statement of work is signed'));
 
         return $sow->fresh();
     }
@@ -279,7 +279,7 @@ class SowsTest extends TestCase
         Mail::assertSent(SigningCode::class, fn (SigningCode $m) => $m->hasTo('ngozi@kilo.test') && $m->purpose === SigningCode::SOW);
         $code = Mail::sent(SigningCode::class)->last()->code;
         $page->set('code', $code === '000000' ? '111111' : '000000')->call('verify')->assertHasErrors('code');
-        $page->set('code', $code)->call('verify')->assertHasNoErrors()->assertSet('done', 'signed')->assertSee('the statement of work is signed');
+        $page->set('code', $code)->call('verify')->assertHasNoErrors()->assertDispatched('praxis-toast', $this->toast('the statement of work is signed'));
 
         $sow->refresh();
         $this->assertSame([StatementOfWork::SIGNED, 'Ngozi Eze', 'CFO', 'ngozi@kilo.test', null], [$sow->status, $sow->signed_by_name, $sow->signed_by_title, $sow->signed_by_email, $sow->auth_otp]);
@@ -362,7 +362,7 @@ class SowsTest extends TestCase
 
         Livewire::test(SowReview::class, ['sow' => $sow->id])->call('choose', 'changes')
             ->set('name', 'Ngozi Eze')->set('email', 'ngozi@kilo.test')->set('changeNote', 'Split the build in two.')
-            ->call('requestChanges')->assertHasNoErrors()->assertSet('done', 'changes');
+            ->call('requestChanges')->assertHasNoErrors()->assertDispatched('praxis-toast', $this->toast('we will come back to you with a new version'));
         $sow->refresh();
         $this->assertSame([StatementOfWork::CHANGES_REQUESTED, 'Split the build in two.', 'Ngozi Eze <ngozi@kilo.test>'], [$sow->status, $sow->changes_request, $sow->changes_requested_by]);
         $this->assertSame('sow', $o->fresh()->stage);

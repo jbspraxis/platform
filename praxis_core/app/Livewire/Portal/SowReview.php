@@ -61,10 +61,6 @@ class SowReview extends Component
 
     public string $changeNote = '';
 
-    /** signed | changes, once done */
-    #[Locked]
-    public string $done = '';
-
     /** The address this page asked a code for: shown on the code step only to whoever asked, never on a reload */
     #[Locked]
     public string $codeSentTo = '';
@@ -106,7 +102,6 @@ class SowReview extends Component
     public function choose(string $mode): void
     {
         $this->resetErrorBag();
-        $this->done = '';
         $this->mode = in_array($mode, ['sign', 'changes'], true) ? $mode : '';
         if ($this->mode === 'sign' && ! $this->contactMaySign($this->sow())) {
             $this->mode = '';
@@ -200,7 +195,7 @@ class SowReview extends Component
         $this->step = 'details';
         $this->code = '';
         $this->signature = '';
-        $this->done = 'signed';
+        session()->flash('success', __('sow.portal.done_signed'));
     }
 
     /** Back to the details: a new code, or another signer */
@@ -229,14 +224,13 @@ class SowReview extends Component
         }
         $this->mode = '';
         $this->changeNote = '';
-        $this->done = 'changes';
+        session()->flash('success', __('sow.portal.done_changes'));
     }
 
     /** The link still works (its expiry kept from mount) and the version waits for the client's signature */
     private function open(StatementOfWork $s): bool
     {
         $this->resetErrorBag();
-        $this->done = '';
         if ($this->linkExpiresAt > 0 && now()->getTimestamp() > $this->linkExpiresAt) {
             $this->addError('mode', __('sow.portal.errors.link_expired'));
 

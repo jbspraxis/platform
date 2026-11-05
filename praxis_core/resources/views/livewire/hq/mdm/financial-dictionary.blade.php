@@ -20,7 +20,6 @@
 
     @include('livewire.hq.mdm.partials.tabs')
 
-    <x-flash class="mb-6" />
 
     <div class="grid grid-cols-1 items-start gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
 

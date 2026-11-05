@@ -29,7 +29,6 @@
         </div>
     </div>
 
-    <x-flash class="mb-6" />
     @if ($flash)<div class="alert alert-success mb-6" role="status">{{ $flash }}</div>@endif
 
     @if ($open && $published && $changes)

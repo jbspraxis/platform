@@ -37,7 +37,6 @@
         </div>
     </div>
 
-    <x-flash class="mb-6" />
 
     <form class="card mb-6" wire:submit="save" novalidate>
         @foreach ($groups as $title => $keys)
