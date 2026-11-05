@@ -30,7 +30,6 @@
         <button type="button" role="tab" wire:click="setRegion('GLOBAL')" class="tab {{ $activeRegion === 'GLOBAL' ? 'is-active' : '' }}" aria-selected="{{ $activeRegion === 'GLOBAL' ? 'true' : 'false' }}">Other countries (flat rate)</button>
     </div>
 
-    <x-flash class="mb-6" />
 
     @if(empty($config['id']))
         <div class="alert alert-info mb-6" role="note">

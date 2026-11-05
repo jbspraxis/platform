@@ -72,17 +72,11 @@
         </div>
 
         <div class="pr-stack">
-            @if ($done === 'approved')
-                <div class="alert alert-success" role="status"><i data-lucide="circle-check"></i><span>{{ __('proposals.portal.done_approved') }}</span></div>
-            @elseif ($done === 'changes')
-                <div class="alert alert-success" role="status"><i data-lucide="circle-check"></i><span>{{ __('proposals.portal.done_changes') }}</span></div>
-            @elseif ($done === 'commented')
-                <div class="alert alert-success" role="status"><i data-lucide="circle-check"></i><span>{{ __('proposals.portal.done_commented') }}</span></div>
-            @endif
-
-            @if ($p->status === 'Client Approved' && $done !== 'approved')
+            {{-- What just happened arrives as a toast (resources/views/components/flash.blade.php); what the page
+                 keeps saying is the record below, so the answer to "did that go through?" survives the toast. --}}
+            @if ($p->status === 'Client Approved')
                 <div class="alert alert-success" role="note"><i data-lucide="badge-check"></i><span>{{ __('proposals.portal.approved', ['name' => $p->client_approved_name, 'date' => $day($p->client_approved_at)]) }}</span></div>
-            @elseif ($p->status === 'Changes Requested' && $done !== 'changes')
+            @elseif ($p->status === 'Changes Requested')
                 <div class="callout" role="note" style="margin: 0"><span>{{ __('proposals.portal.changes_requested') }}</span></div>
             @elseif ($p->status === 'Superseded')
                 <div class="alert alert-warning" role="note"><i data-lucide="history"></i>

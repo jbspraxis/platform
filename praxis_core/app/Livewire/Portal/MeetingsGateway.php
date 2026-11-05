@@ -58,10 +58,6 @@ class MeetingsGateway extends Component
 
     public array $proposed = [];
 
-    /** booked | requested, once done */
-    #[Locked]
-    public string $done = '';
-
     public function mount(string $opportunity): void
     {
         $o = Opportunity::with('organization')->find($opportunity);
@@ -138,7 +134,7 @@ class MeetingsGateway extends Component
         }
         Meetings::tellLead($o, __('meetings.notify.booked_title', [], config('app.staff_locale')),
             __('meetings.notify.booked', ['name' => $this->name, 'title' => $o->title, 'date' => $start->setTimezone(Meetings::TIME_ZONE)->format('j F Y, H:i')], config('app.staff_locale')), $change->meeting->id);
-        $this->done = 'booked';
+        session()->flash('success', __('meetings.portal.done_booked', ['email' => $this->email]));
     }
 
     public function propose(): void
@@ -182,7 +178,7 @@ class MeetingsGateway extends Component
         $meeting = Meetings::request($o, ['agenda' => $agenda] + $this->meetingData($o), $times);
         Meetings::tellLead($o, __('meetings.notify.requested_title', [], config('app.staff_locale')),
             __('meetings.notify.requested', ['name' => $this->name, 'title' => $o->title], config('app.staff_locale')), $meeting->id);
-        $this->done = 'requested';
+        session()->flash('success', __('meetings.portal.done_requested'));
     }
 
     /** Name and email of whoever books */

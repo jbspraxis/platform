@@ -59,14 +59,10 @@
         </div>
 
         <div class="ag-stack">
-            @if ($done)
-                <div class="alert alert-success" role="status"><i data-lucide="badge-check"></i>
-                    <span><strong>{{ __('agreements.portal.done_title') }}</strong>
-                        {{ $document->isFullySigned()
-                            ? __('agreements.portal.done', ['reference' => $document->reference])
-                            : __('agreements.portal.done_pending', ['reference' => $document->reference]) }}</span></div>
-            @elseif ($alreadySigned)
-                <div class="alert alert-success" role="status"><i data-lucide="badge-check"></i>
+            {{-- What just happened arrives as a toast (resources/views/components/flash.blade.php); what the page
+                 keeps saying is the record below, so the answer to "did that go through?" survives the toast. --}}
+            @if ($alreadySigned)
+                <div class="alert alert-success" role="note"><i data-lucide="badge-check"></i>
                     <span><strong>{{ __('agreements.portal.already_title') }}</strong>
                         {{ __('agreements.portal.already', ['reference' => $document->reference, 'date' => $day($party->signed_at)]) }}</span></div>
             @elseif ($refusal === 'expired')
@@ -128,7 +124,7 @@
                     </div>
                 </div>
 
-                @if (! $alreadySigned && ! $done && $refusal === null)
+                @if (! $alreadySigned && $refusal === null)
                     @if ($step === 'details')
                         <form wire:submit="requestCode" class="ag-form" novalidate>
                             <div class="field">

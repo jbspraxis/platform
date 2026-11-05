@@ -210,7 +210,6 @@
                                         <input id="receipt-{{ $req->id }}" type="file" wire:model="receipt_file" class="text-sm" style="max-width: 220px;">
                                         <button type="button" wire:click="uploadReceipt('{{ $req->id }}')" wire:loading.attr="disabled" class="btn btn-secondary btn-sm"><i data-lucide="upload"></i> Upload receipt</button>
                                     </div>
-                                    <x-flash :keys="['message-' . $req->id]" class="mt-1" />
                                 @elseif($req->receipt_url)
                                     <a href="{{ route('hq.file', ['path' => $req->receipt_url]) }}" target="_blank" class="btn btn-ghost btn-sm"><i data-lucide="file-text"></i> View receipt</a>
                                 @elseif($req->status === 'Pending Auth')

@@ -16,7 +16,6 @@
         @endcan
     </div>
 
-    <x-flash class="mb-6" />
 
     <div class="card mb-6">
         <div class="flex flex-wrap items-end gap-4">

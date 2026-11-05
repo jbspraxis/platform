@@ -1,4 +1,5 @@
 import './bootstrap';
+import './toasts';
 import { createIcons } from 'lucide';
 import icons from './icons';
 

@@ -28,7 +28,6 @@
         </div>
     </div>
 
-    <x-flash class="mb-6" />
 
     <div class="tabs" role="tablist">
         @if($canCreate)

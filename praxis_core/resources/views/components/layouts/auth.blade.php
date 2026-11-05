@@ -12,6 +12,8 @@
             {{ $slot }}
         </div>
     </main>
+    {{-- Every confirmation and error, in the corner over the page (resources/views/components/flash.blade.php) --}}
+    <x-flash />
     @livewireScripts
 </body>
 </html>

@@ -45,7 +45,6 @@
         @endif
     </div>
 
-    <x-flash class="mb-6" />
 
     @if ($planPending)
         <div class="callout mb-6" role="note" style="display: flex; gap: 10px; align-items: flex-start">

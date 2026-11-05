@@ -70,7 +70,6 @@
         </div>
     </div>
 
-    <x-flash class="mb-6" />
 
     @php
         // The sections name their icons in PHP. scripts/icons.mjs bundles only icons named in the views, so they are

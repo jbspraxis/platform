@@ -1,44 +1,33 @@
 {{--
-    Flash messages in HQ and the Client Portal, on the brand alert (.alert in resources/css/app.css, docs/BRAND.md
-    section 12). <x-flash /> shows the session's success, info, warning and error messages. :keys names other
-    session keys, whose tone follows the name (team_success, lockout_error; anything else reads as success);
-    :tones overrides a tone, e.g. :tones="['error' => 'warning']". "toast" floats the message over the page with
-    a close button; success and info close by themselves after 6 seconds, warnings and errors stay.
+    The toast host: every confirmation and error in HQ and the Client Portal arrives here, in the bottom-right
+    corner, over whatever the person is looking at (docs/BRAND.md section 12). It sits in the layouts, so no screen
+    has to ask for it and none can forget it.
+
+    Messages waiting on a page load are drawn below and need no JavaScript. Messages flashed by a Livewire action
+    arrive as the praxis-toast browser event (App\Support\Flash\ToastBridge) and are drawn by resources/js/toasts.js.
+    Success and information close themselves after four seconds; warnings and errors stay until they are closed.
 --}}
-@props(['keys' => ['success', 'info', 'warning', 'error'], 'tones' => [], 'toast' => false])
-@php
-    // tone => [alert class, Lucide icon, role]: problems are announced at once, news politely
-    $looks = [
-        'success' => ['alert-success', 'circle-check', 'status'],
-        'info' => ['alert-info', 'info', 'status'],
-        'warning' => ['alert-warning', 'triangle-alert', 'alert'],
-        'error' => ['alert-danger', 'circle-alert', 'alert'],
-    ];
-    $toneOf = fn ($key) => $tones[$key] ?? (preg_match('/(success|info|warning|error)$/', $key, $m) ? $m[1] : 'success');
-@endphp
-@foreach ($keys as $key)
-    @if (filled(session($key)))
-        @php [$class, $icon, $role] = $looks[$toneOf($key)] ?? $looks['info']; @endphp
-        <div {{ $attributes->class(['alert', $class, 'alert-toast' => $toast]) }} role="{{ $role }}" wire:key="flash-{{ $key }}"
-            @if ($toast) x-data="{ show: true }" x-show="show" x-transition.opacity @if ($role === 'status') x-init="setTimeout(() => show = false, 6000)" @endif @endif>
-            <i data-lucide="{{ $icon }}"></i>
-            <span>{{ session($key) }}</span>
-            @if ($toast)
-                <button type="button" class="alert-close" x-on:click="show = false" aria-label="{{ __('flash.close') }}"><i data-lucide="x"></i></button>
-            @endif
-        </div>
-    @endif
-@endforeach
-@if ($toast)
-    @once
-        <style>
-            .alert-toast { position: fixed; top: 80px; right: 24px; z-index: 70; max-width: 420px; box-shadow: var(--shadow-float); }
-            .alert-toast > span { flex: 1 1 auto; }
-            .alert-close { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin: -3px -8px -3px 4px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; cursor: pointer; }
-            .alert-close:hover { background: rgba(12, 20, 43, 0.06); }
-            .alert-close:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
-            .alert-close svg { width: 16px; height: 16px; margin: 0; }
-            @media (max-width: 900px) { .alert-toast { top: 16px; left: 16px; right: 16px; max-width: none; } }
-        </style>
-    @endonce
-@endif
+@once
+    @php
+        $toasts = \App\Support\Flash\Toasts::pull();
+        $config = [
+            'autoCloseMs' => \App\Support\Flash\Toasts::AUTO_CLOSE_MS,
+            'max' => \App\Support\Flash\Toasts::MAX_VISIBLE,
+            'close' => __('flash.close'),
+            'tones' => \App\Support\Flash\Toasts::TONES,
+        ];
+    @endphp
+    <div class="toast-host" data-toast-host data-toast-config="{{ json_encode($config, JSON_UNESCAPED_UNICODE) }}">
+        @foreach ($toasts as $toast)
+            @php [$class, $icon, $role, $closesItself] = \App\Support\Flash\Toasts::look($toast['tone']); @endphp
+            {{-- is-in from the start: a message on a page load is readable before the script runs --}}
+            <div class="alert {{ $class }} alert-toast is-in" role="{{ $role }}" data-toast @if ($closesItself) data-toast-auto @endif>
+                <i data-lucide="{{ $icon }}"></i>
+                <span>{{ $toast['message'] }}</span>
+                <button type="button" class="alert-close" data-toast-close aria-label="{{ __('flash.close') }}">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+        @endforeach
+    </div>
+@endonce

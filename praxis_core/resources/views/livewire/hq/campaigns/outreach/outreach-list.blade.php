@@ -44,7 +44,6 @@
         </div>
     </div>
 
-    <x-flash class="mb-6" />
 
     @if ($me)
         <div class="card orl-day">

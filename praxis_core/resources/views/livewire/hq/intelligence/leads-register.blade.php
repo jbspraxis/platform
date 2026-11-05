@@ -73,7 +73,6 @@
         </div>
     </div>
 
-    <x-flash class="mb-6" />
 
     {{-- The summary strip: the owner filter below applies to it too --}}
     @php

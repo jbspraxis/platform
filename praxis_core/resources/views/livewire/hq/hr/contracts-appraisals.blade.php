@@ -29,7 +29,6 @@
         <button type="button" role="tab" wire:click="setTab('appraisals')" class="tab {{ $activeTab === 'appraisals' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'appraisals' ? 'true' : 'false' }}">Appraisals</button>
     </div>
 
-    <x-flash class="mb-6" />
 
     <div class="grid items-start gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
 

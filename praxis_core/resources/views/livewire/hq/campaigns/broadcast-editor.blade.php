@@ -129,7 +129,6 @@
         </div>
     </div>
 
-    <x-flash class="mb-6" />
 
     @if ($broadcast->status === 'Scheduled')
         <div class="alert alert-info mb-6" role="status">

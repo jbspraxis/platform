@@ -25,7 +25,6 @@
         </div>
     </div>
 
-    <x-flash class="mb-6" />
 
     @if($activeProject)
         @php $cur = $activeProject->currency; @endphp

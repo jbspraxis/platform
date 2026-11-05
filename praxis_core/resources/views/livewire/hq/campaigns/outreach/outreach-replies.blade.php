@@ -96,7 +96,6 @@
                 <p class="page-subtitle">Replies to the outreach emails of {{ $campaigns === 1 ? 'your campaign' : 'your ' . $campaigns . ' campaigns' }}. Claude suggests a label for each; nothing happens until you confirm it or choose another. Bounce notices and spam reports are filed by themselves.</p>
             </div>
         </div>
-        <x-flash class="mb-6" />
         <div class="orp-stats">
             @foreach ([['Replies', $n($stats['replies']), $stats['sent'] ? $stats['reply_rate'] . '% of ' . $n($stats['sent']) . ' delivered' : null], ['To sort', $n($stats['to_sort']), null],
                        ['Interested', $n($stats['interested']), null], ['Not now', $n($stats['not_now']), $reminders ? $reminders . ' ' . ($reminders === 1 ? 'reminder' : 'reminders') . ' set' : null],
@@ -105,7 +104,6 @@
             @endforeach
         </div>
     @else
-        <x-flash class="mb-4" />
     @endif
 
     <div class="segmented orp-filters" role="group" aria-label="Show replies">

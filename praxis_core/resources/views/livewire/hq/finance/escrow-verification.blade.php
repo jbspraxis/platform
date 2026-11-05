@@ -17,7 +17,6 @@
         </div>
     </div>
 
-    <x-flash :tones="['error' => 'warning']" class="mb-6" />
 
     <div class="tabs" role="tablist">
         <button type="button" role="tab" wire:click="setTab('Pending Verification')" class="tab {{ $activeTab === 'Pending Verification' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'Pending Verification' ? 'true' : 'false' }}">Awaiting verification</button>

@@ -66,7 +66,6 @@
         <a href="{{ route('hq.ops.project', ['project' => $projectId]) }}" class="btn btn-secondary" wire:navigate><i data-lucide="arrow-left"></i> {{ __('projects.open_page') }}</a>
     </div>
 
-    <x-flash class="mb-4" />
 
     @if ($notice)
         <div class="alert alert-success mb-4" role="status"><i data-lucide="circle-check"></i><span>{{ $notice }}</span></div>

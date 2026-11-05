@@ -180,7 +180,6 @@
                     </div>
                 @endif
 
-                <x-flash :keys="['lockout_error']" class="mb-4" />
 
                 {{-- After a password sign-in with no passkey yet: offer one (docs/SIGN_IN.md) --}}
                 @if (\App\Livewire\Account\PasskeyOffer::due('client'))
@@ -355,7 +354,6 @@
                         <section class="card">
                             <div class="card-header"><h2 class="card-title">{{ __('portal.qa.form_title') }}</h2></div>
 
-                            <x-flash :keys="['qa_success']" class="mb-4" />
 
                             @if ($can['qa.create'] ?? false)
                                 <form wire:submit.prevent="submitQaTicket" class="flex flex-col gap-4">
@@ -446,7 +444,6 @@
 
                 {{-- ===================== INVOICES AND PAYMENTS ===================== --}}
                 @elseif ($activeTab === 'financials' && $activeProject)
-                    <x-flash :keys="['finance_success']" class="mb-6" />
 
                     <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
                         <section class="card lg:col-span-2">
@@ -679,7 +676,6 @@
                                 <h2 class="card-title flex items-center gap-2"><i data-lucide="palette" class="h-4 w-4 text-deep-teal"></i> {{ __('portal.documents.appearance') }}</h2>
                             </div>
 
-                            <x-flash :keys="['brand_success']" class="mb-4" />
 
                             @if ($can['settings.edit'] ?? false)
                                 <p class="help m-0 mb-4">{{ __('portal.documents.appearance_intro') }}</p>
@@ -719,7 +715,6 @@
                         <section class="card lg:col-span-2">
                             <div class="card-header"><h2 class="card-title">{{ __('portal.team.members', ['count' => count($teamMembers ?? []), 'max' => \App\Livewire\ClientOs\Dashboard::MAX_PORTAL_ACCOUNTS]) }}</h2></div>
 
-                            <x-flash :keys="['team_success']" class="mb-4" />
 
                             @foreach ($teamMembers ?? [] as $member)
                                 @php $manageable = !$member->is_primary_client && ($can['team.edit'] ?? false) && $member->id !== $this->user->id; @endphp
@@ -794,7 +789,6 @@
                                 <h2 class="card-title flex items-center gap-2"><i data-lucide="user-plus" class="h-4 w-4 text-deep-teal"></i> {{ __('portal.team.invite_title') }}</h2>
                             </div>
 
-                            <x-flash :keys="['team_error']" class="mb-4" />
                             @if ($errors->any())
                                 <div class="alert alert-danger mb-4" role="alert">
                                     <i data-lucide="circle-alert"></i>
@@ -873,7 +867,6 @@
         </button>
     @endif
 
-    <x-flash toast :keys="['global_success']" />
 
     {{-- ===== Urgent support (signed-in client) ===== --}}
     @if ($showRedlineModal)

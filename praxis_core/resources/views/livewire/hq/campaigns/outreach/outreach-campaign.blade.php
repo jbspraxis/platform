@@ -136,7 +136,6 @@
         @endif
     </div>
 
-    <x-flash class="mb-6" />
 
     @if ($senderDay['problem'])
         <div class="alert alert-warning mb-6" role="status"><i data-lucide="mail-warning"></i><span>{{ $senderDay['problem'] }}</span></div>

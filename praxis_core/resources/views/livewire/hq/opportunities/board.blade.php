@@ -61,7 +61,6 @@
         @endif
     </div>
 
-    <x-flash class="mb-6" />
 
     @if ($teamOnly)
         <p class="help opb-teamonly"><i data-lucide="users"></i> {{ __('opportunities.team_only') }}</p>

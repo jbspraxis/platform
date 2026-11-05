@@ -907,6 +907,25 @@ Name the action and the consequence, without assuming anyone’s pronouns.
 > "Suspend access for :name? They will be signed out and can’t sign in until you restore access." Buttons: "Suspend access" / "Keep access".
 > « Suspendre l’accès de :name ? Cette personne sera déconnectée et ne pourra plus se connecter tant que vous n’aurez pas rétabli son accès. » Boutons : « Suspendre l’accès » / « Conserver l’accès ».
 
+### Where a message appears
+
+Every confirmation and error in HQ and the Client Portal shows as a toast in the bottom-right corner, over the
+page. Nothing is written into the page itself, so nobody has to scroll to find out whether what they clicked
+worked — and nobody clicks a second time because nothing seemed to happen.
+
+- Good news (success, information) closes itself after four seconds; reading it keeps it, because the clock stops
+  while the pointer or the keyboard is on it. A warning or an error stays until it is closed.
+- Up to four show at once, newest at the bottom.
+- The host (`<x-flash>`) sits in the layouts, so no screen asks for it and none can forget it. A screen just
+  flashes its message to the session: `session()->flash('success', 'Invoice INV-0042 cancelled.')`. The tone comes
+  from the key — `success`, `info`, `warning`, `error`, or a name ending in one of them, such as `team_error`.
+- A toast is what just happened; it is not the record. Where a page states a lasting fact — "Approved by :name on
+  :date", a signed statement of work, a booked meeting — the page keeps saying it after the toast has gone.
+
+Implementation: `resources/views/components/flash.blade.php`, `resources/js/toasts.js`,
+`App\Support\Flash\Toasts`. A message flashed by a Livewire action reaches the browser through
+`App\Support\Flash\ToastBridge`, because a Livewire update never re-renders the layout.
+
 ### Notifications (HQ)
 
 The title says what happened; the body gives the detail and the place to act.

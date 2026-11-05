@@ -153,7 +153,7 @@ class EscrowVerification extends Component
         if ($error) {
             $this->showVerifyModal = false;
             $this->loadTransactions();
-            session()->flash('error', $error);
+            session()->flash('warning', $error);
             return;
         }
 
@@ -194,7 +194,7 @@ class EscrowVerification extends Component
         if (!$handled) {
             $this->showVerifyModal = false;
             $this->loadTransactions();
-            session()->flash('error', 'This payment has already been verified or rejected, so nothing was changed. The list has been refreshed.');
+            session()->flash('warning', 'This payment has already been verified or rejected, so nothing was changed. The list has been refreshed.');
             return;
         }
 

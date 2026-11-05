@@ -235,13 +235,13 @@ class InvoiceLedger extends Component
 
         $invoice = DB::table('invoices')->where('id', $invoiceId)->whereNull('deleted_at')->first();
         if (! $invoice || $invoice->status === 'Cancelled') {
-            session()->flash('error', 'Only an invoice that isn’t cancelled can be emailed. Refresh the page and try again.');
+            session()->flash('warning', 'Only an invoice that isn’t cancelled can be emailed. Refresh the page and try again.');
             $this->loadInvoices();
             return;
         }
         $reached = $this->emailToClient($invoiceId);
         $this->loadInvoices();
-        session()->flash($reached ? 'success' : 'error', "Invoice {$invoice->invoice_number}: " . $this->emailedLine($reached));
+        session()->flash($reached ? 'success' : 'warning', "Invoice {$invoice->invoice_number}: " . $this->emailedLine($reached));
     }
 
     /** @return list<string>|null the addresses reached; null when the email couldn't be prepared */
@@ -272,12 +272,12 @@ class InvoiceLedger extends Component
         // Only an unpaid invoice (pending or overdue) can be cancelled: never a paid one, never twice
         $invoice = DB::table('invoices')->where('id', $invoiceId)->first();
         if (! $invoice) {
-            session()->flash('error', "We couldn’t find that invoice. Refresh the page and try again.");
+            session()->flash('warning', "We couldn’t find that invoice. Refresh the page and try again.");
             $this->loadInvoices();
             return;
         }
         if (! in_array($invoice->status, self::CANCELLABLE, true)) {
-            session()->flash('error', $invoice->status === 'Paid'
+            session()->flash('warning', $invoice->status === 'Paid'
                 ? "Invoice {$invoice->invoice_number} is paid, so it can’t be cancelled."
                 : "Invoice {$invoice->invoice_number} is already cancelled.");
             $this->loadInvoices();
@@ -294,7 +294,7 @@ class InvoiceLedger extends Component
             ]);
 
         if (! $updated) {
-            session()->flash('error', "Invoice {$invoice->invoice_number} changed while you were working, so it wasn’t cancelled. Check its status and try again.");
+            session()->flash('warning', "Invoice {$invoice->invoice_number} changed while you were working, so it wasn’t cancelled. Check its status and try again.");
             $this->loadInvoices();
             return;
         }
@@ -381,7 +381,7 @@ class InvoiceLedger extends Component
         });
 
         $this->loadInvoices();
-        session()->flash('error', $count . ($count === 1 ? ' invoice was' : ' invoices were') . " marked overdue. Client Portal access for those projects is on hold until they’re paid.");
+        session()->flash('warning', $count . ($count === 1 ? ' invoice was' : ' invoices were') . " marked overdue. Client Portal access for those projects is on hold until they’re paid.");
     }
     /** Accounts the client may pay this project's invoice into: its currency, held by its billing company (D8) */
     private function matchingAccounts(): \Illuminate\Support\Collection

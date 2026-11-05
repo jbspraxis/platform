@@ -309,7 +309,6 @@
                     <h2 class="section-title">{{ __('gateway.proposal.code_title') }}</h2>
                     <p class="step-body" style="margin: 0 0 16px;">{{ filled($signerEmail ?? null) ? __('gateway.proposal.code_sent', ['email' => $signerEmail]) : __('gateway.proposal.code_sent_generic') }}</p>
 
-                    <x-flash style="margin-bottom: 16px;" />
 
                     <form wire:submit.prevent="verifyOtpAndExecuteLaunch">
                         <div class="field">

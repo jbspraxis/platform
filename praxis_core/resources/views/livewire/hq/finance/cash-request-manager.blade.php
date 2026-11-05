@@ -193,7 +193,6 @@
                         </div>
                         <button type="button" wire:click="uploadReceipt" wire:loading.attr="disabled" class="btn btn-secondary btn-sm mt-3"><i data-lucide="upload"></i> Upload receipt</button>
                     @endif
-                    <x-flash :keys="['message']" class="mt-3" />
                 </div>
 
                 <div class="alert alert-warning" role="note">

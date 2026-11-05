@@ -26,7 +26,6 @@
         </div>
     </div>
 
-    <x-flash class="mb-6" />
 
     <nav class="tabs aud-tabs" aria-label="Audiences">
         @foreach ($tabs as $key => $label)

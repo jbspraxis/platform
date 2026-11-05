@@ -49,8 +49,6 @@ class AgreementSigning extends Component
 
     /** True once this visit has signed it */
     #[Locked]
-    public bool $done = false;
-
     public function mount(string $token): void
     {
         $party = Agreements::findByToken($token);
@@ -175,7 +173,9 @@ class AgreementSigning extends Component
         $this->code = '';
         $this->signature = '';
         $this->step = 'details';
-        $this->done = true;
+        session()->flash('success', __('agreements.portal.done_title') . ' ' . ($document->fresh()->isFullySigned()
+            ? __('agreements.portal.done', ['reference' => $document->reference])
+            : __('agreements.portal.done_pending', ['reference' => $document->reference])));
     }
 
     /** Back to the name and the signature: a new code, or a correction */

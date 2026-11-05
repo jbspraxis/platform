@@ -45,7 +45,7 @@ class Login extends Component
             }
 
             Auth::guard('tracker')->logout();
-            session()->flash('error', 'You’re not assigned to a project yet. Ask your project lead to add you to one, then sign in again.');
+            session()->flash('warning', 'You’re not assigned to a project yet. Ask your project lead to add you to one, then sign in again.');
             return redirect()->route('taskforce.login');
         }
 

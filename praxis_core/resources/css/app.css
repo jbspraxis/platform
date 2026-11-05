@@ -267,6 +267,24 @@
     .alert-warning { background: var(--color-warning-tint); color: var(--color-warning); }
     .alert-danger { background: var(--color-danger-tint); color: var(--color-danger); }
     .alert-info { background: var(--color-teal-tint); color: var(--color-petrol); }
+
+    /* Toasts: every confirmation and error lands in the bottom-right corner, over the page, so it is seen without
+       scrolling (resources/views/components/flash.blade.php, resources/js/toasts.js). Success and information close
+       themselves after four seconds; warnings and errors stay until they are closed. */
+    .toast-host { position: fixed; right: 24px; bottom: 24px; z-index: 80; display: flex; flex-direction: column; gap: 10px; width: min(420px, calc(100vw - 48px)); pointer-events: none; }
+    .alert-toast { pointer-events: auto; box-shadow: var(--shadow-float); opacity: 0; transform: translateY(12px); transition: opacity 180ms ease-out, transform 180ms ease-out; }
+    .alert-toast.is-in { opacity: 1; transform: none; }
+    .alert-toast.is-out { opacity: 0; transform: translateY(6px); }
+    .alert-toast > span { flex: 1 1 auto; overflow-wrap: anywhere; }
+    .alert-close { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin: -3px -8px -3px 4px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; cursor: pointer; }
+    .alert-close:hover { background: rgba(12, 20, 43, 0.06); }
+    .alert-close:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+    .alert-close svg { width: 16px; height: 16px; margin: 0; }
+    @media (max-width: 900px) { .toast-host { left: 16px; right: 16px; bottom: 16px; width: auto; } }
+    @media (prefers-reduced-motion: reduce) {
+        .alert-toast { transition: opacity 1ms linear; transform: none; }
+        .alert-toast.is-out { transform: none; }
+    }
     .empty-state { padding: 40px 24px; text-align: center; color: var(--color-muted); font-size: 0.875rem; line-height: 1.375rem; }
     .empty-state strong { display: block; margin-bottom: 4px; color: var(--color-ink); font-size: 1rem; }
 

@@ -13,7 +13,6 @@
         </div>
     </div>
 
-    <x-flash class="mb-4" />
 
     <div class="tabs" role="tablist">
         <button type="button" role="tab" wire:click="switchMainTab('ledger')" class="tab {{ $mainTab === 'ledger' ? 'is-active' : '' }}" aria-selected="{{ $mainTab === 'ledger' ? 'true' : 'false' }}">Sign-offs</button>
