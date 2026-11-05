@@ -185,8 +185,8 @@ class InsightsPublishTest extends TestCase
         $component->call('unpublishArticle', $pending['id'])->assertDispatched('praxis-toast', $this->toast('This article isn’t published, so nothing changed.'));
         $component->call('publishArticle', $rejected['id'])->assertDispatched('praxis-toast', $this->toast('Only a draft or an article waiting for review can be published, so nothing changed.'));
         $component->call('askArticleChange', $rejected['id'], 'publish')->assertSet('confirmArticleId', null)
-            ->assertSee('Only a draft or an article waiting for review can be published, so nothing changed.');
-        $component->call('publishArticle', (string) Str::uuid())->assertSee('We couldn’t find this article; it may have been deleted.');
+            ->assertDispatched('praxis-toast', $this->toast('Only a draft or an article waiting for review can be published, so nothing changed.'));
+        $component->call('publishArticle', (string) Str::uuid())->assertDispatched('praxis-toast', $this->toast('We couldn’t find this article; it may have been deleted.'));
         // Only the two named changes exist
         $component->call('askArticleChange', $draft['id'], 'reject')->assertForbidden();
 
