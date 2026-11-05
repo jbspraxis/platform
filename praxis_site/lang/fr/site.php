@@ -110,6 +110,8 @@ return [
     ],
 
     'form' => [
+        // Several countries share one dialling code, so the <select> names the first and counts the rest
+        'dial_shared' => '{1} :country et 1 autre|[2,*] :country et :count autres',
         'honeypot' => 'Laissez ce champ vide',
         'choose' => 'Choisissez',
         'summary' => 'Certaines informations sont à vérifier. Regardez les champs signalés ci-dessous.',
@@ -614,6 +616,107 @@ return [
     ],
 
     // Preuves (refonte PR 3) : la bande de logos et les citations de clients (affichées une fois approuvées)
+    /*
+    | Les formulaires qui peuvent être remplis sous forme de conversation (components/agent-dialog,
+    | resources/js/agent). « common » regroupe ce que tous partagent ; chaque formulaire n'ajoute que ses
+    | propres mots, et la page fusionne les deux. Le calculateur n'est pas ici : il est en ligne, garde son
+    | propre dialogue et ses propres mots (site.calculator.chat), et rien dans ce bloc ne l'atteint.
+    */
+    'agent' => [
+        'common' => [
+            'close' => 'Fermer',
+            'agent' => 'Praxis',
+            'you' => 'Vous',
+            'skip' => 'Passer',
+            'skipped' => 'Non renseigné',
+            'fine' => 'Très bien.',
+            'more' => 'Afficher toute la liste',
+            'all' => 'Les voici toutes (:n) :',
+            'say' => 'Votre réponse',
+            'placeholder' => 'Écrivez votre réponse…',
+            'send' => 'Envoyer',
+            'sending' => 'Envoi…',
+
+            'errors' => [
+                'email' => 'Cela ne ressemble pas à une adresse e-mail — pouvez-vous la vérifier ?',
+                'phone' => 'Cela ne ressemble pas à un numéro de téléphone — pouvez-vous le vérifier ?',
+                'url' => 'Cela ne ressemble pas à une adresse web — pouvez-vous la vérifier ?',
+                'urlHost' => 'Ce n’est pas un lien de ce site — pouvez-vous le vérifier ?',
+                'blank' => 'Désolé, je n’ai pas saisi.',
+                'short' => 'Pouvez-vous m’en dire un peu plus ? Environ :n caractères suffisent.',
+                'list' => 'Cela ne figure pas dans ma liste. Choisissez ci-dessous, ou passez.',
+                'near' => 'Vouliez-vous dire l’une de celles-ci ?',
+            ],
+
+            'edit' => [
+                'ok' => 'Bien sûr — :field vaut :value pour l’instant. Que faut-il mettre ?',
+                'which' => 'Quelle réponse souhaitez-vous modifier ?',
+                'chip' => 'Modifier :field, actuellement :value',
+            ],
+
+            'confirm' => [
+                'heading' => 'Voici tout ce que j’ai. Touchez une ligne pour la modifier.',
+                'send' => 'Envoyer',
+                'change' => 'Modifier quelque chose',
+                'which' => 'Laquelle ?',
+                'ask' => 'Je l’envoie ?',
+                'changed' => 'C’est fait — :field vaut maintenant :value.',
+            ],
+        ],
+
+        // /feedback
+        'feedback' => [
+            'icon' => 'message-square-text',
+            'title' => 'Votre avis',
+            'open' => 'Nous le dire sous forme de conversation',
+
+            'gate' => [
+                'heading' => 'Que devons-nous savoir ?',
+                'lead' => 'Dites-nous ce qui n’a pas fonctionné ou ce qui pourrait être mieux. Quelques questions rapides ensuite, et vous pouvez rester anonyme.',
+                'start' => 'Commencer',
+                'invalid' => 'Pouvez-vous m’en dire un peu plus ?',
+            ],
+
+            'steps' => [
+                'what' => 'Ce qui s’est passé',
+                'you' => 'Vous',
+            ],
+
+            'hello' => 'Merci — c’est noté. Deux questions rapides, puis une sur vous.',
+
+            'ask' => [
+                'category' => 'De quel type d’avis s’agit-il ?',
+                'severity' => 'À quel point cela vous gêne-t-il ?',
+                'identity' => 'De la part de qui ?',
+                'email' => 'Et une adresse e-mail, si vous souhaitez une réponse ?',
+            ],
+
+            'hint' => [
+                'identity' => 'Un nom ou simplement une fonction. Passez pour rester anonyme.',
+                'email' => 'Seulement si vous en voulez une — nous n’en avons pas besoin.',
+            ],
+
+            'short' => [
+                'description' => 'Ce qui s’est passé',
+                'category' => 'Type',
+                'severity' => 'Gêne',
+                'identity' => 'De',
+                'email' => 'E-mail',
+            ],
+
+            // Mots que les gens emploient pour un champ quand ils veulent le modifier, en plus de son nom court
+            'words' => [
+                'description' => 'ce qui s’est passé|le problème|mon message',
+                'category' => 'type|catégorie|genre',
+                'severity' => 'gêne|gravité|impact',
+                'identity' => 'mon nom|nom|qui',
+                'email' => 'e-mail|email|adresse|réponse',
+            ],
+
+            'sent' => 'J’envoie cela à l’équipe.',
+        ],
+    ],
+
     'proof' => [
         'clients_title' => 'Des organisations avec lesquelles nous avons travaillé',
         'clients_pause' => 'Mettre les logos en pause',

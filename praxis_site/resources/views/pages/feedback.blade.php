@@ -11,6 +11,18 @@
                 <p>{{ __('site.feedback.sent_body') }}</p>
             </x-success>
         @else
+            @php
+                // The shared chrome plus this form's own words (lang/{en,fr}/site.php)
+                $agent = array_replace_recursive(__('site.agent.common'), __('site.agent.feedback'));
+            @endphp
+            {{-- The same form as a conversation, for anyone who would rather answer that way. The button only
+                 does anything with JavaScript; the form below it is unchanged and remains the way in. --}}
+            <p class="agent-switch">
+                <button class="btn btn-secondary" type="button" data-agent-open="feedback" data-agent-reveal hidden>
+                    <i data-lucide="message-square-text"></i>{{ $agent['open'] }}
+                </button>
+            </p>
+
             <form class="card form" method="POST" action="{{ route('feedback.store') }}" novalidate>
                 @csrf
                 <x-form-guard form="feedback" />
@@ -29,6 +41,13 @@
                     <button class="btn btn-primary" type="submit"><i data-lucide="send"></i>{{ __('site.feedback.send') }}</button>
                 </div>
             </form>
+
+            <x-agent-dialog
+                form="feedback"
+                :action="route('feedback.store')"
+                :strings="$agent"
+                :lists="['categories' => __('site.feedback.categories'), 'severities' => __('site.feedback.severities')]"
+                :gate="['name' => 'description', 'kind' => 'longtext', 'label' => __('site.feedback.description'), 'hint' => __('site.feedback.description_hint'), 'max' => 5000]" />
         @endif
     </div>
 @endsection

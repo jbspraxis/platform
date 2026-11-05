@@ -114,6 +114,8 @@ return [
     ],
 
     'form' => [
+        // Several countries share one dialling code, so the <select> names the first and counts the rest
+        'dial_shared' => '{1} :country and 1 other|[2,*] :country and :count others',
         'honeypot' => 'Leave this field empty',
         'choose' => 'Choose one',
         'summary' => 'Some details need attention. Check the fields marked below.',
@@ -618,6 +620,107 @@ return [
         'sent_title' => 'Thank you for your feedback',
         'sent_body' => 'It goes to the team that runs this site.',
         'send_another' => 'Send more feedback',
+    ],
+
+    /*
+    | The forms that can be answered as a conversation (components/agent-dialog, resources/js/agent).
+    | "common" is the chrome every one of them shares; each form adds only its own words, and the page
+    | merges the two. The calculator is not here: it is live, keeps its own dialog and its own words
+    | (site.calculator.chat), and nothing in this block reaches it.
+    */
+    'agent' => [
+        'common' => [
+            'close' => 'Close',
+            'agent' => 'Praxis',
+            'you' => 'You',
+            'skip' => 'Skip',
+            'skipped' => 'Not given',
+            'fine' => 'No problem.',
+            'more' => 'Show the full list',
+            'all' => 'Here are all :n:',
+            'say' => 'Your reply',
+            'placeholder' => 'Type your answer…',
+            'send' => 'Send',
+            'sending' => 'Sending…',
+
+            'errors' => [
+                'email' => 'That doesn’t look like an email address — could you check it?',
+                'phone' => 'That doesn’t look like a phone number — could you check it?',
+                'url' => 'That doesn’t look like a web address — could you check it?',
+                'urlHost' => 'That isn’t a link on that site — could you check it?',
+                'blank' => 'Sorry, I didn’t catch that.',
+                'short' => 'Could you give me a little more? About :n characters is enough.',
+                'list' => 'That isn’t on my list. Tap one below, or skip it.',
+                'near' => 'Did you mean one of these?',
+            ],
+
+            'edit' => [
+                'ok' => 'Of course — :field is :value just now. What should it be?',
+                'which' => 'Which answer would you like to change?',
+                'chip' => 'Change :field, currently :value',
+            ],
+
+            'confirm' => [
+                'heading' => 'Here is everything I have. Tap any line to change it.',
+                'send' => 'Send it',
+                'change' => 'Change something',
+                'which' => 'Which one?',
+                'ask' => 'Shall I send it?',
+                'changed' => 'Done — :field is now :value.',
+            ],
+        ],
+
+        // /feedback
+        'feedback' => [
+            'icon' => 'message-square-text',
+            'title' => 'Feedback',
+            'open' => 'Tell us in a conversation instead',
+
+            'gate' => [
+                'heading' => 'What should we know?',
+                'lead' => 'Tell us what didn’t work or what could be better. A few quick questions after this, and you can stay anonymous.',
+                'start' => 'Start',
+                'invalid' => 'Could you give me a little more to go on?',
+            ],
+
+            'steps' => [
+                'what' => 'What happened',
+                'you' => 'You',
+            ],
+
+            'hello' => 'Thank you — that’s noted. Two quick things, then one about you.',
+
+            'ask' => [
+                'category' => 'What kind of feedback is it?',
+                'severity' => 'How much does it get in your way?',
+                'identity' => 'Who shall I say it came from?',
+                'email' => 'And an email address, if you’d like a reply?',
+            ],
+
+            'hint' => [
+                'identity' => 'A name or just a role. Skip it to stay anonymous.',
+                'email' => 'Only if you want one — we don’t need it.',
+            ],
+
+            'short' => [
+                'description' => 'What happened',
+                'category' => 'Type',
+                'severity' => 'Effect',
+                'identity' => 'From',
+                'email' => 'Email',
+            ],
+
+            // Extra words people use for a field when they ask to change it, beyond its short name
+            'words' => [
+                'description' => 'what happened|the problem|the issue|my message',
+                'category' => 'kind|category|sort',
+                'severity' => 'severity|how much|effect|impact',
+                'identity' => 'my name|name|who',
+                'email' => 'email|e-mail|address|reply',
+            ],
+
+            'sent' => 'Sending that to the team now.',
+        ],
     ],
 
     // Praxis AI, the website assistant (docs/SITE_API.md 6.5)
