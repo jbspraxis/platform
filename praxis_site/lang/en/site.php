@@ -114,6 +114,8 @@ return [
     ],
 
     'form' => [
+        // Several countries share one dialling code, so the <select> names the first and counts the rest
+        'dial_shared' => '{1} :country and 1 other|[2,*] :country and :count others',
         'honeypot' => 'Leave this field empty',
         'choose' => 'Choose one',
         'summary' => 'Some details need attention. Check the fields marked below.',
