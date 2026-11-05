@@ -206,6 +206,38 @@ class ComposeSendTest extends TestCase
         $this->assertSame(['bob@client.test', 'carol@client.test'], array_column($outbox->payload['cc'], 'email'));
     }
 
+    public function test_a_reply_leaves_a_quoted_calendar_invitation_out_and_a_forward_keeps_it(): void
+    {
+        [$account, $sender] = $this->shared();
+        $text = "Hello Tom,\n\nPlease see attached\n\n"
+            . "From: JBS Praxis <praxisjbs@gmail.com>\n"
+            . "Subject: Updated invitation: Partnerships Workflow Discovery - Mycityapp @ Thu Nov 5, 2026 12pm - 1pm (WAT) (etudor@mycityapp.io)\n\n"
+            . "This event has been updated\nJoin with Google Meet<https://meet.google.com/orf-kbqz-xzh>\n"
+            . "Yes<https://calendar.google.com/calendar/event?action=RESPOND&eid=abc&rst=1>\n\n"
+            . "Sent by Google Calendar<https://calendar.google.com/calendar/>\n\n"
+            . "Forwarding this invitation could allow any recipient to send a response to the organizer. Learn more<https://support.google.com/calendar/answer/37135#forwarding>";
+        $this->server->deliver(self::BOX, 'INBOX', FakeMailServer::message(
+            from: 'Etudor <etudor@mycityapp.io>',
+            subject: 'RE: Updated invitation: Partnerships Workflow Discovery - Mycityapp @ Thu Nov 5, 2026 12pm - 1pm (WAT) (etudor@mycityapp.io)',
+            text: $text, messageId: 'cal1@mycityapp.test',
+        ));
+        MailSync::make()->account($account);
+        $original = MailMessage::firstOrFail();
+
+        $reply = Outbox::make()->start($sender, 'reply', null, $original);
+        $this->assertSame('Re: Partnerships Workflow Discovery - Mycityapp', $reply->payload['subject'], 'The invitation dressing leaves the subject');
+        foreach (['quote_text', 'quote_html'] as $key) {
+            $this->assertStringContainsString('Please see attached', $reply->payload[$key], "{$key} keeps what Etudor wrote");
+            $this->assertStringContainsString('left out of this quote', $reply->payload[$key]);
+            $this->assertStringNotContainsString('calendar.google.com', $reply->payload[$key], "{$key} carries no RSVP links");
+            $this->assertStringNotContainsString('Sent by Google Calendar', $reply->payload[$key]);
+        }
+
+        $forward = Outbox::make()->start($sender, 'forward', null, $original);
+        $this->assertStringStartsWith('Fwd: RE: Updated invitation:', $forward->payload['subject'], 'A forward is left as it was');
+        $this->assertStringContainsString('calendar.google.com', $forward->payload['quote_text'], 'Forwarding an invitation is deliberate');
+    }
+
     public function test_forwarding_carries_the_originals_attachments_and_uploads_travel_too(): void
     {
         [$account, $sender] = $this->shared();

@@ -443,6 +443,10 @@ final class Outbox
         }
 
         $subject = trim((string) $original->subject);
+        if ($kind !== 'forward' && CalendarInvites::isInvitationSubject($subject)) {
+            // "Updated invitation: X @ Thu Nov 5, 2026 12pm - 1pm (WAT) (guest@…)" answers as "Re: X" (CalendarInvites)
+            $subject = CalendarInvites::cleanSubject($subject);
+        }
         $subject = match ($kind) {
             'forward' => preg_match('/^(fwd?|tr)\s*:/i', $subject) ? $subject : 'Fwd: ' . $subject,
             default => preg_match('/^(re|aw|réf?)\s*:/iu', $subject) ? $subject : 'Re: ' . $subject,
