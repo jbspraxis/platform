@@ -70,6 +70,9 @@ return [
         'profile_share_per_hour' => (int) env('SITE_PROFILE_SHARE_PER_HOUR', 60),
         'forms_per_minute' => 6,
         'forms_per_hour' => 30,
+        // Moving between months in the conversation's calendar: more than a form, far less than a crawler
+        'slots_per_minute' => 30,
+        'slots_per_hour' => 200,
         'chat_per_minute' => 10,
         'chat_per_hour' => 60,
         'pixel_per_minute' => 60,

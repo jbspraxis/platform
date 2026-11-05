@@ -54,6 +54,8 @@ $pages = function () {
     Route::post('/contact', [ContactController::class, 'store'])->middleware(['throttle:forms', 'guard:contact'])->name('contact.store');
 
     Route::get('/schedule', [ScheduleController::class, 'show'])->name('schedule');
+    // The free times as JSON, for the conversation's own calendar (it moves between months without reloading)
+    Route::get('/schedule/slots', [ScheduleController::class, 'slots'])->middleware('throttle:slots')->name('schedule.slots');
     Route::post('/schedule', [ScheduleController::class, 'store'])->middleware(['throttle:forms', 'guard:schedule'])->name('schedule.store');
 
     Route::get('/cost-calculator', [CalculatorController::class, 'show'])->name('calculator');

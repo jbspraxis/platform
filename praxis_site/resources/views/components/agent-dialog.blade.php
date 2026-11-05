@@ -17,6 +17,7 @@
     'lists' => [],
     'gate',            // ['name' => …, 'kind' => 'text'|'email'|'longtext', 'label' => …, 'hint' => …]
     'enctype' => null,
+    'slots' => null,   // where the free times are read from, for a form with a day and time to choose
     'files' => [],     // real file inputs this form needs: ['cv' => ['accept' => '.pdf,.doc', 'label' => …]]
 ])
 @php
@@ -40,7 +41,8 @@
         data-form="{{ $form }}"
         data-locale="{{ app()->getLocale() }}"
         data-strings="{{ json_encode($strings, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}"
-        data-lists="{{ json_encode($agentLists, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}">
+        data-lists="{{ json_encode($agentLists, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}"
+        @if ($slots) data-slots="{{ $slots }}" @endif>
     <form class="agent-shell" method="POST" action="{{ $action }}" data-agent-form novalidate
           @if ($enctype) enctype="{{ $enctype }}" @endif>
         @csrf

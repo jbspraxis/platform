@@ -17,6 +17,20 @@
             </div>
         @else
             <div class="layout-aside">
+                @php
+                    $agent = array_replace_recursive(__('site.agent.common'), __('site.agent.schedule'));
+                    // The calendar inside the conversation names its own weekdays
+                    $agent['weekdays'] = __('site.schedule.weekdays');
+                @endphp
+                {{-- The same booking as a conversation, for anyone who would rather answer that way. The
+                     button only does anything with JavaScript; the form below it is unchanged and remains
+                     the way in, calendar and all. --}}
+                <p class="agent-switch">
+                    <button class="btn btn-secondary" type="button" data-agent-open="schedule" data-agent-reveal hidden>
+                        <i data-lucide="message-square-text"></i>{{ $agent['open'] }}
+                    </button>
+                </p>
+
                 <form class="card form" method="POST" action="{{ route('schedule.store') }}" novalidate>
                     @csrf
                     <x-form-guard form="schedule" />
@@ -127,6 +141,14 @@
                     <h2 class="card-title">{{ __('site.schedule.next_title') }}</h2>
                     <p>{{ __('site.schedule.next_body') }}</p>
                 </aside>
+
+                <x-agent-dialog
+                    form="schedule"
+                    :action="route('schedule.store')"
+                    :slots="route('schedule.slots')"
+                    :strings="$agent"
+                    :lists="['focuses' => __('site.schedule.focuses')]"
+                    :gate="['name' => 'email', 'kind' => 'email', 'label' => __('site.schedule.email'), 'max' => 100]" />
             </div>
         @endif
     </div>

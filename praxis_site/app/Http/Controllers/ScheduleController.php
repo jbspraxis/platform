@@ -19,6 +19,73 @@ class ScheduleController extends Controller
 
     public function show(Request $request, HqApi $api)
     {
+        ['month' => $month, 'free' => $free, 'selected' => $selected, 'previous' => $previous, 'next' => $next, 'tz' => $tz]
+            = $this->month($request, $api);
+
+        // Weeks start on Monday; empty cells pad the first and last week
+        $weeks = [];
+        $week = array_fill(0, $month->dayOfWeekIso - 1, null);
+        for ($d = $month; $d->month === $month->month; $d = $d->addDay()) {
+            $date = $d->format('Y-m-d');
+            $week[] = [
+                'date' => $date,
+                'day' => $d->day,
+                'label' => Format::date($date . 'T12:00:00', $tz),
+                'slots' => count($free[$date] ?? []),
+                'selected' => $date === $selected,
+            ];
+            if (count($week) === 7) {
+                $weeks[] = $week;
+                $week = [];
+            }
+        }
+        if ($week) {
+            $weeks[] = array_pad($week, 7, null);
+        }
+
+        return view('pages.schedule', [
+            'month' => $month,
+            'monthLabel' => $month->locale(app()->getLocale())->isoFormat('MMMM YYYY'),
+            'previous' => $previous,
+            'next' => $next,
+            'weeks' => $weeks,
+            'hasFreeDays' => $free !== [],
+            'selected' => $selected,
+            'selectedLabel' => $selected !== '' ? Format::date($selected . 'T12:00:00', $tz) : null,
+            'times' => $free[$selected] ?? [],
+        ]);
+    }
+
+    /**
+     * GET /schedule/slots?month=YYYY-MM: the same free days this page reads, as JSON.
+     *
+     * The conversation (components/agent-dialog) draws its own calendar and lets people move between
+     * months without leaving it, which the page does by reloading. Nothing is cached here and nothing new
+     * is asked of HQ: it is the one read show() already makes, answered to the browser instead of a view.
+     */
+    public function slots(Request $request, HqApi $api)
+    {
+        ['month' => $month, 'free' => $free, 'previous' => $previous, 'next' => $next] = $this->month($request, $api);
+
+        return response()->json([
+            'month' => $month->format('Y-m'),
+            'label' => $month->locale(app()->getLocale())->isoFormat('MMMM YYYY'),
+            'first_weekday' => $month->dayOfWeekIso,   // 1 is Monday, as the page's grid starts
+            'days_in_month' => $month->daysInMonth,
+            'previous' => $previous,
+            'next' => $next,
+            'days' => $free,
+        ]);
+    }
+
+    /**
+     * The month being looked at and the days in it that have free times, from GET /booking/slots.
+     * Both the page and the JSON read it through here so they can never disagree about what is free.
+     *
+     * @return array{month: CarbonImmutable, free: array<string, list<string>>, selected: string, previous: ?string, next: ?string, tz: string}
+     */
+    private function month(Request $request, HqApi $api): array
+    {
         $tz = (string) config('site.booking_timezone', 'Africa/Lagos');
         $thisMonth = CarbonImmutable::now($tz)->startOfMonth();
         // A booking can be at most 92 days ahead (docs/SITE_API.md 6.2): later days are never offered
@@ -55,38 +122,14 @@ class ScheduleController extends Controller
             $selected = '';
         }
 
-        // Weeks start on Monday; empty cells pad the first and last week
-        $weeks = [];
-        $week = array_fill(0, $month->dayOfWeekIso - 1, null);
-        for ($d = $month; $d->month === $month->month; $d = $d->addDay()) {
-            $date = $d->format('Y-m-d');
-            $week[] = [
-                'date' => $date,
-                'day' => $d->day,
-                'label' => Format::date($date . 'T12:00:00', $tz),
-                'slots' => count($free[$date] ?? []),
-                'selected' => $date === $selected,
-            ];
-            if (count($week) === 7) {
-                $weeks[] = $week;
-                $week = [];
-            }
-        }
-        if ($week) {
-            $weeks[] = array_pad($week, 7, null);
-        }
-
-        return view('pages.schedule', [
+        return [
             'month' => $month,
-            'monthLabel' => $month->locale(app()->getLocale())->isoFormat('MMMM YYYY'),
+            'free' => $free,
+            'selected' => $selected,
             'previous' => $month->gt($thisMonth) ? $month->subMonth()->format('Y-m') : null,
             'next' => $month->lt($lastMonth) ? $month->addMonth()->format('Y-m') : null,
-            'weeks' => $weeks,
-            'hasFreeDays' => $free !== [],
-            'selected' => $selected,
-            'selectedLabel' => $selected !== '' ? Format::date($selected . 'T12:00:00', $tz) : null,
-            'times' => $free[$selected] ?? [],
-        ]);
+            'tz' => $tz,
+        ];
     }
 
     public function store(Request $request, HqApi $api)

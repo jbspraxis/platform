@@ -56,11 +56,65 @@ class ScheduleTest extends TestCase
             ->assertSee('What would you like to focus on?');
     }
 
+    public function test_the_slots_route_answers_the_same_free_days_as_the_page(): void
+    {
+        $this->fakeHq(['booking/slots*' => Http::response($this->slots())]);
+
+        $this->get('/schedule/slots')->assertOk()
+            ->assertJson([
+                'month' => '2026-11',
+                'label' => 'November 2026',
+                'first_weekday' => 7,     // 1 November 2026 is a Sunday
+                'days_in_month' => 30,
+                'previous' => null,       // this month, so there is nothing before it
+                'next' => '2026-12',
+                'days' => [
+                    '2026-11-04' => ['09:00'],
+                    '2026-11-05' => ['10:30', '14:30'],
+                ],
+            ]);
+
+        // Only the days that have times, and the same single read of HQ the page makes
+        $days = $this->get('/schedule/slots')->json('days');
+        $this->assertSame(['2026-11-04', '2026-11-05'], array_keys($days));
+        Http::assertSent(fn (HttpRequest $r) => str_ends_with($r->url(), '/booking/slots?month=2026-11'));
+    }
+
+    public function test_the_slots_route_keeps_to_the_same_window_as_the_calendar(): void
+    {
+        $this->fakeHq(['booking/slots*' => Http::response($this->slots())]);
+
+        // A month in the past is clamped to this one, and no earlier month is offered
+        $this->get('/schedule/slots?month=2025-01')->assertOk()->assertJson(['month' => '2026-11', 'previous' => null]);
+
+        // Beyond the 92-day window the last bookable month is the furthest offered
+        $this->get('/schedule/slots?month=2027-09')->assertOk()->assertJson(['month' => '2027-02', 'next' => null]);
+
+        // Nonsense is ignored rather than trusted
+        $this->get('/schedule/slots?month=not-a-month')->assertOk()->assertJson(['month' => '2026-11']);
+    }
+
+    public function test_a_day_beyond_the_window_is_not_offered_as_free(): void
+    {
+        // 2 February 2027 is the last bookable day; the 3rd is past it
+        $this->fakeHq(['booking/slots*' => Http::response(['data' => ['month' => '2027-02', 'timezone' => 'Africa/Lagos', 'days' => [
+            ['date' => '2027-02-02', 'slots' => ['09:00']],
+            ['date' => '2027-02-03', 'slots' => ['09:00']],
+        ]]])]);
+
+        $days = $this->get('/schedule/slots?month=2027-02')->assertOk()->json('days');
+        $this->assertSame(['2027-02-02'], array_keys($days), 'the day past the window is not offered');
+    }
+
     public function test_months_before_this_one_are_not_offered(): void
     {
         $this->fakeHq(['booking/slots*' => Http::response($this->slots())]);
 
-        $this->get('/schedule?month=2025-01')->assertOk()->assertDontSee('Previous month');
+        // The link itself, not the words: the page also carries the conversation's strings, which name
+        // the months for its own calendar. What matters is that no earlier month is linked to.
+        $this->get('/schedule?month=2025-01')->assertOk()
+            ->assertDontSee(url('/schedule?month=2026-10'), false)
+            ->assertSee('November 2026');
         Http::assertSent(fn (HttpRequest $r) => str_ends_with($r->url(), 'month=2026-11'));
     }
 
@@ -166,7 +220,8 @@ class ScheduleTest extends TestCase
             ['date' => '2027-02-03', 'slots' => ['09:00']],
         ]]])]);
 
-        $response = $this->get('/schedule?month=2027-02')->assertOk()->assertSee('February 2027')->assertDontSee('Next month');
+        $response = $this->get('/schedule?month=2027-02')->assertOk()->assertSee('February 2027')
+            ->assertDontSee(url('/schedule?month=2027-03'), false);
         $response->assertSee('href="' . url('/schedule?month=2027-02&amp;date=2027-02-02') . '#step-time"', false)
             ->assertDontSee('date=2027-02-03', false)
             ->assertSee('Wednesday 3 February 2027, no times available');

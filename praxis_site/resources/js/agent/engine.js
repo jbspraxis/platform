@@ -27,6 +27,7 @@ const wait = (ms) => new Promise((resolve) => { window.setTimeout(resolve, REDUC
 export function buildAgent(dialog, flow) {
     const strings = read(dialog, 'strings');
     const lists = read(dialog, 'lists');
+    const locale = dialog.dataset.locale === 'fr' ? 'fr' : 'en';
 
     const el = {
         form: dialog.querySelector('[data-agent-form]'),
@@ -57,6 +58,8 @@ export function buildAgent(dialog, flow) {
     };
 
     const t = (path, replace) => fill(dig(strings, path), replace);
+    /** The value as it is, for the few that are a list or a map rather than a sentence. */
+    const raw = (path) => dig(strings, path);
     const options = (name) => (Array.isArray(lists[name]) ? lists[name] : []);
     const byName = (name) => flow.fields.find((field) => field.name === name) || null;
     const gateField = () => flow.fields.find((field) => field.gate) || null;
@@ -237,6 +240,7 @@ export function buildAgent(dialog, flow) {
             el.log.lastElementChild.append(note);
         }
         if (field.kind === 'picker') picker(field);
+        else if (field.kind === 'slot') slotStep(field);
         else if (field.kind === 'file') fileChoice(field);
         else choices(pillsFor(field));
         el.input.focus({ preventScroll: true });
@@ -379,6 +383,155 @@ export function buildAgent(dialog, flow) {
         await say(t('edit.ok', { field: t(`short.${field.name}`).toLowerCase(), value: state.shown[field.name] }));
         await ask(field);
     }
+
+    /**
+     * Picking a day and a time. Days come from the site's own /schedule/slots, the same read the page
+     * makes, so the two can never disagree about what is free; moving between months happens here rather
+     * than by reloading the page. It is asked last on purpose: the less time between choosing a time and
+     * sending the form, the less chance of someone else taking it first.
+     */
+    async function slotStep(field) {
+        let month = state.month || '';
+        el.choices.replaceChildren();
+        el.choices.hidden = false;
+
+        const frame = document.createElement('span');
+        frame.className = 'agent-cal';
+        el.choices.append(frame);
+
+        const load = async (want) => {
+            frame.replaceChildren(note(t('slot.loading')));
+            let data;
+            try {
+                const url = new URL(dialog.dataset.slots, window.location.origin);
+                if (want) url.searchParams.set('month', want);
+                const answer = await fetch(url, { headers: { Accept: 'application/json' } });
+                if (!answer.ok) throw new Error(String(answer.status));
+                data = await answer.json();
+            } catch {
+                frame.replaceChildren(note(t('slot.failed')));
+                return;
+            }
+            month = data.month;
+            state.month = month;
+            draw(data);
+        };
+
+        const note = (text) => {
+            const line = document.createElement('span');
+            line.className = 'agent-cal-note';
+            line.textContent = text;
+            return line;
+        };
+
+        const draw = (data) => {
+            frame.replaceChildren();
+
+            const head = document.createElement('span');
+            head.className = 'agent-cal-head';
+            head.append(
+                navButton(data.previous, t('slot.previous'), '\u2039'),
+                Object.assign(document.createElement('span'), { className: 'agent-cal-month', textContent: data.label }),
+                navButton(data.next, t('slot.next'), '\u203a'),
+            );
+            frame.append(head);
+
+            const grid = document.createElement('span');
+            grid.className = 'agent-cal-grid';
+            for (const short of Object.keys(raw('weekdays') || {})) {
+                const cell = document.createElement('span');
+                cell.className = 'agent-cal-weekday';
+                cell.textContent = short;
+                grid.append(cell);
+            }
+            for (let blank = 1; blank < data.first_weekday; blank += 1) {
+                grid.append(Object.assign(document.createElement('span'), { className: 'agent-cal-blank' }));
+            }
+            for (let day = 1; day <= data.days_in_month; day += 1) {
+                const date = `${data.month}-${String(day).padStart(2, '0')}`;
+                const times = data.days[date] || [];
+                if (!times.length) {
+                    const shut = document.createElement('span');
+                    shut.className = 'agent-cal-day is-shut';
+                    shut.textContent = String(day);
+                    grid.append(shut);
+                    continue;
+                }
+                const open = document.createElement('button');
+                open.type = 'button';
+                open.className = 'agent-cal-day';
+                open.textContent = String(day);
+                open.setAttribute('aria-label', t('slot.free', { date, count: String(times.length) }));
+                open.addEventListener('click', () => { if (!state.busy) times_(date, times); });
+                grid.append(open);
+            }
+            frame.append(grid);
+
+            if (!Object.keys(data.days).length) frame.append(note(t('slot.none')));
+        };
+
+        const navButton = (to, label, glyph) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'agent-cal-nav';
+            button.textContent = glyph;
+            button.setAttribute('aria-label', label);
+            button.title = label;
+            if (!to) button.disabled = true;
+            else button.addEventListener('click', () => { if (!state.busy) load(to); });
+            return button;
+        };
+
+        /** The times free on a chosen day, as pills. */
+        const times_ = (date, times) => {
+            el.choices.replaceChildren();
+            const back = document.createElement('button');
+            back.type = 'button';
+            back.className = 'agent-pill is-quiet';
+            back.textContent = t('slot.back');
+            back.addEventListener('click', () => { if (!state.busy) slotStep(field); });
+            el.choices.append(back);
+
+            times.forEach((time, index) => {
+                const pill = document.createElement('button');
+                pill.type = 'button';
+                pill.className = 'agent-pill';
+                pill.textContent = time;
+                pill.style.setProperty('--i', String(index));
+                pill.addEventListener('click', async () => {
+                    if (state.busy) return;
+                    state.busy = true;
+                    el.choices.replaceChildren();
+                    el.choices.hidden = true;
+                    chooseSlot(field, date, time);
+                    echo(`${longDate(date)}, ${time}`);
+                    await onward();
+                    state.busy = false;
+                });
+                el.choices.append(pill);
+            });
+        };
+
+        await load(month);
+    }
+
+    /** A day and a time are one answer to the visitor and two inputs to the controller. */
+    function chooseSlot(field, date, time) {
+        store(field, date, `${longDate(date)}, ${time}`);
+        const pair = field.pairs;
+        if (!pair) return;
+        const input = el.hidden.querySelector(`input[name="${pair}"]`) || el.hidden.appendChild(document.createElement('input'));
+        input.type = 'hidden';
+        input.name = pair;
+        input.value = time;
+        state.time = time;
+    }
+
+    const longDate = (date) => {
+        const [y, m, d] = date.split('-').map(Number);
+        return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(locale === 'fr' ? 'fr-FR' : 'en-GB',
+            { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+    };
 
     /**
      * Choosing a file. The input is a real one inside this form, because a File cannot be written into a
@@ -668,6 +821,22 @@ export function buildAgent(dialog, flow) {
     }
 
     async function submit() {
+        // Someone else may have taken the time while this conversation was being had. Asking for it last
+        // makes that unlikely; checking once more here means that when it does happen they are asked for
+        // another time instead of losing everything they have just typed.
+        const slot = flow.fields.find((field) => field.kind === 'slot');
+        if (slot && state.answers[slot.name] && !(await slotStillFree(state.answers[slot.name], state.time))) {
+            state.phase = 'asking';
+            delete state.answers[slot.name];
+            delete state.shown[slot.name];
+            el.hidden.querySelector(`input[name="${slot.name}"]`)?.remove();
+            if (slot.pairs) el.hidden.querySelector(`input[name="${slot.pairs}"]`)?.remove();
+            paint();
+            await say(t('slot.taken'));
+            await ask(slot);
+            return;
+        }
+
         state.phase = 'sending';
         choices([]);
         el.input.disabled = true;
@@ -676,6 +845,20 @@ export function buildAgent(dialog, flow) {
         await say(t('sent'));
         // A plain POST to the route the page form already posts to: Post/Redirect/Get
         el.form.submit();
+    }
+
+    /** Whether that day still offers that time. If we cannot tell, we let the send go ahead: HQ decides. */
+    async function slotStillFree(date, time) {
+        try {
+            const url = new URL(dialog.dataset.slots, window.location.origin);
+            url.searchParams.set('month', date.slice(0, 7));
+            const answer = await fetch(url, { headers: { Accept: 'application/json' } });
+            if (!answer.ok) return true;
+            const data = await answer.json();
+            return (data.days?.[date] || []).includes(time);
+        } catch {
+            return true;
+        }
     }
 
     // ------------------------------------------------------------ the one field asked the ordinary way
