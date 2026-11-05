@@ -665,6 +665,15 @@ return [
     ],
 
     // /verify/{token} : la page qu’ouvre le QR code d’un document officiel (docs/DOCUMENTS.md section 7)
+    'profile_link' => [
+        'eyebrow' => 'Profil de l’entreprise',
+        'title' => 'Ce lien a expiré',
+        'description' => 'Un lien vers le profil de JBS Praxis qui n’est plus ouvert.',
+        'ended' => 'Le lien que vous avez suivi n’ouvre plus notre profil d’entreprise. Chaque lien est créé pour un lecteur et se referme après un certain temps : celui-ci a probablement simplement fait son temps.',
+        'too_many' => 'Ce lien a été ouvert un très grand nombre de fois dans la dernière heure ; il se repose. Merci de réessayer dans un instant.',
+        'ask' => 'Si quelqu’un de JBS Praxis vous l’a envoyé, demandez-lui un nouveau lien, ou écrivez à :email et nous vous en enverrons un.',
+        'cta' => 'Nous écrire',
+    ],
     'verify' => [
         'eyebrow' => 'Vérification de document',
         'title' => 'Ce document est-il authentique ?',

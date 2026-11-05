@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Exceptions\Hq\HqConflict;
+use App\Exceptions\Hq\HqGone;
 use App\Exceptions\Hq\HqNotFound;
 use App\Exceptions\Hq\HqRateLimited;
 use App\Exceptions\Hq\HqUnavailable;
@@ -183,6 +184,30 @@ final class HqApi
         $this->data($response, 'clients.file');
 
         throw new HqUnavailable('HQ answered without the logo');
+    }
+
+    /**
+     * GET /profile/{token}: the company profile behind a tracked share link
+     * (docs/COMPANY_PROFILE.md section 14). Never cached here: the link can be revoked at any moment, and
+     * HQ counts the open, so every request must reach it.
+     *
+     * Returns the PDF bytes. A link that has ended raises HqGone, which the page turns into its own words.
+     */
+    public function profileShare(string $token): string
+    {
+        $response = $this->send('GET', '/profile/' . rawurlencode($token));
+        if ($response->successful() && str_contains((string) $response->header('Content-Type'), 'application/pdf')) {
+            return $response->body();
+        }
+
+        if ($response->status() === 410) {
+            throw new HqGone((string) ($response->json('error.state') ?: 'not_found'));
+        }
+
+        // Anything else (429, 503, a malformed answer) raises the right typed exception
+        $this->data($response, 'profile.share');
+
+        throw new HqUnavailable('HQ answered without the profile');
     }
 
     /** GET /booking/slots?month=YYYY-MM (not cached: free times change). */

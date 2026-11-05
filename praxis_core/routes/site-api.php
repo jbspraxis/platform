@@ -9,6 +9,7 @@ use App\Http\Controllers\SiteApi\EnquiryController;
 use App\Http\Controllers\SiteApi\FormsController;
 use App\Http\Controllers\SiteApi\KaizenController;
 use App\Http\Controllers\SiteApi\NotFoundController;
+use App\Http\Controllers\SiteApi\ProfileShareController;
 use App\Http\Controllers\SiteApi\SettingsController;
 use App\Http\Controllers\SiteApi\TrackingController;
 use App\Support\Hosts;
@@ -32,6 +33,10 @@ Route::domain(Hosts::hq())->group(function () {
         Route::get('/kaizen/articles', [KaizenController::class, 'index']);
         Route::get('/kaizen/articles/{slug}', [KaizenController::class, 'show'])->where('slug', '[A-Za-z0-9-]{1,255}');
         Route::get('/portfolio', [FormsController::class, 'portfolio']);
+
+        // A tracked share link for the company profile (docs/COMPANY_PROFILE.md section 14): the PDF
+        // itself while the link is open, 410 link_ended otherwise. The open is counted on the way out.
+        Route::get('/profile/{token}', [ProfileShareController::class, 'show'])->where('token', '[A-Za-z0-9]{48}');
 
         // The logo strip (docs/COMPANY_PROFILE.md section 4): the list, then one WebP at a time. The site
         // caches both and serves its last good copy when HQ cannot be reached, so the strip never breaks.

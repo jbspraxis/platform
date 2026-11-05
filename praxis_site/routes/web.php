@@ -8,6 +8,7 @@ use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\KaizenController;
 use App\Http\Controllers\ClientLogoController;
 use App\Http\Controllers\PageController;
+use App\Http\Controllers\ProfileShareController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\ServicesController;
@@ -61,6 +62,11 @@ $pages = function () {
     Route::get('/dossier/{token}', [ReportController::class, 'show'])->where('token', '[A-Za-z0-9-]{6,100}')->name('report');
 
     // The QR code on a formal document (docs/DOCUMENTS.md section 7): is it genuine, and does it still stand?
+    // A tracked share link for the company profile (docs/COMPANY_PROFILE.md section 14). Private rather
+    // than secret-keeping: a 48-character token, never indexed, limited, and revocable from HQ.
+    Route::get('/profile/{token}', [ProfileShareController::class, 'show'])
+        ->where('token', '[A-Za-z0-9]{48}')->middleware('throttle:profile-share')->name('profile.share');
+
     Route::get('/verify/{token}', [VerifyController::class, 'show'])->where('token', '[A-Za-z0-9]{24,64}')->name('verify');
     Route::get('/verify/{token}/document.pdf', [VerifyController::class, 'file'])->where('token', '[A-Za-z0-9]{24,64}')->name('verify.file');
 
