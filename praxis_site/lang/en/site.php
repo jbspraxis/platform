@@ -640,6 +640,14 @@ return [
                 'more' => ':n more — keep typing to narrow it down.',
             ],
 
+            'file' => [
+                'choose' => 'Choose a file',
+                'again' => 'I need the file itself — choose it below.',
+                'type' => 'That has to be a :types file.',
+                'size' => 'That one is :got, and the limit is :max. Could you send a smaller one?',
+                'empty' => 'That file is empty — could you check it?',
+            ],
+
             'errors' => [
                 'email' => 'That doesn’t look like an email address — could you check it?',
                 'phone' => 'That doesn’t look like a phone number — could you check it?',
@@ -804,6 +812,84 @@ return [
             ],
 
             'sent' => 'Sending that to the team now.',
+        ],
+
+        // /careers
+        'careers' => [
+            'icon' => 'briefcase',
+            'title' => 'Careers',
+            'open' => 'Apply in a conversation instead',
+
+            'gate' => [
+                'heading' => 'Tell us about something you fixed',
+                'lead' => 'A process or a system that wasn’t working, what you changed, and what happened next. We’ll ask the rest as we go.',
+                'start' => 'Start',
+                'invalid' => 'Could you give me a little more? A few sentences is plenty.',
+            ],
+
+            'steps' => [
+                'you' => 'You',
+                'reach' => 'Reaching you',
+                'skills' => 'Your skills',
+                'work' => 'Your work',
+            ],
+
+            'hello' => 'Thank you — that’s the part we read first. Now a few details.',
+
+            'ask' => [
+                'full_name' => 'What’s your full name?',
+                'email' => 'And your email address?',
+                'country_code' => 'Which country is your phone number in?',
+                'phone' => 'And the number itself?',
+                'city' => 'Which city are you in?',
+                'primary_skill' => 'What’s your main skill?',
+                'other_skill' => 'Tell me in your own words.',
+                'secondary_skillset' => 'What else do you work with?',
+                'linkedin_url' => 'What’s your LinkedIn profile?',
+                'portfolio_url' => 'A portfolio or GitHub, if you have one?',
+                'cv' => 'Last thing — your CV.',
+            ],
+
+            'hint' => [
+                'country_code' => 'Search by country or by code — “nig” and “234” both find Nigeria.',
+                'phone' => 'Just the local number; I have the country code.',
+                'secondary_skillset' => 'For example: SQL, process mapping, Power BI.',
+                'linkedin_url' => 'The address is enough — I’ll tidy it up.',
+                'portfolio_url' => 'Skip it if you’d rather not.',
+                'cv' => 'PDF, DOC or DOCX, up to 5 MB.',
+            ],
+
+            'short' => [
+                'praxis_answer' => 'What you fixed',
+                'full_name' => 'Name',
+                'email' => 'Email',
+                'country_code' => 'Country code',
+                'phone' => 'Phone',
+                'city' => 'City',
+                'primary_skill' => 'Main skill',
+                'other_skill' => 'Your skill',
+                'secondary_skillset' => 'Other skills',
+                'linkedin_url' => 'LinkedIn',
+                'portfolio_url' => 'Portfolio',
+                'cv' => 'CV',
+            ],
+
+            'words' => [
+                'praxis_answer' => 'what i fixed|the answer|my example|the story',
+                'full_name' => 'my name|name|who i am',
+                'email' => 'e-mail|address',
+                'country_code' => 'country|dialling code|dial code|code',
+                'phone' => 'number|telephone|mobile|cell',
+                'city' => 'town|where i am|location',
+                'primary_skill' => 'main skill|skill|speciality|specialty',
+                'other_skill' => 'my skill|describe my skill',
+                'secondary_skillset' => 'other skills|also|secondary',
+                'linkedin_url' => 'linkedin|profile',
+                'portfolio_url' => 'portfolio|github|website|work',
+                'cv' => 'cv|resume|résumé|file|attachment',
+            ],
+
+            'sent' => 'Sending your application now.',
         ],
     ],
 

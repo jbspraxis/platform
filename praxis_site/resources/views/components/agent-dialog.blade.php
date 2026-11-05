@@ -17,6 +17,7 @@
     'lists' => [],
     'gate',            // ['name' => …, 'kind' => 'text'|'email'|'longtext', 'label' => …, 'hint' => …]
     'enctype' => null,
+    'files' => [],     // real file inputs this form needs: ['cv' => ['accept' => '.pdf,.doc', 'label' => …]]
 ])
 @php
     // Lists are given the way the page already has them (value => label, from lang or from HQ); the engine
@@ -47,6 +48,17 @@
              form name comes from the route, not from here --}}
         <x-form-guard :form="$guard ?? $form . '-agent'" />
         <div data-agent-hidden hidden></div>
+
+        {{-- A File cannot be written into a hidden input from script, so the real one lives here and the
+             visitor picks on it; the browser then posts it from where they chose it. It is placed off
+             screen rather than display:none, so that clicking it from the conversation works everywhere. --}}
+        @foreach ((array) $files as $fileName => $file)
+            <label class="agent-file" for="agent-{{ $form }}-{{ $fileName }}">
+                <span>{{ $file['label'] ?? $fileName }}</span>
+                <input type="file" id="agent-{{ $form }}-{{ $fileName }}" name="{{ $fileName }}"
+                       accept="{{ $file['accept'] ?? '' }}" tabindex="-1">
+            </label>
+        @endforeach
 
         <header class="agent-head">
             <div class="agent-head-row">
