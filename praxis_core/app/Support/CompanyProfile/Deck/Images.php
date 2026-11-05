@@ -27,6 +27,39 @@ final class Images
         return self::png($bytes) ?? self::jpeg($bytes);
     }
 
+    /**
+     * How large one logo is drawn on the wall.
+     *
+     * Logos arrive at every proportion, and matching them on height alone makes a wide wordmark shout and
+     * a square mark whisper — the book learnt this first (App\Support\CompanyProfile\Assets::logoBox).
+     * Matching them on **area** is what a designer does by eye. The box is then clamped so nothing breaks
+     * its cell or its row.
+     *
+     * @return array{width: float, height: float}|null
+     */
+    public static function box(string $path, float $area, float $maxWidth, float $maxHeight): ?array
+    {
+        $size = self::size($path);
+        if ($size === null || $size['width'] <= 0 || $size['height'] <= 0) {
+            return null;
+        }
+
+        $ratio = $size['width'] / $size['height'];
+        $width = sqrt($area * $ratio);
+        $height = $width / $ratio;
+
+        if ($width > $maxWidth) {
+            $width = $maxWidth;
+            $height = $width / $ratio;
+        }
+        if ($height > $maxHeight) {
+            $height = $maxHeight;
+            $width = $height * $ratio;
+        }
+
+        return ['width' => round($width, 2), 'height' => round($height, 2)];
+    }
+
     /** The part extension a file goes into the package under, or null when it is not one we place. */
     public static function extension(string $path): ?string
     {

@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\CompanyProfile;
 
+use App\Models\CompanyProfile\ClientLogo;
 use App\Support\CompanyProfile\Deck\Blueprint;
 use App\Support\CompanyProfile\Deck\Zip;
+use App\Support\CompanyProfile\LogoLibrary;
 use App\Support\CompanyProfile\Profile;
 use App\Support\CompanyProfile\Typography;
 use Tests\Feature\UsesThrowawayDatabase;
@@ -19,7 +21,28 @@ use Tests\TestCase;
  */
 class ProfileDownloadDeckTest extends TestCase
 {
-    use ProfileFixtures, UsesThrowawayDatabase;
+    use LogoFixtures, ProfileFixtures, UsesThrowawayDatabase;
+
+    public function test_the_wall_carries_the_logos_the_library_ticks_for_the_deck(): void
+    {
+        ClientLogo::query()->delete();
+
+        // Two for the deck, one kept off it: the deck asks the library for its own set, not the book's
+        LogoLibrary::save(['name' => 'Deck One (test)'], ['print' => $this->jpeg(), 'png' => $this->png()]);
+        LogoLibrary::save(['name' => 'Deck Two (test)'], ['print' => $this->jpeg(), 'png' => $this->png()]);
+        LogoLibrary::save(['name' => 'Book Only (test)', 'on_deck' => false], ['print' => $this->jpeg(), 'png' => $this->png()]);
+
+        $this->assertCount(2, LogoLibrary::shownOn('deck'));
+
+        $response = $this->actingAs($this->person(['view']))->get($this->hqUrl('/company-profile/deck?locale=en'));
+        $response->assertOk();
+
+        $entries = Zip::entries((string) $response->getContent());
+        $wall = $entries['ppt/slides/slide22.xml'];
+
+        $this->assertSame(2, substr_count($wall, '<p:pic>'), 'the wall is not drawing the library\'s logos');
+        $this->assertStringNotContainsString('Book Only (test)', $wall, 'a logo kept off the deck reached it');
+    }
 
     public function test_the_download_deck_button_sends_a_twenty_four_slide_pptx_in_both_languages(): void
     {

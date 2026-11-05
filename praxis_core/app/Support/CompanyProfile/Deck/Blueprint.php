@@ -33,6 +33,11 @@ final class Blueprint
 
     private const CONTENT_Y = self::RULE_TOP + self::RULE_GAP;
 
+    /** The wall: every logo drawn to the same optical area, in a band this tall. */
+    private const LOGO_AREA = 2400.0;
+
+    private const LOGO_HEIGHT = 52.0;
+
     /**
      * Draw a section's rule above a block of this height, with the pair set in the live area rather than
      * clinging to the top of it, and answer where the content starts.
@@ -563,16 +568,22 @@ final class Blueprint
             $id = null;
 
             if (isset($logo['path'])) {
-                $size = Images::size($logo['path']);
-                if ($size !== null && $size['height'] > 0) {
-                    $width = min($cell, 48.0 * $size['width'] / $size['height']);
-                    $height = $width * $size['height'] / $size['width'];
-                    $id = $slide->picture($logo['path'], $x + (($cell - $width) / 2), $y + ((56.0 - $height) / 2), $width, $height, 'logo');
+                // Equal area, not equal height: see Deck\Images::box
+                $box = Images::box($logo['path'], self::LOGO_AREA, $cell, self::LOGO_HEIGHT);
+                if ($box !== null) {
+                    $id = $slide->picture(
+                        $logo['path'],
+                        $x + (($cell - $box['width']) / 2),
+                        $y + ((self::LOGO_HEIGHT - $box['height']) / 2),
+                        $box['width'],
+                        $box['height'],
+                        'logo',
+                    );
                 }
             }
 
             // No PNG for this one: the name, set the way the wall would have set the mark
-            $id ??= $slide->text($x, $y + 8.0, $cell, [
+            $id ??= $slide->text($x, $y + 10.0, $cell, [
                 ['text' => (string) $logo['name'], 'role' => 'subhead', 'colour' => Style::INK],
             ], ['name' => 'client']);
 

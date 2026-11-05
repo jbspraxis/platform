@@ -206,7 +206,7 @@ own keys (`company-profile/CONTRACT.md`).
 | 19 | **Teams**, 3–4 | `teams.items[2..3]` | Morph; the same build |
 | 20 | **Selected work** — the opener and the first three | `work.title`, `work.lead`, `work.items[0..2]` | the head rises, the rule draws, each hairline wipes and its case rises |
 | 21 | **Selected work** — the other three | `work.items[3..5]` | Morph; the same build |
-| 22 | **Clients** | `clients.title`, `clients.logos` | the head rises, the rule draws, the wall fades in, 70ms apart |
+| 22 | **Clients** | `clients.title`, `clients.logos` (the library's deck set) | the head rises, the rule draws, the wall fades in, 70ms apart |
 | 23 | **Security and company facts** (Ink) | `security.title`, `security.items`, `facts.title`, **enabled** `facts.items` | the head rises, the rule draws in white then Bright Teal, the items fade, the facts rise |
 | 24 | **Back cover** | `contact.*`, `meta` | the call rises, the rule draws, the contact fades, the hairline wipes, the closing line rises |
 
@@ -220,8 +220,20 @@ them — the same decision the book made, for the same reason.
 **transparent PNG** of every logo for exactly this and knows which logos are ticked for the deck rather
 than for the book. The deck asks it for `forProfile('deck')`. A wall is never worth a failed download,
 so with no library — a preview off the seed, a test with no database — it falls back to what the
-contract carries, and then to the clients the profile itself names in its work. Nothing invents a
-client or renames one.
+contract carries, and then to the clients the profile itself names in its work, set in the serif at
+sub-head size so the slide still reads as a wall. Nothing invents a client or renames one. A logo the
+library has no PNG for keeps its name and loses its mark, which is the rule the book keeps for SVGs
+dompdf cannot draw.
+
+**Matched on area, not on height.** Logos arrive at every proportion, and scaling them all to one
+height makes a wide wordmark shout and a square mark whisper. `Deck\Images::box()` gives every mark the
+same optical area (2400pt²) and then clamps it to its cell and to a 52pt band, so a mark too tall for
+the band is held to the band rather than breaking the row. The book learnt this first
+(`App\Support\CompanyProfile\Assets::logoBox`); this is the same rule with the deck's own reader.
+
+The committed previews are rendered from the seed, which carries no logos, so slide 22 shows the
+fallback there. `deck-previews/en-22-with-logos.jpg` is the same slide rendered with twelve marks on
+the library, which is what sales will see.
 
 ---
 
@@ -252,7 +264,7 @@ php artisan company-profile:deck --fit              measures both and writes not
 ```
 
 `docs/company-profile/deck-previews/` holds every slide as an image in both languages, plus a contact
-sheet per language. They are rendered by opening the deck in PowerPoint and exporting PNGs, then
+sheet per language and `en-22-with-logos.jpg`, the wall with marks on it. They are rendered by opening the deck in PowerPoint and exporting PNGs, then
 scaling them; **a renderer is not part of the app**.
 
 **What a still frame cannot show:** the previews are the final frame of every slide, so they show the

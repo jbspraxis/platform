@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\CompanyProfile;
 
+use App\Support\CompanyProfile\ClientLogos;
 use App\Support\CompanyProfile\Deck\Blueprint;
 use App\Support\CompanyProfile\Deck\DeckRenderer;
 use App\Support\CompanyProfile\Deck\Fit;
@@ -25,10 +26,23 @@ use Tests\TestCase;
  */
 class DeckRendererTest extends TestCase
 {
+    /** @var list<string> scratch files a test wrote, taken away afterwards */
+    private array $files = [];
+
     protected function setUp(): void
     {
         parent::setUp();
         Metrics::forget();
+    }
+
+    protected function tearDown(): void
+    {
+        foreach ($this->files as $file) {
+            @unlink($file);
+        }
+        $this->files = [];
+
+        parent::tearDown();
     }
 
     public function test_it_writes_a_pptx_that_opens_in_both_languages(): void
@@ -284,6 +298,172 @@ class DeckRendererTest extends TestCase
         $this->assertStringNotContainsString("\u{202F}", $text);
         $this->assertStringNotContainsString("\u{2009}", $text);
         $this->assertStringContainsString(Typography::NBSP.':', $text);
+    }
+
+    public function test_the_wall_draws_the_librarys_logos_when_there_are_some(): void
+    {
+        $this->wallFromTheContract();
+
+        // A wall of real marks at the proportions logos really arrive at: a wide wordmark, a square mark,
+        // a tall one, and the rest in between.
+        $shapes = [
+            'Smart Logistics and Services' => [620, 120],
+            'Pixie Girl Global' => [420, 130],
+            'La Petite Cour' => [360, 180],
+            'NFELIA' => [300, 300],
+            'Orika Living' => [400, 110],
+            'OK Veggies' => [240, 400],
+        ];
+
+        $logos = [];
+        foreach ($shapes as $name => [$width, $height]) {
+            $logos[] = [
+                'name' => $name,
+                'path' => $this->pngFile($width, $height),
+                'png' => $this->pngFile($width, $height),
+                'kind' => 'png',
+                'key' => \Illuminate\Support\Str::slug($name),
+                'sector' => null,
+            ];
+        }
+
+        $content = $this->content('en');
+        $content['clients']['logos'] = $logos;
+
+        $entries = Zip::entries((new DeckRenderer)->pptx($content));
+        $slide = $entries['ppt/slides/slide22.xml'];
+        $rels = $entries['ppt/slides/_rels/slide22.xml.rels'];
+
+        // One picture a logo, each with a part of its own and a relationship that resolves
+        $this->assertSame(count($logos), substr_count($slide, '<p:pic>'), 'the wall is not drawing the logos');
+        $this->assertSame(count($logos), substr_count($rels, 'relationships/image'), 'a logo has no relationship');
+        foreach (array_keys($logos) as $i) {
+            $this->assertArrayHasKey('ppt/media/slide22-'.($i + 2).'.png', $entries, 'a logo has no part in the package');
+        }
+
+        // The names are not drawn as well: a mark replaces its name, it does not sit beside it
+        $this->assertStringNotContainsString('Pixie Girl Global', $slide, 'the wall draws a name over a mark');
+
+        // Equal area, not equal height: that is what stops a wide wordmark shouting and a square mark
+        // whispering. The marks here run from 5.2:1 to 0.6:1 and are given in that order.
+        preg_match_all('#<p:pic>.*?<a:ext cx="(\d+)" cy="(\d+)"/>.*?</p:pic>#s', $slide, $boxes, PREG_SET_ORDER);
+        $this->assertCount(count($logos), $boxes, 'a logo was not drawn');
+
+        $matched = 0;
+        foreach ($boxes as $box) {
+            $width = (int) $box[1] / 12700;
+            $height = (int) $box[2] / 12700;
+
+            // Nothing breaks its cell or the band the row gives it
+            $this->assertLessThanOrEqual(Style::even(5) + 0.01, $width, 'a logo is wider than its cell');
+            $this->assertLessThanOrEqual(52.01, $height, 'a logo is taller than its band');
+
+            if (abs(($width * $height) - 2400) <= 48) {
+                $matched++;
+            }
+        }
+
+        // Every mark but the tall one lands on the same area; the tall one is held to the band's height,
+        // which is the clamp doing its job rather than the rule failing
+        $this->assertSame(count($logos) - 1, $matched, 'the wall is not matched on area');
+        $this->assertEqualsWithDelta(52.0, (int) $boxes[count($logos) - 1][2] / 12700, 0.01, 'the tall mark was not held to the band');
+    }
+
+    public function test_the_wall_falls_back_to_the_names_the_profile_itself_uses(): void
+    {
+        $this->wallFromTheContract();
+
+        $content = $this->content('en');
+        $content['clients']['logos'] = [];
+
+        $entries = Zip::entries((new DeckRenderer)->pptx($content));
+        $slide = $entries['ppt/slides/slide22.xml'];
+
+        $this->assertStringNotContainsString('<p:pic>', $slide, 'the wall placed a picture it does not have');
+
+        // The clients the profile names in its own work, named exactly as it names them
+        $named = array_values(array_unique(array_filter(array_map(
+            fn ($item) => trim((string) ($item['client'] ?? '')),
+            (array) $content['work']['items'],
+        ))));
+        $this->assertNotEmpty($named);
+        foreach ($named as $client) {
+            $this->assertStringContainsString(
+                htmlspecialchars(Typography::text($client, 'en'), ENT_QUOTES | ENT_XML1, 'UTF-8'),
+                $slide,
+                "the wall does not name {$client}",
+            );
+        }
+    }
+
+    public function test_a_logo_the_library_has_no_png_for_is_left_off_rather_than_broken(): void
+    {
+        $this->wallFromTheContract();
+
+        $content = $this->content('en');
+        $content['clients']['logos'] = [
+            ['name' => 'Has A Mark', 'path' => $this->pngFile(400, 120), 'png' => $this->pngFile(400, 120)],
+            // PowerPoint places an SVG only beside a raster copy, and nothing on the server can make one
+            ['name' => 'Svg Only', 'path' => $this->svgFile(), 'png' => null],
+        ];
+
+        $slide = Zip::entries((new DeckRenderer)->pptx($content))['ppt/slides/slide22.xml'];
+
+        $this->assertSame(1, substr_count($slide, '<p:pic>'), 'the SVG was placed as something it is not');
+        $this->assertStringContainsString('Svg Only', $slide, 'the logo with no mark lost its name as well');
+    }
+
+    /**
+     * Put a provider that is not the HQ library in front of the renderer.
+     *
+     * DeckRenderer asks the library for its own deck set and falls back to the contract when the provider
+     * is something else. These tests are about what the wall does with a given set of logos, not about
+     * which set it is given, so they hand it one and take the library out of the way — otherwise the
+     * answer would depend on whether the run has a database behind it.
+     */
+    private function wallFromTheContract(): void
+    {
+        $this->app->bind(ClientLogos::class, fn () => new class implements ClientLogos
+        {
+            public function all(): array
+            {
+                return [];
+            }
+        });
+    }
+
+    /** A real PNG of a given size, written to the scratch disk: enough bytes for Deck\Images to read it. */
+    private function pngFile(int $width, int $height): string
+    {
+        $path = sys_get_temp_dir().'/deck-logo-'.$width.'x'.$height.'.png';
+        if (is_file($path)) {
+            return $path;
+        }
+
+        $chunk = function (string $type, string $body): string {
+            return pack('N', strlen($body)).$type.$body.pack('N', crc32($type.$body));
+        };
+
+        // 8-bit greyscale, one filter byte a row, which is the smallest PNG that still states a size
+        $raw = str_repeat("\x00".str_repeat("\xFF", $width), $height);
+        $png = "\x89PNG\r\n\x1a\n"
+            .$chunk('IHDR', pack('NNCCCCC', $width, $height, 8, 0, 0, 0, 0))
+            .$chunk('IDAT', (string) gzcompress($raw, 9))
+            .$chunk('IEND', '');
+
+        file_put_contents($path, $png);
+        $this->files[] = $path;
+
+        return $path;
+    }
+
+    private function svgFile(): string
+    {
+        $path = sys_get_temp_dir().'/deck-logo.svg';
+        file_put_contents($path, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 40"><rect width="100" height="40"/></svg>');
+        $this->files[] = $path;
+
+        return $path;
     }
 
     /** Every word the deck draws, in reading order. */
