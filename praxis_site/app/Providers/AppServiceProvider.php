@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\CalculatorOptions;
 use App\Support\HqApi;
 use App\Support\SiteSettings;
 use App\Support\Turnstile;
@@ -57,6 +58,11 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute($per('chat_per_minute', 10))->by('chat|' . VisitorIp::key($request)),
             Limit::perHour($per('chat_per_hour', 60))->by('chat-hour|' . VisitorIp::key($request)),
         ]);
+        // A share link is a private address; a bot that found one must not be able to pull the PDF in bulk
+        RateLimiter::for('profile-share', fn (Request $request) => [
+            Limit::perMinute($per('profile_share_per_minute', 10))->by('profile-share|' . VisitorIp::key($request)),
+            Limit::perHour($per('profile_share_per_hour', 60))->by('profile-share-hour|' . VisitorIp::key($request)),
+        ]);
         RateLimiter::for('unsubscribe', fn (Request $request) => Limit::perMinute($per('unsubscribe_per_minute', 30))->by('unsubscribe|' . VisitorIp::key($request)));
 
         // Cloudflare Turnstile's script, on pages with a form, only when its keys are set
@@ -65,6 +71,27 @@ class AppServiceProvider extends ServiceProvider
         // Header, footer and pages read the settings as $site (company, offices, contact email, social links)
         View::composer(['layouts.*', 'partials.*', 'pages.*', 'kaizen.*', 'errors.*', 'errors::*'], function ($view) {
             $view->with('site', app(SiteSettings::class));
+        });
+
+        // The conversational calculator's lists (partials/calculator-dialog). The read is cached and keeps its
+        // last good copy for 24 h; if HQ has never answered, the dialog gets nothing and the button stays a
+        // plain link to /cost-calculator. It must never fail the page it sits on.
+        View::composer('partials.calculator-dialog', function ($view) {
+            try {
+                $options = CalculatorOptions::fromApi(app(HqApi::class)->calculatorReference());
+            } catch (\Throwable) {
+                $options = [];
+            }
+
+            $lists = [];
+            foreach ($options as $name => $rows) {
+                $lists[$name] = [];
+                foreach ((array) $rows as $value => $label) {
+                    $lists[$name][] = ['value' => (string) $value, 'label' => (string) $label];
+                }
+            }
+
+            $view->with('calcLists', $lists);
         });
 
         // An empty error bag for pages rendered outside the session middleware (a 404 for an unknown path);

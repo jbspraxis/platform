@@ -81,6 +81,7 @@ Preview of the new app: `next.jbspraxis.com` (noindex). Live switch: PR3.
 | `POST /kaizen/submissions` | Contributor submits an article for review | `Kaizen::submitInsight` |
 | `POST /feedback` | Site feedback form | `TelemetryNode::transmitTelemetry` |
 | `GET /portfolio` | Published case studies and quotes | `Portfolio` |
+| `GET /profile/{token}` | The company profile behind a tracked share link (docs/COMPANY_PROFILE.md section 14) | new in PR 3 |
 | `GET /clients` | The logo strip, from the HQ client logo library (docs/COMPANY_PROFILE.md section 4) | `config/site.php` `clients` |
 | `GET /clients/{key}.webp` | One logo's WebP | `public/img/clients/{key}.webp` |
 | `POST /careers/applications` | Application, multipart with `cv` (PDF/DOC/DOCX, 5 MB), stored on the private disk | `Careers::transmitDossier` |
@@ -148,6 +149,11 @@ above were removed from praxis_core on 30 Oct 2026; their route names stay as 40
   renders only that subset (`App\Support\ChatText` on the server, the same rules in `resources/js/app.js`).
 - `GET /portfolio` → `{"case_studies":[{"client_pseudonym","title","industry","challenge","audit","architecture_deployed",
   "roi_metrics":{"metric","description","tags":[]}}],"quotes":[{"quote","source"}]}` (cacheable 10 min).
+- `GET /profile/{token}` → the **PDF itself** (`application/pdf`) while the link is open; `410
+  {"error":{"code":"link_ended","state":"revoked|expired|not_found"}}` for a link that has ended, the same
+  shape for all three; `429 too_many` past 120 opens of that token in an hour. The token is 48 characters
+  `[A-Za-z0-9]`. Never cached (`no-store`) and never indexed (`X-Robots-Tag: noindex`), because a link can be
+  revoked at any moment. HQ counts the open as it hands the file over.
 - `GET /clients` → `{"clients":[{"key","name","sector","sha256","width","height"}]}`, in the order the strip shows them,
   only the live logos ticked for the website (cacheable 10 min). `sha256` is the hash of that logo's WebP, so the site keeps
   one file per version and asks again only when it really changed. `GET /clients/{key}.webp` is those bytes (cacheable 1 h);

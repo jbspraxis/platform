@@ -65,6 +65,9 @@ return [
 
     // The site's own limits per visitor (an IPv4 address or an IPv6 /64), before HQ's stricter ones.
     'limits' => [
+        // A share link is a private address; a bot that found one must not pull the PDF in bulk
+        'profile_share_per_minute' => (int) env('SITE_PROFILE_SHARE_PER_MINUTE', 10),
+        'profile_share_per_hour' => (int) env('SITE_PROFILE_SHARE_PER_HOUR', 60),
         'forms_per_minute' => 6,
         'forms_per_hour' => 30,
         'chat_per_minute' => 10,
