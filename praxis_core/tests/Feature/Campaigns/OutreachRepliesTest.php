@@ -433,7 +433,7 @@ class OutreachRepliesTest extends TestCase
         $this->assertTrue(DB::table('notifications')->where('user_id', $kemi->id)->where('title', 'A contact from outreach: Delta Oil Services (test)')->exists());
         // Kofi is already Echo's contact: linked, nothing new
         Livewire::test(OutreachReplies::class, ['campaignId' => $campaign->id])->call('openReply', $this->replyOf($c)->id)->call('makeLead')
-            ->assertSee('Kofi Obi is already a contact of Echo Retail (test)');
+            ->assertDispatched('praxis-toast', $this->toast('Kofi Obi is already a contact of Echo Retail (test)'));
         $this->assertSame([$echo->id, 1], [$c->fresh()->organization_id, ClientUser::where('email', 'kofi@echo-retail.test')->count()]);
         $this->assertSame(3, Outreach::stats([$campaign->id])[$campaign->id]['leads']);
     }

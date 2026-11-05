@@ -102,7 +102,7 @@ class LiveConsultationGoogleTest extends TestCase
         // Another booking, declined: its meeting is cancelled and the timeline keeps the team's reason
         [, , $other] = $this->booking('EN', 'Beta Ltd', 'bola@beta.test');
         \App\Support\Leads\LeadMeetings::forAppointment(DB::table('appointments')->where('id', $other)->first());   // as BookingService makes it
-        Livewire::test(LiveConsultation::class)->call('declineRequest', $other, 'A test booking', false)->assertSee('Request declined');
+        Livewire::test(LiveConsultation::class)->call('declineRequest', $other, 'A test booking', false)->assertDispatched('praxis-toast', $this->toast('Request declined'));
         $declined = Meeting::where('appointment_id', $other)->sole();
         $this->assertSame('cancelled', $declined->status);
         $this->assertDatabaseHas('lead_timeline', ['type' => 'meeting', 'meeting_id' => $declined->id, 'summary' => 'Free audit request declined in Free audits.', 'body' => 'A test booking']);

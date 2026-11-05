@@ -55,7 +55,7 @@ class AudiencesScreenTest extends TestCase
         $gone = DB::table('marketing_suppressions')->where('email', 'gone@example.test')->value('id');
         Livewire::test(Audiences::class)->set('tab', 'suppressed')
             ->call('unblock', $gone)->assertDispatched('praxis-toast', $this->toast('only they can change that'))
-            ->call('unblock', $id)->assertSee('can receive marketing again');
+            ->call('unblock', $id)->assertDispatched('praxis-toast', $this->toast('can receive marketing again'));
         $this->assertTrue(Marketing::canEmail('asked.by.phone@example.test'));
         $this->assertFalse(Marketing::canEmail('gone@example.test'));
     }

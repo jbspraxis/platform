@@ -63,7 +63,7 @@ class PayrollControlsTest extends TestCase
 
         $this->actingAs($this->checker);
         Livewire::test(PayrollManager::class)->call('approveRun', $checked)
-            ->assertSee('You checked this payroll run, so you can’t approve it. Ask another approver to approve it.');
+            ->assertDispatched('praxis-toast', $this->toast('You checked this payroll run, so you can’t approve it. Ask another approver to approve it.'));
         $this->assertSame('Pending_Review', $this->runStatus($checked));
         $this->assertSame(0, DB::table('system_audit_logs')->where('target_id', $checked)->count());
     }
@@ -104,7 +104,7 @@ class PayrollControlsTest extends TestCase
         // A paid run stays paid
         $paid = $this->payrollRun(['status' => 'Disbursed', 'checker_id' => $this->checker->id, 'pay_period_start' => '2026-07-01']);
         Livewire::test(PayrollManager::class)->call('approveRun', $paid)
-            ->assertSee('This payroll run has already been approved or paid, so it wasn’t changed.');
+            ->assertDispatched('praxis-toast', $this->toast('This payroll run has already been approved or paid, so it wasn’t changed.'));
         Livewire::test(PayrollManager::class)->call('rejectRun', $paid)
             ->assertSee('Only a run awaiting approval or approved (not yet paid) can be returned to draft.');
         $this->assertSame('Disbursed', $this->runStatus($paid));
