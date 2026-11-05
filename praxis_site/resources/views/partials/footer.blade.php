@@ -71,6 +71,9 @@
                     <li><a href="{{ route('security') }}">{{ __('site.footer.security') }}</a></li>
                     <li><a href="{{ route('privacy') }}">{{ __('site.footer.privacy') }}</a></li>
                     <li><a href="{{ route('careers') }}">{{ __('site.footer.careers') }}</a></li>
+                    <li><a href="{{ route('contact') }}">{{ __('site.footer.contact_link') }}</a></li>
+                    <li><a href="{{ route('calculator') }}">{{ __('site.footer.calculator') }}</a></li>
+                    <li><a href="{{ route('feedback') }}">{{ __('site.footer.feedback') }}</a></li>
                     <li><a href="{{ config('site.portal_url') }}/login">{{ __('site.nav.client_login') }}</a></li>
                     @if (config('site.ga4_id') !== '')
                         <li><button class="footer-button" type="button" data-consent-open>{{ __('site.footer.cookies') }}</button></li>

@@ -8,7 +8,7 @@ use Throwable;
 final class Sitemap
 {
     /** Pages listed in the sitemap, each in English and French (route names without the "fr." prefix). */
-    public const PAGES = ['home', 'services', 'how-we-work', 'work', 'industries', 'company', 'security', 'schedule', 'contact', 'calculator', 'kaizen', 'careers', 'privacy'];
+    public const PAGES = ['home', 'services', 'how-we-work', 'work', 'industries', 'company', 'security', 'schedule', 'contact', 'calculator', 'kaizen', 'kaizen.write', 'careers', 'feedback', 'privacy'];
 
     /**
      * Every page and case study (App\Support\Work) in both languages with its hreflang pair, then the published Insights articles (English), on $root
