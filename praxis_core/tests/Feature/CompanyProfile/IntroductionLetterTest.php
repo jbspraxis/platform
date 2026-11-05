@@ -98,6 +98,12 @@ class IntroductionLetterTest extends TestCase
             ->call('save')
             ->assertHasNoErrors();
 
+        // The two languages are named as the brand names them, accent and all
+        $this->assertSame(
+            ['en' => 'English', 'fr' => 'Français'],
+            LetterTypes::fields('company_introduction')['locale']['options'],
+        );
+
         $saved = $document->fresh();
         $this->assertSame('en', $saved->fields['locale']);
         $this->assertSame('a.mbeki@example.test', $saved->fields['contact_email']);

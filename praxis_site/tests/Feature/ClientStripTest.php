@@ -200,6 +200,50 @@ class ClientStripTest extends TestCase
         );
     }
 
+    /**
+     * "acme" and "acme-corp" are both real keys, and one is a prefix of the other. Keeping a new version of
+     * the shorter one must not take the longer one's file with it: that would lose a logo nobody touched and
+     * make the site fetch it from HQ again on the next request.
+     */
+    public function test_keeping_one_logo_leaves_a_key_that_merely_starts_the_same_alone(): void
+    {
+        Storage::fake('local');
+        $short = $this->webp();
+        $long = (string) base64_decode('UklGRiIAAABXRUJQVlA4TBUAAAAvAAAAEAcQEREBiIj+ByAAAAD+AAA=');
+        $shortSha = hash('sha256', $short);
+        $longSha = hash('sha256', $long);
+
+        $this->fakeHq([
+            'clients' => Http::response(['data' => ['clients' => [
+                ['key' => 'acme', 'name' => 'Acme', 'sha256' => $shortSha],
+                ['key' => 'acme-corp', 'name' => 'Acme Corp', 'sha256' => $longSha],
+            ]]]),
+            'clients/acme.webp*' => Http::response($short, 200, ['Content-Type' => 'image/webp']),
+            'clients/acme-corp.webp*' => Http::response($long, 200, ['Content-Type' => 'image/webp']),
+        ]);
+
+        // The longer key is fetched and kept first
+        $this->get('/img/client-logos/acme-corp.webp?v=' . substr($longSha, 0, 12))->assertOk();
+        // Then the shorter one, whose name starts the longer one
+        $this->get('/img/client-logos/acme.webp?v=' . substr($shortSha, 0, 12))->assertOk();
+
+        $files = Storage::disk('local')->files('clients');
+        sort($files);
+        $this->assertSame([
+            'clients/acme-' . substr($shortSha, 0, 12) . '.webp',
+            'clients/acme-corp-' . substr($longSha, 0, 12) . '.webp',
+        ], $files, 'both logos are still here');
+
+        // And the longer one is still served from disk, without asking HQ a second time
+        $before = count(Http::recorded(fn (HttpRequest $r) => str_contains($r->url(), '/clients/acme-corp.webp')));
+        $this->get('/img/client-logos/acme-corp.webp?v=' . substr($longSha, 0, 12))->assertOk();
+        $this->assertSame(
+            $before,
+            count(Http::recorded(fn (HttpRequest $r) => str_contains($r->url(), '/clients/acme-corp.webp'))),
+            'its file survived, so HQ is not asked again',
+        );
+    }
+
     // ------------------------------------------------------------------ when HQ cannot be reached
 
     public function test_the_strip_falls_back_to_the_shipped_logos_when_hq_has_never_answered(): void
