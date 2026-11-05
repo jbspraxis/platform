@@ -173,6 +173,11 @@ class DocumentPage extends Component
             Agreements::saveCounterparty($record, $this->counterparty);
         }
 
+        // The introduction letter prints the contact's address in the block at the top, so it must be one
+        if ($record->type === 'company_introduction' && trim((string) ($this->fields['contact_email'] ?? '')) !== '') {
+            $this->validate(['fields.contact_email' => ['email', 'max:200']], [], ['fields.contact_email' => 'email']);
+        }
+
         $record->forceFill([
             'title' => trim($this->title),
             'document_date' => $this->documentDate,
@@ -202,6 +207,11 @@ class DocumentPage extends Component
                     }
                 }
                 $out[$key] = $rows;
+            } elseif (($definition['type'] ?? 'text') === 'select') {
+                // Only one of the options the template offers ever reaches the document
+                $options = array_keys((array) ($definition['options'] ?? []));
+                $value = trim((string) ($this->fields[$key] ?? ''));
+                $out[$key] = in_array($value, $options, true) ? $value : (string) ($options[0] ?? '');
             } else {
                 $out[$key] = trim((string) ($this->fields[$key] ?? ''));
             }

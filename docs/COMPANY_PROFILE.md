@@ -156,12 +156,62 @@ writes one plain A4 landscape page by hand — no PDF library, no font files, no
 same ground `docs/DOCUMENTS.md` had to cover. **PR 2 rebinds the interface in `AppServiceProvider`; nothing
 else changes.**
 
-## 9. The logo wall
+## 9. The logo wall: the client logo library
 
-`clients.logos` comes from the `ClientLogos` provider, never from the editor. PR 1 binds
-`DirectoryClientLogos`, which lists the PNGs and SVGs in `praxis_core/resources/company-profile/logos/` in
-filename order; a leading number sets the order and is not shown. An empty or missing folder gives an empty
-wall, never an error. **PR 3 rebinds the interface** with the logo library managed from HQ.
+`clients.logos` comes from the `ClientLogos` provider, never from the editor. **PR 3 binds the HQ logo
+library** (`App\Support\CompanyProfile\LogoLibrary`) over PR 1's `DirectoryClientLogos` in
+`AppServiceProvider`, so the wall is managed in **HQ > Company profile > Client logos** rather than by dropping
+files in `resources/company-profile/logos/`. That folder is no longer read.
+
+One library; the company profile, the deck and the strip on jbspraxis.com all read it, so a client is named
+once and corrected once. Each logo has the organisation's name **as it may be shown** (section 10's naming
+rules hold here too: a client who has not agreed to be named is described, and then no logo is used), a sector,
+a place in the order, and three ticks - **profile**, **deck**, **website** - saying where it appears. A logo is
+**retired**, never deleted, so the profile versions that carried it stay true; a retired logo can be put back,
+and returns at the end of the order.
+
+### The three renditions, and why there are three
+
+No PHP here can convert an image: the live web PHP has **no gd and no imagick**, and dompdf **cannot read a
+PNG at all** (`docs/DOCUMENTS.md` section 3). So the browser makes all three when the file is chosen
+(`resources/company-profile/logos.js`), the way the signature pad makes a JPEG, and the server only checks the
+bytes really are what they claim before it keeps them:
+
+| Slot | What it is | Who reads it |
+|---|---|---|
+| `print` | the SVG as it was chosen, or a **JPEG on white** | the company profile PDF, and anything else dompdf renders |
+| `png` | the same artwork on transparency | the deck, and any renderer that can read a PNG |
+| `web` | a WebP | jbspraxis.com |
+
+A raster logo is trimmed to its ink and scaled to 160 px high (at most 720 px wide) before any of this, so
+every logo on the wall sits on the same baseline. An SVG is kept exactly as it was for print, because it stays
+sharp at any size, and is rasterised for the other two.
+
+**An uploaded SVG is cleaned** (`App\Support\CompanyProfile\LogoFiles::cleanSvg`): only shape elements and
+presentation attributes survive, every event handler and script goes, and a reference may only point inside
+the file. What is left is what php-svg-lib draws and what a browser can show without running anything.
+
+The files live on the **private disk** (`storage/app/private/company-profile/logos/`). Nothing is on a public
+path: HQ is served a logo through a route behind `company_profile.view`, and the website through the signed
+Site API.
+
+`ClientLogos::all()` is what the engine reads - `[['name' => ..., 'path' => ...], ...]` for the logos ticked
+for the profile. `path` is always a file the PDF renderer can **actually draw**: an SVG or a JPEG, **never a
+PNG**, which is a deliberate narrowing of `clients.logos` in the contract ("a PNG/SVG"), because a PNG would
+throw on the live server. `LogoLibrary::forProfile('deck'|'website')` gives the richer rows - the transparent
+PNG, the kind, the key and the sector - to anything that wants them. A logo whose print file has gone missing
+is left out rather than breaking the render.
+
+### Where it starts
+
+`Database\Seeders\ClientLogoSeeder` puts the **fifteen logos the website already shows** in the library, in
+the order it shows them, so nothing changes on jbspraxis.com the day HQ takes the strip over. Their three
+renditions live in `database/seeders/company-profile/logos/`; `build_logos.py` beside them rebuilds those files
+from the website's own WebP, and is the only thing that ever converts an image here. The last two, Praxis LS
+and NFELIA, are our own products: the strip shows them, the profile does not count them as clients. Sectors
+nobody has on record are left empty for the owner to fill, rather than guessed.
+
+Re-seeding never overwrites a logo somebody replaced in HQ: a key that is already there is left alone.
 
 ## 10. Rules that do not bend
 
@@ -190,6 +240,16 @@ wall, never an error. **PR 3 rebinds the interface** with the logo library manag
 - `ProfileSeederAndDownloadTest` — the seeder, its idempotence, the importer lining the two files up and
   warning when they do not, the download route, the stub PDF and the default logo provider.
 
+PR 3 adds, in the same folder:
+
+- `LogoLibraryTest` - the four permissions and the wildcard being kept off, adding a logo with its name and
+  sector, the SVG cleaner, a file that lies about what it is, the order and its two ends, retire and restore,
+  what the provider hands the engine, a logo whose file has gone missing, and the signed `/clients` feed.
+- `IntroductionLetterTest` - the template and its reference, the language and contact fields, the recipient's
+  own details, the words coming from the published profile, the banned words, the sign-off following the
+  language, one page in both languages, the copy budget, issuing and downloading it, and what the letter says
+  when nothing is published.
+
 They need MySQL (`tests/Feature/UsesThrowawayDatabase`):
 
 ```
@@ -197,7 +257,82 @@ DB_CONNECTION=mysql DB_HOST=127.0.0.1 DB_PORT=3307 DB_USERNAME=root DB_DATABASE=
   php vendor/bin/phpunit tests/Feature/CompanyProfile
 ```
 
-## 12. Open decisions for the owner
+## 12. The introduction letter
+
+**HQ > Documents > New document > Introduction letter** (PR 3). One page introducing JBS Praxis to a company we
+would like to work with. It is a `letter_documents` row like every other formal document
+(`docs/DOCUMENTS.md`), so it carries a reference of its own (`JBS/INT/2026/001`), sits in the register, is
+signed with a stored signature, is issued once with its SHA-256, and can carry the QR code that opens
+`jbspraxis.com/verify/{token}`.
+
+The author fills in four things beyond the common ones: the **company** and its **address** (the document's
+"Addressed to"), a **contact person**, their **email** (optional), and the **language**, English or French.
+
+**Everything else is read from the published profile** through `App\Support\CompanyProfile\ProfileCopy`,
+which calls `Profile::data($locale)`. Nothing is kept twice, so the letter and the profile cannot drift apart:
+
+1. the salutation - the contact person by name, or "Dear Sir or Madam" / "Madame, Monsieur,";
+2. one short paragraph naming the recipient company and why we write, with `cover.descriptor` inside it;
+3. one paragraph on what we build: `pov`'s closing paragraph, without the sentence that only makes sense after
+   the two before it ("We close it differently.");
+4. **three proof lines** from `work.items` - the client and what the work did for them. Our own products are
+   left out: they are not proof of what we do for a client. A client is named exactly as the profile names
+   them, which is where section 10's naming rules are kept;
+5. the call to action with the schedule link and a reply address (`contact.cta`, `cta_url`, `sales_email`);
+6. the sign-off **JBS Praxis**, over the signature block.
+
+`cover.headline` is the subject line.
+
+**With nothing published** - which is where production stands until the owner signs in and the profile is
+seeded - `Profile::data()` raises `MissingProfile`, `ProfileCopy` catches it, and the letter writes on short
+house copy: the headline, the descriptor, what we build and the call to action, and **no proof lines at all**.
+It never names a client of its own accord; a client's work is the profile's to publish, not the letter's to
+remember. `test_with_no_published_profile_the_letter_writes_without_claiming_any_work` holds it to that.
+
+### One page, in both languages
+
+The letter is **set tighter than the other templates** (`$compact` in `resources/views/pdf/letter.blade.php`):
+9.3 pt on 1.33, smaller margins, a shorter signature line. That buys one page, and no more, so the copy has a
+budget, which `IntroductionLetterTest::test_the_letter_copy_stays_inside_the_one_page_budget` holds to:
+
+- the headline and the descriptor: 90 characters each
+- what we build: 320 characters
+- exactly three proof lines, 220 characters each
+- the call to action: 120 characters
+
+`test_it_holds_one_page_in_english_and_in_french` renders both PDFs and counts the pages. If new copy breaks
+either, shorten it or decide on a second page on purpose.
+
+French goes all the way through: the date, "Notre reference", the salutation, the closing, the draft notice,
+the QR words and "Page 1 sur 2" in the footer. Nothing else in Documents changes language; every other template
+is English, as it was.
+
+## 13. The logo strip on jbspraxis.com
+
+The strip "Organisations we have worked with" is fed by the library, so **a logo added in HQ and ticked for the
+website appears on the site without a code change**.
+
+| Method and path | What it answers |
+|---|---|
+| `GET /api/site/v1/clients` | The website logos, in order: `key`, `name`, `sector`, `sha256` of the WebP, `width`, `height` |
+| `GET /api/site/v1/clients/{key}.webp` | That logo's WebP |
+
+Both are plain signed reads under the API's own read limit (`docs/SITE_API.md`).
+
+On the site (`App\Support\Clients`):
+
+- The **list** is a cached read: 10 minutes, with the last good copy kept for a day, like settings and
+  portfolio. The page makes one call and no more.
+- Each **file** is fetched once and then kept on this server. The markup points at the site's own
+  `/img/client-logos/{key}.webp?v=<first 12 of the sha>`, so a logo replaced in HQ is a new address and nothing
+  anywhere serves yesterday's picture; the response is immutable for a year.
+- **It never breaks.** If HQ cannot be reached and nothing is saved, the strip falls back to the fifteen logos
+  shipped with the site (`config/site.php` `clients` and `public/img/clients/`), which is exactly what it showed
+  before. A single file HQ cannot give falls back to the shipped one of that name, then to 404.
+
+The shipped list and files stay in the repository on purpose: they are the floor the strip stands on.
+
+## 14. Open decisions for the owner
 
 1. **Who else may read the profile?** Today: the Owner, and Sales & Marketing (view only). Partner, Delivery
    Lead and Auditor do not see it, because it carries the teams' credentials.
@@ -205,6 +340,10 @@ DB_CONNECTION=mysql DB_HOST=127.0.0.1 DB_PORT=3307 DB_USERNAME=root DB_DATABASE=
 3. **Where the profile lives in the rail** — it has its own entry, next to Documents. Say if it belongs inside
    Documents instead.
 4. **The Cameroon entity fact** is off. Switch it on when the entity is registered.
-5. **Tracked share links** (a link per prospect, with a record of who opened it) are not in PR 1. They need a
-   public route and a decision about what a link exposes. Worth their own PR.
+5. **Tracked share links** (a link per prospect, with a record of who opened it) are in neither PR 1 nor
+   PR 3. They need a public route and a decision about what a link exposes, and come next in PR 3's chat.
 6. **The animated 24-slide deck** is after the profile, as agreed.
+7. **`company_profile.*` for other roles** - the owner ticks whichever roles should see the logo library, on
+   Roles and permissions.
+8. **The sectors the logo seed left empty** (La Petite Cour, RN Afriluxe, HOD): nothing on record said what
+   they are, so the seeder left them blank rather than guessing. The owner fills them in on the screen.

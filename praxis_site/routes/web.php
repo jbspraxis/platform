@@ -6,6 +6,7 @@ use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\KaizenController;
+use App\Http\Controllers\ClientLogoController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ScheduleController;
@@ -90,6 +91,12 @@ Route::permanentRedirect('/portfolio', '/work');
 Route::permanentRedirect('/framework', '/how-we-work#method');
 Route::permanentRedirect('/kaizen-hub', '/kaizen');
 Route::permanentRedirect('/privacy-policy', '/privacy');
+
+// The logo strip (docs/COMPANY_PROFILE.md section 4): the list and the files come from the HQ library, and the
+// first request for a logo this server has not got fetches it once and keeps it. ?v is the file's own version,
+// so a logo replaced in HQ is a new address. No session, no cookie: it is an image.
+Route::get('/img/client-logos/{key}.webp', [ClientLogoController::class, 'show'])
+    ->where('key', '[a-z0-9-]{1,80}')->withoutMiddleware($stateless)->name('clients.logo');
 
 // Search engines and AI crawlers
 Route::get('/sitemap.xml', [PageController::class, 'sitemap'])->withoutMiddleware($stateless)->name('sitemap');

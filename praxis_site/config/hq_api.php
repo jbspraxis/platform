@@ -33,6 +33,8 @@ return [
         'portfolio' => 600,
         'kaizen' => 600,
         'calculator_reference' => 600,
+        // The client logo strip, fed by the HQ logo library (docs/COMPANY_PROFILE.md section 4)
+        'clients' => 600,
     ],
     'stale_ttl' => 86400,
 
