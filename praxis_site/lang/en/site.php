@@ -83,6 +83,11 @@ return [
         'security' => 'Security and data',
         'privacy' => 'Privacy',
         'careers' => 'Careers',
+        // The pages a visitor can act on. Before this they had no path from the site: /contact only from a
+        // profile share link, /cost-calculator only from the homepage band (a JS dialog), /feedback nowhere
+        'contact_link' => 'Contact us',
+        'calculator' => 'Cost calculator',
+        'feedback' => 'Site feedback',
         'cookies' => 'Cookie settings',
         'preview_note' => 'This is a preview of the new jbspraxis.com. It isn’t public yet.',
         'copyright' => '© :year :name',

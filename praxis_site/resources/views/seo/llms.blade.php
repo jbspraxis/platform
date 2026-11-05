@@ -19,7 +19,9 @@ The way of working is the Praxis Method (formerly the Praxis Framework): See, De
 - [Contact]({{ url('/contact') }})
 - [Cost of poor quality calculator]({{ url('/cost-calculator') }})
 - [Insights]({{ url('/kaizen') }}): articles on how organisations run
+- [Write for Insights]({{ url('/kaizen/write') }}): send an article for review
 - [Careers]({{ url('/careers') }})
+- [Feedback]({{ url('/feedback') }}): tell us what to fix or improve on this site
 - [Privacy]({{ url('/privacy') }})
 
 ## Case studies
