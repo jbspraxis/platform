@@ -13,6 +13,10 @@ use Carbon\CarbonImmutable;
  *
  * Blocks: recipient, reference, subject, salutation, para, clauses (numbered "RESOLVED that ..."), list, html,
  * closing. The same blocks are drawn on screen and in the PDF, so the preview is the document.
+ *
+ * An agreement (docs/DOCUMENTS.md section 12) prints a title block — the title, the reference and the date —
+ * and then nothing but the body the author wrote, so a contract reads exactly as it was drafted, parties and
+ * all. Who the other party is prints under their signature at the end, not twice.
  */
 final class LetterBody
 {
@@ -23,7 +27,7 @@ final class LetterBody
         $date = CarbonImmutable::parse($document->document_date)->locale('en');
         $blocks = [];
 
-        if ($document->type !== 'board_resolution') {
+        if (! in_array($document->type, ['board_resolution', 'agreement'], true)) {
             $blocks[] = ['kind' => 'recipient', 'lines' => self::recipientLines($document)];
         }
 
@@ -32,6 +36,7 @@ final class LetterBody
             'introduction' => self::introduction($document, $details, $f),
             'employment' => self::employment($document, $details, $f),
             'authority' => self::authority($document, $details, $f),
+            'agreement' => self::agreement($document, $date),
             default => self::freeLetter($document, $f),
         });
 
@@ -226,6 +231,80 @@ final class LetterBody
         $blocks[] = ['kind' => 'para', 'text' => 'This authority stays in force until it is withdrawn in writing by the company.'];
 
         return $blocks;
+    }
+
+    /**
+     * An agreement: a centred title, the reference and the date under it, then the body. Headings are kept with
+     * the text under them (keepHeadingsWithText), because a contract that leaves "7. Intellectual property"
+     * alone at the foot of a page reads as though a clause went missing.
+     */
+    private static function agreement(LetterDocument $document, CarbonImmutable $date): array
+    {
+        $blocks = [[
+            'kind' => 'agreement_head',
+            'title' => (string) ($document->title ?: 'Agreement'),
+            'reference' => (string) $document->reference,
+            'date' => $date->format('j F Y'),
+        ]];
+
+        $html = self::keepHeadingsWithText(RichText::clean((string) $document->body));
+        if ($html !== '') {
+            $blocks[] = ['kind' => 'html', 'html' => $html, 'agreement' => true];
+        }
+
+        return $blocks;
+    }
+
+    /** A block this short may be carried onto the next page with the heading above it, rather than left behind */
+    private const KEEP_WITH_HEADING = 600;
+
+    /**
+     * Wraps every heading and the block under it in one <div class="keep">, which the document's CSS tells dompdf
+     * not to break inside. dompdf does not understand page-break-after: avoid, so this is how a heading is kept
+     * with its text. Only a short block is carried along: a long one is left to break where it will, so a heading
+     * near the foot of a page never pushes half a page of white space ahead of it.
+     */
+    public static function keepHeadingsWithText(string $html): string
+    {
+        if ($html === '' || ! preg_match('~<h[23][^a-z]~i', $html)) {
+            return $html;
+        }
+        $doc = new \DOMDocument('1.0', 'UTF-8');
+        $previous = libxml_use_internal_errors(true);
+        $doc->loadHTML('<?xml encoding="utf-8"?><html><body><div id="kp-root">' . $html . '</div></body></html>', LIBXML_NONET | LIBXML_COMPACT);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        $root = $doc->getElementById('kp-root');
+        if (! $root) {
+            return $html;
+        }
+
+        foreach (iterator_to_array($root->childNodes) as $node) {
+            if (! $node instanceof \DOMElement || ! in_array(strtolower($node->tagName), ['h2', 'h3'], true)) {
+                continue;
+            }
+            $keep = $doc->createElement('div');
+            $keep->setAttribute('class', 'keep');
+            $root->insertBefore($keep, $node);
+            $keep->appendChild($node);
+
+            $next = $keep->nextSibling;
+            while ($next instanceof \DOMText && trim($next->nodeValue) === '') {
+                $next = $next->nextSibling;
+            }
+            if ($next instanceof \DOMElement && ! in_array(strtolower($next->tagName), ['h2', 'h3'], true)
+                && mb_strlen(trim($next->textContent)) <= self::KEEP_WITH_HEADING) {
+                $keep->appendChild($next);
+            }
+        }
+
+        $out = '';
+        foreach ($root->childNodes as $child) {
+            $out .= $doc->saveHTML($child);
+        }
+
+        return trim($out);
     }
 
     private static function freeLetter(LetterDocument $document, array $f): array

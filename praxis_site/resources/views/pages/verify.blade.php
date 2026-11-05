@@ -8,9 +8,12 @@
     /** /verify/{token} (docs/DOCUMENTS.md section 7): what the QR code on a formal document opens. */
     $found = is_array($document);
     $status = (string) ($document['status'] ?? '');
-    $valid = $status === 'issued';
+    // An agreement out for signature, or signed by both sides, is as valid as any other issued document
+    $valid = in_array($status, ['issued', 'sent_for_signature', 'fully_signed'], true);
     $signatories = (array) ($document['signatories'] ?? []);
     $sha = (string) ($document['file_sha256'] ?? '');
+    // A signed agreement has a second file, the countersigned one; the reader may hold either
+    $shaSigned = (string) ($document['signed_file_sha256'] ?? '');
     $mark = $valid ? 'is-valid' : ($status === 'replaced' ? 'is-replaced' : 'is-stopped');
 
     // The kind in the page's own language, by type and then by type alone; HQ's English label when neither
@@ -128,7 +131,7 @@
 
         @if ($sha !== '')
             {{-- The file the reader drops here is hashed in their own browser and never leaves their device --}}
-            <section class="card" aria-labelledby="vf-tamper" data-verify-check data-expected="{{ $sha }}">
+            <section class="card" aria-labelledby="vf-tamper" data-verify-check data-expected="{{ $sha }}" data-expected-signed="{{ $shaSigned }}">
                 <h2 class="section-title" id="vf-tamper">{{ __('site.verify.tamper.title') }}</h2>
                 <p class="muted">{{ __('site.verify.tamper.explain') }}</p>
 

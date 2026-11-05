@@ -10,16 +10,26 @@ use DOMText;
 /**
  * The text blocks of a broadcast (docs/CAMPAIGNS.md 4.4). What the editor sends is the browser's HTML, so nothing in
  * it is trusted: clean() keeps paragraphs, line breaks, bold, italics, underline, links (http, https, mailto),
- * lists and two heading levels, without any attribute but a link's address; everything else is unwrapped or
- * dropped. forEmail() adds the inline styles email clients need. fromPlain() turns an AI draft's plain text
+ * lists, two heading levels and simple tables, without any attribute but a link's address and a cell's span;
+ * everything else is unwrapped or dropped. forEmail() adds the inline styles email clients need. fromPlain() turns an AI draft's plain text
  * ("- " list items, **bold**, blank lines between paragraphs) into the same HTML.
  */
 final class RichText
 {
-    /** Tags kept, after renaming (b → strong, i → em, div → p, h1 → h2, h4–h6 → h3) */
-    private const KEEP = ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'h2', 'h3'];
+    /**
+     * Tags kept, after renaming (b → strong, i → em, div → p, h1 → h2, h4–h6 → h3).
+     *
+     * The table tags are here for the schedules of an agreement (docs/DOCUMENTS.md section 12): a pay schedule or
+     * a list of milestones reads as a table and nothing else. Only the structure survives — no widths, no colours,
+     * no classes — so a pasted table takes the document's own look.
+     */
+    private const KEEP = ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'h2', 'h3',
+        'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td'];
 
     private const RENAME = ['b' => 'strong', 'i' => 'em', 'div' => 'p', 'h1' => 'h2', 'h4' => 'h3', 'h5' => 'h3', 'h6' => 'h3'];
+
+    /** The only attributes kept on a cell: a merged header is the one thing a schedule's table really needs */
+    private const SPANS = ['colspan', 'rowspan'];
 
     /** Dropped with everything inside them */
     private const DROP = ['script', 'style', 'iframe', 'object', 'embed', 'noscript', 'template', 'head', 'title', 'meta', 'link', 'img',
@@ -37,6 +47,9 @@ final class RichText
         'em' => 'font-style: italic;',
         'u' => 'text-decoration: underline;',
         'a' => 'color: #08707C; text-decoration: underline;',
+        'table' => "width: 100%; margin: 0 0 16px; border-collapse: collapse; font-family: 'Plus Jakarta Sans', Arial, sans-serif; font-size: 15px; line-height: 22px; color: #4A5468;",
+        'th' => 'padding: 6px 8px; border-bottom: 1px solid #D8DEE6; text-align: left; font-weight: 600; color: #0C142B;',
+        'td' => 'padding: 6px 8px; border-bottom: 1px solid #EEF1F5; text-align: left;',
     ];
 
     public static function clean(?string $html): string
@@ -65,7 +78,7 @@ final class RichText
     /** The cleaned HTML with the email's inline styles (run clean() first) */
     public static function forEmail(string $html): string
     {
-        return preg_replace_callback('~<(p|ul|ol|li|h2|h3|strong|em|u|a)\b([^>]*)>~i', function ($m) {
+        return preg_replace_callback('~<(p|ul|ol|li|h2|h3|strong|em|u|a|table|th|td)\b([^>]*)>~i', function ($m) {
             return '<' . $m[1] . ' style="' . self::EMAIL_STYLES[strtolower($m[1])] . '"' . $m[2] . '>';
         }, $html);
     }
@@ -94,7 +107,7 @@ final class RichText
     /** The text alone (for previews, the AI's material and checks) */
     public static function text(?string $html): string
     {
-        $html = preg_replace('~</(p|li|h2|h3)>|<br\s*/?>~i', "\n", (string) $html);
+        $html = preg_replace('~</(p|li|h2|h3|th|td|tr|caption)>|<br\s*/?>~i', "\n", (string) $html);
 
         return trim(preg_replace("/\n{3,}/", "\n\n", html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
     }
@@ -162,8 +175,12 @@ final class RichText
             }
 
             $href = $tag === 'a' ? trim($child->getAttribute('href')) : null;
+            $spans = in_array($tag, ['th', 'td'], true) ? self::spans($child) : [];
             foreach (iterator_to_array($child->attributes) as $attribute) {
                 $child->removeAttribute($attribute->nodeName);
+            }
+            foreach ($spans as $name => $value) {
+                $child->setAttribute($name, (string) $value);
             }
             if ($tag === 'a') {
                 if (self::isSafeUrl($href)) {
@@ -178,10 +195,24 @@ final class RichText
         }
     }
 
+    /** A cell's colspan and rowspan, when they are small whole numbers; anything else is dropped */
+    private static function spans(DOMElement $cell): array
+    {
+        $out = [];
+        foreach (self::SPANS as $name) {
+            $value = (int) trim($cell->getAttribute($name));
+            if ($value > 1 && $value <= 20) {
+                $out[$name] = $value;
+            }
+        }
+
+        return $out;
+    }
+
     /** Text and inline tags left at the top level (the editor's first line) go into a paragraph */
     private static function wrapLooseText(DOMElement $root): void
     {
-        $blocks = ['p', 'ul', 'ol', 'h2', 'h3'];
+        $blocks = ['p', 'ul', 'ol', 'h2', 'h3', 'table'];
         $doc = $root->ownerDocument;
         $paragraph = null;
         foreach (iterator_to_array($root->childNodes) as $child) {

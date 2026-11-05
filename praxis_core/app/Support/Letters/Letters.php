@@ -3,6 +3,7 @@
 namespace App\Support\Letters;
 
 use App\Models\CompanyDocument;
+use App\Models\Letters\LetterCounterparty;
 use App\Models\Letters\LetterDocument;
 use App\Models\Letters\LetterDocumentSignature;
 use App\Models\User;
@@ -128,7 +129,9 @@ final class Letters
 
     public static function revoke(LetterDocument $document, string $reason, User $by): LetterDocument
     {
-        if ($document->status !== LetterDocument::ISSUED) {
+        // An agreement out for signature, or already signed, can be revoked too: what is revoked is the document,
+        // not the file, and whoever holds a copy is told when they check it
+        if (! $document->isIssued()) {
             throw new RuntimeException('Only an issued document can be revoked.');
         }
 
@@ -150,7 +153,7 @@ final class Letters
      */
     public static function replace(LetterDocument $document, User $by): LetterDocument
     {
-        if (! in_array($document->status, [LetterDocument::ISSUED, LetterDocument::REVOKED], true)) {
+        if (! $document->isIssued() && $document->status !== LetterDocument::REVOKED) {
             throw new RuntimeException('Only an issued or revoked document can be replaced.');
         }
 
@@ -179,6 +182,10 @@ final class Letters
             'created_by' => $by->id,
         ]);
 
+        if ($document->isAgreement()) {
+            self::copyCounterparties($document, $copy);
+        }
+
         self::audit('LETTER_REPLACEMENT_STARTED', 'Started ' . $copy->reference . ' to replace ' . $document->reference, $copy);
 
         return $copy;
@@ -198,6 +205,27 @@ final class Letters
         ])->save();
 
         self::audit('LETTER_REPLACED', $original->reference . ' was replaced by ' . $replacement->reference, $original);
+    }
+
+    /**
+     * A new draft of an agreement carries the other party over too, so a replacement does not have to be typed
+     * again. The copy starts unsent and unsigned: its own link, its own code, its own signature.
+     */
+    private static function copyCounterparties(LetterDocument $from, LetterDocument $to): void
+    {
+        foreach (Agreements::parties($from) as $party) {
+            LetterCounterparty::create([
+                'document_id' => $to->id,
+                'position' => $party->position,
+                'name' => $party->name,
+                'role_title' => $party->role_title,
+                'email' => $party->email,
+                'address' => $party->address,
+                'company' => $party->company,
+                'registration' => $party->registration,
+                'status' => LetterCounterparty::PENDING,
+            ]);
+        }
     }
 
     /** Apply one person's own signature to a draft. The caller has checked the permission and the fresh sign-in. */
@@ -253,7 +281,8 @@ final class Letters
         if ($document->company_document_id) {
             throw new RuntimeException('This document is already in Company documents.');
         }
-        $pdf = self::file($document);
+        // A signed agreement files the signed version: that is the one the company needs on its shelf
+        $pdf = Agreements::signedFile($document) ?? self::file($document);
         if ($pdf === null) {
             throw new RuntimeException('The issued file is missing, so there is nothing to file.');
         }

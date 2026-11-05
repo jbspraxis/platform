@@ -12,6 +12,7 @@ namespace App\Support\Letters;
  *   INT  letter of introduction
  *   EMP  employment letter     an offer, a confirmation or a letter for a bank or an embassy
  *   AUT  authority to act      what one named person may do on the company's behalf
+ *   AGR  agreement             a contract both sides sign: JBS Praxis in HQ, the other party online
  */
 final class LetterTypes
 {
@@ -45,12 +46,34 @@ final class LetterTypes
             'label' => 'Authority to act',
             'summary' => 'Names one person and says exactly what they may do for the company.',
         ],
+        'agreement' => [
+            'code' => 'AGR',
+            'label' => 'Agreement',
+            'summary' => 'A contract: JBS Praxis signs it here, the other party countersigns online.',
+        ],
         'free_letter' => [
             'code' => 'LET',
             'label' => 'Free letter',
             'summary' => 'A blank letter on the letterhead: you write the whole body yourself.',
         ],
     ];
+
+    /**
+     * The other party to an agreement (docs/DOCUMENTS.md section 12). These are not kept in the document's own
+     * fields: they are a row of their own in letter_counterparties, because each signatory carries a private
+     * link, a one-time code and a signature, and an agreement may have more than one of them later.
+     */
+    public static function counterpartyFields(): array
+    {
+        return [
+            'name' => ['label' => 'Their name', 'type' => 'text', 'required' => true, 'help' => 'As it should be printed under the signature.'],
+            'role_title' => ['label' => 'Their role or title', 'type' => 'text', 'required' => true, 'placeholder' => 'Contractor'],
+            'email' => ['label' => 'Their email address', 'type' => 'text', 'required' => true, 'help' => 'Where the private signing link and the one-time code are sent.'],
+            'address' => ['label' => 'Their address', 'type' => 'textarea', 'rows' => 3],
+            'company' => ['label' => 'Company (optional)', 'type' => 'text', 'help' => 'When they sign for a company rather than for themselves.'],
+            'registration' => ['label' => 'Registration number (optional)', 'type' => 'text', 'placeholder' => 'RC 1234567'],
+        ];
+    }
 
     /** Fields every document has, whatever its type */
     public static function common(): array
@@ -133,7 +156,13 @@ final class LetterTypes
     /** True when the body is written by hand (a rich-text body) rather than built from the fields */
     public static function isFreeBody(string $type): bool
     {
-        return in_array($type, ['formal_letter', 'free_letter'], true);
+        return in_array($type, ['formal_letter', 'free_letter', 'agreement'], true);
+    }
+
+    /** The agreement is the one kind with a counterparty and an online countersignature */
+    public static function isAgreement(string $type): bool
+    {
+        return $type === 'agreement';
     }
 
     public static function code(string $type): string
@@ -168,6 +197,7 @@ final class LetterTypes
             $type === 'introduction' => 'Letter of introduction',
             $type === 'employment' => 'Letter of employment',
             $type === 'authority' => 'Authority to act',
+            $type === 'agreement' => 'Agreement',
             default => '',
         };
     }
@@ -177,7 +207,8 @@ final class LetterTypes
     {
         $common = ['salutation' => 'Dear Sir or Madam,', 'closing' => 'Yours faithfully,'];
 
-        return $common + match ($type) {
+        // The type's own defaults win, so an agreement can start with no salutation and no closing
+        return match ($type) {
             'board_resolution' => [
                 'place' => trim(implode(', ', $details['office_lines'] ?: [])),
                 'mandate' => 'Any one signatory',
@@ -191,7 +222,9 @@ final class LetterTypes
                 ]],
             ],
             'employment' => ['employment_type' => 'Full time, permanent'],
+            // An agreement is not a letter: no salutation, no closing, and the parties are named in the body
+            'agreement' => ['salutation' => '', 'closing' => ''],
             default => [],
-        };
+        } + $common;
     }
 }
