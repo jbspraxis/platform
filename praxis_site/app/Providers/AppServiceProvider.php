@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\CalculatorOptions;
 use App\Support\HqApi;
 use App\Support\SiteSettings;
 use App\Support\Turnstile;
@@ -65,6 +66,27 @@ class AppServiceProvider extends ServiceProvider
         // Header, footer and pages read the settings as $site (company, offices, contact email, social links)
         View::composer(['layouts.*', 'partials.*', 'pages.*', 'kaizen.*', 'errors.*', 'errors::*'], function ($view) {
             $view->with('site', app(SiteSettings::class));
+        });
+
+        // The conversational calculator's lists (partials/calculator-dialog). The read is cached and keeps its
+        // last good copy for 24 h; if HQ has never answered, the dialog gets nothing and the button stays a
+        // plain link to /cost-calculator. It must never fail the page it sits on.
+        View::composer('partials.calculator-dialog', function ($view) {
+            try {
+                $options = CalculatorOptions::fromApi(app(HqApi::class)->calculatorReference());
+            } catch (\Throwable) {
+                $options = [];
+            }
+
+            $lists = [];
+            foreach ($options as $name => $rows) {
+                $lists[$name] = [];
+                foreach ((array) $rows as $value => $label) {
+                    $lists[$name][] = ['value' => (string) $value, 'label' => (string) $label];
+                }
+            }
+
+            $view->with('calcLists', $lists);
         });
 
         // An empty error bag for pages rendered outside the session middleware (a 404 for an unknown path);

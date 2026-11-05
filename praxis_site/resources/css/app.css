@@ -975,6 +975,169 @@
 
     /* ---- The final call to action's second line ---- */
     .final-note { margin: var(--space-4) 0 0; max-width: var(--measure); font-size: var(--step-small); color: var(--color-fg-on-dark-muted); }
+
+    /* ================================================================================================
+       The calculator as a conversation (partials/calculator-dialog, resources/js/calculator).
+
+       Deliberately not the Ask Praxis chat: that is a small support panel in the corner, this is the
+       product. The agent speaks in Newsreader at reading size with no bubble around it, the visitor's
+       own words sit in a small Teal-tint pill, and the Ink header carries the six steps and every
+       answer given so far. Nothing here moves when the visitor asks for no motion.
+       ================================================================================================ */
+
+    .calculator-switch { margin: 0; }
+
+    /* fit-content, not auto: a modal dialog carries inset: 0 from the UA sheet, so an auto height stretches
+       to fill the screen instead of hugging the one field the dialog opens with */
+    .agent { margin: auto; width: min(58rem, calc(100vw - 2rem)); max-width: 58rem; height: fit-content; max-height: min(46rem, calc(100vh - 2rem)); padding: 0; border: 0;
+        border-radius: var(--radius-dialog); background: var(--color-paper); color: var(--color-ink); box-shadow: 0 32px 80px rgba(12, 20, 43, 0.28); overflow: hidden; }
+    .agent::backdrop { background: rgba(12, 20, 43, 0.78); }
+    .agent[open] { animation: agent-in var(--motion-standard) var(--ease-settle) both; }
+    .agent[open]::backdrop { animation: agent-fade var(--motion-standard) var(--ease-enter) both; }
+    /* Asking one thing needs no more room than one thing takes; the conversation then grows it to full height */
+    .agent.is-talking { height: min(46rem, calc(100vh - 2rem)); }
+    .agent-shell { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+    .agent :focus-visible { outline: var(--focus-width) solid var(--color-focus); outline-offset: var(--focus-offset); }
+
+    /* ---- The head: who is speaking, where we are, and everything said so far ---- */
+    .agent-head { flex: none; padding: var(--space-4) var(--space-5) var(--space-3); background: var(--color-ink); color: var(--color-fg-on-dark); }
+    .agent-head :focus-visible { outline-color: var(--color-accent-on-dark); }
+    .agent-head-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+    .agent-mark { display: inline-flex; align-items: center; gap: 10px; margin: 0; font-size: var(--step-small); font-weight: 600; letter-spacing: 0.02em; color: #fff; }
+    .agent-mark i[data-lucide] { width: 18px; height: 18px; color: var(--color-bright-teal); }
+    .agent-close { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin-right: -8px; padding: 0; border: 0; border-radius: var(--radius-control);
+        background: transparent; color: var(--color-fg-on-dark-muted); cursor: pointer; transition: background var(--motion-instant), color var(--motion-instant); }
+    .agent-close:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+    .agent-close svg { width: 18px; height: 18px; }
+
+    /* The six steps. --fill is the share of that step's questions answered, set by the engine. */
+    .agent-rail { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: var(--space-2); margin: var(--space-4) 0 0; padding: 0; list-style: none; }
+    .agent-rail-step { --fill: 0; position: relative; padding-top: 10px; min-width: 0; }
+    .agent-rail-step::before { content: ''; position: absolute; inset: 0 0 auto; height: 3px; border-radius: 2px; background: var(--color-border-on-dark); }
+    .agent-rail-step::after { content: ''; position: absolute; inset: 0 auto auto 0; height: 3px; width: 100%; border-radius: 2px; background: var(--color-bright-teal);
+        transform: scaleX(var(--fill)); transform-origin: left; transition: transform var(--motion-data) var(--ease-settle); }
+    .agent-rail-name { display: block; overflow: hidden; font-size: var(--step-caption); line-height: var(--lh-caption); white-space: nowrap; text-overflow: ellipsis; color: var(--color-fg-on-dark-muted); transition: color var(--motion-quick); }
+    .agent-rail-step.is-here .agent-rail-name { color: #fff; font-weight: 600; }
+    .agent-rail-step.is-here::before { background: rgba(11, 184, 196, 0.35); }
+    .agent-rail-step.is-done .agent-rail-name { color: var(--color-accent-on-dark); }
+
+    /* The answers so far: each one a way back to that question */
+    .agent-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); max-height: 5.5rem; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--color-border-on-dark) transparent; }
+    /* Past two rows the rest scroll: fade the cut edge so a clipped row reads as "more", not as broken */
+    .agent-chips.is-scrollable { mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent); }
+    .agent-chip { display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; padding: 5px 10px; border: 1px solid var(--color-border-on-dark); border-radius: 999px;
+        background: rgba(255, 255, 255, 0.04); color: var(--color-fg-on-dark); font-family: var(--font-sans); font-size: var(--step-caption); line-height: var(--lh-caption); cursor: pointer;
+        animation: agent-chip-in var(--motion-quick) var(--ease-settle) both; transition: background var(--motion-instant), border-color var(--motion-instant); }
+    .agent-chip:hover { background: rgba(11, 184, 196, 0.14); border-color: var(--color-accent-on-dark); }
+    .agent-chip-name { color: var(--color-fg-on-dark-muted); }
+    .agent-chip-value { overflow: hidden; max-width: 14rem; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; }
+
+    /* ---- The body: the first question, then the conversation ---- */
+    .agent-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-6) var(--space-5); }
+
+    .agent-gate { max-width: 34rem; margin: 0 auto; padding: var(--space-5) 0; transition: opacity var(--motion-quick) var(--ease-exit), transform var(--motion-quick) var(--ease-exit); }
+    .agent-gate.is-done { opacity: 0; transform: translateY(-8px); }
+    .agent-gate-title { margin: 0; font-family: var(--font-serif); font-size: var(--step-h2); line-height: var(--lh-h2); letter-spacing: var(--tracking-display); }
+    .agent-gate-lead { margin: var(--space-4) 0 var(--space-6); font-size: var(--step-lead); line-height: var(--lh-lead); color: var(--color-fg-body); }
+    .agent-gate-field { margin-bottom: var(--space-5); }
+    .agent-gate .field-error:empty { display: none; }
+    .agent-start { width: 100%; }
+
+    .agent-log { display: grid; gap: var(--space-5); align-content: start; max-width: 44rem; margin: 0 auto; padding: 0; list-style: none; }
+    .agent-log:empty { display: none; }
+    .agent-turn { display: grid; gap: 6px; max-width: 100%; overflow-wrap: anywhere; animation: agent-turn-in var(--motion-standard) var(--ease-settle) both; }
+    .agent-turn .who { font-size: 0.6875rem; line-height: 1rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-fg-muted); }
+
+    /* The agent reads as prose, not as a bubble: Newsreader, reading size, a Teal rule down the side */
+    .agent-turn.is-agent { justify-items: start; padding-left: var(--space-4); border-left: 2px solid var(--color-teal-tint); }
+    .agent-turn.is-agent .agent-said { font-family: var(--font-serif); font-size: var(--step-lead); line-height: var(--lh-lead); color: var(--color-ink); }
+    .agent-turn.is-you { justify-items: end; justify-self: end; max-width: 80%; text-align: right; }
+    .agent-turn.is-you .agent-said { display: inline-block; padding: 8px 14px; border-radius: 14px 14px 2px 14px; background: var(--color-teal-tint); color: var(--color-ink);
+        font-size: var(--step-small); line-height: var(--lh-small); text-align: left; }
+    .agent-word { display: inline-block; animation: agent-word var(--motion-quick) var(--ease-enter) both; animation-delay: calc(var(--i) * 18ms); }
+
+    .agent-dots { display: inline-flex; gap: 4px; padding: 6px 0; }
+    .agent-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--color-line-strong); animation: agent-dot 1.1s var(--ease-settle) infinite; }
+    .agent-dots i:nth-child(2) { animation-delay: 0.16s; }
+    .agent-dots i:nth-child(3) { animation-delay: 0.32s; }
+
+    .agent-note { font-size: var(--step-small); line-height: var(--lh-small); color: var(--color-fg-muted); }
+
+    /* The sum's assumption, one tap from being corrected */
+    .agent-aside { display: block; margin-top: var(--space-2); }
+    .agent-link { padding: 0; border: 0; border-bottom: 1px dashed var(--color-line-strong); background: none; color: var(--color-fg-link); font-family: var(--font-sans);
+        font-size: var(--step-caption); line-height: var(--lh-caption); cursor: pointer; }
+    .agent-link:hover, .agent-link.is-open { color: var(--color-action-hover); border-bottom-color: var(--color-action-hover); }
+    .agent-week { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); margin-top: var(--space-3); padding: var(--space-4); border: 1px solid var(--color-line);
+        border-radius: var(--radius-card); background: var(--color-mist); animation: agent-turn-in var(--motion-quick) var(--ease-settle) both; }
+    .agent-week-field { display: grid; gap: 4px; font-size: var(--step-caption); line-height: var(--lh-caption); color: var(--color-fg-muted); }
+    .agent-week-field .input { width: 6rem; }
+
+    /* The summary: every answer, each line a way back into it */
+    .agent-summary { display: grid; gap: 1px; margin-top: var(--space-3); border: 1px solid var(--color-line); border-radius: var(--radius-card); background: var(--color-line); overflow: hidden; }
+    .agent-summary-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); width: 100%; padding: 10px 14px; border: 0; background: var(--color-paper);
+        color: var(--color-fg-body); font-family: var(--font-sans); font-size: var(--step-small); line-height: var(--lh-small); text-align: left; cursor: pointer; transition: background var(--motion-instant); }
+    .agent-summary-row:hover { background: var(--color-teal-tint); }
+    .agent-summary-value { font-weight: 600; color: var(--color-ink); text-align: right; }
+
+    /* ---- The foot: what they can tap, and what they can type ---- */
+    .agent-foot { flex: none; display: grid; gap: var(--space-3); padding: var(--space-4) var(--space-5) var(--space-5); border-top: 1px solid var(--color-line); background: var(--color-paper); }
+    .agent-choices { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+    .agent-pill { padding: 9px 14px; border: 1px solid var(--color-line-strong); border-radius: 999px; background: var(--color-paper); color: var(--color-ink); font-family: var(--font-sans);
+        font-size: var(--step-small); line-height: var(--lh-small); cursor: pointer; animation: agent-pill-in var(--motion-quick) var(--ease-settle) both; animation-delay: calc(var(--i) * 26ms);
+        transition: background var(--motion-instant), border-color var(--motion-instant), transform var(--motion-instant); }
+    .agent-pill:hover { background: var(--color-teal-tint); border-color: var(--color-deep-teal); transform: translateY(-1px); }
+    .agent-pill.is-quiet { border-style: dashed; border-color: var(--color-line); color: var(--color-fg-muted); }
+    .agent-pill.is-quiet:hover { color: var(--color-ink); }
+    .agent-pill.is-go { background: var(--color-deep-teal); border-color: var(--color-deep-teal); color: #fff; font-weight: 600; }
+    .agent-pill.is-go:hover { background: var(--color-petrol); border-color: var(--color-petrol); }
+
+    .agent-composer { display: flex; align-items: flex-end; gap: var(--space-2); padding: 6px 6px 6px var(--space-4); border: 1px solid var(--color-line-strong); border-radius: 24px;
+        background: var(--color-paper); transition: border-color var(--motion-instant), box-shadow var(--motion-instant); }
+    .agent-composer:focus-within { border-color: var(--color-deep-teal); box-shadow: 0 0 0 3px rgba(12, 139, 155, 0.14); }
+    .agent-input { flex: 1; min-height: 40px; max-height: 120px; padding: 9px 0; border: 0; background: none; color: var(--color-ink); font-family: var(--font-sans);
+        font-size: var(--step-body); line-height: var(--lh-body); resize: none; }
+    .agent-input:focus { outline: none; }
+    .agent-send { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--color-deep-teal);
+        color: #fff; cursor: pointer; transition: background var(--motion-instant); }
+    .agent-send:hover { background: var(--color-petrol); }
+    .agent-send:disabled { background: var(--color-line-strong); cursor: not-allowed; }
+    .agent-send svg { width: 18px; height: 18px; }
+    .agent-status { min-height: 1.125rem; margin: 0; font-size: var(--step-caption); line-height: var(--lh-caption); color: var(--color-fg-muted); }
+    .agent-status:empty { display: none; }
+
+    /* Turnstile is rendered from the start so Cloudflare's script finds it, and shown at the last step only */
+    .agent-guard { height: 0; overflow: hidden; visibility: hidden; }
+    .agent-guard.is-ready { height: auto; overflow: visible; visibility: visible; }
+    .agent-guard .turnstile { margin: 0; }
+
+    /* On a phone the conversation takes the whole screen */
+    @media (max-width: 640px) {
+        .agent { width: 100vw; max-width: none; height: 100dvh; max-height: none; border-radius: 0; }
+        .agent-head, .agent-body, .agent-foot { padding-left: var(--space-4); padding-right: var(--space-4); }
+        .agent-rail-name { font-size: 0.6875rem; }
+        .agent-chips, .agent-chips.is-scrollable { mask-image: none; }
+        .agent-chips { flex-wrap: nowrap; max-height: none; overflow-y: hidden; overflow-x: auto; overscroll-behavior-x: contain; margin-right: calc(var(--space-4) * -1); padding-right: var(--space-4); scrollbar-width: none; }
+        .agent-chips::-webkit-scrollbar { display: none; }
+        .agent-chip { flex: none; }
+        .agent-turn.is-agent .agent-said { font-size: var(--step-body); line-height: var(--lh-body); }
+        .agent-turn.is-you { max-width: 90%; }
+    }
+
+    @keyframes agent-in { from { opacity: 0; transform: translateY(12px) scale(0.985); } }
+    @keyframes agent-fade { from { opacity: 0; } }
+    @keyframes agent-turn-in { from { opacity: 0; transform: translateY(8px); } }
+    @keyframes agent-word { from { opacity: 0; transform: translateY(0.16em); } }
+    @keyframes agent-pill-in { from { opacity: 0; transform: translateY(6px); } }
+    @keyframes agent-chip-in { from { opacity: 0; transform: scale(0.92); } }
+    @keyframes agent-dot { 0%, 100% { opacity: 0.3; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
+
+    /* Asked for no motion: every final state is already there, so only the delays have to go */
+    @media (prefers-reduced-motion: reduce) {
+        .agent-word, .agent-pill, .agent-chip, .agent-turn, .agent[open], .agent[open]::backdrop, .agent-week { animation: none; }
+        .agent-dots i { animation: none; opacity: 0.6; }
+        .agent-rail-step::after { transition: none; }
+    }
 }
 
 /* Page transitions (redesign PR 2): a same-site link cross-fades the page under a still header. Browsers without

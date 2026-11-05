@@ -287,6 +287,158 @@ return [
         'company' => 'Nom de l’organisation',
         'send' => 'Voir votre rapport',
         'no_lists' => 'Les listes de ce calculateur ne sont pas encore disponibles.',
+
+        // Le calculateur sous forme de conversation (partials/calculator-dialog) : l’agent demande, le visiteur
+        // choisit ou écrit, et chaque réponse reste modifiable en haut. Les clés suivent resources/js/calculator.
+        'chat' => [
+            'title' => 'Coût de la non-qualité',
+            'open' => 'Répondre sous forme de conversation',
+            'close' => 'Fermer',
+            'agent' => 'Praxis',
+            'you' => 'Vous',
+            'unit' => ['hours' => 'h'],
+
+            'gate' => [
+                'heading' => 'Combien la non-qualité vous coûte-t-elle ?',
+                'lead' => 'Quelques questions et nous vous montrons le chiffre, dans votre devise. Comptez deux minutes, et vous pouvez modifier chaque réponse en chemin.',
+                'hint' => 'Nous envoyons le rapport à cette adresse.',
+                'start' => 'Commencer',
+                'invalid' => 'Cela ne ressemble pas à une adresse e-mail — pouvez-vous la vérifier ?',
+            ],
+
+            'steps' => [
+                'you' => 'Vous',
+                'organisation' => 'Organisation',
+                'scale' => 'Taille',
+                'flow' => 'Flux',
+                'quality' => 'Qualité',
+                'money' => 'Montants',
+            ],
+
+            'hello' => 'Merci — j’enverrai le rapport à cette adresse. Calculons vos chiffres.',
+
+            'ask' => [
+                'name' => 'D’abord — à qui ai-je le plaisir de parler ?',
+                'company' => 'Et de quelle organisation parlons-nous ?',
+                'industry' => 'Dans quel secteur travaille-t-elle ?',
+                'tool' => 'Quel est le principal système sur lequel le travail repose aujourd’hui ?',
+                'headcount' => 'Combien de personnes y travaillent, à peu près ?',
+                'mgmt_nodes' => 'Et combien d’entre elles contrôlent ou valident le travail des autres ?',
+                'bottleneck' => 'Où le travail ralentit-il le plus ?',
+                'manual_hrs' => 'Combien de temps un de ces responsables passe-t-il à contrôler le travail à la main ?',
+                'error_rate' => 'Quelle part du travail doit être refaite, approximativement ?',
+                'acv' => 'Combien vaut un contrat client sur une année, en moyenne ?',
+                'currency' => 'Dans quelle devise dois-je travailler ?',
+                'hourly_cost' => 'Combien coûte un de ces responsables ?',
+                'turnover' => 'Dernière question — quel est le chiffre d’affaires ou le budget annuel ?',
+            ],
+
+            'hint' => [
+                'mgmt_nodes' => 'Si vous ne savez pas, un cinquième de l’effectif est l’ordre de grandeur habituel.',
+                'manual_hrs' => 'Par responsable. « 2 heures par jour » convient autant que « 10 par semaine ».',
+                'acv' => 'Passez cette question si vous ne vendez pas de contrats.',
+                'hourly_cost' => 'Dites-le comme vous le pensez — « 600 000 FCFA par mois » convient très bien. Je calcule le taux horaire.',
+                'turnover' => 'Un chiffre arrondi suffit.',
+            ],
+
+            'short' => [
+                'email' => 'E-mail',
+                'name' => 'Nom',
+                'company' => 'Organisation',
+                'industry' => 'Secteur',
+                'tool' => 'Système',
+                'headcount' => 'Effectif',
+                'mgmt_nodes' => 'Responsables',
+                'bottleneck' => 'Blocage',
+                'manual_hrs' => 'Contrôles manuels',
+                'error_rate' => 'Travail refait',
+                'acv' => 'Valeur contrat',
+                'currency' => 'Devise',
+                'hourly_cost' => 'Coût responsable',
+                'turnover' => 'Chiffre d’affaires',
+            ],
+
+            'shown' => ['hours' => ':n h par semaine'],
+            'period' => [
+                'hour' => 'de l’heure',
+                'shift' => 'par poste',
+                'day' => 'par jour',
+                'week' => 'par semaine',
+                'month' => 'par mois',
+                'year' => 'par an',
+            ],
+
+            // Le calcul, montré pour que l’hypothèse qui le porte puisse être contestée
+            'working' => [
+                'divide' => '÷ :divisor :unit :period',
+                'times' => '× :factor',
+                'split' => '÷ :people personnes',
+            ],
+            'derived' => [
+                'pay' => ':said :sum = :rate de l’heure. Je retiens ce chiffre.',
+                'already' => 'Très bien — :rate de l’heure.',
+                'assumed' => 'Je l’ai lu comme un montant mensuel — dites-le-moi si ce n’est pas le cas.',
+                'hours' => ':sum — soit :n heures par semaine.',
+                'annual' => ':sum = :total par an.',
+            ],
+
+            'week' => [
+                'button' => 'Notre semaine n’est pas de :hours h',
+                'day' => 'Heures par jour',
+                'days' => 'Jours par semaine',
+                'apply' => 'Utiliser cette semaine',
+                'done' => 'Mis à jour sur une semaine de :hours heures. J’ai recalculé : :fields.',
+                'noted' => 'Mis à jour sur une semaine de :hours heures.',
+            ],
+
+            // FCFA désigne deux devises : nous demandons plutôt que de nous tromper sur tous les chiffres
+            'cfa' => [
+                'ask' => 'FCFA désigne deux devises — laquelle est la vôtre ?',
+                'xof' => 'XOF — Afrique de l’Ouest',
+                'xaf' => 'XAF — Afrique centrale',
+            ],
+
+            'pills' => [
+                'fifth' => 'Environ un cinquième (:n)',
+                'noncommercial' => 'Nous ne vendons pas de contrats',
+                'hours' => ':n h par semaine',
+            ],
+
+            'skip' => 'Passer',
+            'skipped' => 'Non renseigné',
+            'fine' => 'Très bien.',
+            'more' => 'Afficher toute la liste',
+            'all' => 'Les voici toutes (:n) :',
+
+            'errors' => [
+                'email' => 'Cela ne ressemble pas à une adresse e-mail — pouvez-vous la vérifier ?',
+                'blank' => 'Désolé, je n’ai pas saisi.',
+                'number' => 'Il me faut un nombre pour cette question. Une estimation suffit.',
+                'list' => 'Cela ne figure pas dans ma liste. Choisissez ci-dessous, ou passez.',
+                'near' => 'Vouliez-vous dire l’une de celles-ci ?',
+            ],
+
+            'edit' => [
+                'ok' => 'Bien sûr — :field vaut :value pour l’instant. Que faut-il mettre ?',
+                'which' => 'Quelle réponse souhaitez-vous modifier ?',
+                'chip' => 'Modifier :field, actuellement :value',
+            ],
+
+            'confirm' => [
+                'heading' => 'Voici tout ce que j’ai. Touchez une ligne pour la modifier.',
+                'run' => 'Lancer mon rapport',
+                'change' => 'Modifier quelque chose',
+                'which' => 'Laquelle ?',
+                'ask' => 'Je lance le calcul ?',
+                'changed' => 'C’est fait — :field vaut maintenant :value.',
+            ],
+
+            'sending' => 'Calcul de vos chiffres…',
+            'sent' => 'Je lance le calcul — votre rapport s’ouvre dans un instant.',
+            'say' => 'Votre réponse',
+            'placeholder' => 'Écrivez votre réponse…',
+            'send' => 'Envoyer',
+        ],
     ],
 
     'report' => [

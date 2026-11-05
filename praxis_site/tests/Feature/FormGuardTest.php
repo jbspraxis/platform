@@ -27,11 +27,19 @@ class FormGuardTest extends TestCase
             'booking/slots*' => Http::response(['data' => ['month' => now('Africa/Lagos')->format('Y-m'), 'days' => []]]),
         ]);
 
-        foreach (['/contact', '/schedule', '/cost-calculator', '/kaizen/write', '/services', '/careers', '/feedback', '/tracking/unsubscribe/42'] as $path) {
+        // The page's own form and the Praxis AI form, so two; /cost-calculator also carries the same
+        // calculator as a conversation (partials/calculator-dialog), which is a third real form.
+        $forms = [
+            '/contact' => 2, '/schedule' => 2, '/cost-calculator' => 3, '/kaizen/write' => 2,
+            '/services' => 2, '/careers' => 2, '/feedback' => 2, '/tracking/unsubscribe/42' => 2,
+        ];
+
+        foreach ($forms as $path => $expected) {
             $html = $this->get($path)->assertOk()->getContent();
-            // the page's own form and the Praxis AI form
-            $this->assertSame(2, preg_match_all('/<input type="hidden" name="form_ts" value="(\d+\.[0-9a-f]{40})">/', $html, $m), $path);
-            $this->assertNotNull(FormStamp::age($m[1][0]), $path . ': the stamp is signed with the app key');
+            $this->assertSame($expected, preg_match_all('/<input type="hidden" name="form_ts" value="(\d+\.[0-9a-f]{40})">/', $html, $m), $path);
+            foreach ($m[1] as $stamp) {
+                $this->assertNotNull(FormStamp::age($stamp), $path . ': every stamp is signed with the app key');
+            }
         }
     }
 
