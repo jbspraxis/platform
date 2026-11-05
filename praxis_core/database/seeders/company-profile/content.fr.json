@@ -523,10 +523,7 @@
     "sales_email": "sales@jbspraxis.com",
     "phone": "",
     "website": "jbspraxis.com",
-    "offices": [
-      "Lagos",
-      "Douala"
-    ],
+    "offices": [],
     "closing": "L’ordre, rendu visible."
   }
 }
