@@ -104,7 +104,9 @@ class IndexNowTest extends TestCase
 
         $urls = $this->submitted()['urlList'];
         $this->assertContains('https://jbspraxis.com/fr/privacy', $urls);
-        $this->assertSame([], preg_grep('~/kaizen/.~', $urls));
+        // No articles: /kaizen/write is a page of its own (Sitemap::PAGES), so it is listed either way
+        $this->assertSame([], preg_grep('~/kaizen/(?!write$).~', $urls));
+        $this->assertContains('https://jbspraxis.com/kaizen/write', $urls);
     }
 
     public function test_given_paths_and_addresses_are_sent_as_they_are(): void

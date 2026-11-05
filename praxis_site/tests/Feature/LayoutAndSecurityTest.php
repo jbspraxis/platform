@@ -97,6 +97,35 @@ class LayoutAndSecurityTest extends TestCase
         $this->assertMatchesRegularExpression('~West Africa \(ECOWAS\)<br>\s*Lagos, Nigeria\s*<br>21B Bode Ajakaiye Street, Lekki~', $this->get('/company')->getContent());
     }
 
+    /**
+     * Every page a visitor can act on has a path from the footer. /contact, /cost-calculator and /feedback
+     * each had none: the first only from a profile share link, the second only from the homepage band (a
+     * JavaScript dialog), the third from nowhere at all.
+     */
+    public function test_the_footer_links_to_every_page_a_visitor_can_act_on(): void
+    {
+        Http::fake([self::HQ . '/settings' => Http::response(['data' => $this->settingsData()])]);
+
+        $html = $this->get('/')->assertOk()->getContent();
+        $footer = substr($html, strpos($html, '<footer'));
+
+        foreach (['/work', '/industries', '/security', '/privacy', '/careers', '/contact', '/cost-calculator', '/feedback'] as $path) {
+            $this->assertStringContainsString('href="' . url($path) . '"', $footer, $path . ' has no link in the footer');
+        }
+        $this->assertStringContainsString('>Contact us</a>', $footer);
+        $this->assertStringContainsString('>Cost calculator</a>', $footer);
+        $this->assertStringContainsString('>Site feedback</a>', $footer);
+
+        // French pages link to the French addresses, with the French labels
+        $fr = $this->get('/fr')->assertOk()->getContent();
+        $frFooter = substr($fr, strpos($fr, '<footer'));
+        foreach (['/fr/contact', '/fr/cost-calculator', '/fr/feedback'] as $path) {
+            $this->assertStringContainsString('href="' . url($path) . '"', $frFooter, $path . ' has no link in the French footer');
+        }
+        $this->assertStringContainsString('>Nous contacter</a>', $frFooter);
+        $this->assertStringContainsString('>Votre avis</a>', $frFooter);
+    }
+
     public function test_a_registration_number_is_shown_once_it_is_registered(): void
     {
         $settings = $this->settingsData();
