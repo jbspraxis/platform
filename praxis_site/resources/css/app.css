@@ -1087,6 +1087,8 @@
     .agent-gate-field { margin-bottom: var(--space-5); }
     .agent-gate .field-error:empty { display: none; }
     .agent-start { width: 100%; }
+    /* Scrolled to just above the keyboard, not flush against it */
+    .agent-start { scroll-margin-block-end: var(--space-5); }
 
     .agent-log { display: grid; gap: var(--space-5); align-content: start; max-width: 44rem; margin: 0 auto; padding: 0; list-style: none; }
     .agent-log:empty { display: none; }
@@ -1158,7 +1160,15 @@
 
     /* On a phone the conversation takes the whole screen */
     @media (max-width: 640px) {
-        .agent { width: 100vw; max-width: none; height: 100dvh; max-height: none; border-radius: 0; }
+        /* Pinned, not centred: margin:auto against the UA's inset:0 centres the dialog, so one a pixel
+           taller than the screen loses equal slices off the top and the bottom and the title is cut in
+           half. Height follows the visual viewport (resources/js/dialog-viewport) so the keyboard takes
+           room from the conversation rather than covering the composer; 100dvh is the fallback. */
+        /* .agent.is-talking is named too, or it would keep its desktop height the moment the
+           conversation starts and outrank this rule on specificity */
+        .agent, .agent.is-talking { width: 100vw; max-width: none; border-radius: 0; margin: 0;
+            top: var(--agent-screen-top, 0); left: 0; right: auto; bottom: auto;
+            height: var(--agent-screen-h, 100dvh); max-height: none; }
         .agent-head, .agent-body, .agent-foot { padding-left: var(--space-4); padding-right: var(--space-4); }
         .agent-rail-name { font-size: 0.6875rem; }
         .agent-chips, .agent-chips.is-scrollable { mask-image: none; }
@@ -1167,6 +1177,21 @@
         .agent-chip { flex: none; }
         .agent-turn.is-agent .agent-said { font-size: var(--step-body); line-height: var(--lh-body); }
         .agent-turn.is-you { max-width: 90%; }
+        /* With the keyboard up there is little room: the gate scrolls to its own button rather than
+           centring itself in a space that no longer exists */
+        .agent-gate { padding-top: var(--space-4); padding-bottom: var(--space-4); }
+        .agent-body { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+        /* Nothing in the footer may be pushed out of reach */
+        .agent-foot { padding-bottom: max(var(--space-4), env(safe-area-inset-bottom)); }
+
+        /* Keyboard up, almost no screen left: everything stays, the room around it gives way */
+        .agent.is-tight .agent-head { padding-top: var(--space-2); padding-bottom: var(--space-2); }
+        .agent.is-tight .agent-rail { margin-top: var(--space-2); }
+        .agent.is-tight .agent-chips { margin-top: var(--space-2); }
+        .agent.is-tight .agent-body { padding-top: var(--space-3); padding-bottom: var(--space-3); }
+        .agent.is-tight .agent-log { gap: var(--space-3); }
+        .agent.is-tight .agent-foot { padding-top: var(--space-2); gap: var(--space-2); }
+        .agent.is-tight .agent-mark { font-size: var(--step-caption); }
     }
 
     @keyframes agent-in { from { opacity: 0; transform: translateY(12px) scale(0.985); } }
