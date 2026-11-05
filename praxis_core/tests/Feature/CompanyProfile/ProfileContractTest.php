@@ -71,7 +71,12 @@ class ProfileContractTest extends TestCase
             $this->assertIsString($data['pov']['paragraphs'][0]);
             $this->assertIsString($data['teams']['items'][0]['disciplines'][0]);
             $this->assertIsString($data['practices']['items'][0]['capabilities'][0]);
-            $this->assertIsString($data['contact']['offices'][0]);
+            // The approved content lists no offices (the owner, 5 Nov 2026: no cities in the profile), so the
+            // list may be empty; whatever it holds is still plain strings
+            $this->assertIsArray($data['contact']['offices']);
+            foreach ($data['contact']['offices'] as $office) {
+                $this->assertIsString($office);
+            }
         }
     }
 
