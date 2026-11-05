@@ -25,6 +25,12 @@
     foreach ((array) $lists as $listName => $rows) {
         $agentLists[$listName] = [];
         foreach ((array) $rows as $value => $label) {
+            // Already a row (countries have to be: several share a dialling code, and a map keyed by the
+            // code would keep only the last of each)
+            if (is_array($label)) {
+                $agentLists[$listName][] = ['value' => (string) ($label['value'] ?? ''), 'label' => (string) ($label['label'] ?? '')];
+                continue;
+            }
             $agentLists[$listName][] = ['value' => (string) $value, 'label' => (string) $label];
         }
     }

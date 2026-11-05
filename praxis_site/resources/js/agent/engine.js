@@ -13,7 +13,7 @@
 // JavaScript the opener is a plain link to the page and the page form is untouched.
 
 import {
-    matchOption, rankOptions, readTarget, readEmail, readUrl, readPhone,
+    fold, matchOption, rankOptions, readTarget, readEmail, readUrl, readPhone,
     isSkip, isYes, isNo, isEdit,
 } from './parse';
 
@@ -216,7 +216,7 @@ export function buildAgent(dialog, flow) {
 
     async function ask(field) {
         // A list the page did not send cannot be chosen from, and free text would only fail validation
-        if (field.kind === 'select' && !options(field.list).length) {
+        if ((field.kind === 'select' || field.kind === 'picker') && !options(field.list).length) {
             store(field, field.default ?? '', t('skipped'));
             await onward();
             return;
@@ -232,9 +232,122 @@ export function buildAgent(dialog, flow) {
             note.textContent = hint;
             el.log.lastElementChild.append(note);
         }
-        choices(pillsFor(field));
+        if (field.kind === 'picker') picker(field); else choices(pillsFor(field));
         el.input.focus({ preventScroll: true });
         scroll();
+    }
+
+    /**
+     * A list too long to tap through — every country, say — as a search box with the matches under it.
+     * Typing in the prompt field works just as well; this is the way that does not need them to know the
+     * spelling. Matching is on the name and on the dialling code, so "nig" and "234" both find Nigeria.
+     */
+    function picker(field) {
+        const all = options(field.list);
+        el.choices.replaceChildren();
+        el.choices.hidden = false;
+
+        const box = document.createElement('span');
+        box.className = 'agent-picker';
+
+        const search = document.createElement('input');
+        search.type = 'search';
+        search.className = 'agent-picker-search';
+        search.autocomplete = 'off';
+        search.placeholder = t('picker.search');
+        search.setAttribute('aria-label', t('picker.search'));
+        search.setAttribute('role', 'combobox');
+        search.setAttribute('aria-expanded', 'true');
+        search.setAttribute('aria-autocomplete', 'list');
+
+        const list = document.createElement('span');
+        list.className = 'agent-picker-list';
+        list.setAttribute('role', 'listbox');
+        list.id = `agent-picker-${field.name}`;
+        search.setAttribute('aria-controls', list.id);
+
+        const note = document.createElement('span');
+        note.className = 'agent-picker-note';
+
+        let marked = 0;
+        let showing = [];
+        let matches = 0;
+
+        const draw = () => {
+            const query = fold(search.value);
+            const digits = query.replace(/\D/gu, '');
+            const found = !query ? all : all.filter((option) => {
+                const name = fold(option.label);
+                return name.includes(query)
+                    || (digits !== '' && option.value.replace(/\D/gu, '').startsWith(digits));
+            });
+            // Names that start with what they typed first: "ni" should open on Nicaragua, not Benin
+            found.sort((a, b) => Number(fold(b.label).startsWith(query)) - Number(fold(a.label).startsWith(query)));
+            matches = found.length;
+            showing = found.slice(0, 60);
+            marked = 0;
+
+            list.replaceChildren();
+            showing.forEach((option, index) => {
+                const row = document.createElement('button');
+                row.type = 'button';
+                row.className = 'agent-picker-option';
+                row.setAttribute('role', 'option');
+                row.setAttribute('aria-selected', String(index === 0));
+                const name = document.createElement('span');
+                name.textContent = option.label;
+                const code = document.createElement('span');
+                code.className = 'agent-picker-dial';
+                code.textContent = option.value;
+                row.append(name, code);
+                row.addEventListener('click', () => {
+                    if (state.busy) return;
+                    el.choices.replaceChildren();
+                    el.choices.hidden = true;
+                    hear(option.label, { label: `${option.label} (${option.value})`, value: option.value });
+                });
+                list.append(row);
+            });
+            mark(0);
+            // Only two things are worth saying: nothing matched, or there is more than we are showing
+            if (!showing.length) note.textContent = t('picker.none');
+            else if (matches > showing.length) note.textContent = t('picker.more', { n: String(matches - showing.length) });
+            else note.textContent = '';
+        };
+
+        const mark = (next) => {
+            const rows = [...list.children];
+            if (!rows.length) return;
+            marked = Math.max(0, Math.min(rows.length - 1, next));
+            rows.forEach((row, index) => {
+                row.classList.toggle('is-marked', index === marked);
+                row.setAttribute('aria-selected', String(index === marked));
+            });
+            rows[marked].scrollIntoView({ block: 'nearest' });
+        };
+
+        search.addEventListener('input', draw);
+        search.addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowDown') { event.preventDefault(); mark(marked + 1); }
+            else if (event.key === 'ArrowUp') { event.preventDefault(); mark(marked - 1); }
+            else if (event.key === 'Enter') {
+                event.preventDefault();
+                list.children[marked]?.click();
+            }
+        });
+
+        box.append(search, note, list);
+        el.choices.append(box);
+        if (!field.required) {
+            const skip = document.createElement('button');
+            skip.type = 'button';
+            skip.className = 'agent-pill is-quiet';
+            skip.textContent = t('skip');
+            skip.addEventListener('click', () => { if (!state.busy) { el.choices.hidden = true; hear('skip', { label: t('skip') }); } });
+            el.choices.append(skip);
+        }
+        draw();
+        search.focus({ preventScroll: true });
     }
 
     function pillsFor(field) {
@@ -349,11 +462,15 @@ export function buildAgent(dialog, flow) {
             return true;
         }
 
-        if (field.kind === 'select') {
+        if (field.kind === 'select' || field.kind === 'picker') {
             const list = options(field.list);
             const exact = pill?.value ? list.find((option) => option.value === pill.value) : null;
             const hit = exact || matchOption(text, list);
-            if (hit) { store(field, hit.value, hit.label); return true; }
+            if (hit) {
+                // A picker's chip names what is actually being sent, since the country is not the value
+                store(field, hit.value, field.kind === 'picker' ? `${hit.label} (${hit.value})` : hit.label);
+                return true;
+            }
 
             const near = rankOptions(text, list);
             if (near.length) {
@@ -362,7 +479,10 @@ export function buildAgent(dialog, flow) {
                     state.awaiting = null;
                     if (chosen?.value) {
                         const option = list.find((entry) => entry.value === chosen.value);
-                        if (option) { store(field, option.value, option.label); await onward(); return; }
+                        if (option) {
+                            store(field, option.value, field.kind === 'picker' ? `${option.label} (${option.value})` : option.label);
+                            await onward(); return;
+                        }
                     }
                     if (isSkip(answer) && !field.required) { await skipped(field); return; }
                     if (await take(field, answer, null)) await onward();
@@ -374,7 +494,7 @@ export function buildAgent(dialog, flow) {
                 return false;
             }
             await say(t('errors.list'));
-            choices(pillsFor(field));
+            if (field.kind === 'picker') picker(field); else choices(pillsFor(field));
             return false;
         }
 

@@ -987,6 +987,27 @@
 
     .calculator-switch { margin: 0; }
     .agent-switch { margin: 0; }
+
+    /* A list too long to tap through (every country): a search box with the matches under it */
+    .agent-picker { display: block; width: 100%; }
+    .agent-picker-search { display: block; width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid var(--color-line-strong); border-radius: var(--radius-control);
+        background: var(--color-paper); color: var(--color-ink); font-family: var(--font-sans); font-size: var(--step-body); line-height: var(--lh-body); box-sizing: border-box; }
+    .agent-picker-search:focus { outline: none; border-color: var(--color-deep-teal); box-shadow: 0 0 0 3px rgba(12, 139, 155, 0.14); }
+    .agent-picker-note { display: block; margin-top: 6px; font-size: var(--step-caption); line-height: var(--lh-caption); color: var(--color-fg-muted); }
+    .agent-picker-note:empty { display: none; }
+    .agent-picker-list { display: block; max-height: 13rem; margin-top: var(--space-2); overflow-y: auto; overscroll-behavior: contain;
+        border: 1px solid var(--color-line); border-radius: var(--radius-card); background: var(--color-paper); }
+    .agent-picker-list:empty { display: none; }
+    .agent-picker-option { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); width: 100%; padding: 9px 14px; border: 0;
+        border-top: 1px solid var(--color-line); background: var(--color-paper); color: var(--color-ink); font-family: var(--font-sans); font-size: var(--step-small);
+        line-height: var(--lh-small); text-align: left; cursor: pointer; }
+    .agent-picker-option:first-child { border-top: 0; }
+    .agent-picker-option:hover, .agent-picker-option.is-marked { background: var(--color-teal-tint); }
+    .agent-picker-dial { flex: none; color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
+    .agent-picker-option.is-marked .agent-picker-dial { color: var(--color-deep-teal); }
+    .agent-picker + .agent-pill { margin-top: var(--space-2); }
+    /* On a short screen the list must not squeeze the conversation out of the way */
+    @media (max-height: 760px) { .agent-picker-list { max-height: 8.5rem; } }
     .agent-gate-field .textarea { min-height: 7rem; }
 
     /* fit-content, not auto: a modal dialog carries inset: 0 from the UA sheet, so an auto height stretches
