@@ -1,11 +1,14 @@
 {
-  "meta": { "version": "v1", "published_at": "2026-11-06", "locale": "en", "reference": "JBS-CP-2026-11-v1" },
-
+  "meta": {
+    "version": "v1",
+    "published_at": "2026-11-06",
+    "locale": "en",
+    "reference": "JBS-CP-2026-11-v1"
+  },
   "cover": {
     "headline": "Run everything. Ask anything.",
     "descriptor": "Intelligent operating systems for organisations."
   },
-
   "pov": {
     "title": "Every organisation has two versions of itself.",
     "paragraphs": [
@@ -14,18 +17,28 @@
       "We close it differently. We design how the organisation should run, then build the one system that runs it that way and answers for it. Ask it anything, and it answers."
     ]
   },
-
   "system": {
     "title": "One system that runs the organisation, and answers for it.",
     "lead": "We build the operating system an organisation runs on: money, people, operations, risk and customers in one place, designed around the way it works, with intelligence in every layer.",
     "pillars": [
-      { "title": "Designed around you", "body": "We start from how your organisation works, not from a product. Your processes, controls, roles and numbers shape the system, never the other way round." },
-      { "title": "One source of truth", "body": "Every transaction, approval and document is recorded once, in one place. Finance, operations and leadership read the same numbers." },
-      { "title": "Intelligence on your own data", "body": "Ask a question in plain language and get a straight answer, a chart, a table or a drafted action, from your own records, limited to what each person is allowed to see." },
-      { "title": "Built to grow for decades", "body": "A solid foundation first. Each new capability is then added as another floor, so nothing is rebuilt as you grow." }
+      {
+        "title": "Designed around you",
+        "body": "We start from how your organisation works, not from a product. Your processes, controls, roles and numbers shape the system, never the other way round."
+      },
+      {
+        "title": "One source of truth",
+        "body": "Every transaction, approval and document is recorded once, in one place. Finance, operations and leadership read the same numbers."
+      },
+      {
+        "title": "Intelligence on your own data",
+        "body": "Ask a question in plain language and get a straight answer, a chart, a table or a drafted action, from your own records, limited to what each person is allowed to see."
+      },
+      {
+        "title": "Built to grow for decades",
+        "body": "A solid foundation first. Each new capability is then added as another floor, so nothing is rebuilt as you grow."
+      }
     ]
   },
-
   "problems": {
     "title": "The hard problems we solve.",
     "lead": "Clients do not come to us for software. They come with problems that cost them money, time and confidence. These are some of the ones we solve every day; the list grows with every engagement.",
@@ -33,79 +46,178 @@
       {
         "domain": "Money in motion",
         "items": [
-          { "problem": "Payments arrive through several gateways and never quite match the bank.", "answer": "Gateway integrations with settlement monitoring and automatic reconciliation: every payment matched to its invoice, every settlement to the bank, exceptions raised the same day." },
-          { "problem": "A gateway fails quietly, and sales are lost before anyone notices.", "answer": "Real-time gateway health monitoring that watches every provider, alerts the right people the moment one degrades, and routes payments to a healthy one where the business allows." },
-          { "problem": "Invoices, receipts and debts live in different places, in different currencies.", "answer": "Invoicing, collections and receivables in one ledger, in any currency, with every balance and its due date in view." }
+          {
+            "problem": "Payments arrive through several gateways and never quite match the bank.",
+            "answer": "Gateway integrations with settlement monitoring and automatic reconciliation: every payment matched to its invoice, every settlement to the bank, exceptions raised the same day."
+          },
+          {
+            "problem": "A gateway fails quietly, and sales are lost before anyone notices.",
+            "answer": "Real-time gateway health monitoring that watches every provider, alerts the right people the moment one degrades, and routes payments to a healthy one where the business allows."
+          },
+          {
+            "problem": "Invoices, receipts and debts live in different places, in different currencies.",
+            "answer": "Invoicing, collections and receivables in one ledger, in any currency, with every balance and its due date in view."
+          }
         ]
       },
       {
         "domain": "Decisions and data",
         "items": [
-          { "problem": "Leadership waits days for numbers that are already out of date.", "answer": "Live business analytics drawn from the records the teams work in, so the numbers are current when the meeting starts." },
-          { "problem": "The data is too large, or too scattered, to be useful.", "answer": "Big data pipelines that bring every source together, clean it once and make it ready for analysis, forecasting and AI." },
-          { "problem": "Forecasts are rebuilt by hand in spreadsheets every quarter.", "answer": "Financial models and forecasts built on the organisation's own history, refreshed as new data arrives." }
+          {
+            "problem": "Leadership waits days for numbers that are already out of date.",
+            "answer": "Live business analytics drawn from the records the teams work in, so the numbers are current when the meeting starts."
+          },
+          {
+            "problem": "The data is too large, or too scattered, to be useful.",
+            "answer": "Big data pipelines that bring every source together, clean it once and make it ready for analysis, forecasting and AI."
+          },
+          {
+            "problem": "Forecasts are rebuilt by hand in spreadsheets every quarter.",
+            "answer": "Financial models and forecasts built on the organisation's own history, refreshed as new data arrives."
+          }
         ]
       },
       {
         "domain": "Operations and people",
         "items": [
-          { "problem": "Approvals wait in one person's inbox.", "answer": "Approval chains, thresholds and delegations set as rules, applied the same way every time, with a complete trail." },
-          { "problem": "Work in the field is invisible to head office.", "answer": "Field reporting with location check-ins, offline work that syncs when the signal returns, and live views for every manager." },
-          { "problem": "Hiring, attendance, performance and payroll sit in separate spreadsheets.", "answer": "One record for every person, from application to payslip." }
+          {
+            "problem": "Approvals wait in one person's inbox.",
+            "answer": "Approval chains, thresholds and delegations set as rules, applied the same way every time, with a complete trail."
+          },
+          {
+            "problem": "Work in the field is invisible to head office.",
+            "answer": "Field reporting with location check-ins, offline work that syncs when the signal returns, and live views for every manager."
+          },
+          {
+            "problem": "Hiring, attendance, performance and payroll sit in separate spreadsheets.",
+            "answer": "One record for every person, from application to payslip."
+          }
         ]
       },
       {
         "domain": "Control and risk",
         "items": [
-          { "problem": "Nobody can say who changed what, or why.", "answer": "Every action permissioned and logged: who, what, when and from where." },
-          { "problem": "Sensitive information is visible to too many people.", "answer": "Access by role, down to each page and record, set by the organisation itself." },
-          { "problem": "Compliance deadlines are discovered when they are missed.", "answer": "Obligations generated from each registration, assigned to an owner and announced well before they fall due." }
+          {
+            "problem": "Nobody can say who changed what, or why.",
+            "answer": "Every action permissioned and logged: who, what, when and from where."
+          },
+          {
+            "problem": "Sensitive information is visible to too many people.",
+            "answer": "Access by role, down to each page and record, set by the organisation itself."
+          },
+          {
+            "problem": "Compliance deadlines are discovered when they are missed.",
+            "answer": "Obligations generated from each registration, assigned to an owner and announced well before they fall due."
+          }
         ]
       },
       {
         "domain": "Customers and growth",
         "items": [
-          { "problem": "Conversations by email, WhatsApp, Instagram and the website are scattered across phones.", "answer": "One inbox on each customer's record, with every conversation, order and invoice in one place." },
-          { "problem": "Marketing, advertising and sales run in tools that never talk to each other.", "answer": "Campaigns, content calendars and advertising performance connected to the customer record, so spend can be traced to revenue." }
+          {
+            "problem": "Conversations by email, WhatsApp, Instagram and the website are scattered across phones.",
+            "answer": "One inbox on each customer's record, with every conversation, order and invoice in one place."
+          },
+          {
+            "problem": "Marketing, advertising and sales run in tools that never talk to each other.",
+            "answer": "Campaigns, content calendars and advertising performance connected to the customer record, so spend can be traced to revenue."
+          }
         ]
       },
       {
         "domain": "Too many tools",
         "items": [
-          { "problem": "A dozen subscriptions, and not one of them agrees with another.", "answer": "One system in place of the patchwork of mail, accounting, CRM, chat, project and scheduling tools, with your data in one place that you own." }
+          {
+            "problem": "A dozen subscriptions, and not one of them agrees with another.",
+            "answer": "One system in place of the patchwork of mail, accounting, CRM, chat, project and scheduling tools, with your data in one place that you own."
+          }
         ]
       }
     ],
     "closing": "If it moves money, people, goods or decisions, we can design it and build it."
   },
-
   "practices": {
     "title": "Four practices. One system.",
     "lead": "Every engagement draws on four practices working as one team, so the way the organisation should run and the system that runs it are designed together.",
     "items": [
-      { "name": "Strategy and operating design", "summary": "We design how the organisation should run: processes, controls, roles, approvals and the numbers that matter.", "capabilities": ["Operating model and process design", "Internal controls and audit readiness", "Performance frameworks and KPIs", "Change management and training"] },
-      { "name": "Systems engineering", "summary": "We build the system that runs it: custom platforms, their integrations and the infrastructure beneath them.", "capabilities": ["Custom ERP and business platforms", "Web, mobile and offline-first applications", "Payment gateway integration and reconciliation", "APIs, webhooks and third-party integrations"] },
-      { "name": "Data and AI", "summary": "We make the organisation's data answer: pipelines, analytics and assistants that work on its own records.", "capabilities": ["Big data pipelines and warehousing", "Business analytics and dashboards", "AI assistants on your own data, under your permissions", "Machine learning and automation"] },
-      { "name": "Finance and performance", "summary": "We make the numbers hold: ledgers, reporting, models and forecasts that leadership can rely on.", "capabilities": ["Accounting systems under IFRS and OHADA", "Financial modelling and forecasting", "Treasury, multi-currency and cash visibility", "Management and board reporting"] }
+      {
+        "name": "Strategy and operating design",
+        "summary": "We design how the organisation should run: processes, controls, roles, approvals and the numbers that matter.",
+        "capabilities": [
+          "Operating model and process design",
+          "Internal controls and audit readiness",
+          "Performance frameworks and KPIs",
+          "Change management and training"
+        ]
+      },
+      {
+        "name": "Systems engineering",
+        "summary": "We build the system that runs it: custom platforms, their integrations and the infrastructure beneath them.",
+        "capabilities": [
+          "Custom ERP and business platforms",
+          "Web, mobile and offline-first applications",
+          "Payment gateway integration and reconciliation",
+          "APIs, webhooks and third-party integrations"
+        ]
+      },
+      {
+        "name": "Data and AI",
+        "summary": "We make the organisation's data answer: pipelines, analytics and assistants that work on its own records.",
+        "capabilities": [
+          "Big data pipelines and warehousing",
+          "Business analytics and dashboards",
+          "AI assistants on your own data, under your permissions",
+          "Machine learning and automation"
+        ]
+      },
+      {
+        "name": "Finance and performance",
+        "summary": "We make the numbers hold: ledgers, reporting, models and forecasts that leadership can rely on.",
+        "capabilities": [
+          "Accounting systems under IFRS and OHADA",
+          "Financial modelling and forecasting",
+          "Treasury, multi-currency and cash visibility",
+          "Management and board reporting"
+        ]
+      }
     ]
   },
-
   "method": {
     "title": "The Praxis Method",
     "lead": "One method for every engagement, whatever its size.",
     "stages": [
-      { "name": "See", "body": "We map how one area of the organisation really runs today, starting with a free audit." },
-      { "name": "Design", "body": "We design how it should run: processes, controls, roles and the numbers that matter." },
-      { "name": "Build", "body": "We build the system that runs it and shows it, in stages, so the organisation never stops working." },
-      { "name": "Hold", "body": "We stay until it holds, train your team, then hand over the keys." }
+      {
+        "name": "See",
+        "body": "We map how one area of the organisation really runs today, starting with a free audit."
+      },
+      {
+        "name": "Design",
+        "body": "We design how it should run: processes, controls, roles and the numbers that matter."
+      },
+      {
+        "name": "Build",
+        "body": "We build the system that runs it and shows it, in stages, so the organisation never stops working."
+      },
+      {
+        "name": "Hold",
+        "body": "We stay until it holds, train your team, then hand over the keys."
+      }
     ],
     "principles": [
-      { "title": "A foundation built for every floor", "body": "We lay the foundation for the organisation you are becoming. Each new capability is added as another floor, without rebuilding what came before." },
-      { "title": "Better with every release", "body": "Continuous improvement is part of the work: each new floor makes the ones beneath it better." },
-      { "title": "Your system, your keys", "body": "You own the code and the data. Your team can run the system without us, and can remove our access at any time." }
+      {
+        "title": "A foundation built for every floor",
+        "body": "We lay the foundation for the organisation you are becoming. Each new capability is added as another floor, without rebuilding what came before."
+      },
+      {
+        "title": "Better with every release",
+        "body": "Continuous improvement is part of the work: each new floor makes the ones beneath it better."
+      },
+      {
+        "title": "Your system, your keys",
+        "body": "You own the code and the data. Your team can run the system without us, and can remove our access at any time."
+      }
     ]
   },
-
   "teams": {
     "title": "The teams behind the work.",
     "lead": "Our consultants and engineers come from banking, telecommunications, government audit, multinational consulting, oil and gas, logistics and software engineering. Each brings between five and twenty years of practice.",
@@ -113,99 +225,297 @@
       {
         "name": "Software engineering",
         "summary": "Engineers who build platforms meant to run every day for years: clean architecture, automated tests, and releases that never break what already works.",
-        "disciplines": ["Platform and back-end engineering", "Web and mobile applications", "Integrations, APIs and payments", "Quality assurance and test automation"],
+        "disciplines": [
+          "Platform and back-end engineering",
+          "Web and mobile applications",
+          "Integrations, APIs and payments",
+          "Quality assurance and test automation"
+        ],
         "experience": "5 to 20 years each",
         "credentials": [
-          { "name": "OpenJS Node.js Application Developer (JSNAD)", "issuer": "OpenJS Foundation", "held": false },
-          { "name": "AWS Certified Developer – Associate", "issuer": "Amazon Web Services", "held": false },
-          { "name": "Microsoft Certified: Azure Developer Associate", "issuer": "Microsoft", "held": false },
-          { "name": "Professional Scrum Master I (PSM I)", "issuer": "Scrum.org", "held": false }
+          {
+            "name": "OpenJS Node.js Application Developer (JSNAD)",
+            "issuer": "OpenJS Foundation",
+            "held": false
+          },
+          {
+            "name": "AWS Certified Developer – Associate",
+            "issuer": "Amazon Web Services",
+            "held": false
+          },
+          {
+            "name": "Microsoft Certified: Azure Developer Associate",
+            "issuer": "Microsoft",
+            "held": false
+          },
+          {
+            "name": "Professional Scrum Master I (PSM I)",
+            "issuer": "Scrum.org",
+            "held": false
+          }
         ]
       },
       {
         "name": "AI, data and cloud",
         "summary": "Specialists who turn scattered data into answers, and keep the infrastructure fast, secure and available.",
-        "disciplines": ["AI and machine learning engineering", "Data engineering and big data", "Cloud architecture and DevOps", "Security engineering"],
+        "disciplines": [
+          "AI and machine learning engineering",
+          "Data engineering and big data",
+          "Cloud architecture and DevOps",
+          "Security engineering"
+        ],
         "experience": "5 to 20 years each",
         "credentials": [
-          { "name": "IBM Data Engineering Professional Certificate", "issuer": "IBM", "held": false },
-          { "name": "IBM Data Science Professional Certificate", "issuer": "IBM", "held": false },
-          { "name": "Google Cloud Professional Data Engineer", "issuer": "Google Cloud", "held": false },
-          { "name": "AWS Certified Solutions Architect – Associate", "issuer": "Amazon Web Services", "held": false },
-          { "name": "Microsoft Certified: Azure AI Engineer Associate", "issuer": "Microsoft", "held": false },
-          { "name": "Certified Kubernetes Administrator (CKA)", "issuer": "Cloud Native Computing Foundation", "held": false },
-          { "name": "CompTIA Security+", "issuer": "CompTIA", "held": false }
+          {
+            "name": "IBM Data Engineering Professional Certificate",
+            "issuer": "IBM",
+            "held": false
+          },
+          {
+            "name": "IBM Data Science Professional Certificate",
+            "issuer": "IBM",
+            "held": false
+          },
+          {
+            "name": "Google Cloud Professional Data Engineer",
+            "issuer": "Google Cloud",
+            "held": false
+          },
+          {
+            "name": "AWS Certified Solutions Architect – Associate",
+            "issuer": "Amazon Web Services",
+            "held": false
+          },
+          {
+            "name": "Microsoft Certified: Azure AI Engineer Associate",
+            "issuer": "Microsoft",
+            "held": false
+          },
+          {
+            "name": "Certified Kubernetes Administrator (CKA)",
+            "issuer": "Cloud Native Computing Foundation",
+            "held": false
+          },
+          {
+            "name": "CompTIA Security+",
+            "issuer": "CompTIA",
+            "held": false
+          }
         ]
       },
       {
         "name": "Management consulting",
         "summary": "Former auditors and performance professionals who design how the organisation should run, and make sure its controls hold under scrutiny.",
-        "disciplines": ["Operating model and process design", "Internal audit and controls", "Performance management and KPIs", "Programme and change management"],
+        "disciplines": [
+          "Operating model and process design",
+          "Internal audit and controls",
+          "Performance management and KPIs",
+          "Programme and change management"
+        ],
         "experience": "5 to 20 years each",
         "credentials": [
-          { "name": "Certified Information Systems Auditor (CISA)", "issuer": "ISACA", "held": false },
-          { "name": "Certified Internal Auditor (CIA)", "issuer": "The Institute of Internal Auditors", "held": false },
-          { "name": "Project Management Professional (PMP)", "issuer": "PMI", "held": false },
-          { "name": "PRINCE2 Practitioner", "issuer": "PeopleCert", "held": false },
-          { "name": "Lean Six Sigma Green Belt", "issuer": "IASSC", "held": false },
-          { "name": "ITIL 4 Foundation", "issuer": "PeopleCert", "held": false }
+          {
+            "name": "Certified Information Systems Auditor (CISA)",
+            "issuer": "ISACA",
+            "held": false
+          },
+          {
+            "name": "Certified Internal Auditor (CIA)",
+            "issuer": "The Institute of Internal Auditors",
+            "held": false
+          },
+          {
+            "name": "Project Management Professional (PMP)",
+            "issuer": "PMI",
+            "held": false
+          },
+          {
+            "name": "PRINCE2 Practitioner",
+            "issuer": "PeopleCert",
+            "held": false
+          },
+          {
+            "name": "Lean Six Sigma Green Belt",
+            "issuer": "IASSC",
+            "held": false
+          },
+          {
+            "name": "ITIL 4 Foundation",
+            "issuer": "PeopleCert",
+            "held": false
+          }
         ]
       },
       {
         "name": "Finance and modelling",
         "summary": "Accountants and financial modellers who make the numbers hold, from the ledger to the board pack.",
-        "disciplines": ["Accounting systems under IFRS and OHADA", "Financial modelling and valuation", "Forecasting and planning", "Treasury and reporting"],
+        "disciplines": [
+          "Accounting systems under IFRS and OHADA",
+          "Financial modelling and valuation",
+          "Forecasting and planning",
+          "Treasury and reporting"
+        ],
         "experience": "5 to 20 years each",
         "credentials": [
-          { "name": "Financial Modeling & Valuation Analyst (FMVA)", "issuer": "Corporate Finance Institute", "held": true },
-          { "name": "Business Intelligence & Data Analyst (BIDA)", "issuer": "Corporate Finance Institute", "held": false },
-          { "name": "ACCA", "issuer": "Association of Chartered Certified Accountants", "held": false },
-          { "name": "Chartered Accountant (ACA)", "issuer": "Institute of Chartered Accountants of Nigeria", "held": false }
+          {
+            "name": "Financial Modeling & Valuation Analyst (FMVA)",
+            "issuer": "Corporate Finance Institute",
+            "held": true
+          },
+          {
+            "name": "Business Intelligence & Data Analyst (BIDA)",
+            "issuer": "Corporate Finance Institute",
+            "held": false
+          },
+          {
+            "name": "ACCA",
+            "issuer": "Association of Chartered Certified Accountants",
+            "held": false
+          },
+          {
+            "name": "Chartered Accountant (ACA)",
+            "issuer": "Institute of Chartered Accountants of Nigeria",
+            "held": false
+          }
         ]
       }
     ]
   },
-
   "work": {
     "title": "Selected work.",
     "lead": "Each system below runs in production or is being built. Where a client is not named, we describe it by its sector.",
     "items": [
-      { "client": "Smart Logistics and Services", "sector": "Logistics and freight", "title": "A freight business where every shipment file reaches the books.", "problem": "Its older system had no accounting layer and worked in English only, in a country that works in French and English.", "built": "Praxis LS: shipment files, warehouse, fleet, people and OHADA accounting in one bilingual system.", "outcome": "Invoices, file costs, purchases and payroll post to one ledger as the work happens, and tax deadlines remind the people responsible.", "image": null },
-      { "client": "Pixie Girl Global", "sector": "Retail and consumer brands", "title": "A hair brand that knows what each wig costs, from factory to customer.", "problem": "Making, importing and selling through a shop, a website, social media and wholesale, without one view of stock or margin.", "built": "One platform for costing, stock, the brand's own online shop, deliveries, people and accounts, with every conversation in one inbox.", "outcome": "Every channel draws on one stock count, and each price starts from the landed cost and a margin management sets.", "image": null },
-      { "client": "A leading pharmaceutical manufacturer", "sector": "Pharmaceuticals, with Tales Consulting", "title": "A national sales force, its managers and its forecast, on one platform.", "problem": "Managers could not see field visits and orders as they happened, and forecasts were assembled by hand.", "built": "A platform for representatives, managers and leadership: verified visits, offline work that syncs, and a national forecast.", "outcome": "Visits are checked in where they happen, nothing is lost offline, and the platform runs in the client's own cloud account.", "image": null },
-      { "client": "La Petite Cour", "sector": "Consumer goods and distribution", "title": "An ERP rebuilt in stages, while the business kept using it.", "problem": "A distributor's system had to be rebuilt without stopping orders, deliveries or the books.", "built": "Orders, deliveries, returnable containers, fleet, payroll and OHADA accounts, released in stages, with checks before each go-live.", "outcome": "Access by role, books that refuse unbalanced entries and keep closed years closed, and every change on the record.", "image": null },
-      { "client": "An oil and gas company", "sector": "Oil and gas", "title": "Field work that keeps pace with the rig.", "problem": "Reports, approvals and purchases lagged behind operations that run around the clock.", "built": "Real-time rig tracking, daily drilling reports that build themselves, work tickets that need two signatures, and a procurement pipeline.", "outcome": "Daily reports no longer wait to be assembled by hand, and every ticket carries two signatures.", "image": null },
-      { "client": "NFELIA", "sector": "Our product, for small businesses", "title": "A small business's records, on the phone it already uses.", "problem": "Owners sell through chats and word of mouth, with their records spread across notebooks and messages.", "built": "A website for each business, plus orders, invoices, receipts, debts, stock and deliveries on the phone.", "outcome": "Live in Nigeria, Cameroon, Ghana and Kenya, each with its own currency and its own way to pay.", "image": null }
+      {
+        "client": "Smart Logistics and Services",
+        "sector": "Logistics and freight",
+        "title": "A freight business where every shipment file reaches the books.",
+        "problem": "Its older system had no accounting layer and worked in English only, in a country that works in French and English.",
+        "built": "Praxis LS: shipment files, warehouse, fleet, people and OHADA accounting in one bilingual system.",
+        "outcome": "Invoices, file costs, purchases and payroll post to one ledger as the work happens, and tax deadlines remind the people responsible.",
+        "image": null
+      },
+      {
+        "client": "Pixie Girl Global",
+        "sector": "Manufacturing and global brands",
+        "title": "A global hair brand, run in English and Chinese, from the factory to the customer.",
+        "problem": "The brand manufactures in China and is registered in China, the United States and Nigeria. Factory, freight, stock and sales lived in separate places, in different languages.",
+        "built": "One platform from the factory floor to the customer: production batches, factory accounts and freight in Chinese for the factory team; costing, stock, the brand's own online shop, deliveries, people and accounts in English.",
+        "outcome": "The factory and head office work in one system, each in its own language. Every unit is costed from production to landed cost, and every channel draws on one stock count.",
+        "image": null
+      },
+      {
+        "client": "A leading pharmaceutical manufacturer",
+        "sector": "Pharmaceuticals, with Tales Consulting",
+        "title": "A national sales force, its managers and its forecast, on one platform.",
+        "problem": "Managers could not see field visits and orders as they happened, and forecasts were assembled by hand.",
+        "built": "A platform for representatives, managers and leadership: verified visits, offline work that syncs, and a national forecast.",
+        "outcome": "Visits are checked in where they happen, nothing is lost offline, and the platform runs in the client's own cloud account.",
+        "image": null
+      },
+      {
+        "client": "La Petite Cour",
+        "sector": "Consumer goods and distribution",
+        "title": "An ERP rebuilt in stages, while the business kept using it.",
+        "problem": "A distributor's system had to be rebuilt without stopping orders, deliveries or the books.",
+        "built": "Orders, deliveries, returnable containers, fleet, payroll and OHADA accounts, released in stages, with checks before each go-live.",
+        "outcome": "Access by role, books that refuse unbalanced entries and keep closed years closed, and every change on the record.",
+        "image": null
+      },
+      {
+        "client": "An oil and gas company",
+        "sector": "Oil and gas",
+        "title": "Field work that keeps pace with the rig.",
+        "problem": "Reports, approvals and purchases lagged behind operations that run around the clock.",
+        "built": "Real-time rig tracking, daily drilling reports that build themselves, work tickets that need two signatures, and a procurement pipeline.",
+        "outcome": "Daily reports no longer wait to be assembled by hand, and every ticket carries two signatures.",
+        "image": null
+      },
+      {
+        "client": "NFELIA",
+        "sector": "Our product, for small businesses",
+        "title": "A small business's records, on the phone it already uses.",
+        "problem": "Owners sell through chats and word of mouth, with their records spread across notebooks and messages.",
+        "built": "A website for each business, plus orders, invoices, receipts, debts, stock and deliveries on the phone.",
+        "outcome": "Live in Nigeria, Cameroon, Ghana and Kenya, each with its own currency and its own way to pay.",
+        "image": null
+      }
     ]
   },
-
-  "clients": { "title": "Organisations that run on our work.", "logos": [] },
-
+  "clients": {
+    "title": "Organisations that run on our work.",
+    "logos": []
+  },
   "security": {
     "title": "Security and data.",
     "items": [
-      { "title": "Aligned with ISO 27001", "body": "Our controls follow ISO 27001: access by role, encrypted connections, tested backups and a record of every change." },
-      { "title": "Your data stays yours", "body": "Client data is never reused. Systems can run in your own cloud account, under your own sign-in." },
-      { "title": "Every action on the record", "body": "Each change is permissioned and logged: who made it, what changed and when." },
-      { "title": "Tested before it ships", "body": "Every release passes automated tests, and teams can practise in a separate environment without touching live records." }
+      {
+        "title": "Aligned with ISO 27001",
+        "body": "Our controls follow ISO 27001: access by role, encrypted connections, tested backups and a record of every change."
+      },
+      {
+        "title": "Your data stays yours",
+        "body": "Client data is never reused. Systems can run in your own cloud account, under your own sign-in."
+      },
+      {
+        "title": "Every action on the record",
+        "body": "Each change is permissioned and logged: who made it, what changed and when."
+      },
+      {
+        "title": "Tested before it ships",
+        "body": "Every release passes automated tests, and teams can practise in a separate environment without touching live records."
+      }
     ]
   },
-
   "facts": {
     "title": "Company facts.",
     "items": [
-      { "label": "Legal name", "value": "JBS Praxis Limited", "enabled": true },
-      { "label": "Registration", "value": "RC 9985884, Corporate Affairs Commission, Nigeria", "enabled": true },
-      { "label": "Tax identification number", "value": "2622490936068", "enabled": true },
-      { "label": "Registered office", "value": "21B Bode Ajakaiye Street, Lekki, Lagos, Nigeria", "enabled": true },
-      { "label": "Cameroon entity", "value": "JBS Praxis SARL, Douala, RC/DLA/1097C", "enabled": false },
-      { "label": "Working languages", "value": "English and French", "enabled": true },
-      { "label": "Accounting standards", "value": "IFRS and OHADA (SYSCOHADA)", "enabled": true },
-      { "label": "Information security", "value": "Aligned with ISO 27001", "enabled": true },
-      { "label": "Sectors", "value": "Logistics, consumer goods, retail, pharmaceuticals, oil and gas, technology, education, faith organisations and small businesses", "enabled": true }
+      {
+        "label": "Legal name",
+        "value": "JBS Praxis Limited",
+        "enabled": true
+      },
+      {
+        "label": "Registration",
+        "value": "RC 9985884, Corporate Affairs Commission, Nigeria",
+        "enabled": true
+      },
+      {
+        "label": "Tax identification number",
+        "value": "2622490936068",
+        "enabled": true
+      },
+      {
+        "label": "Registered office",
+        "value": "21B Bode Ajakaiye Street, Lekki, Lagos, Nigeria",
+        "enabled": true
+      },
+      {
+        "label": "Cameroon entity",
+        "value": "JBS Praxis SARL, Douala, RC/DLA/1097C",
+        "enabled": false
+      },
+      {
+        "label": "Working languages",
+        "value": "English and French",
+        "enabled": true
+      },
+      {
+        "label": "Accounting standards",
+        "value": "IFRS and OHADA (SYSCOHADA)",
+        "enabled": true
+      },
+      {
+        "label": "Information security",
+        "value": "Aligned with ISO 27001",
+        "enabled": true
+      },
+      {
+        "label": "Sectors",
+        "value": "Logistics, manufacturing, consumer goods, retail, pharmaceuticals, oil and gas, technology, education, faith organisations and small businesses",
+        "enabled": true
+      }
     ]
   },
-
   "contact": {
     "cta": "Book a free audit and demo.",
     "cta_url": "https://jbspraxis.com/schedule",
@@ -213,7 +523,10 @@
     "sales_email": "sales@jbspraxis.com",
     "phone": "",
     "website": "jbspraxis.com",
-    "offices": ["Lagos", "Douala"],
+    "offices": [
+      "Lagos",
+      "Douala"
+    ],
     "closing": "Order, made visible."
   }
 }

@@ -25,7 +25,7 @@
         </div>
     </div>
 
-    <div style="height: 22pt; font-size: 0; line-height: 0;"></div>
+    <div style="height: 14pt; font-size: 0; line-height: 0;"></div>
 
     <div class="cols">
         @foreach ($practices as $practice)
@@ -34,7 +34,7 @@
                 <p class="h3" style="margin-top: 13pt;">{{ $practice['name'] ?? '' }}</p>
                 <p class="small" style="margin-top: 9pt;">{{ $practice['summary'] ?? '' }}</p>
                 @if (($practice['capabilities'] ?? []) !== [])
-                    <p class="meta" style="margin-top: 10pt; line-height: 11pt;">
+                    <p class="meta" style="margin-top: 9pt; line-height: 10.5pt;">
                         @foreach ($practice['capabilities'] as $capability)
                             {{ $capability }}@if (! $loop->last)<br>@endif
                         @endforeach
@@ -46,16 +46,16 @@
     @endif
 
     @if ($showPractices && $showMethod)
-        <div style="height: 26pt; font-size: 0; line-height: 0;"></div>
-        <div class="hair"></div>
         <div style="height: 18pt; font-size: 0; line-height: 0;"></div>
+        <div class="hair"></div>
+        <div style="height: 12pt; font-size: 0; line-height: 0;"></div>
     @endif
 
     @if ($showMethod)
     <div class="cols">
         <div class="col" style="width: {{ Layout::columnWidth(6) }}pt;">
             <p class="{{ $showPractices ? 'statement' : 'h1' }}">{{ $method['title'] ?? '' }}</p>
-        </div><div class="gap"></div><div class="col" style="width: {{ Layout::columnWidth(6) }}pt; padding-top: 10pt;">
+        </div><div class="gap"></div><div class="col" style="width: {{ Layout::columnWidth(6) }}pt; padding-top: 6pt;">
             <p class="small">{{ $method['lead'] ?? '' }}</p>
         </div>
     </div>
@@ -63,10 +63,10 @@
     @include('pdf.company-profile.rule', [
         'left' => ($split * ($stageWidth + Layout::GUTTER)) - Layout::GUTTER,
         'right' => Layout::CONTENT_WIDTH - ($split * ($stageWidth + Layout::GUTTER)) + Layout::GUTTER,
-        'style' => 'margin-top: 16pt;',
+        'style' => 'margin-top: 12pt;',
     ])
 
-    <div class="cols" style="margin-top: 12pt;">
+    <div class="cols" style="margin-top: 8pt;">
         @foreach ($stages as $stage)
             <div class="col" style="width: {{ $stageWidth }}pt;">
                 <p class="meta">{{ $loop->iteration }}</p>

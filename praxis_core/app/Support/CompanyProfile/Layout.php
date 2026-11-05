@@ -92,7 +92,8 @@ final class Layout
             $pages[] = $page;
         }
 
-        foreach (self::clientPages($data['clients'] ?? []) as $page) {
+        $platforms = self::platforms($data['work']['items'] ?? []);
+        foreach (self::clientPages($data['clients'] ?? [], $platforms) as $page) {
             $pages[] = ['view' => 'clients', 'surface' => 'paper', 'data' => $page];
         }
 
@@ -167,10 +168,12 @@ final class Layout
     private static function fillProblems(array $groups, array $problems, float $fraction): array
     {
         // What the template spends, in points: the head with the section title and its lead, the quiet
-        // running head on a later page, a domain label, and the hairline between two problems.
+        // running head on a later page, the domain label that sits above the first problem of its group
+        // in the problem column, the air before a new domain, and the hairline between two problems.
         $head = self::headHeight((string) ($problems['lead'] ?? ''));
         $runningHead = 28.0;
-        $label = 53.0;
+        $label = 16.0;
+        $groupGap = 12.0;
         $separator = 19.5;
         $slack = 8.0;
 
@@ -183,7 +186,7 @@ final class Layout
             $pending = ['domain' => $group['domain'] ?? '', 'items' => [], 'continued' => false];
 
             foreach ($items as $item) {
-                $cost = self::problemHeight($item) + ($pending['items'] === [] ? $label : $separator);
+                $cost = self::problemHeight($item) + ($pending['items'] === [] ? $label + $groupGap : $separator);
 
                 if ($cost > $budget && ($current['groups'] !== [] || $pending['items'] !== [])) {
                     if ($pending['items'] !== []) {
@@ -230,7 +233,7 @@ final class Layout
 
         return match ($page['view']) {
             'problems' => self::shrinkProblems($pages, $index),
-            'teams', 'work-grid', 'platforms' => self::shrinkItems($pages, $index),
+            'teams', 'work-grid' => self::shrinkItems($pages, $index),
             'clients' => self::shrinkClients($pages, $index),
             'practices' => self::shrinkPractices($pages, $index),
             default => null,
@@ -319,6 +322,8 @@ final class Layout
         $data = $pages[$index]['data'];
         $data['items'] = [$moved];
         $data['first'] = false;
+        // Anything that closes the section goes with the page that now ends it, not on both.
+        $pages[$index]['data']['platforms'] = [];
         array_splice($pages, $index + 1, 0, [[
             'view' => $pages[$index]['view'],
             'surface' => $pages[$index]['surface'],
@@ -526,14 +531,14 @@ final class Layout
     }
 
     /**
-     * Selected work, over three kinds of page.
+     * Selected work, on one page: every case as an entry, three to a row, which is how a reader takes
+     * in breadth.
      *
-     * The first case is the feature: a whole page bleeding a place photograph, with the story on a Paper
-     * panel, which is the only thing the brand allows on top of a photograph. The rest set as short
-     * entries, three to a row, which is how a reader takes in breadth. Then the platforms: each client's
-     * own system as its team signs in to it, every one in that client's brand. That page is the proof —
-     * a logo wall says who hired us, these say what they got — so it replaces the band of place imagery
-     * that used to close the section, which was only atmosphere.
+     * The first case used to have a whole page of place photography to itself, with its story on a
+     * Paper panel. The owner's twelve pages bought that page back: fifteen problems need three pages at
+     * a size anyone would read, and this is the page that had to give. The entries carry each case's own
+     * line and its outcome; the problem it started from and what was built for it are in the proposal,
+     * where a reader who has got this far will ask for them. The platforms close the clients page.
      *
      * @return list<array<string, mixed>>
      */
@@ -544,41 +549,31 @@ final class Layout
             return [];
         }
 
-        $feature = array_shift($items);
-        $pages = [[
-            'view' => 'work-feature',
-            'surface' => 'bleed',
-            'footer' => 'light',
-            'data' => [
-                'title' => $work['title'] ?? '',
-                'lead' => $work['lead'] ?? '',
-                'item' => $feature,
-                'image' => Assets::placeForSector((string) ($feature['sector'] ?? ''), $feature['image'] ?? null),
-            ],
-        ]];
+        $pages = [];
 
-        foreach (array_chunk($items, 6) as $chunk) {
+        foreach (array_chunk($items, 6) as $index => $chunk) {
             $pages[] = [
                 'view' => 'work-grid',
                 'surface' => 'paper',
-                'data' => ['title' => $work['title'] ?? '', 'items' => $chunk],
+                'data' => [
+                    'title' => $work['title'] ?? '',
+                    'lead' => $work['lead'] ?? '',
+                    'first' => $index === 0,
+                    'items' => $chunk,
+                ],
             ];
-        }
-
-        foreach (self::platformPages(array_merge([$feature], $items)) as $page) {
-            $pages[] = $page;
         }
 
         return $pages;
     }
 
     /**
-     * The cases that have a screen of their own, six to a page. A case whose client is described rather
-     * than named has none, which is right: there is no screen to show without naming the client.
+     * The cases that have a screen of their own. A case whose client the copy describes rather than
+     * names has none, which is right: there is no screen to show without naming the client.
      *
      * @return list<array<string, mixed>>
      */
-    public static function platformPages(array $items): array
+    public static function platforms(array $items): array
     {
         $platforms = [];
         foreach ($items as $item) {
@@ -588,20 +583,7 @@ final class Layout
             }
         }
 
-        if ($platforms === []) {
-            return [];
-        }
-
-        $pages = [];
-        foreach (array_chunk($platforms, 6) as $index => $chunk) {
-            $pages[] = [
-                'view' => 'platforms',
-                'surface' => 'paper',
-                'data' => ['items' => $chunk, 'first' => $index === 0],
-            ];
-        }
-
-        return $pages;
+        return $platforms;
     }
 
     /**
@@ -610,7 +592,7 @@ final class Layout
      *
      * @return list<array<string, mixed>>
      */
-    public static function clientPages(array $clients): array
+    public static function clientPages(array $clients, array $platforms = []): array
     {
         $logos = array_values(array_filter(
             $clients['logos'] ?? [],
@@ -622,12 +604,16 @@ final class Layout
         }
 
         $pages = [];
-        foreach (array_chunk($logos, 20) as $index => $chunk) {
+        $chunks = array_chunk($logos, 15);
+        foreach ($chunks as $index => $chunk) {
             $pages[] = [
                 'title' => $clients['title'] ?? '',
                 'note' => $clients['note'] ?? '',
                 'rows' => array_chunk($chunk, 5),
                 'first' => $index === 0,
+                // The platforms close the page, and the book's proof: each client's own system as its
+                // team signs in to it. A logo wall says who hired us; the strip says what they got.
+                'platforms' => $index === count($chunks) - 1 ? $platforms : [],
             ];
         }
 

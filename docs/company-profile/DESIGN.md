@@ -49,31 +49,35 @@ diagonal like the logo's, Ink left of the split and Teal right of it.
 2. **Point of view** — the statement large on the left, the argument at reading size on the right, the
    three principles across the foot.
 3. **What we build** — the pillars, two to a row under their own hairlines. Not cards.
-4–6. **The hard problems we solve** — problem left, answer right, under the split rule. An open set: the
-   domains are listed, never counted, and the list runs over as many pages as the content needs.
-7. **Practices and the Praxis Method** — one page in English; in French the copy runs longer and the
-   renderer gives each half its own page.
+4–6. **The hard problems we solve** — problem left, answer right, under the split rule. The domain sits
+   in the problem column above the first problem it governs, not on a line of its own: on its own line
+   it cost a third of the section in white space and made the list read as six short lists. An open
+   set: the domains are listed, never counted.
+7. **Practices and the Praxis Method** — one page, in both languages.
 8. **Teams and credentials** — by discipline. Never a name.
-9. **Selected work** — the first case across a whole page of place photography, with the story on a
-   Paper panel, which is the only thing the brand allows on top of a photograph.
-10. **Selected work, continued** — the rest as an index, three to a row.
-11. **The platforms** — each client's own system, as that client's team signs in to it, every one in the
-    client's own brand. A logo wall says who hired us; this says what they got. The screens are the
-    website's own, already public, and they are sign-in screens, so none carries a client's records. A
-    case whose client the copy describes rather than names has no screen here, which is right: there is
-    nothing to show without naming them.
-12. **Clients** — the logo wall.
-13. **Security and company facts** — the one Ink page.
-14. **Back cover** — the call to action, where to find us, and the closing line.
+9. **Selected work** — every case as an entry, three to a row: its own line, the client, the sector and
+   what the system changed.
+10. **Clients** — the logo wall, and the platforms across the foot: each client's own system as that
+    client's team signs in to it, every one in the client's own brand. A logo wall says who hired us;
+    the strip says what they got. The screens are the website's own, already public, and they are
+    sign-in screens, so none carries a client's records. A case whose client the copy describes rather
+    than names has no screen, which is right: there is nothing to show without naming them.
+11. **Security and company facts** — the one Ink page.
+12. **Back cover** — the call to action, where to find us, and the closing line.
 
-The approved content of 6 November 2026 sets as **14 pages in English and 15 in French**. The brief
-asked for 10 to 12; six problem domains with fifteen problems in them, six case stories and four
-platforms do not fit in twelve at a size anyone would want to read. Cutting three problems takes two
-pages off, and dropping the platforms page takes another; the renderer re-flows on its own, because
-nothing here is page-numbered by hand.
+**Twelve pages, in both languages**, which is the owner's brief. Getting there cost two things worth
+knowing, because they are the first two to give back if the copy grows:
 
-The platforms page has no copy of its own in the contract, so its title and its lead sit in
-`PdfRenderer::words()` until the content carries them.
+- The feature case lost its page. It had a whole page of place photography with its story on a Paper
+  panel, and it was the most striking page in the book; fifteen problems need three pages at a size
+  anyone would read, and this was the page that had to go. The entries carry each case's own line and
+  its outcome. The problem it started from and what was built for it are in the proposal, where a
+  reader who has got this far will ask for them.
+- With it went the only photography in the book. The platform screens are the imagery now, and they
+  are the better proof: a photograph of a port is atmosphere, and a client's own system is evidence.
+
+The strip of platforms has no copy of its own in the contract, so its label sits in
+`PdfRenderer::words()` until the content carries it.
 
 ## How the pages are decided
 

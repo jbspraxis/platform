@@ -41,7 +41,7 @@ class PdfRendererTest extends TestCase
         $this->assertInstanceOf(CompanyProfileRenderer::class, new PdfRenderer);
     }
 
-    public function test_the_book_is_a4_landscape_and_the_length_the_design_allows(): void
+    public function test_the_book_is_a4_landscape_and_the_length_the_owner_asked_for(): void
     {
         foreach (['en', 'fr'] as $locale) {
             $pdf = (new PdfRenderer)->pdf($this->content($locale));
@@ -56,8 +56,9 @@ class PdfRendererTest extends TestCase
             // The page tree's own count, not the outline's, which is also written as /Count.
             preg_match('/\/Type \/Pages\b.*?\/Count (\d+)/s', $pdf, $match);
             $pages = (int) ($match[1] ?? 0);
+            // The owner's brief: ten to twelve pages, in both languages.
             $this->assertGreaterThanOrEqual(10, $pages, "{$locale} is shorter than the design allows");
-            $this->assertLessThanOrEqual(16, $pages, "{$locale} is longer than the design allows");
+            $this->assertLessThanOrEqual(12, $pages, "{$locale} is longer than the owner asked for");
         }
     }
 
@@ -131,8 +132,7 @@ class PdfRendererTest extends TestCase
         $this->assertSame('cover', $views[0]);
         $this->assertSame('back', $views[count($views) - 1]);
         $this->assertContains('problems', $views);
-        $this->assertContains('work-feature', $views);
-        $this->assertContains('platforms', $views);
+        $this->assertContains('work-grid', $views);
         $this->assertContains('clients', $views);
         $this->assertContains('facts', $views);
     }
@@ -145,8 +145,8 @@ class PdfRendererTest extends TestCase
 
         $platforms = [];
         foreach ($pages as $page) {
-            if ($page['view'] === 'platforms') {
-                $platforms = array_merge($platforms, $page['data']['items']);
+            if ($page['view'] === 'clients') {
+                $platforms = array_merge($platforms, $page['data']['platforms'] ?? []);
             }
         }
 

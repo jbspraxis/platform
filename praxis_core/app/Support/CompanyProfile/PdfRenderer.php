@@ -148,11 +148,98 @@ final class PdfRenderer implements CompanyProfileRenderer
             }
 
             if (! $moved) {
+                $pages = $this->balance($prepared, $pages, $cache);
+
                 break;
             }
         }
 
         return array_values($pages);
+    }
+
+    /**
+     * Even out a section that runs over several pages. Fitting fills each page to the brim, which can
+     * leave the last one holding a single problem beside a page of eight: correct, and it reads as
+     * running out rather than as a designed ending. So wherever a page carries more than the page after
+     * it can account for, it hands one item along, and the two pages it touched are re-rendered to be
+     * sure they both still fit. The moment one does not, the section keeps the last arrangement that
+     * worked.
+     *
+     * @param  list<array{view: string, surface: string, data: array<string, mixed>}>  $pages
+     * @return list<array{view: string, surface: string, data: array<string, mixed>}>
+     */
+    private function balance(array $prepared, array $pages, string $cache): array
+    {
+        foreach ($this->runs($pages) as [$from, $to]) {
+            for ($pass = 0; $pass < 12; $pass++) {
+                $move = null;
+                for ($index = $from; $index < $to; $index++) {
+                    if ($this->itemCount($pages[$index]) > $this->itemCount($pages[$index + 1]) + 1) {
+                        $move = $index;
+
+                        break;
+                    }
+                }
+
+                if ($move === null) {
+                    break;
+                }
+
+                $shifted = Layout::shrink($pages, $move);
+                if ($shifted === null || count($shifted) !== count($pages)) {
+                    break;
+                }
+
+                if (! $this->fits($prepared, $shifted[$move], $cache)
+                    || ! $this->fits($prepared, $shifted[$move + 1], $cache)) {
+                    break;
+                }
+
+                $pages = $shifted;
+            }
+        }
+
+        return $pages;
+    }
+
+    /**
+     * The runs of consecutive pages that carry one section between them and can pass items along.
+     *
+     * @return list<array{int, int}>
+     */
+    private function runs(array $pages): array
+    {
+        $runs = [];
+        $start = null;
+
+        foreach ($pages as $index => $page) {
+            $same = $start !== null && $pages[$start]['view'] === $page['view'];
+            if ($same) {
+                continue;
+            }
+            if ($start !== null && $index - 1 > $start) {
+                $runs[] = [$start, $index - 1];
+            }
+            $start = in_array($page['view'], ['problems', 'teams', 'clients', 'work-grid'], true) ? $index : null;
+        }
+
+        if ($start !== null && count($pages) - 1 > $start) {
+            $runs[] = [$start, count($pages) - 1];
+        }
+
+        return $runs;
+    }
+
+    /** How many things a page carries, whatever kind of page it is. */
+    private function itemCount(array $page): int
+    {
+        $data = $page['data'] ?? [];
+
+        if (isset($data['groups'])) {
+            return array_sum(array_map(fn ($group) => count($group['items'] ?? []), $data['groups']));
+        }
+
+        return count($data['items'] ?? $data['rows'] ?? []);
     }
 
     /** True when this one page sets on one page. */
@@ -288,10 +375,9 @@ final class PdfRenderer implements CompanyProfileRenderer
                 'credentials' => 'Credentials held',
                 'published' => 'Published',
                 'speak' => 'Let us look at one part of your organisation.',
-                // The platforms page has no copy of its own in the contract, so these two lines live
-                // here until the content carries them. They are the lead chat's to rewrite.
-                'platforms' => 'The platforms, as their teams see them.',
-                'platforms_lead' => 'Every system we build carries the organisation’s own name, its own sign-in and its own rules. These are live.',
+                // The strip of platforms has no copy of its own in the contract, so this line lives
+                // here until the content carries it. It is the lead chat's to rewrite.
+                'platforms' => 'The platforms, as their teams see them',
             ],
             'fr' => [
                 'continued' => 'suite',
@@ -304,8 +390,7 @@ final class PdfRenderer implements CompanyProfileRenderer
                 'credentials' => 'Certifications détenues',
                 'published' => 'Publié le',
                 'speak' => 'Examinons ensemble une partie de votre organisation.',
-                'platforms' => 'Les plateformes, telles que leurs équipes les voient.',
-                'platforms_lead' => 'Chaque système que nous construisons porte le nom de l’organisation, sa connexion et ses règles. Tous sont en service.',
+                'platforms' => 'Les plateformes, telles que leurs équipes les voient',
             ],
         ];
 

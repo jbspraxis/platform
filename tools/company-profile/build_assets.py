@@ -37,10 +37,11 @@ BRAND = ROOT / "praxis_core" / "resources" / "brand"
 PAPER = (255, 255, 255)
 INK = (12, 20, 43)  # #0C142B
 
-# The page the imagery bleeds across: A4 landscape is 841.89 x 595.28pt.
+# The page the imagery bleeds across, when a page does: A4 landscape is 841.89 x 595.28pt.
 PAGE_RATIO = 841.89 / 595.28
 
 # Place imagery: the sector and city photographs, graded to the brand direction (BRAND.md section 10).
+# No page carries one at twelve pages; they are kept built, because the page that did is one edit away.
 PLACE = {
     "pharmaceuticals": "pharmaceuticals-2400.webp",
     "consumer-goods": "consumer-goods-2400.webp",
@@ -117,7 +118,7 @@ def logos() -> None:
 
 
 def place() -> None:
-    """Place imagery, cropped at build time to the page it bleeds across, so no page squashes one."""
+    """Place imagery, cropped at build time to the shapes it bleeds across, so no page squashes one."""
     dest = OUT / "img"
     dest.mkdir(parents=True, exist_ok=True)
     for name, filename in PLACE.items():

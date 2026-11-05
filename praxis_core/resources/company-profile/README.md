@@ -27,7 +27,7 @@ A PNG dropped into `logos/` will not appear in the PDF.
 |---|---|---|
 | `content/` | The approved copy, English and French | The lead chat's `content.{en,fr}.json`. When PR 1's seeder lands at `database/seeders/company-profile/`, point `company-profile:preview` there and delete this folder. |
 | `fonts/` | Seven static cuts of Newsreader and Plus Jakarta Sans, and their OFL licences | php-font-lib reads a static TTF, not a woff2 and not a variable axis. Newsreader has an optical size axis, so it is cut three times: Display for 36pt and up, Headline for 17 to 30, Text for 9 to 13. |
-| `img/` | Place photography, cut to the page it bleeds across | Cut at build time so no page ever squashes or crops an image. |
+| `img/` | Place photography, cut to the page it bleeds across | No page carries one at twelve pages; kept built, because the page that did is one edit away. |
 | `screens/` | Each client's own platform sign-in screen | From `praxis_site/public/img/screens`, already public on the website, and sign-in screens, so none carries a client's records. 2:1 as captured; nothing is cropped. |
 | `logos/` | Client logos, greyscale on Paper | The wall reads as one wall rather than fifteen brands shouting. Sized by area, not height, so a wide wordmark does not drown a square mark. |
 | `brand/` | The logo lockups | JPEG renders from the brand kit's PNGs. The kit's SVGs are an automatic trace with nested `<svg>` and `<use>`, which php-svg-lib draws only partly — the wordmark disappears — so they are not used. |
