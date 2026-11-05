@@ -648,6 +648,17 @@ return [
                 'empty' => 'That file is empty — could you check it?',
             ],
 
+            'slot' => [
+                'loading' => 'Looking at the diary…',
+                'failed' => 'I couldn’t reach the diary just now. Try again in a moment.',
+                'none' => 'Nothing free this month — try the next one.',
+                'previous' => 'Previous month',
+                'next' => 'Next month',
+                'back' => 'Pick another day',
+                'free' => ':date, :count free',
+                'taken' => 'That time went while we were talking, sorry. Here is what is still free.',
+            ],
+
             'errors' => [
                 'email' => 'That doesn’t look like an email address — could you check it?',
                 'phone' => 'That doesn’t look like a phone number — could you check it?',
@@ -890,6 +901,69 @@ return [
             ],
 
             'sent' => 'Sending your application now.',
+        ],
+
+        // /schedule, the free audit and demo
+        'schedule' => [
+            'icon' => 'calendar-check',
+            'title' => 'Book a free audit',
+            'open' => 'Book in a conversation instead',
+
+            'gate' => [
+                'heading' => 'Let’s find an hour that suits you',
+                'lead' => 'A few quick questions, then you pick the day and time. The audit and demo takes about an hour.',
+                'start' => 'Start',
+                'invalid' => 'That doesn’t look like an email address — could you check it?',
+            ],
+
+            'steps' => [
+                'you' => 'You',
+                'organisation' => 'Organisation',
+                'when' => 'When',
+            ],
+
+            'hello' => 'Thank you — I’ll send the confirmation there. A few quick things first.',
+
+            'ask' => [
+                'full_name' => 'Who am I booking this for?',
+                'title' => 'And your job title?',
+                'enterprise_name' => 'Which organisation are you with?',
+                'phone' => 'A phone number, in case we need to reach you?',
+                'focus' => 'What would you like us to look at?',
+                'custom_focus' => 'Tell me in a few words.',
+                'date' => 'Last thing — pick a day that suits you.',
+            ],
+
+            'hint' => [
+                'title' => 'Skip it if you’d rather not say.',
+                'phone' => 'With the country code, please.',
+                'custom_focus' => 'Up to 40 characters.',
+                'date' => 'All times are Lagos time. I’ll hold it as soon as you choose.',
+            ],
+
+            'short' => [
+                'email' => 'Email',
+                'full_name' => 'Name',
+                'title' => 'Job title',
+                'enterprise_name' => 'Organisation',
+                'phone' => 'Phone',
+                'focus' => 'Focus',
+                'custom_focus' => 'Your focus',
+                'date' => 'When',
+            ],
+
+            'words' => [
+                'email' => 'e-mail|address',
+                'full_name' => 'my name|name|who i am',
+                'title' => 'role|position|job',
+                'enterprise_name' => 'company|organisation|organization|employer|firm',
+                'phone' => 'number|telephone|mobile|cell',
+                'focus' => 'focus|what to look at|subject|topic',
+                'custom_focus' => 'my focus|describe the focus',
+                'date' => 'day|time|slot|when|appointment|booking',
+            ],
+
+            'sent' => 'Booking that now — I’ll confirm by email.',
         ],
     ],
 

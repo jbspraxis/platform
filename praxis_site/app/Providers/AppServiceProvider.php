@@ -54,6 +54,10 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute($per('forms_per_minute', 6))->by('forms|' . VisitorIp::key($request)),
             Limit::perHour($per('forms_per_hour', 30))->by('forms-hour|' . VisitorIp::key($request)),
         ]);
+        RateLimiter::for('slots', fn (Request $request) => [
+            Limit::perMinute($per('slots_per_minute', 30))->by('slots|' . VisitorIp::key($request)),
+            Limit::perHour($per('slots_per_hour', 200))->by('slots-hour|' . VisitorIp::key($request)),
+        ]);
         RateLimiter::for('chat', fn (Request $request) => [
             Limit::perMinute($per('chat_per_minute', 10))->by('chat|' . VisitorIp::key($request)),
             Limit::perHour($per('chat_per_hour', 60))->by('chat-hour|' . VisitorIp::key($request)),

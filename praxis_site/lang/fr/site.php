@@ -643,6 +643,17 @@ return [
                 'empty' => 'Ce fichier est vide — pouvez-vous le vérifier ?',
             ],
 
+            'slot' => [
+                'loading' => 'Je consulte l’agenda…',
+                'failed' => 'Je n’ai pas pu consulter l’agenda. Réessayez dans un instant.',
+                'none' => 'Rien de libre ce mois-ci — essayez le mois suivant.',
+                'previous' => 'Mois précédent',
+                'next' => 'Mois suivant',
+                'back' => 'Choisir un autre jour',
+                'free' => ':date, :count libres',
+                'taken' => 'Ce créneau est parti pendant notre échange, désolé. Voici ce qui reste libre.',
+            ],
+
             'errors' => [
                 'email' => 'Cela ne ressemble pas à une adresse e-mail — pouvez-vous la vérifier ?',
                 'phone' => 'Cela ne ressemble pas à un numéro de téléphone — pouvez-vous le vérifier ?',
@@ -885,6 +896,69 @@ return [
             ],
 
             'sent' => 'J’envoie votre candidature.',
+        ],
+
+        // /schedule, l’audit gratuit et la démo
+        'schedule' => [
+            'icon' => 'calendar-check',
+            'title' => 'Réserver un audit gratuit',
+            'open' => 'Réserver sous forme de conversation',
+
+            'gate' => [
+                'heading' => 'Trouvons une heure qui vous convient',
+                'lead' => 'Quelques questions rapides, puis vous choisissez le jour et l’heure. L’audit et la démo durent environ une heure.',
+                'start' => 'Commencer',
+                'invalid' => 'Cela ne ressemble pas à une adresse e-mail — pouvez-vous la vérifier ?',
+            ],
+
+            'steps' => [
+                'you' => 'Vous',
+                'organisation' => 'Organisation',
+                'when' => 'Quand',
+            ],
+
+            'hello' => 'Merci — j’enverrai la confirmation à cette adresse. D’abord quelques éléments.',
+
+            'ask' => [
+                'full_name' => 'Pour qui est cette réservation ?',
+                'title' => 'Et votre fonction ?',
+                'enterprise_name' => 'Pour quelle organisation travaillez-vous ?',
+                'phone' => 'Un numéro de téléphone, au cas où ?',
+                'focus' => 'Que souhaitez-vous que nous examinions ?',
+                'custom_focus' => 'Dites-le en quelques mots.',
+                'date' => 'Dernière chose — choisissez un jour qui vous convient.',
+            ],
+
+            'hint' => [
+                'title' => 'Passez si vous préférez ne pas le dire.',
+                'phone' => 'Avec l’indicatif du pays, s’il vous plaît.',
+                'custom_focus' => 'Jusqu’à 40 caractères.',
+                'date' => 'Toutes les heures sont celles de Lagos. Je le retiens dès que vous choisissez.',
+            ],
+
+            'short' => [
+                'email' => 'E-mail',
+                'full_name' => 'Nom',
+                'title' => 'Fonction',
+                'enterprise_name' => 'Organisation',
+                'phone' => 'Téléphone',
+                'focus' => 'Sujet',
+                'custom_focus' => 'Votre sujet',
+                'date' => 'Quand',
+            ],
+
+            'words' => [
+                'email' => 'e-mail|adresse',
+                'full_name' => 'mon nom|nom|qui je suis',
+                'title' => 'fonction|poste|rôle',
+                'enterprise_name' => 'entreprise|organisation|société|employeur',
+                'phone' => 'numéro|téléphone|portable|mobile',
+                'focus' => 'sujet|thème|ce qu’il faut examiner',
+                'custom_focus' => 'mon sujet|décrire le sujet',
+                'date' => 'jour|heure|créneau|quand|rendez-vous|réservation',
+            ],
+
+            'sent' => 'Je réserve — je confirme par e-mail.',
         ],
     ],
 

@@ -13,6 +13,7 @@
 //   select    one of the page's lists; pills to tap, or type and we match it
 //   picker    a list too long to tap through; a search box with the matches under it
 //   file      chosen on a real file input in the form, because a File cannot be put in a hidden one
+//   slot      a day and a time from the site's own /schedule/slots; writes two inputs (see pairs)
 //
 // required fields may not be skipped. minChars mirrors the page form's own minimum.
 // showWhen mirrors the page form's data-show-when.
@@ -89,4 +90,27 @@ export const careers = {
     ],
 };
 
-export const FORMS = { feedback, contact, careers };
+/** /schedule, the free audit and demo (App\Http\Controllers\ScheduleController). */
+export const schedule = {
+    name: 'schedule',
+    steps: ['you', 'organisation', 'when'],
+    fields: [
+        // The address the confirmation goes to, asked the ordinary way before any of the talking
+        { name: 'email', kind: 'email', step: 'you', required: true, gate: true, max: 100 },
+
+        { name: 'full_name', kind: 'text', step: 'you', required: true, max: 100 },
+        { name: 'title', kind: 'text', step: 'you', max: 100 },
+
+        { name: 'enterprise_name', kind: 'text', step: 'organisation', required: true, max: 150 },
+        { name: 'phone', kind: 'tel', step: 'organisation', required: true, max: 30 },
+        { name: 'focus', kind: 'select', step: 'organisation', list: 'focuses', required: true },
+        // The page form hides this until the focus is "Other"; here it is simply the next question
+        { name: 'custom_focus', kind: 'text', step: 'organisation', required: true, max: 40, showWhen: { field: 'focus', is: 'Other' } },
+
+        // Last on purpose: the shorter the gap between choosing a time and sending, the less chance
+        // someone else has taken it. It answers two inputs, the date and the time beside it.
+        { name: 'date', kind: 'slot', step: 'when', required: true, pairs: 'time' },
+    ],
+};
+
+export const FORMS = { feedback, contact, careers, schedule };

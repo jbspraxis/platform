@@ -988,6 +988,25 @@
     .calculator-switch { margin: 0; }
     .agent-switch { margin: 0; }
 
+    /* The free days, inside the conversation: the page's calendar reloads, this one does not */
+    .agent-cal { display: block; width: 100%; max-width: 21rem; margin: 0 auto; }
+    .agent-cal-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-2); }
+    .agent-cal-month { font-weight: 600; font-size: var(--step-small); }
+    .agent-cal-nav { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1px solid var(--color-line-strong); border-radius: var(--radius-control);
+        background: var(--color-paper); color: var(--color-ink); font-size: 1.125rem; line-height: 1; cursor: pointer; }
+    .agent-cal-nav:hover:not(:disabled) { background: var(--color-teal-tint); border-color: var(--color-deep-teal); }
+    .agent-cal-nav:disabled { opacity: 0.35; cursor: not-allowed; }
+    .agent-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+    .agent-cal-weekday { display: flex; align-items: center; justify-content: center; padding-bottom: 2px; font-size: var(--step-caption); color: var(--color-fg-muted); }
+    .agent-cal-blank { display: block; }
+    .agent-cal-day { display: flex; align-items: center; justify-content: center; aspect-ratio: 1; min-height: 34px; padding: 0; border: 1px solid var(--color-line); border-radius: var(--radius-control);
+        background: var(--color-paper); color: var(--color-ink); font-family: var(--font-sans); font-size: var(--step-small); font-variant-numeric: tabular-nums; cursor: pointer;
+        transition: background var(--motion-instant), border-color var(--motion-instant); }
+    .agent-cal-day:hover { background: var(--color-deep-teal); border-color: var(--color-deep-teal); color: #fff; }
+    .agent-cal-day.is-shut { border-color: transparent; background: transparent; color: var(--color-line-strong); cursor: default; }
+    .agent-cal-note { display: block; padding: var(--space-3) 0; font-size: var(--step-small); color: var(--color-fg-muted); }
+    @media (max-height: 760px) { .agent-cal-day { min-height: 30px; } }
+
     /* The real file input: off screen rather than display:none, so clicking it from the conversation works */
     .agent-file { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 
