@@ -178,7 +178,7 @@ wall, never an error. **PR 3 rebinds the interface** with the logo library manag
 
 ## 11. Tests
 
-`praxis_core/tests/Feature/CompanyProfile/` — 51 tests:
+`praxis_core/tests/Feature/CompanyProfile/` — 50 tests:
 
 - `ProfileContractTest` — the contract shape for both locales, key by key; the gating; the editor query; the
   logo provider; a missing section still returning its whole shape.
