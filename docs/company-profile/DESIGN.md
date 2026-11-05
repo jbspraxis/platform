@@ -117,6 +117,22 @@ Two more things dompdf made us do, both worth knowing before touching the templa
 - **A registered `@font-face` is written to `fontDir`, not `fontCache`,** and is only found at an
   absolute path. A path relative to the document's base is not resolved for fonts at all.
 
+## The logo wall, and where its files live
+
+`clients.logos` comes from the engine's `ClientLogos`, never from this side: `Profile::data()` fills it, and
+a preview straight off the seed asks the same provider, so there is one answer to what is on the wall.
+
+Two things follow from the files being someone else's:
+
+- **dompdf reads only what it is told it may read.** Its chroot is its own cache, this folder, and the folder
+  of every logo the content names — `Assets::chroot()` collects them. PR 3's library keeps its files in its
+  own storage, outside `resources/`, and without their folder on that list every one of them is refused and
+  the wall prints blank.
+- **An SVG has no size until it says so.** `getimagesize()` answers for a JPEG and knows nothing about an
+  SVG, so `Assets::aspect()` reads the `<svg>` tag: its width and height when it gives them, otherwise its
+  `viewBox`. An SVG with neither has no intrinsic shape and is left off the wall rather than guessed at,
+  the same as a PNG, which dompdf cannot read without `gd`.
+
 ## The rules the file keeps
 
 - A credential whose `held` is not `true`, and a fact whose `enabled` is not `true`, never reach the

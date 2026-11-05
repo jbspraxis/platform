@@ -3,12 +3,15 @@
 namespace App\Support\CompanyProfile;
 
 /**
- * A placeholder renderer, so that the Download button, the route and the tests work before PR 2 lands the
- * designed one. It writes a single A4 landscape page — the headline, the descriptor and a line per section
- * saying what the real profile will carry — by hand, with no PDF library and no font files, so it cannot
- * break on a server missing gd, imagick or zip (the same ground DOCUMENTS.md found).
+ * A renderer that writes a single A4 landscape page by hand — the headline, the descriptor and a line per
+ * section saying what the profile carries — with no PDF library and no font files, so it cannot break on a
+ * server missing gd, imagick or zip (the same ground DOCUMENTS.md found).
  *
- * PR 2 replaces the CompanyProfileRenderer binding in AppServiceProvider. Nothing else changes.
+ * **Nothing in the application resolves this any more.** PR 2's App\Support\CompanyProfile\PdfRenderer is
+ * bound in AppServiceProvider and is what the Download button sends. This is kept for two reasons, and
+ * ProfileSeederAndDownloadTest still covers it: it is a fast fake for a test that needs a renderer but not
+ * a three-second render, and it is the thing to bind if dompdf ever cannot run on the server, since it
+ * needs nothing at all. Delete it, and those two tests, the day neither reason holds.
  */
 class StubProfileRenderer implements CompanyProfileRenderer
 {

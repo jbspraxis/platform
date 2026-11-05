@@ -145,12 +145,11 @@ final class Assets
      */
     public static function logoBox(string $path, float $area = 1250.0, float $maxWidth = 108.0, float $maxHeight = 27.0): ?array
     {
-        $size = @getimagesize($path);
-        if ($size === false || ($size[1] ?? 0) <= 0) {
+        $ratio = self::aspect($path);
+        if ($ratio === null) {
             return null;
         }
 
-        $ratio = $size[0] / $size[1];
         $width = sqrt($area * $ratio);
         $height = $width / $ratio;
 
@@ -164,5 +163,97 @@ final class Assets
         }
 
         return ['width' => round($width, 2), 'height' => round($height, 2)];
+    }
+
+    /**
+     * How wide a logo is against its height. getimagesize() answers for a JPEG and knows nothing about an
+     * SVG, so an SVG is read for what it declares: its width and height when it gives them, and otherwise
+     * its viewBox, which is the only thing many drawing programs write. Without one of those an SVG has no
+     * intrinsic size at all and is left off the wall rather than guessed at.
+     */
+    public static function aspect(string $path): ?float
+    {
+        if (strtolower(pathinfo($path, PATHINFO_EXTENSION)) === 'svg') {
+            return self::svgAspect($path);
+        }
+
+        $size = @getimagesize($path);
+        if ($size === false || ($size[0] ?? 0) <= 0 || ($size[1] ?? 0) <= 0) {
+            return null;
+        }
+
+        return $size[0] / $size[1];
+    }
+
+    private static function svgAspect(string $path): ?float
+    {
+        // The opening tag is all that is needed, and a logo's path data can run to megabytes.
+        $handle = @fopen($path, 'rb');
+        if ($handle === false) {
+            return null;
+        }
+        $head = (string) fread($handle, 4096);
+        fclose($handle);
+
+        if (preg_match('/<svg\b[^>]*>/i', $head, $tag) !== 1) {
+            return null;
+        }
+
+        $width = self::svgLength($tag[0], 'width');
+        $height = self::svgLength($tag[0], 'height');
+        if ($width !== null && $height !== null && $height > 0.0) {
+            return $width / $height;
+        }
+
+        if (preg_match('/\bviewBox\s*=\s*["\']\s*([-\d.eE]+)[,\s]+([-\d.eE]+)[,\s]+([-\d.eE]+)[,\s]+([-\d.eE]+)/i', $tag[0], $box) === 1) {
+            $boxWidth = (float) $box[3];
+            $boxHeight = (float) $box[4];
+            if ($boxWidth > 0.0 && $boxHeight > 0.0) {
+                return $boxWidth / $boxHeight;
+            }
+        }
+
+        return null;
+    }
+
+    /** A width or height from the <svg> tag, in whatever unit it is written; only the ratio is wanted. */
+    private static function svgLength(string $tag, string $attribute): ?float
+    {
+        if (preg_match('/\b'.$attribute.'\s*=\s*["\']\s*([\d.]+)\s*(px|pt|mm|cm|in|pc|em|ex)?\s*["\']/i', $tag, $match) !== 1) {
+            return null;
+        }
+
+        $value = (float) $match[1];
+
+        return $value > 0.0 ? $value : null;
+    }
+
+    /**
+     * The folders dompdf is allowed to read, beyond its own cache: this one, and wherever the engine's
+     * logo library keeps its files. PR 3's library stores logos outside resources/, so without their
+     * folder on the list every one of them is refused and the wall prints blank.
+     *
+     * Only the folders the content actually names are added, and only if they exist.
+     *
+     * @param  array<string, mixed>  $data  the prepared profile
+     * @return list<string>
+     */
+    public static function chroot(array $data): array
+    {
+        $roots = [self::root()];
+
+        foreach ($data['clients']['logos'] ?? [] as $logo) {
+            $path = is_array($logo) ? ($logo['path'] ?? null) : null;
+            if (! is_string($path) || $path === '' || ! is_file($path)) {
+                continue;
+            }
+
+            $directory = realpath(dirname($path));
+            if ($directory !== false) {
+                $roots[] = str_replace(DIRECTORY_SEPARATOR, '/', $directory);
+            }
+        }
+
+        return array_values(array_unique($roots));
     }
 }

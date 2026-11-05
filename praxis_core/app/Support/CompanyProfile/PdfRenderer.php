@@ -45,7 +45,8 @@ final class PdfRenderer implements CompanyProfileRenderer
             $this->render($prepared, $pages),
             $this->footer($prepared),
             $this->footerPlacement($pages),
-            $this->cache()
+            $this->cache(),
+            Assets::chroot($prepared)
         );
     }
 
@@ -116,6 +117,7 @@ final class PdfRenderer implements CompanyProfileRenderer
     public function fit(array $prepared, array $pages): array
     {
         $cache = $this->cache();
+        $roots = Assets::chroot($prepared);
         $checked = [];
 
         for ($pass = 0; $pass < 24; $pass++) {
@@ -127,7 +129,7 @@ final class PdfRenderer implements CompanyProfileRenderer
                     continue;
                 }
 
-                if ($this->fits($prepared, $page, $cache)) {
+                if ($this->fits($prepared, $page, $cache, $roots)) {
                     $checked[$key] = true;
 
                     continue;
@@ -149,7 +151,7 @@ final class PdfRenderer implements CompanyProfileRenderer
             }
 
             if (! $moved) {
-                $pages = $this->balance($prepared, $pages, $cache);
+                $pages = $this->balance($prepared, $pages, $cache, $roots);
 
                 break;
             }
@@ -169,7 +171,7 @@ final class PdfRenderer implements CompanyProfileRenderer
      * @param  list<array{view: string, surface: string, data: array<string, mixed>}>  $pages
      * @return list<array{view: string, surface: string, data: array<string, mixed>}>
      */
-    private function balance(array $prepared, array $pages, string $cache): array
+    private function balance(array $prepared, array $pages, string $cache, array $roots = []): array
     {
         foreach ($this->runs($pages) as [$from, $to]) {
             for ($pass = 0; $pass < 12; $pass++) {
@@ -191,8 +193,8 @@ final class PdfRenderer implements CompanyProfileRenderer
                     break;
                 }
 
-                if (! $this->fits($prepared, $shifted[$move], $cache)
-                    || ! $this->fits($prepared, $shifted[$move + 1], $cache)) {
+                if (! $this->fits($prepared, $shifted[$move], $cache, $roots)
+                    || ! $this->fits($prepared, $shifted[$move + 1], $cache, $roots)) {
                     break;
                 }
 
@@ -244,9 +246,9 @@ final class PdfRenderer implements CompanyProfileRenderer
     }
 
     /** True when this one page sets on one page. */
-    private function fits(array $prepared, array $page, string $cache): bool
+    private function fits(array $prepared, array $page, string $cache, array $roots = []): bool
     {
-        $dompdf = new Dompdf($this->options($cache));
+        $dompdf = new Dompdf($this->options($cache, $roots));
         $dompdf->loadHtml($this->render($prepared, [$page]), 'UTF-8');
         $dompdf->setPaper([0, 0, Layout::PAGE_WIDTH, Layout::PAGE_HEIGHT]);
         $dompdf->render();
@@ -264,9 +266,9 @@ final class PdfRenderer implements CompanyProfileRenderer
      *                                                                       where Muted on Paper at the
      *                                                                       foot would not do
      */
-    public function fromHtml(string $html, string $footer, array $placement, string $cache): string
+    public function fromHtml(string $html, string $footer, array $placement, string $cache, array $roots = []): string
     {
-        $dompdf = new Dompdf($this->options($cache));
+        $dompdf = new Dompdf($this->options($cache, $roots));
 
         $dompdf->loadHtml($html, 'UTF-8');
         $dompdf->setPaper([0, 0, Layout::PAGE_WIDTH, Layout::PAGE_HEIGHT]);
@@ -293,7 +295,8 @@ final class PdfRenderer implements CompanyProfileRenderer
         return $dompdf->output();
     }
 
-    private function options(string $cache): Options
+    /** @param  list<string>  $roots  the folders the pages read from, beyond dompdf's own cache */
+    private function options(string $cache, array $roots = []): Options
     {
         return new Options([
             'defaultFont' => 'Jakarta',
@@ -306,7 +309,7 @@ final class PdfRenderer implements CompanyProfileRenderer
             'fontDir' => $cache,
             'fontCache' => $cache,
             'tempDir' => $cache,
-            'chroot' => [$cache, Assets::root()],
+            'chroot' => array_values(array_unique(array_merge([$cache], $roots ?: [Assets::root()]))),
         ]);
     }
 

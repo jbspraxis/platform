@@ -219,6 +219,65 @@ class PdfRendererTest extends TestCase
         $this->assertInstanceOf(PdfRenderer::class, app(CompanyProfileRenderer::class));
     }
 
+    public function test_the_wall_draws_an_svg_and_a_jpeg_from_a_library_outside_the_resources_folder(): void
+    {
+        // PR 3's logo library keeps its files in its own storage, not in resources/company-profile/logos.
+        // dompdf refuses anything outside its chroot, so a logo from there would print blank unless the
+        // renderer puts the library's folder on the list. This is that, with both formats it may hold.
+        $library = sys_get_temp_dir().'/jbs-logo-library-'.bin2hex(random_bytes(4));
+        mkdir($library, 0777, true);
+
+        $svg = $library.'/one-mark.svg';
+        file_put_contents($svg, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60">'
+            .'<rect x="0" y="0" width="240" height="60" fill="#0C142B"/>'
+            .'<rect x="12" y="12" width="96" height="36" fill="#0BB8C4"/></svg>');
+
+        $jpeg = $library.'/other-mark.jpg';
+        copy(Assets::path('logos', 'tales-consulting.jpg'), $jpeg);
+
+        $content = $this->content('en');
+        $content['clients']['logos'] = [
+            ['name' => 'One Mark', 'path' => str_replace(DIRECTORY_SEPARATOR, '/', $svg)],
+            ['name' => 'Other Mark', 'path' => str_replace(DIRECTORY_SEPARATOR, '/', $jpeg)],
+        ];
+
+        $renderer = new PdfRenderer;
+        $prepared = $renderer->prepare($content);
+
+        // Both are on the wall, and the SVG is sized from its viewBox rather than skipped.
+        $wall = [];
+        foreach (Layout::pages($prepared) as $page) {
+            if ($page['view'] === 'clients') {
+                foreach ($page['data']['rows'] as $row) {
+                    foreach ($row as $logo) {
+                        $wall[] = $logo['name'];
+                    }
+                }
+            }
+        }
+        $this->assertSame(['One Mark', 'Other Mark'], $wall);
+
+        $box = Assets::logoBox($svg);
+        $this->assertNotNull($box, 'the SVG has no size the wall could use');
+        $this->assertEqualsWithDelta(4.0, $box['width'] / $box['height'], 0.01, 'the viewBox ratio is 4:1');
+
+        $this->assertContains(
+            str_replace(DIRECTORY_SEPARATOR, '/', (string) realpath($library)),
+            Assets::chroot($prepared),
+            'the library folder is not readable by dompdf'
+        );
+
+        // And the page really draws them: the teal of the SVG and the JPEG both reach the file.
+        $pdf = $renderer->pdf($content);
+        $this->assertStringStartsWith('%PDF-', $pdf);
+        $this->assertStringContainsString('/Subtype /Image', $pdf, 'the JPEG was not placed');
+        $this->assertGreaterThan(1, substr_count($pdf, '/Subtype /Image'), 'only one image reached the file');
+
+        unlink($svg);
+        unlink($jpeg);
+        rmdir($library);
+    }
+
     /** @return array<string, mixed> */
     private function content(string $locale): array
     {
