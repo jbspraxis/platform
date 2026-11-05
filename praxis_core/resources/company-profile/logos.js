@@ -106,6 +106,67 @@
         return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(text)));
     }
 
+    /**
+     * The add/edit modal. The house modal markup closes on Escape and on a backdrop click; this adds what a
+     * dialog also owes the keyboard: the focus goes inside on open, stays inside while it is open, and goes
+     * back to the button that opened it on close. It also asks once before throwing away unsaved changes.
+     */
+    window.logoModal = function () {
+        return {
+            dirty: false,
+            opener: null,
+
+            init: function () {
+                // Whatever had the focus when the modal opened is what gets it back on close
+                this.opener = document.activeElement;
+                var dialog = this.$refs.dialog;
+                this.$nextTick(function () {
+                    var first = dialog.querySelector('[x-ref="first"]') || focusable(dialog)[0];
+                    if (first) first.focus();
+                });
+            },
+
+            destroy: function () {
+                var opener = this.opener;
+                if (opener && document.contains(opener)) {
+                    opener.focus();
+                } else {
+                    // The row's Edit button was redrawn: put the focus somewhere sensible rather than on the body
+                    var add = document.querySelector('[data-logo-add]');
+                    if (add) add.focus();
+                }
+            },
+
+            /** Tab and Shift+Tab wrap inside the dialog rather than walking out of it */
+            trap: function (e) {
+                var items = focusable(this.$refs.dialog);
+                if (!items.length) return;
+                var first = items[0];
+                var last = items[items.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            },
+
+            close: function () {
+                if (this.dirty && !window.confirm('Discard changes?')) return;
+                this.$wire.cancel();
+            }
+        };
+    };
+
+    function focusable(root) {
+        var selector = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]),'
+            + ' select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+        return Array.prototype.filter.call(root.querySelectorAll(selector), function (el) {
+            return el.offsetParent !== null || el === document.activeElement;
+        });
+    }
+
     window.logoPicker = function () {
         return {
             busy: false,

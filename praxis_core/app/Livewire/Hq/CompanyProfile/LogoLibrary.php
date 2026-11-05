@@ -17,12 +17,24 @@ use Throwable;
  *
  * The browser makes the three renditions before anything is sent (resources/company-profile/logos.js), because
  * no PHP here can convert an image: the live server has neither gd nor imagick.
+ *
+ * Adding and editing both happen in one modal over the list (the owner, 5 November 2026), so the page never
+ * scrolls away from the row being worked on: it closes, the row updates where it sits, and a short fade marks
+ * it so the eye finds it again.
  */
 #[Layout('components.layouts.hq')]
 class LogoLibrary extends Component
 {
     /** The row being edited, or '' for the new one */
     public string $editing = '';
+
+    /** The name of the row being edited, for the modal's title; empty while adding */
+    #[Locked]
+    public string $editingName = '';
+
+    /** The row just saved, marked briefly in the list so the eye finds it again */
+    #[Locked]
+    public string $highlight = '';
 
     public bool $adding = false;
 
@@ -69,12 +81,19 @@ class LogoLibrary extends Component
         $this->adding = true;
     }
 
+    /** True while the modal is open, for either job */
+    public function getOpenProperty(): bool
+    {
+        return $this->adding || $this->editing !== '';
+    }
+
     public function edit(string $id): void
     {
         $this->authorize('company_profile.edit');
         $logo = ClientLogo::findOrFail($id);
         $this->resetForm();
         $this->editing = $logo->id;
+        $this->editingName = (string) $logo->name;
         $this->name = (string) $logo->name;
         $this->sector = (string) $logo->sector;
         $this->onProfile = (bool) $logo->on_profile;
@@ -111,7 +130,7 @@ class LogoLibrary extends Component
         $logo = $this->editing !== '' ? ClientLogo::findOrFail($this->editing) : null;
 
         try {
-            Library::save([
+            $saved = Library::save([
                 'name' => $this->name,
                 'sector' => $this->sector,
                 'on_profile' => $this->onProfile,
@@ -131,6 +150,8 @@ class LogoLibrary extends Component
         }
 
         $this->flash = $logo ? 'Saved.' : 'Added.';
+        // The list redraws in place; this marks the row that changed, briefly
+        $this->highlight = $saved->id;
         $this->resetForm();
     }
 
@@ -139,18 +160,21 @@ class LogoLibrary extends Component
     public function moveUp(string $id): void
     {
         $this->authorize('company_profile.edit');
+        $this->highlight = '';
         Library::move(ClientLogo::findOrFail($id), -1, Auth::user());
     }
 
     public function moveDown(string $id): void
     {
         $this->authorize('company_profile.edit');
+        $this->highlight = '';
         Library::move(ClientLogo::findOrFail($id), 1, Auth::user());
     }
 
     public function retire(string $id): void
     {
         $this->authorize('company_profile.manage');
+        $this->highlight = '';
         $logo = Library::retire(ClientLogo::findOrFail($id), Auth::user());
         $this->flash = $logo->name . ' is retired. It stays on the profiles that already carried it.';
     }
@@ -158,6 +182,7 @@ class LogoLibrary extends Component
     public function restore(string $id): void
     {
         $this->authorize('company_profile.manage');
+        $this->highlight = '';
         $logo = Library::restore(ClientLogo::findOrFail($id), Auth::user());
         $this->flash = $logo->name . ' is back in the library, at the end.';
     }
@@ -165,7 +190,7 @@ class LogoLibrary extends Component
     private function resetForm(): void
     {
         $this->reset([
-            'editing', 'adding', 'name', 'sector', 'printUri', 'pngUri', 'webUri',
+            'editing', 'editingName', 'adding', 'name', 'sector', 'printUri', 'pngUri', 'webUri',
             'width', 'height', 'chosen',
         ]);
         $this->onProfile = true;
@@ -180,6 +205,7 @@ class LogoLibrary extends Component
 
         return view('livewire.hq.company-profile.logos', [
             'logos' => Library::live(),
+            'editingLogo' => $this->editing === '' ? null : ClientLogo::find($this->editing),
             'retiredLogos' => $this->showRetired ? Library::retired() : collect(),
             'canEdit' => (bool) $user?->can('company_profile.edit'),
             'canManage' => (bool) $user?->can('company_profile.manage'),
