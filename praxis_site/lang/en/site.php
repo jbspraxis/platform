@@ -521,6 +521,15 @@ return [
     ],
 
     // /verify/{token}: the page a QR code on a formal document opens (docs/DOCUMENTS.md section 7)
+    'profile_link' => [
+        'eyebrow' => 'Company profile',
+        'title' => 'This link has ended',
+        'description' => 'A link to the JBS Praxis company profile that is no longer open.',
+        'ended' => 'The link you followed no longer opens our company profile. Links are made for one reader and are closed again after a while, so this one may simply have run its course.',
+        'too_many' => 'This link has been opened a great many times in the last hour, so it is resting. Please try again shortly.',
+        'ask' => 'If you were sent this by someone at JBS Praxis, ask them for a fresh link, or write to :email and we will send you one.',
+        'cta' => 'Get in touch',
+    ],
     'verify' => [
         'eyebrow' => 'Document check',
         'title' => 'Is this document genuine?',

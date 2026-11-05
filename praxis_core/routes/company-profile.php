@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 |   /company-profile/versions                        every version, who wrote it, who approved it
 |   /company-profile/versions/{version}/preview      a version exactly as the renderers read it
 |   /company-profile/download                        the PDF (route name: company-profile.download)
+|   /company-profile/shares                          tracked share links: make one, see its opens, revoke it
 |   /company-profile/logos                           the client logo library: upload, name, sector, order, where it shows
 |   /company-profile/logos/{logo}/{kind}             the bytes of one logo (web, png or print), for HQ only
 |   /company-profile/logos.js                        the logo screen's script; plain script, no build step
@@ -28,6 +29,9 @@ Route::prefix('company-profile')->middleware('can:company_profile.view')->group(
 
     Route::get('/versions/{version}/preview', \App\Livewire\Hq\CompanyProfile\ProfilePreview::class)
         ->whereUuid('version')->name('hq.company-profile.preview');
+
+    // Tracked share links (docs/COMPANY_PROFILE.md section 14): a link per prospect, and what it has done
+    Route::get('/shares', \App\Livewire\Hq\CompanyProfile\ShareLinks::class)->name('hq.company-profile.shares');
 
     // The client logo library (PR 3): the one place a client logo is kept, read by the profile above, by the
     // deck, and by the strip on jbspraxis.com through the Site API.

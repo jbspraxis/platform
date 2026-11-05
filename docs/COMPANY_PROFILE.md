@@ -356,7 +356,76 @@ The shipped list and files stay in the repository on purpose: they are the floor
 `praxis_site/tests/Feature/ClientStripTest.php` holds the route to all of this, including the two ways a bot
 would try to abuse it.
 
-## 14. Open decisions for the owner
+## 14. Tracked share links
+
+**HQ › Company profile › Share links.** A link per prospect: it opens the profile PDF on jbspraxis.com with no
+sign-in, every open is counted and rings the maker's bell, and it can be revoked or left to expire. Built to
+the owner's answer of 5 November 2026, "tracked share links (opens and bell)".
+
+Making one needs `company_profile.view` — anyone who may read the profile may send it. Revoking is for the
+person who made the link, or anyone with `company_profile.manage`.
+
+A link carries a **language**, a **version** (pinned, or whatever is published when it is opened), an optional
+**recipient name and company** — which the visitor never sees; they name the link in the list and on the bell —
+and an optional **expiry** in days.
+
+### The address
+
+`https://jbspraxis.com/profile/<token>`, where the token is **48 random characters**. It is never the version
+number and never derived from one, so a link cannot be guessed and nobody can walk the versions by changing a
+digit. The token is shown in full **once**, when the link is made, so it can be copied into an email; after
+that the list shows what the link is for, not the address. `token` is hidden on the model, so it does not slip
+into a payload by accident.
+
+### What a visitor gets
+
+| State | Answer |
+|---|---|
+| Open | The PDF itself, rendered through the **same renderer** as the HQ download |
+| Revoked, expired, or never a link | `410` and a plain branded page, identical for all three |
+| Opened too often in an hour | `429` and a calm page saying the link is resting |
+
+Because the PDF comes through the same renderer, the held/enabled and naming rules of
+`company-profile/CONTRACT.md` hold on a share link exactly as they do everywhere else: there is no second path
+that could render an unheld credential or name a client the rules say to describe.
+
+The three ended states read **the same page, byte for byte** (a test asserts it), so a stranger who tries a
+token cannot tell a revoked link from one that never existed.
+
+Nothing is ever cached: `Cache-Control: no-store` and `X-Robots-Tag: noindex, nofollow, noarchive` on the PDF
+and on the page, because the link can be revoked at any moment.
+
+### What is recorded, and what is not
+
+An open is recorded with the time, a **coarse** user agent ("Chrome on Windows" — never the whole string,
+which carries versions and build numbers that together name a device), and the visitor as a **SHA-256 of the
+address and the app key**. The address itself is never stored.
+
+The same visitor opening it again within **30 minutes** is the same open: it is not counted again and does not
+ring the bell again, so a PDF viewer that asks twice is one reader, not three.
+
+The bell goes to the person who made the link. `notifications.type` is an enum (`System`, `Financial`,
+`Project`, `Message`, `QA_Update`) — anything else makes the insert fail inside the `rescue` and the bell
+never rings, which is why the type here is `System` and a test watches for it.
+
+### The limits
+
+- **Per token**: 120 opens an hour in HQ, then `429`.
+- **Per visitor** on the site: 10 a minute and 60 an hour (`site.limits.profile_share_*`), so a bot that finds
+  one link cannot pull the PDF in bulk.
+
+### Files
+
+| Part | Files |
+|---|---|
+| Data | `database/migrations/2026_11_05_980000_create_company_profile_share_links.php`, `app/Models/CompanyProfile/{ProfileShareLink,ProfileShareOpen}.php` |
+| Rules | `app/Support/CompanyProfile/Shares.php` |
+| Screen | `app/Livewire/Hq/CompanyProfile/ShareLinks.php`, `resources/views/livewire/hq/company-profile/shares.blade.php` |
+| The API the site reads | `app/Http/Controllers/SiteApi/ProfileShareController.php`, `routes/site-api.php` |
+| The site | `praxis_site`: `app/Http/Controllers/ProfileShareController.php`, `app/Support/HqApi.php` (`profileShare`), `app/Exceptions/Hq/HqGone.php`, `resources/views/pages/profile-link.blade.php`, `lang/{en,fr}/site.php`, `routes/web.php`, `config/site.php` |
+| Tests | `praxis_core/tests/Feature/CompanyProfile/ShareLinksTest.php`; `praxis_site/tests/Feature/ProfileShareTest.php` |
+
+## 15. Open decisions for the owner
 
 1. **Who else may read the profile?** Today: the Owner, and Sales & Marketing (view only). Partner, Delivery
    Lead and Auditor do not see it, because it carries the teams' credentials.
@@ -364,8 +433,9 @@ would try to abuse it.
 3. **Where the profile lives in the rail** — it has its own entry, next to Documents. Say if it belongs inside
    Documents instead.
 4. **The Cameroon entity fact** is off. Switch it on when the entity is registered.
-5. **Tracked share links** (a link per prospect, with a record of who opened it) are in neither PR 1 nor
-   PR 3. They need a public route and a decision about what a link exposes, and come next in PR 3's chat.
+5. **Tracked share links** are built (section 14). What is left is the owner's call on how long a link
+   should last by default; today the screen offers 30 days and the field can be emptied for one that never
+   expires.
 6. **The animated 24-slide deck** is after the profile, as agreed.
 7. **`company_profile.*` for other roles** - the owner ticks whichever roles should see the logo library, on
    Roles and permissions.

@@ -57,6 +57,11 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute($per('chat_per_minute', 10))->by('chat|' . VisitorIp::key($request)),
             Limit::perHour($per('chat_per_hour', 60))->by('chat-hour|' . VisitorIp::key($request)),
         ]);
+        // A share link is a private address; a bot that found one must not be able to pull the PDF in bulk
+        RateLimiter::for('profile-share', fn (Request $request) => [
+            Limit::perMinute($per('profile_share_per_minute', 10))->by('profile-share|' . VisitorIp::key($request)),
+            Limit::perHour($per('profile_share_per_hour', 60))->by('profile-share-hour|' . VisitorIp::key($request)),
+        ]);
         RateLimiter::for('unsubscribe', fn (Request $request) => Limit::perMinute($per('unsubscribe_per_minute', 30))->by('unsubscribe|' . VisitorIp::key($request)));
 
         // Cloudflare Turnstile's script, on pages with a form, only when its keys are set
