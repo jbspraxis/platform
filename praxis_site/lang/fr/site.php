@@ -635,6 +635,14 @@ return [
                 'more' => ':n de plus — continuez à taper pour affiner.',
             ],
 
+            'file' => [
+                'choose' => 'Choisir un fichier',
+                'again' => 'Il me faut le fichier lui-même — choisissez-le ci-dessous.',
+                'type' => 'Ce doit être un fichier :types.',
+                'size' => 'Celui-ci fait :got, et la limite est :max. Pouvez-vous en envoyer un plus petit ?',
+                'empty' => 'Ce fichier est vide — pouvez-vous le vérifier ?',
+            ],
+
             'errors' => [
                 'email' => 'Cela ne ressemble pas à une adresse e-mail — pouvez-vous la vérifier ?',
                 'phone' => 'Cela ne ressemble pas à un numéro de téléphone — pouvez-vous le vérifier ?',
@@ -799,6 +807,84 @@ return [
             ],
 
             'sent' => 'J’envoie cela à l’équipe.',
+        ],
+
+        // /careers
+        'careers' => [
+            'icon' => 'briefcase',
+            'title' => 'Carrières',
+            'open' => 'Postuler sous forme de conversation',
+
+            'gate' => [
+                'heading' => 'Parlez-nous de quelque chose que vous avez corrigé',
+                'lead' => 'Un processus ou un système qui ne fonctionnait pas, ce que vous avez changé, et ce qui s’est passé ensuite. Nous demanderons le reste en chemin.',
+                'start' => 'Commencer',
+                'invalid' => 'Pouvez-vous m’en dire un peu plus ? Quelques phrases suffisent.',
+            ],
+
+            'steps' => [
+                'you' => 'Vous',
+                'reach' => 'Vous joindre',
+                'skills' => 'Vos compétences',
+                'work' => 'Votre travail',
+            ],
+
+            'hello' => 'Merci — c’est la partie que nous lisons en premier. Maintenant quelques détails.',
+
+            'ask' => [
+                'full_name' => 'Quel est votre nom complet ?',
+                'email' => 'Et votre adresse e-mail ?',
+                'country_code' => 'Dans quel pays se trouve votre numéro ?',
+                'phone' => 'Et le numéro lui-même ?',
+                'city' => 'Dans quelle ville êtes-vous ?',
+                'primary_skill' => 'Quelle est votre compétence principale ?',
+                'other_skill' => 'Dites-le avec vos propres mots.',
+                'secondary_skillset' => 'Avec quoi travaillez-vous d’autre ?',
+                'linkedin_url' => 'Quel est votre profil LinkedIn ?',
+                'portfolio_url' => 'Un portfolio ou un GitHub, si vous en avez un ?',
+                'cv' => 'Dernière chose — votre CV.',
+            ],
+
+            'hint' => [
+                'country_code' => 'Cherchez par pays ou par indicatif — « nig » et « 234 » trouvent tous deux le Nigeria.',
+                'phone' => 'Seulement le numéro local ; j’ai déjà l’indicatif.',
+                'secondary_skillset' => 'Par exemple : SQL, cartographie des processus, Power BI.',
+                'linkedin_url' => 'L’adresse suffit — je m’occupe du reste.',
+                'portfolio_url' => 'Passez si vous préférez.',
+                'cv' => 'PDF, DOC ou DOCX, jusqu’à 5 Mo.',
+            ],
+
+            'short' => [
+                'praxis_answer' => 'Ce que vous avez corrigé',
+                'full_name' => 'Nom',
+                'email' => 'E-mail',
+                'country_code' => 'Indicatif',
+                'phone' => 'Téléphone',
+                'city' => 'Ville',
+                'primary_skill' => 'Compétence principale',
+                'other_skill' => 'Votre compétence',
+                'secondary_skillset' => 'Autres compétences',
+                'linkedin_url' => 'LinkedIn',
+                'portfolio_url' => 'Portfolio',
+                'cv' => 'CV',
+            ],
+
+            'words' => [
+                'praxis_answer' => 'ce que j’ai corrigé|ma réponse|mon exemple',
+                'full_name' => 'mon nom|nom|qui je suis',
+                'email' => 'e-mail|adresse',
+                'country_code' => 'pays|indicatif|code',
+                'phone' => 'numéro|téléphone|portable|mobile',
+                'city' => 'ville|où je suis|localisation',
+                'primary_skill' => 'compétence principale|compétence|spécialité',
+                'other_skill' => 'ma compétence|décrire ma compétence',
+                'secondary_skillset' => 'autres compétences|aussi',
+                'linkedin_url' => 'linkedin|profil',
+                'portfolio_url' => 'portfolio|github|site|travaux',
+                'cv' => 'cv|curriculum|fichier|pièce jointe',
+            ],
+
+            'sent' => 'J’envoie votre candidature.',
         ],
     ],
 

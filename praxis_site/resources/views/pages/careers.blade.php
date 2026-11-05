@@ -11,6 +11,21 @@
                 <p>{{ __('site.careers.sent_body') }}</p>
             </x-success>
         @else
+            @php
+                $agent = array_replace_recursive(__('site.agent.common'), __('site.agent.careers'));
+                $agentCountries = array_map(
+                    fn ($c) => ['value' => $c['dial'], 'label' => $c['name']],
+                    \App\Support\Countries::options()
+                );
+            @endphp
+            {{-- The same form as a conversation, for anyone who would rather apply that way. The button only
+                 does anything with JavaScript; the form below it is unchanged and remains the way in. --}}
+            <p class="agent-switch">
+                <button class="btn btn-secondary" type="button" data-agent-open="careers" data-agent-reveal hidden>
+                    <i data-lucide="message-square-text"></i>{{ $agent['open'] }}
+                </button>
+            </p>
+
             <form class="card form" method="POST" action="{{ route('careers.store') }}" enctype="multipart/form-data" novalidate>
                 @csrf
                 <x-form-guard form="careers" />
@@ -49,6 +64,15 @@
                     <button class="btn btn-primary" type="submit"><i data-lucide="send"></i>{{ __('site.careers.send') }}</button>
                 </div>
             </form>
+
+            <x-agent-dialog
+                form="careers"
+                :action="route('careers.store')"
+                enctype="multipart/form-data"
+                :strings="$agent"
+                :lists="['countries' => $agentCountries, 'primary_skills' => __('site.careers.primary_skills')]"
+                :files="['cv' => ['label' => __('site.careers.cv'), 'accept' => '.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document']]"
+                :gate="['name' => 'praxis_answer', 'kind' => 'longtext', 'label' => __('site.careers.praxis_answer'), 'hint' => __('site.careers.praxis_answer_hint'), 'max' => 1000]" />
         @endif
     </div>
 @endsection

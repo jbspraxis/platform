@@ -185,12 +185,16 @@ export function buildAgent(dialog, flow) {
         state.answers[field.name] = String(value);
         state.shown[field.name] = label;
 
+        // A file lives on the real file input inside this form: a File cannot be put into a hidden input,
+        // so there is nothing to copy and the browser posts it from where the visitor chose it.
+        if (field.kind === 'file') { /* nothing to write */ } else {
         const existing = el.hidden.querySelector(`input[name="${field.name}"]`);
         if (String(value) === '') { existing?.remove(); } else {
             const input = existing || el.hidden.appendChild(document.createElement('input'));
             input.type = 'hidden';
             input.name = field.name;
             input.value = String(value);
+        }
         }
 
         // A conditional answer whose condition no longer holds is not ours to send
@@ -232,7 +236,9 @@ export function buildAgent(dialog, flow) {
             note.textContent = hint;
             el.log.lastElementChild.append(note);
         }
-        if (field.kind === 'picker') picker(field); else choices(pillsFor(field));
+        if (field.kind === 'picker') picker(field);
+        else if (field.kind === 'file') fileChoice(field);
+        else choices(pillsFor(field));
         el.input.focus({ preventScroll: true });
         scroll();
     }
@@ -374,6 +380,74 @@ export function buildAgent(dialog, flow) {
         await ask(field);
     }
 
+    /**
+     * Choosing a file. The input is a real one inside this form, because a File cannot be written into a
+     * hidden input from script: the visitor picks it on that input and the browser posts it from there.
+     * Type and size are checked here so a CV that is too big is caught in the conversation, not after it.
+     */
+    function fileChoice(field) {
+        const input = el.form.querySelector(`input[type="file"][name="${field.name}"]`);
+        if (!input) { skipped(field); return; }
+
+        el.choices.replaceChildren();
+        el.choices.hidden = false;
+
+        const pick = document.createElement('button');
+        pick.type = 'button';
+        pick.className = 'agent-pill is-go';
+        pick.textContent = t('file.choose');
+        pick.addEventListener('click', () => { if (!state.busy) input.click(); });
+        el.choices.append(pick);
+
+        if (!field.required) {
+            const skip = document.createElement('button');
+            skip.type = 'button';
+            skip.className = 'agent-pill is-quiet';
+            skip.textContent = t('skip');
+            skip.addEventListener('click', () => { if (!state.busy) { el.choices.hidden = true; hear('skip', { label: t('skip') }); } });
+            el.choices.append(skip);
+        }
+
+        input.onchange = async () => {
+            const file = input.files?.[0];
+            if (!file || state.busy) return;
+            state.busy = true;
+            el.choices.hidden = true;
+            el.choices.replaceChildren();
+
+            const problem = fileProblem(file, field);
+            if (problem) {
+                input.value = '';   // nothing half-chosen is left on the form
+                echo(file.name);
+                await say(problem);
+                state.busy = false;
+                fileChoice(field);
+                return;
+            }
+
+            echo(`${file.name} (${size(file.size)})`);
+            store(field, file.name, `${file.name} (${size(file.size)})`);
+            await onward();
+            state.busy = false;
+        };
+    }
+
+    /** What is wrong with a chosen file, or null. The same two rules the controller applies. */
+    function fileProblem(file, field) {
+        const types = (field.accept || []).map((type) => type.toLowerCase());
+        const name = file.name.toLowerCase();
+        if (types.length && !types.some((type) => name.endsWith(`.${type}`))) {
+            return t('file.type', { types: types.join(', ') });
+        }
+        if (field.maxBytes && file.size > field.maxBytes) {
+            return t('file.size', { max: size(field.maxBytes), got: size(file.size) });
+        }
+        if (file.size === 0) return t('file.empty');
+        return null;
+    }
+
+    const size = (bytes) => (bytes >= 1048576 ? `${Math.round(bytes / 104857.6) / 10} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
+
     /** revisit() from a click: the one place that has to check nothing else is mid-sentence. */
     function editField(field) {
         if (state.busy) return;
@@ -495,6 +569,12 @@ export function buildAgent(dialog, flow) {
             }
             await say(t('errors.list'));
             if (field.kind === 'picker') picker(field); else choices(pillsFor(field));
+            return false;
+        }
+
+        if (field.kind === 'file') {
+            await say(t('file.again'));
+            fileChoice(field);
             return false;
         }
 

@@ -32,7 +32,7 @@ class FormGuardTest extends TestCase
         // or the shared one (components/agent-dialog). Both are real forms and both must be guarded.
         $forms = [
             '/contact' => 3, '/schedule' => 2, '/cost-calculator' => 3, '/kaizen/write' => 2,
-            '/services' => 2, '/careers' => 2, '/feedback' => 3, '/tracking/unsubscribe/42' => 2,
+            '/services' => 2, '/careers' => 3, '/feedback' => 3, '/tracking/unsubscribe/42' => 2,
         ];
 
         foreach ($forms as $path => $expected) {

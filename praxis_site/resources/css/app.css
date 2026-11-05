@@ -988,6 +988,9 @@
     .calculator-switch { margin: 0; }
     .agent-switch { margin: 0; }
 
+    /* The real file input: off screen rather than display:none, so clicking it from the conversation works */
+    .agent-file { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
     /* A list too long to tap through (every country): a search box with the matches under it */
     .agent-picker { display: block; width: 100%; }
     .agent-picker-search { display: block; width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid var(--color-line-strong); border-radius: var(--radius-control);
