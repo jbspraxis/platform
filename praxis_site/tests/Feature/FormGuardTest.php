@@ -27,11 +27,12 @@ class FormGuardTest extends TestCase
             'booking/slots*' => Http::response(['data' => ['month' => now('Africa/Lagos')->format('Y-m'), 'days' => []]]),
         ]);
 
-        // The page's own form and the Praxis AI form, so two; /cost-calculator also carries the same
-        // calculator as a conversation (partials/calculator-dialog), which is a third real form.
+        // The page's own form and the Praxis AI form, so two. A page that also offers its form as a
+        // conversation carries a third real form: the calculator's own dialog (partials/calculator-dialog),
+        // or the shared one (components/agent-dialog). Both are real forms and both must be guarded.
         $forms = [
             '/contact' => 2, '/schedule' => 2, '/cost-calculator' => 3, '/kaizen/write' => 2,
-            '/services' => 2, '/careers' => 2, '/feedback' => 2, '/tracking/unsubscribe/42' => 2,
+            '/services' => 2, '/careers' => 2, '/feedback' => 3, '/tracking/unsubscribe/42' => 2,
         ];
 
         foreach ($forms as $path => $expected) {

@@ -2,6 +2,7 @@ import { createIcons } from 'lucide';
 import icons from './icons';
 import { startMotion } from './motion/index';
 import { startCalculator } from './calculator/index';
+import { startAgentForms } from './agent/index';
 
 // Icons are written as <i data-lucide="name"> in the views: one pinned copy of lucide (package.json), only
 // the icons the views use (scripts/icons.mjs), drawn with a 1.5px stroke (docs/BRAND.md section 9).
@@ -491,6 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleOtherFields();
     enhanceDemo();
     startCalculator();
+    startAgentForms();
     enhanceConsent();
     enhanceVerify();
     startMotion();

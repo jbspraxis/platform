@@ -986,6 +986,8 @@
        ================================================================================================ */
 
     .calculator-switch { margin: 0; }
+    .agent-switch { margin: 0; }
+    .agent-gate-field .textarea { min-height: 7rem; }
 
     /* fit-content, not auto: a modal dialog carries inset: 0 from the UA sheet, so an auto height stretches
        to fill the screen instead of hugging the one field the dialog opens with */
