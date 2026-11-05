@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             AccessSeeder::class,
             CoreSeeder::class,
             WebsiteContentSeeder::class,
+            CompanyProfileSeeder::class,
         ]);
     }
 }

@@ -1,0 +1,532 @@
+{
+  "meta": {
+    "version": "v1",
+    "published_at": "2026-11-06",
+    "locale": "fr",
+    "reference": "JBS-CP-2026-11-v1"
+  },
+  "cover": {
+    "headline": "Pilotez tout. Interrogez tout.",
+    "descriptor": "Des systèmes de pilotage intelligents pour les organisations."
+  },
+  "pov": {
+    "title": "Chaque organisation existe en deux versions.",
+    "paragraphs": [
+      "L’une est sur le papier : les procédures, l’organigramme, le budget, la cartographie des processus. L’autre est la façon dont le travail se fait vraiment : des chiffres reconstitués à la main chaque fin de mois, des paiements qui ne se rapprochent jamais tout à fait, des validations qui attendent une seule personne, des décisions prises sans les faits.",
+      "La plupart des organisations tentent de combler cet écart en ajoutant des logiciels. La messagerie dans un outil, la comptabilité dans un autre, les clients dans un troisième, les conversations dans un quatrième. Chaque outil fait son travail. Aucun ne peut vous dire comment se porte l’organisation.",
+      "Nous le comblons autrement. Nous concevons le fonctionnement de l’organisation, puis le système unique qui la fait fonctionner ainsi et qui en rend compte. Posez-lui toutes vos questions : il répond."
+    ]
+  },
+  "system": {
+    "title": "Un seul système qui fait fonctionner l’organisation et qui en rend compte.",
+    "lead": "Nous construisons le système sur lequel repose une organisation : finances, équipes, opérations, risques et clients réunis en un seul endroit, conçu autour de sa façon de travailler, avec de l’intelligence à chaque niveau.",
+    "pillars": [
+      {
+        "title": "Conçu autour de vous",
+        "body": "Nous partons de la façon dont votre organisation fonctionne, pas d’un produit. Vos processus, vos contrôles, vos rôles et vos indicateurs façonnent le système, jamais l’inverse."
+      },
+      {
+        "title": "Une seule source de vérité",
+        "body": "Chaque transaction, chaque validation et chaque document est enregistré une seule fois, au même endroit. La finance, les opérations et la direction lisent les mêmes chiffres."
+      },
+      {
+        "title": "L’intelligence sur vos propres données",
+        "body": "Posez une question en langage courant et obtenez une réponse claire, un graphique, un tableau ou une action préparée, à partir de vos propres données, dans la limite de ce que chacun est autorisé à voir."
+      },
+      {
+        "title": "Conçu pour durer des décennies",
+        "body": "D’abord des fondations solides. Chaque nouvelle capacité s’ajoute ensuite comme un étage de plus : rien n’est reconstruit à mesure que vous grandissez."
+      }
+    ]
+  },
+  "problems": {
+    "title": "Les problèmes difficiles que nous résolvons.",
+    "lead": "Nos clients ne viennent pas chercher un logiciel. Ils viennent avec des problèmes qui leur coûtent de l’argent, du temps et de la confiance. En voici quelques-uns que nous résolvons chaque jour ; la liste s’allonge à chaque mission.",
+    "groups": [
+      {
+        "domain": "L’argent en mouvement",
+        "items": [
+          {
+            "problem": "Les paiements arrivent par plusieurs passerelles et ne concordent jamais tout à fait avec la banque.",
+            "answer": "Des intégrations de passerelles de paiement avec suivi des règlements et rapprochement automatique : chaque paiement rapproché de sa facture, chaque règlement de la banque, les écarts signalés le jour même."
+          },
+          {
+            "problem": "Une passerelle tombe en panne sans bruit, et des ventes sont perdues avant que quiconque s’en aperçoive.",
+            "answer": "Une surveillance en temps réel de l’état des passerelles : chaque prestataire est suivi, les bonnes personnes sont alertées dès qu’un service se dégrade, et les paiements basculent vers un prestataire disponible lorsque l’activité le permet."
+          },
+          {
+            "problem": "Factures, reçus et créances sont dispersés, dans plusieurs devises.",
+            "answer": "Facturation, encaissements et créances dans un seul grand livre, dans toutes les devises, avec chaque solde et son échéance en vue."
+          }
+        ]
+      },
+      {
+        "domain": "Décisions et données",
+        "items": [
+          {
+            "problem": "La direction attend des jours des chiffres déjà dépassés.",
+            "answer": "Des analyses de l’activité en temps réel, tirées des données dans lesquelles les équipes travaillent : les chiffres sont à jour quand la réunion commence."
+          },
+          {
+            "problem": "Les données sont trop volumineuses, ou trop dispersées, pour être utiles.",
+            "answer": "Des chaînes de traitement big data qui réunissent toutes les sources, les nettoient une fois pour toutes et les préparent pour l’analyse, la prévision et l’IA."
+          },
+          {
+            "problem": "Les prévisions sont refaites à la main dans des tableurs chaque trimestre.",
+            "answer": "Des modèles financiers et des prévisions construits sur l’historique de l’organisation, actualisés à mesure que les données arrivent."
+          }
+        ]
+      },
+      {
+        "domain": "Opérations et équipes",
+        "items": [
+          {
+            "problem": "Les validations attendent dans la boîte de réception d’une seule personne.",
+            "answer": "Des circuits de validation, des seuils et des délégations définis comme des règles, appliqués de la même façon à chaque fois, avec une traçabilité complète."
+          },
+          {
+            "problem": "Le travail sur le terrain reste invisible pour le siège.",
+            "answer": "Des rapports de terrain avec pointage géolocalisé, un travail hors connexion qui se synchronise au retour du réseau, et des vues en direct pour chaque responsable."
+          },
+          {
+            "problem": "Recrutement, présences, performance et paie sont éparpillés dans des tableurs.",
+            "answer": "Un seul dossier par personne, de la candidature au bulletin de paie."
+          }
+        ]
+      },
+      {
+        "domain": "Contrôle et risques",
+        "items": [
+          {
+            "problem": "Personne ne peut dire qui a modifié quoi, ni pourquoi.",
+            "answer": "Chaque action est soumise à autorisation et journalisée : qui, quoi, quand et d’où."
+          },
+          {
+            "problem": "Des informations sensibles sont visibles par trop de personnes.",
+            "answer": "Un accès par rôle, jusqu’à chaque page et chaque enregistrement, défini par l’organisation elle-même."
+          },
+          {
+            "problem": "Les échéances de conformité sont découvertes une fois dépassées.",
+            "answer": "Des obligations générées à partir de chaque immatriculation, attribuées à un responsable et annoncées bien avant leur échéance."
+          }
+        ]
+      },
+      {
+        "domain": "Clients et croissance",
+        "items": [
+          {
+            "problem": "Les échanges par e-mail, WhatsApp, Instagram et le site web sont éparpillés sur les téléphones.",
+            "answer": "Une seule boîte de réception sur la fiche de chaque client, avec chaque conversation, chaque commande et chaque facture au même endroit."
+          },
+          {
+            "problem": "Le marketing, la publicité et les ventes vivent dans des outils qui ne se parlent pas.",
+            "answer": "Campagnes, calendriers de contenu et performance publicitaire reliés à la fiche client : chaque dépense peut être rattachée au chiffre d’affaires."
+          }
+        ]
+      },
+      {
+        "domain": "Trop d’outils",
+        "items": [
+          {
+            "problem": "Une douzaine d’abonnements, dont aucun ne concorde avec un autre.",
+            "answer": "Un seul système à la place de la mosaïque d’outils de messagerie, de comptabilité, de CRM, de discussion, de projets et d’agenda, avec vos données au même endroit, qui vous appartient."
+          }
+        ]
+      }
+    ],
+    "closing": "Si cela fait circuler de l’argent, des personnes, des marchandises ou des décisions, nous savons le concevoir et le construire."
+  },
+  "practices": {
+    "title": "Quatre expertises. Un seul système.",
+    "lead": "Chaque mission mobilise quatre expertises qui travaillent comme une seule équipe : la façon dont l’organisation doit fonctionner et le système qui la fait fonctionner sont conçus ensemble.",
+    "items": [
+      {
+        "name": "Stratégie et conception organisationnelle",
+        "summary": "Nous concevons la façon dont l’organisation doit fonctionner : processus, contrôles, rôles, validations et indicateurs qui comptent.",
+        "capabilities": [
+          "Modèle opérationnel et conception des processus",
+          "Contrôle interne et préparation aux audits",
+          "Cadres de performance et indicateurs clés",
+          "Conduite du changement et formation"
+        ]
+      },
+      {
+        "name": "Ingénierie des systèmes",
+        "summary": "Nous construisons le système qui la fait fonctionner : plateformes sur mesure, intégrations et infrastructure qui les porte.",
+        "capabilities": [
+          "ERP et plateformes métier sur mesure",
+          "Applications web, mobiles et hors connexion",
+          "Intégration de passerelles de paiement et rapprochement",
+          "API, webhooks et intégrations tierces"
+        ]
+      },
+      {
+        "name": "Données et IA",
+        "summary": "Nous faisons parler les données de l’organisation : chaînes de traitement, analyses et assistants qui travaillent sur ses propres données.",
+        "capabilities": [
+          "Chaînes de traitement big data et entrepôts de données",
+          "Analyse de l’activité et tableaux de bord",
+          "Assistants IA sur vos propres données, selon vos autorisations",
+          "Apprentissage automatique et automatisation"
+        ]
+      },
+      {
+        "name": "Finance et performance",
+        "summary": "Nous rendons les chiffres fiables : grands livres, reporting, modèles et prévisions sur lesquels la direction peut compter.",
+        "capabilities": [
+          "Systèmes comptables IFRS et OHADA",
+          "Modélisation financière et prévisions",
+          "Trésorerie, multidevise et visibilité sur la trésorerie",
+          "Reporting de gestion et pour le conseil d’administration"
+        ]
+      }
+    ]
+  },
+  "method": {
+    "title": "La Méthode Praxis",
+    "lead": "Une seule méthode pour chaque mission, quelle que soit sa taille.",
+    "stages": [
+      {
+        "name": "Diagnostiquer",
+        "body": "Nous observons comment un domaine de l’organisation fonctionne réellement aujourd’hui, en commençant par un audit gratuit."
+      },
+      {
+        "name": "Concevoir",
+        "body": "Nous concevons la façon dont il doit fonctionner : processus, contrôles, rôles et indicateurs qui comptent."
+      },
+      {
+        "name": "Construire",
+        "body": "Nous construisons le système qui le fait fonctionner et qui le montre, par étapes, pour que l’organisation ne s’arrête jamais."
+      },
+      {
+        "name": "Pérenniser",
+        "body": "Nous restons jusqu’à ce que tout tienne, nous formons vos équipes, puis nous vous remettons les clés."
+      }
+    ],
+    "principles": [
+      {
+        "title": "Des fondations pour chaque étage",
+        "body": "Nous posons les fondations de l’organisation que vous êtes en train de devenir. Chaque nouvelle capacité s’ajoute comme un étage de plus, sans reconstruire ce qui existe."
+      },
+      {
+        "title": "Meilleur à chaque version",
+        "body": "L’amélioration continue fait partie du travail : chaque nouvel étage améliore ceux qui le portent."
+      },
+      {
+        "title": "Votre système, vos clés",
+        "body": "Le code et les données vous appartiennent. Vos équipes peuvent piloter le système sans nous et retirer nos accès à tout moment."
+      }
+    ]
+  },
+  "teams": {
+    "title": "Les équipes derrière le travail.",
+    "lead": "Nos consultants et nos ingénieurs viennent de la banque, des télécommunications, de l’audit public, du conseil international, du pétrole et du gaz, de la logistique et de l’ingénierie logicielle. Chacun apporte entre cinq et vingt ans de pratique.",
+    "items": [
+      {
+        "name": "Ingénierie logicielle",
+        "summary": "Des ingénieurs qui construisent des plateformes faites pour fonctionner chaque jour pendant des années : une architecture propre, des tests automatisés et des mises en production qui ne cassent jamais ce qui fonctionne déjà.",
+        "disciplines": [
+          "Ingénierie de plateformes et back-end",
+          "Applications web et mobiles",
+          "Intégrations, API et paiements",
+          "Assurance qualité et automatisation des tests"
+        ],
+        "experience": "5 à 20 ans chacun",
+        "credentials": [
+          {
+            "name": "OpenJS Node.js Application Developer (JSNAD)",
+            "issuer": "OpenJS Foundation",
+            "held": false
+          },
+          {
+            "name": "AWS Certified Developer – Associate",
+            "issuer": "Amazon Web Services",
+            "held": false
+          },
+          {
+            "name": "Microsoft Certified: Azure Developer Associate",
+            "issuer": "Microsoft",
+            "held": false
+          },
+          {
+            "name": "Professional Scrum Master I (PSM I)",
+            "issuer": "Scrum.org",
+            "held": false
+          }
+        ]
+      },
+      {
+        "name": "IA, données et cloud",
+        "summary": "Des spécialistes qui transforment des données dispersées en réponses et qui gardent l’infrastructure rapide, sûre et disponible.",
+        "disciplines": [
+          "Ingénierie de l’IA et de l’apprentissage automatique",
+          "Ingénierie des données et big data",
+          "Architecture cloud et DevOps",
+          "Ingénierie de la sécurité"
+        ],
+        "experience": "5 à 20 ans chacun",
+        "credentials": [
+          {
+            "name": "IBM Data Engineering Professional Certificate",
+            "issuer": "IBM",
+            "held": false
+          },
+          {
+            "name": "IBM Data Science Professional Certificate",
+            "issuer": "IBM",
+            "held": false
+          },
+          {
+            "name": "Google Cloud Professional Data Engineer",
+            "issuer": "Google Cloud",
+            "held": false
+          },
+          {
+            "name": "AWS Certified Solutions Architect – Associate",
+            "issuer": "Amazon Web Services",
+            "held": false
+          },
+          {
+            "name": "Microsoft Certified: Azure AI Engineer Associate",
+            "issuer": "Microsoft",
+            "held": false
+          },
+          {
+            "name": "Certified Kubernetes Administrator (CKA)",
+            "issuer": "Cloud Native Computing Foundation",
+            "held": false
+          },
+          {
+            "name": "CompTIA Security+",
+            "issuer": "CompTIA",
+            "held": false
+          }
+        ]
+      },
+      {
+        "name": "Conseil en management",
+        "summary": "D’anciens auditeurs et des professionnels de la performance qui conçoivent la façon dont l’organisation doit fonctionner, et s’assurent que ses contrôles résistent à l’examen.",
+        "disciplines": [
+          "Modèle opérationnel et conception des processus",
+          "Audit interne et contrôles",
+          "Pilotage de la performance et indicateurs clés",
+          "Gestion de programmes et conduite du changement"
+        ],
+        "experience": "5 à 20 ans chacun",
+        "credentials": [
+          {
+            "name": "Certified Information Systems Auditor (CISA)",
+            "issuer": "ISACA",
+            "held": false
+          },
+          {
+            "name": "Certified Internal Auditor (CIA)",
+            "issuer": "The Institute of Internal Auditors",
+            "held": false
+          },
+          {
+            "name": "Project Management Professional (PMP)",
+            "issuer": "PMI",
+            "held": false
+          },
+          {
+            "name": "PRINCE2 Practitioner",
+            "issuer": "PeopleCert",
+            "held": false
+          },
+          {
+            "name": "Lean Six Sigma Green Belt",
+            "issuer": "IASSC",
+            "held": false
+          },
+          {
+            "name": "ITIL 4 Foundation",
+            "issuer": "PeopleCert",
+            "held": false
+          }
+        ]
+      },
+      {
+        "name": "Finance et modélisation",
+        "summary": "Des comptables et des modélisateurs financiers qui rendent les chiffres fiables, du grand livre jusqu’au dossier du conseil d’administration.",
+        "disciplines": [
+          "Systèmes comptables IFRS et OHADA",
+          "Modélisation financière et évaluation",
+          "Prévisions et planification",
+          "Trésorerie et reporting"
+        ],
+        "experience": "5 à 20 ans chacun",
+        "credentials": [
+          {
+            "name": "Financial Modeling & Valuation Analyst (FMVA)",
+            "issuer": "Corporate Finance Institute",
+            "held": true
+          },
+          {
+            "name": "Business Intelligence & Data Analyst (BIDA)",
+            "issuer": "Corporate Finance Institute",
+            "held": false
+          },
+          {
+            "name": "ACCA",
+            "issuer": "Association of Chartered Certified Accountants",
+            "held": false
+          },
+          {
+            "name": "Chartered Accountant (ACA)",
+            "issuer": "Institute of Chartered Accountants of Nigeria",
+            "held": false
+          }
+        ]
+      }
+    ]
+  },
+  "work": {
+    "title": "Réalisations choisies.",
+    "lead": "Chaque système ci-dessous est en production ou en cours de construction. Lorsqu’un client n’est pas nommé, nous le décrivons par son secteur.",
+    "items": [
+      {
+        "client": "Smart Logistics and Services",
+        "sector": "Logistique et transit",
+        "title": "Une entreprise de transit où chaque dossier d’expédition arrive en comptabilité.",
+        "problem": "Son ancien système n’avait pas de couche comptable et ne fonctionnait qu’en anglais, dans un pays qui travaille en français et en anglais.",
+        "built": "Praxis LS : dossiers d’expédition, entrepôt, flotte, équipes et comptabilité OHADA dans un seul système bilingue.",
+        "outcome": "Factures, coûts des dossiers, achats et paie sont comptabilisés dans un seul grand livre au fil de l’activité, et les échéances fiscales sont rappelées aux personnes responsables.",
+        "image": null
+      },
+      {
+        "client": "Pixie Girl Global",
+        "sector": "Industrie et marques internationales",
+        "title": "Une marque capillaire internationale, pilotée en anglais et en chinois, de l’usine au client.",
+        "problem": "La marque fabrique en Chine et est immatriculée en Chine, aux États-Unis et au Nigeria. L’usine, le fret, le stock et les ventes étaient dispersés, dans des langues différentes.",
+        "built": "Une seule plateforme, de l’atelier au client : lots de production, comptes d’usine et fret en chinois pour l’équipe de l’usine ; calcul des coûts, stock, boutique en ligne de la marque, livraisons, équipes et comptabilité en anglais.",
+        "outcome": "L’usine et le siège travaillent dans un même système, chacun dans sa langue. Chaque pièce est valorisée de la production au coût de revient rendu, et tous les canaux puisent dans un seul stock.",
+        "image": null
+      },
+      {
+        "client": "Un grand fabricant pharmaceutique",
+        "sector": "Industrie pharmaceutique, avec Tales Consulting",
+        "title": "Une force de vente nationale, ses responsables et ses prévisions, sur une seule plateforme.",
+        "problem": "Les responsables ne voyaient pas les visites et les commandes en temps réel, et les prévisions étaient assemblées à la main.",
+        "built": "Une plateforme pour les délégués, les responsables et la direction : visites vérifiées, travail hors connexion synchronisé et prévisions nationales.",
+        "outcome": "Les visites sont pointées là où elles ont lieu, rien n’est perdu hors connexion, et la plateforme fonctionne dans le propre compte cloud du client.",
+        "image": null
+      },
+      {
+        "client": "La Petite Cour",
+        "sector": "Biens de consommation et distribution",
+        "title": "Un ERP reconstruit par étapes, pendant que l’entreprise continuait de l’utiliser.",
+        "problem": "Le système d’un distributeur devait être reconstruit sans interrompre les commandes, les livraisons ni la comptabilité.",
+        "built": "Commandes, livraisons, emballages consignés, flotte, paie et comptabilité OHADA, mis en production par étapes, avec des contrôles avant chaque mise en service.",
+        "outcome": "Un accès par rôle, une comptabilité qui refuse les écritures déséquilibrées et garde les exercices clos fermés, et chaque modification tracée.",
+        "image": null
+      },
+      {
+        "client": "Une société pétrolière et gazière",
+        "sector": "Pétrole et gaz",
+        "title": "Un travail de terrain qui suit le rythme du forage.",
+        "problem": "Les rapports, les validations et les achats prenaient du retard sur des opérations qui tournent jour et nuit.",
+        "built": "Un suivi des forages en temps réel, des rapports de forage quotidiens qui se construisent seuls, des bons de travail à double signature et un circuit d’achats.",
+        "outcome": "Les rapports quotidiens n’attendent plus d’être assemblés à la main, et chaque bon porte deux signatures.",
+        "image": null
+      },
+      {
+        "client": "NFELIA",
+        "sector": "Notre produit, pour les petites entreprises",
+        "title": "La gestion d’une petite entreprise, sur le téléphone qu’elle utilise déjà.",
+        "problem": "Les gérants vendent par messagerie et par le bouche-à-oreille, avec leurs données dispersées entre carnets et messages.",
+        "built": "Un site web pour chaque entreprise, ainsi que les commandes, les factures, les reçus, les créances, le stock et les livraisons sur le téléphone.",
+        "outcome": "En service au Nigeria, au Cameroun, au Ghana et au Kenya, chacun avec sa propre devise et ses propres moyens de paiement.",
+        "image": null
+      }
+    ]
+  },
+  "clients": {
+    "title": "Des organisations qui reposent sur notre travail.",
+    "logos": []
+  },
+  "security": {
+    "title": "Sécurité et données.",
+    "items": [
+      {
+        "title": "Aligné sur la norme ISO 27001",
+        "body": "Nos contrôles suivent la norme ISO 27001 : accès par rôle, connexions chiffrées, sauvegardes testées et trace de chaque modification."
+      },
+      {
+        "title": "Vos données restent les vôtres",
+        "body": "Les données des clients ne sont jamais réutilisées. Les systèmes peuvent fonctionner dans votre propre compte cloud, avec vos propres identifiants."
+      },
+      {
+        "title": "Chaque action tracée",
+        "body": "Chaque modification est soumise à autorisation et journalisée : qui l’a faite, ce qui a changé et quand."
+      },
+      {
+        "title": "Testé avant chaque mise en production",
+        "body": "Chaque version passe des tests automatisés, et les équipes peuvent s’entraîner dans un environnement séparé sans toucher aux données réelles."
+      }
+    ]
+  },
+  "facts": {
+    "title": "L’entreprise en bref.",
+    "items": [
+      {
+        "label": "Raison sociale",
+        "value": "JBS Praxis Limited",
+        "enabled": true
+      },
+      {
+        "label": "Immatriculation",
+        "value": "RC 9985884, Corporate Affairs Commission, Nigeria",
+        "enabled": true
+      },
+      {
+        "label": "Numéro d’identification fiscale",
+        "value": "2622490936068",
+        "enabled": true
+      },
+      {
+        "label": "Siège social",
+        "value": "21B Bode Ajakaiye Street, Lekki, Lagos, Nigeria",
+        "enabled": true
+      },
+      {
+        "label": "Entité au Cameroun",
+        "value": "JBS Praxis SARL, Douala, RC/DLA/1097C",
+        "enabled": false
+      },
+      {
+        "label": "Langues de travail",
+        "value": "Français et anglais",
+        "enabled": true
+      },
+      {
+        "label": "Référentiels comptables",
+        "value": "IFRS et OHADA (SYSCOHADA)",
+        "enabled": true
+      },
+      {
+        "label": "Sécurité de l’information",
+        "value": "Aligné sur la norme ISO 27001",
+        "enabled": true
+      },
+      {
+        "label": "Secteurs",
+        "value": "Logistique, industrie manufacturière, biens de consommation, commerce, industrie pharmaceutique, pétrole et gaz, technologie, éducation, organisations confessionnelles et petites entreprises",
+        "enabled": true
+      }
+    ]
+  },
+  "contact": {
+    "cta": "Réservez un audit et une démonstration gratuits.",
+    "cta_url": "https://jbspraxis.com/fr/schedule",
+    "email": "info@jbspraxis.com",
+    "sales_email": "sales@jbspraxis.com",
+    "phone": "",
+    "website": "jbspraxis.com",
+    "offices": [
+      "Lagos",
+      "Douala"
+    ],
+    "closing": "L’ordre, rendu visible."
+  }
+}
