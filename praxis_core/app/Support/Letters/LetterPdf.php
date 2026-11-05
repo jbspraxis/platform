@@ -44,7 +44,10 @@ final class LetterPdf
         $cache = storage_path('framework/cache/dompdf');
         File::ensureDirectoryExists($cache);
 
-        return self::fromHtml($html, $details['footer_legal'], $details['footer_contact'], $cache, self::headerLine($document));
+        return self::fromHtml(
+            $html, $details['footer_legal'], $details['footer_contact'], $cache,
+            self::headerLine($document), LetterBody::locale($document),
+        );
     }
 
     /** The running head of a multi-page agreement; null for every other kind, which keeps the letterhead as it was */
@@ -62,6 +65,8 @@ final class LetterPdf
             $document->loadMissing('counterparties');
         }
         $verifyUrl = $document->verify_token ? Verification::url($document->verify_token) : null;
+        // Every template but the introduction letter writes English; that one follows the author's choice
+        $locale = LetterBody::locale($document);
 
         return view('pdf.letter', [
             'document' => $document,
@@ -72,13 +77,17 @@ final class LetterPdf
             'isAgreement' => $isAgreement,
             'countersigned' => $countersigned,
             'logo' => Letterhead::logoDataUri(),
-            'issuedDate' => CarbonImmutable::parse($document->document_date)->format('j F Y'),
+            'locale' => $locale,
+            // The introduction letter must hold one page in both languages, so it is set a little tighter
+            'compact' => $document->type === 'company_introduction',
+            'issuedDate' => CarbonImmutable::parse($document->document_date)->locale($locale)->translatedFormat('j F Y'),
             'final' => $final,
             'qr' => $document->show_qr && $verifyUrl ? Qr::dataUri($verifyUrl, 22) : null,
             'verifyUrl' => $verifyUrl,
             'blankSignatory' => [
-                'name' => $details['representative'] ?: 'For and on behalf of ' . $details['name'],
-                'title' => $details['representative_title'] ?: 'Director',
+                'name' => $details['representative']
+                    ?: ($locale === 'fr' ? 'Pour le compte de ' : 'For and on behalf of ') . $details['name'],
+                'title' => $details['representative_title'] ?: ($locale === 'fr' ? 'Directeur' : 'Director'),
             ],
         ])->render();
     }
@@ -88,7 +97,14 @@ final class LetterPdf
      * missing extensions runs. $cache is a writable folder for fonts and temporary files, and the only folder
      * dompdf may read; the page reads none, because the logo, the QR code and the signatures are data URIs.
      */
-    public static function fromHtml(string $html, string $footerLegal, string $footerContact, string $cache, ?string $headerLine = null): string
+    public static function fromHtml(
+        string $html,
+        string $footerLegal,
+        string $footerContact,
+        string $cache,
+        ?string $headerLine = null,
+        string $locale = 'en',
+    ): string
     {
         $dompdf = new Dompdf(new Options([
             'defaultFont' => 'DejaVu Sans',
@@ -106,11 +122,12 @@ final class LetterPdf
         $dompdf->render();
 
         $canvas = $dompdf->getCanvas();
-        $canvas->page_script(function (int $page, int $pages, CPDF $pdf, FontMetrics $metrics) use ($footerLegal, $footerContact, $headerLine) {
+        $canvas->page_script(function (int $page, int $pages, CPDF $pdf, FontMetrics $metrics) use ($footerLegal, $footerContact, $headerLine, $locale) {
             $font = $metrics->getFont('DejaVu Sans');
             $teal = [0.047, 0.545, 0.608];   // #0C8B9B
             $grey = [0.369, 0.400, 0.475];   // #5E6679
-            $label = $pages > 1 ? 'Page ' . $page . ' of ' . $pages : null;
+            // "Page 2 sur 3" in a French document; every other template writes English, as it did
+            $label = $pages > 1 ? 'Page ' . $page . ($locale === 'fr' ? ' sur ' : ' of ') . $pages : null;
 
             $pdf->line(self::LEFT, 776, self::RIGHT, 776, $teal, 0.7);
             $pdf->text(self::LEFT, 787, $footerLegal, $font, 7, $grey);

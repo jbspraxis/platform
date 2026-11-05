@@ -9,7 +9,7 @@ namespace App\Support\Letters;
  *
  *   RES  board resolution      the sole director's written resolution (open a bank account; appoint a signatory)
  *   LET  formal letter         a letter on the letterhead, and the free letter and Claude's draft
- *   INT  letter of introduction
+ *   INT  letter of introduction, and the one-page introduction of the firm itself to a company we want to work with
  *   EMP  employment letter     an offer, a confirmation or a letter for a bank or an embassy
  *   AUT  authority to act      what one named person may do on the company's behalf
  *   AGR  agreement             a contract both sides sign: JBS Praxis in HQ, the other party online
@@ -35,6 +35,11 @@ final class LetterTypes
             'code' => 'INT',
             'label' => 'Letter of introduction',
             'summary' => 'Introduces a member of the firm and says what they are there to do.',
+        ],
+        'company_introduction' => [
+            'code' => 'INT',
+            'label' => 'Introduction letter',
+            'summary' => 'One page introducing JBS Praxis to a company, in English or French, from the published company profile.',
         ],
         'employment' => [
             'code' => 'EMP',
@@ -101,6 +106,15 @@ final class LetterTypes
                 'person_title' => ['label' => 'Their role', 'type' => 'text', 'required' => true],
                 'purpose' => ['label' => 'What they are there to do', 'type' => 'textarea', 'rows' => 3, 'required' => true],
                 'valid_until' => ['label' => 'Good until', 'type' => 'date'],
+            ],
+            'company_introduction' => [
+                'locale' => ['label' => 'Language', 'type' => 'select', 'required' => true,
+                    'options' => ['en' => 'English', 'fr' => 'Francais'],
+                    'help' => 'The whole letter, its date and its closing follow this.'],
+                'contact_person' => ['label' => 'Contact person', 'type' => 'text',
+                    'help' => 'Left out of the salutation when it is empty.'],
+                'contact_email' => ['label' => 'Their email (optional)', 'type' => 'text',
+                    'help' => 'Printed under the closing so they can reply to the right place.'],
             ],
             'employment' => [
                 'employee_name' => ['label' => 'Employee', 'type' => 'text', 'required' => true],
@@ -195,6 +209,7 @@ final class LetterTypes
             $type === 'board_resolution' && $subtype === 'appoint_signatory' => 'Resolution of the director of ' . $companyName . ': appointment of a signatory',
             $type === 'board_resolution' => 'Resolution of the director of ' . $companyName . ': opening of a corporate bank account',
             $type === 'introduction' => 'Letter of introduction',
+            $type === 'company_introduction' => 'An introduction to ' . $companyName,
             $type === 'employment' => 'Letter of employment',
             $type === 'authority' => 'Authority to act',
             $type === 'agreement' => 'Agreement',
@@ -207,7 +222,8 @@ final class LetterTypes
     {
         $common = ['salutation' => 'Dear Sir or Madam,', 'closing' => 'Yours faithfully,'];
 
-        // The type's own defaults win, so an agreement can start with no salutation and no closing
+        // The type's own defaults win over the common ones, so an agreement can start with no salutation
+        // and no closing, and the introduction letter can leave both to the language the author picks
         return match ($type) {
             'board_resolution' => [
                 'place' => trim(implode(', ', $details['office_lines'] ?: [])),
@@ -221,6 +237,7 @@ final class LetterTypes
                     'title' => (string) ($details['representative_title'] ?: 'Director'),
                 ]],
             ],
+            'company_introduction' => ['locale' => 'en', 'salutation' => '', 'closing' => ''],
             'employment' => ['employment_type' => 'Full time, permanent'],
             // An agreement is not a letter: no salutation, no closing, and the parties are named in the body
             'agreement' => ['salutation' => '', 'closing' => ''],

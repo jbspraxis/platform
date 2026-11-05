@@ -81,6 +81,8 @@ Preview of the new app: `next.jbspraxis.com` (noindex). Live switch: PR3.
 | `POST /kaizen/submissions` | Contributor submits an article for review | `Kaizen::submitInsight` |
 | `POST /feedback` | Site feedback form | `TelemetryNode::transmitTelemetry` |
 | `GET /portfolio` | Published case studies and quotes | `Portfolio` |
+| `GET /clients` | The logo strip, from the HQ client logo library (docs/COMPANY_PROFILE.md section 4) | `config/site.php` `clients` |
+| `GET /clients/{key}.webp` | One logo's WebP | `public/img/clients/{key}.webp` |
 | `POST /careers/applications` | Application, multipart with `cv` (PDF/DOC/DOCX, 5 MB), stored on the private disk | `Careers::transmitDossier` |
 | `POST /whitepaper` | Method PDF request by email | `Services::processWhitepaper/dispatchEmail` |
 | `POST /chat` | One chat turn: `{"history":[{"role":"user|assistant","text":"..."}], "message":"..."}` → `{"reply":"..."}` | `AiAgent` (keys stay in HQ) |
@@ -146,6 +148,11 @@ above were removed from praxis_core on 30 Oct 2026; their route names stay as 40
   renders only that subset (`App\Support\ChatText` on the server, the same rules in `resources/js/app.js`).
 - `GET /portfolio` → `{"case_studies":[{"client_pseudonym","title","industry","challenge","audit","architecture_deployed",
   "roi_metrics":{"metric","description","tags":[]}}],"quotes":[{"quote","source"}]}` (cacheable 10 min).
+- `GET /clients` → `{"clients":[{"key","name","sector","sha256","width","height"}]}`, in the order the strip shows them,
+  only the live logos ticked for the website (cacheable 10 min). `sha256` is the hash of that logo's WebP, so the site keeps
+  one file per version and asks again only when it really changed. `GET /clients/{key}.webp` is those bytes (cacheable 1 h);
+  an unknown, retired or not-for-the-website key is `404 not_found`. The site falls back to the logos shipped with it when
+  HQ cannot be reached, so the strip never breaks (docs/COMPANY_PROFILE.md section 4).
 - `GET /tracking/open/{campaign_id}/{user_id}?country=NG`: `country` (optional) is the visitor's country if the site
   knows it (Cloudflare `CF-IPCountry`), else `Unknown Location` is stored; the visitor IP is stored as the open IP.
   → `{"data":{"recorded":true|false}}`. `POST /tracking/unsubscribe/{user_id}` → `{"data":{"unsubscribed":true}}`.

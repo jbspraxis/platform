@@ -135,7 +135,8 @@
                 @endif
             @endcan
 
-            {{-- Company profile (docs/COMPANY_PROFILE.md): the firm's own profile, in English and French --}}
+            {{-- Company profile (docs/COMPANY_PROFILE.md): the firm's own profile, in English and French, and
+                 the client logo library the profile, the deck and the website all read --}}
             @can('company_profile.view')
                 <a href="{{ route('hq.company-profile.editor') }}" class="rail-link {{ $on('hq.company-profile.*') }}" wire:navigate>
                     <i data-lucide="book-open"></i> Company profile
@@ -144,6 +145,7 @@
                     <div class="rail-sub">
                         <a href="{{ route('hq.company-profile.editor') }}" class="{{ $on('hq.company-profile.editor') }}" wire:navigate>Sections</a>
                         <a href="{{ route('hq.company-profile.versions') }}" class="{{ $on('hq.company-profile.versions', 'hq.company-profile.preview') }}" wire:navigate>Versions</a>
+                        <a href="{{ route('hq.company-profile.logos') }}" class="{{ $on('hq.company-profile.logos') }}" wire:navigate>Client logos</a>
                     </div>
                 @endif
             @endcan

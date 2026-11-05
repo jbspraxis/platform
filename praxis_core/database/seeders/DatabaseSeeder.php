@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             CoreSeeder::class,
             WebsiteContentSeeder::class,
             CompanyProfileSeeder::class,
+            ClientLogoSeeder::class,
         ]);
     }
 }

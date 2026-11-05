@@ -200,7 +200,8 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
         // 10. DOCUMENTS (docs/DOCUMENTS.md): formal documents on the company letterhead; routes/letters.php
         require __DIR__ . '/letters.php';
 
-        // 11. COMPANY PROFILE (docs/COMPANY_PROFILE.md): the firm's own profile, EN and FR; routes/company-profile.php
+        // 11. COMPANY PROFILE (docs/COMPANY_PROFILE.md): the firm's own profile, EN and FR, and the client
+        //     logo library the profile, the deck and jbspraxis.com all read; routes/company-profile.php
         require __DIR__ . '/company-profile.php';
 
         // Private uploads (receipts, payment proofs, QA evidence, CVs), checked per file
