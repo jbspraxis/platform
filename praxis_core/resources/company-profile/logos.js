@@ -110,6 +110,7 @@
         return {
             busy: false,
             error: '',
+            note: '',
             preview: '',
 
             /** The file picker ends here: three renditions and the size go to Livewire in one call */
@@ -120,6 +121,7 @@
 
                 var self = this;
                 this.error = '';
+                this.note = '';
                 this.busy = true;
 
                 this.renditions(file).then(function (payload) {
@@ -128,9 +130,15 @@
                     self.$wire.setFiles(payload);
                 }).catch(function (e) {
                     self.busy = false;
-                    self.error = e && e.message === 'too-big'
-                        ? 'That file is larger than 4 MB. Please choose a smaller one.'
-                        : 'That image could not be read. Choose an SVG or a PNG.';
+                    self.note = '';
+                    if (e && e.message === 'too-big') {
+                        self.error = 'That file is larger than 4 MB. Please choose a smaller one.';
+                    } else if (e && e.message === 'svg-text') {
+                        self.error = 'That SVG draws its lettering with a font, and this browser could not draw it '
+                            + 'to a picture. Outline the text in your drawing program, or upload a PNG instead.';
+                    } else {
+                        self.error = 'That image could not be read. Choose an SVG or a PNG.';
+                    }
                 });
             },
 
@@ -145,8 +153,13 @@
              * The PNG and the WebP are drawn from it, so the deck and the website have a bitmap to show.
              */
             fromSvg: function (file) {
+                var self = this;
                 return readAs(file, 'text').then(function (text) {
                     var uri = base64(text);
+                    // Live text in an SVG is lettering a font has to draw, and the PDF has only DejaVu and no
+                    // way to fetch the real face, so the server refuses such an SVG for print. The browser
+                    // has the font right here, so it draws the logo once and the JPEG goes for print instead.
+                    var liveText = /<\s*(?:text|tspan)[\s>]/i.test(text);
                     return load(uri).then(function (image) {
                         var width = image.naturalWidth || image.width || TARGET_HEIGHT;
                         var height = image.naturalHeight || image.height || TARGET_HEIGHT;
@@ -154,15 +167,24 @@
                         if (width * scale > MAX_WIDTH) scale = MAX_WIDTH / width;
                         var canvas = canvasOf(width * scale, height * scale);
                         canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+                        if (liveText) {
+                            self.note = 'This SVG draws its lettering with a font, which a PDF cannot do, so the '
+                                + 'picture below was drawn from it. Outline the text in your drawing program for a '
+                                + 'logo that stays sharp at any size.';
+                        }
                         return {
                             filename: file.name,
-                            print: uri,
+                            print: liveText ? onWhite(canvas).toDataURL('image/jpeg', JPEG_QUALITY) : uri,
                             png: canvas.toDataURL('image/png'),
                             web: canvas.toDataURL('image/webp', WEBP_QUALITY),
                             width: canvas.width,
                             height: canvas.height
                         };
                     }).catch(function () {
+                        if (liveText) {
+                            // Nothing here can draw it, and the server will refuse it: say so rather than fail later
+                            throw new Error('svg-text');
+                        }
                         // A browser that will not rasterise the SVG still gets a usable print rendition
                         return { filename: file.name, print: uri, png: '', web: '', width: 0, height: 0 };
                     });

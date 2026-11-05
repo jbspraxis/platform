@@ -191,6 +191,12 @@ sharp at any size, and is rasterised for the other two.
 presentation attributes survive, every event handler and script goes, and a reference may only point inside
 the file. What is left is what php-svg-lib draws and what a browser can show without running anything.
 
+**An SVG that draws its lettering with a font is refused for print**, rather than quietly losing the words:
+the PDF carries only DejaVu and cannot fetch the real face. The screen's own script notices `<text>` first,
+draws the logo to a JPEG with the font it has right there, and sends that as the print copy with a line saying
+why; `LogoFiles::decode` refuses such an SVG outright, so the words can never be lost without somebody being
+told. Outlined lettering is only shapes, and goes in as it is.
+
 The files live on the **private disk** (`storage/app/private/company-profile/logos/`). Nothing is on a public
 path: HQ is served a logo through a route behind `company_profile.view`, and the website through the signed
 Site API.
@@ -243,8 +249,9 @@ Re-seeding never overwrites a logo somebody replaced in HQ: a key that is alread
 PR 3 adds, in the same folder:
 
 - `LogoLibraryTest` - the four permissions and the wildcard being kept off, adding a logo with its name and
-  sector, the SVG cleaner, a file that lies about what it is, the order and its two ends, retire and restore,
-  what the provider hands the engine, a logo whose file has gone missing, and the signed `/clients` feed.
+  sector, the SVG cleaner, an SVG whose lettering is live text, a file that lies about what it is, the order
+  and its two ends, retire and restore, what the provider hands the engine, a logo whose file has gone
+  missing, and the signed `/clients` feed.
 - `IntroductionLetterTest` - the template and its reference, the language and contact fields, the recipient's
   own details, the words coming from the published profile, the banned words, the sign-off following the
   language, one page in both languages, the copy budget, issuing and downloading it, and what the letter says
@@ -325,12 +332,22 @@ On the site (`App\Support\Clients`):
   portfolio. The page makes one call and no more.
 - Each **file** is fetched once and then kept on this server. The markup points at the site's own
   `/img/client-logos/{key}.webp?v=<first 12 of the sha>`, so a logo replaced in HQ is a new address and nothing
-  anywhere serves yesterday's picture; the response is immutable for a year.
-- **It never breaks.** If HQ cannot be reached and nothing is saved, the strip falls back to the fifteen logos
-  shipped with the site (`config/site.php` `clients` and `public/img/clients/`), which is exactly what it showed
-  before. A single file HQ cannot give falls back to the shipped one of that name, then to 404.
+  anywhere serves yesterday's picture; that address is immutable for a year.
+- **The route is public and cookieless, so a visitor chooses both the key and the version.** Neither may make
+  this server call HQ or write a file, or a bot could fill the disk one made-up version at a time and drain
+  the Site API allowance the contact form, the chat and the verify page all share. So HQ is asked for a logo
+  **only** when the cached list names that key **and** the caller asked for exactly the version the list
+  names, and the bytes are kept **only** when their SHA-256 is the one the list gave. One file is kept per
+  key, and a new version deletes the one it supersedes. Everything else — a made-up version, a key nobody
+  knows, bytes that do not match — is answered from what is already here, without a single call to HQ, and a
+  made-up version is never answered as immutable.
+- **It never breaks.** If HQ cannot be reached, the strip falls back to whatever version of each logo this
+  server kept last, then to the fifteen shipped with the site (`config/site.php` `clients` and
+  `public/img/clients/`), which is exactly what it showed before, then to 404.
 
 The shipped list and files stay in the repository on purpose: they are the floor the strip stands on.
+`praxis_site/tests/Feature/ClientStripTest.php` holds the route to all of this, including the two ways a bot
+would try to abuse it.
 
 ## 14. Open decisions for the owner
 

@@ -96,6 +96,7 @@
                         </p>
                         <p class="help" x-show="busy" x-cloak>Preparing the file&hellip;</p>
                         <p class="field-error" x-show="error" x-text="error" x-cloak></p>
+                        <p class="help" x-show="note" x-text="note" x-cloak></p>
                         @if ($chosen)<p class="help">Chosen: {{ $chosen }}</p>@endif
                     </div>
                 </div>

@@ -169,6 +169,26 @@ class LogoLibraryTest extends TestCase
         $this->assertStringContainsString('<rect', $kept);
     }
 
+    public function test_an_svg_that_draws_its_lettering_with_a_font_is_refused_rather_than_losing_the_words(): void
+    {
+        $this->actingAs($this->staff('owner', ['owner']));
+
+        // The PDF has only DejaVu and cannot fetch the real face, so such a logo would print the wrong
+        // lettering or none. The screen's own script draws it to a JPEG first; this is the guard behind that.
+        try {
+            $this->add('Live text (test)', ['print' => $this->svg('<text x="4" y="20">Foxtrot</text>')]);
+            $this->fail('an SVG with live text should be refused');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('Outline the text', $e->getMessage());
+        }
+
+        $this->assertSame(0, ClientLogo::query()->count());
+
+        // Outlined lettering is just shapes, and goes in as it is
+        $logo = $this->add('Outlined (test)', ['print' => $this->svg('<path d="M0 0h10v10H0z"/>')]);
+        $this->assertSame('svg', $logo->print_kind);
+    }
+
     public function test_a_file_that_is_not_what_it_claims_is_refused(): void
     {
         $this->expectException(RuntimeException::class);

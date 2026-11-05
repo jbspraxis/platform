@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Support\Clients;
 use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -77,9 +78,11 @@ class ClientStripTest extends TestCase
     public function test_a_logo_is_fetched_from_hq_once_and_then_served_from_here(): void
     {
         Storage::fake('local');
-        $this->fakeLibrary([['key' => 'brand-new-client', 'name' => 'Brand New Client', 'sha256' => str_repeat('a', 64)]]);
+        // The list vouches for the bytes HQ will serve; anything else is refused (see the abuse tests below)
+        $sha = hash('sha256', $this->webp());
+        $this->fakeLibrary([['key' => 'brand-new-client', 'name' => 'Brand New Client', 'sha256' => $sha]]);
 
-        $version = str_repeat('a', 12);
+        $version = substr($sha, 0, 12);
         $first = $this->get('/img/client-logos/brand-new-client.webp?v=' . $version);
         $first->assertOk()->assertHeader('Content-Type', 'image/webp');
         $this->assertSame($this->webp(), $first->getContent());
@@ -101,6 +104,100 @@ class ClientStripTest extends TestCase
         $this->get('/img/client-logos/mtn.webp')->assertOk()->assertHeader('Content-Type', 'image/webp');
         $this->get('/img/client-logos/nobody-here.webp')->assertNotFound();
         $this->get('/img/client-logos/Not A Key.webp')->assertNotFound();
+    }
+
+    // ------------------------------------------------------------------ the route is public, so it is abused
+
+    /**
+     * The route has no session and no cookie, so a visitor chooses both the key and the version. Neither may
+     * make this server call HQ or write a file: a bot looping over made-up versions would otherwise fill the
+     * disk a logo at a time and drain the Site API allowance the contact form, the chat and the verify page
+     * all share.
+     */
+    public function test_a_made_up_version_never_calls_hq_and_never_writes_a_file(): void
+    {
+        Storage::fake('local');
+        $sha = hash('sha256', $this->webp());
+        $this->fakeLibrary([['key' => 'real-client', 'name' => 'Real Client', 'sha256' => $sha]]);
+
+        // One honest request stores the one version the list names
+        $this->get('/img/client-logos/real-client.webp?v=' . substr($sha, 0, 12))->assertOk();
+        $this->assertCount(1, Storage::disk('local')->files('clients'));
+
+        $fetches = fn () => count(Http::recorded(fn (HttpRequest $r) => str_contains($r->url(), '/clients/real-client.webp')));
+        $this->assertSame(1, $fetches());
+
+        // Now the loop a bot would run: the same real key, a different made-up version each time
+        foreach (['abcdef012345', '0123456789ab', 'ffffffffffff', 'deadbeefcafe'] as $madeUp) {
+            $response = $this->get('/img/client-logos/real-client.webp?v=' . $madeUp)->assertOk();
+            // It is answered from what is already here, and never as immutable under that address
+            $this->assertSame($this->webp(), $response->getContent());
+            $this->assertStringNotContainsString('immutable', (string) $response->headers->get('Cache-Control'));
+        }
+
+        $this->assertSame(1, $fetches(), 'no further call to HQ');
+        $this->assertCount(1, Storage::disk('local')->files('clients'), 'no further file written');
+    }
+
+    public function test_a_key_hq_does_not_know_never_calls_hq_and_never_writes_a_file(): void
+    {
+        Storage::fake('local');
+        $this->fakeLibrary([['key' => 'real-client', 'name' => 'Real Client', 'sha256' => hash('sha256', $this->webp())]]);
+
+        foreach (['nobody-here', 'also-not-here', 'mtn-x'] as $unknown) {
+            $this->get('/img/client-logos/' . $unknown . '.webp?v=abcdef012345')->assertNotFound();
+        }
+
+        $this->assertCount(0, Http::recorded(fn (HttpRequest $r) => str_contains($r->url(), '/clients/')
+            && ! str_ends_with($r->url(), '/clients')));
+        $this->assertSame([], Storage::disk('local')->files('clients'));
+    }
+
+    public function test_bytes_that_are_not_the_ones_the_list_vouched_for_are_neither_kept_nor_served(): void
+    {
+        Storage::fake('local');
+        // The list promises one file; HQ answers with different bytes
+        $this->fakeHq([
+            'clients' => Http::response(['data' => ['clients' => [
+                ['key' => 'real-client', 'name' => 'Real Client', 'sha256' => hash('sha256', $this->webp())],
+            ]]]),
+            'clients/*' => Http::response('RIFF....WEBPsomething else', 200, ['Content-Type' => 'image/webp']),
+        ]);
+
+        $version = substr(hash('sha256', $this->webp()), 0, 12);
+        // Nothing stored and nothing shipped under that name: there is nothing honest to show
+        $this->get('/img/client-logos/real-client.webp?v=' . $version)->assertNotFound();
+
+        $this->assertSame([], Storage::disk('local')->files('clients'), 'the wrong bytes are not kept');
+    }
+
+    public function test_a_new_version_replaces_the_one_it_supersedes(): void
+    {
+        Storage::fake('local');
+        $first = hash('sha256', $this->webp());
+        $this->fakeLibrary([['key' => 'real-client', 'name' => 'Real Client', 'sha256' => $first]]);
+        $this->get('/img/client-logos/real-client.webp?v=' . substr($first, 0, 12))->assertOk();
+        $this->assertSame(['clients/real-client-' . substr($first, 0, 12) . '.webp'], Storage::disk('local')->files('clients'));
+
+        // The logo is replaced in HQ: a new sha, new bytes, a new address
+        $replacement = (string) base64_decode('UklGRiIAAABXRUJQVlA4TBUAAAAvAAAAEAcQEREBiIj+ByAAAAD+AAA=');
+        $second = hash('sha256', $replacement);
+        $this->refakeHttp([
+            self::HQ . '/clients' => Http::response(['data' => ['clients' => [
+                ['key' => 'real-client', 'name' => 'Real Client', 'sha256' => $second],
+            ]]]),
+            self::HQ . '/clients/*' => Http::response($replacement, 200, ['Content-Type' => 'image/webp']),
+            self::HQ . '/settings' => Http::response(['data' => $this->settingsData()]),
+        ]);
+        Cache::flush();
+
+        $this->get('/img/client-logos/real-client.webp?v=' . substr($second, 0, 12))->assertOk();
+
+        $this->assertSame(
+            ['clients/real-client-' . substr($second, 0, 12) . '.webp'],
+            Storage::disk('local')->files('clients'),
+            'one file per key: the superseded version goes',
+        );
     }
 
     // ------------------------------------------------------------------ when HQ cannot be reached

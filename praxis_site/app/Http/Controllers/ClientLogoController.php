@@ -18,13 +18,18 @@ class ClientLogoController extends Controller
 {
     public function show(Request $request, string $key): Response
     {
-        $bytes = Clients::logo($key, (string) $request->query('v', ''));
+        $version = (string) $request->query('v', '');
+        $bytes = Clients::logo($key, $version);
         abort_if($bytes === null, 404);
+
+        // Only the version the library actually names is immutable. A made-up `v` is answered from what is
+        // already here, and must not be cached for a year under that address.
+        $exact = $version !== '' && Clients::isCurrentVersion($key, $version);
 
         return response($bytes, 200, [
             'Content-Type' => 'image/webp',
             'Content-Length' => (string) strlen($bytes),
-            'Cache-Control' => $request->query('v') ? 'public, max-age=31536000, immutable' : 'public, max-age=3600',
+            'Cache-Control' => $exact ? 'public, max-age=31536000, immutable' : 'public, max-age=3600',
             'X-Content-Type-Options' => 'nosniff',
         ]);
     }

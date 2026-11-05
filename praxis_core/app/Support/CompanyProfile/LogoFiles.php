@@ -38,6 +38,17 @@ final class LogoFiles
     private const SVG_REFERENCES = ['href', 'xlink:href', 'clip-path', 'fill', 'stroke'];
 
     /**
+     * An SVG that draws its lettering with a font rather than with outlines. The PDF carries only DejaVu and
+     * cannot fetch the real face, so the lettering would come out in the wrong font or not at all. Rather than
+     * drop it quietly, such a file is refused and the uploader is told what to do about it; the screen's own
+     * script draws it to a JPEG first, so in practice this is the belt to that braces.
+     */
+    public static function hasLiveText(string $svg): bool
+    {
+        return preg_match('#<\s*(?:text|tspan)[\s>]#i', $svg) === 1;
+    }
+
+    /**
      * "data:image/png;base64,..." to the raw bytes, checked against what the media type promises.
      *
      * @param  list<string>  $allowed
@@ -64,6 +75,12 @@ final class LogoFiles
         }
         if (! self::looksLike($media, $bytes)) {
             throw new RuntimeException('That file is not really ' . $media . '.');
+        }
+        if ($media === 'image/svg+xml' && self::hasLiveText($bytes)) {
+            throw new RuntimeException(
+                'That SVG draws its lettering with a font, which a PDF cannot do, so the words would be lost. '
+                . 'Outline the text in your drawing program, or upload a PNG instead.'
+            );
         }
 
         return [
