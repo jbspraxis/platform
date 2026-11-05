@@ -41,6 +41,37 @@ class VerifyDocumentTest extends TestCase
         ], $overrides)];
     }
 
+    public function test_an_agreement_signed_by_both_parties_is_valid_and_offers_both_fingerprints(): void
+    {
+        $signed = '9c2d41a6d0b4cf5e8a7b1f03e5d6c7980a1b2c3d4e5f60718293a4b5c6d7e8f9';
+        $this->fakeHq(['documents/' . self::TOKEN => Http::response($this->document([
+            'kind' => 'Agreement', 'type' => 'agreement', 'subtype' => null,
+            'title' => 'Project Contractor Agreement', 'reference' => 'JBS/AGR/2026/001',
+            'status' => 'fully_signed', 'countersigned' => true, 'signed_at' => '2026-11-07',
+            'signed_file_sha256' => $signed,
+            'signatories' => [['name' => 'Ada Test', 'title' => 'Director'], ['name' => 'A Contractor', 'title' => 'Engineer']],
+        ]))]);
+
+        $this->get('/verify/' . self::TOKEN)->assertOk()
+            ->assertSee('Genuine document issued by JBS Praxis Limited')
+            ->assertSee('It is valid: it has not been revoked or replaced.')
+            ->assertSee('JBS/AGR/2026/001')
+            ->assertSee('A Contractor')
+            // The reader may hold either file: the one they were sent, or the countersigned one
+            ->assertSee(self::SHA)
+            ->assertSee($signed);
+    }
+
+    public function test_an_agreement_waiting_for_a_countersignature_is_valid_too(): void
+    {
+        $this->fakeHq(['documents/' . self::TOKEN => Http::response($this->document([
+            'kind' => 'Agreement', 'type' => 'agreement', 'subtype' => null, 'status' => 'sent_for_signature',
+        ]))]);
+
+        $this->get('/verify/' . self::TOKEN)->assertOk()
+            ->assertSee('It is valid: it has not been revoked or replaced.');
+    }
+
     public function test_a_valid_document_says_who_issued_it_and_who_signed_it(): void
     {
         $this->fakeHq(['documents/' . self::TOKEN => Http::response($this->document())]);

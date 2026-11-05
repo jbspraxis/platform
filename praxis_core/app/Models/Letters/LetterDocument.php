@@ -21,6 +21,12 @@ class LetterDocument extends Model
 
     public const ISSUED = 'issued';
 
+    /** An agreement that JBS Praxis has issued and the other party has been asked to countersign */
+    public const SENT_FOR_SIGNATURE = 'sent_for_signature';
+
+    /** Every counterparty has signed; the countersigned PDF is stored beside the issued one */
+    public const FULLY_SIGNED = 'fully_signed';
+
     public const REVOKED = 'revoked';
 
     public const REPLACED = 'replaced';
@@ -37,13 +43,21 @@ class LetterDocument extends Model
         'copy_public' => 'boolean',
         'document_date' => 'date',
         'issued_at' => 'datetime',
+        'fully_signed_at' => 'datetime',
         'revoked_at' => 'datetime',
         'file_bytes' => 'integer',
+        'signed_file_bytes' => 'integer',
     ];
 
     public function signatures(): HasMany
     {
         return $this->hasMany(LetterDocumentSignature::class, 'document_id')->orderBy('position');
+    }
+
+    /** The other signatories (docs/DOCUMENTS.md section 12): one row each, printed in this order */
+    public function counterparties(): HasMany
+    {
+        return $this->hasMany(LetterCounterparty::class, 'document_id')->orderBy('position');
     }
 
     public function author(): BelongsTo
@@ -77,9 +91,26 @@ class LetterDocument extends Model
         return $this->status === self::DRAFT;
     }
 
-    /** Issued and still good: not revoked, not replaced */
+    /** An agreement: the one kind with a second signature box and online countersigning */
+    public function isAgreement(): bool
+    {
+        return $this->type === 'agreement';
+    }
+
+    /** Issued and still good: not revoked, not replaced. An agreement waiting for, or carrying, a countersignature is still good. */
     public function isValid(): bool
     {
-        return $this->status === self::ISSUED;
+        return in_array($this->status, [self::ISSUED, self::SENT_FOR_SIGNATURE, self::FULLY_SIGNED], true);
+    }
+
+    /** It has been issued: the PDF and its fingerprint are fixed from here on, whatever happens next */
+    public function isIssued(): bool
+    {
+        return in_array($this->status, [self::ISSUED, self::SENT_FOR_SIGNATURE, self::FULLY_SIGNED], true);
+    }
+
+    public function isFullySigned(): bool
+    {
+        return $this->status === self::FULLY_SIGNED;
     }
 }

@@ -29,6 +29,11 @@
         .doc-state.is-issued { background: #E7F4EC; color: #1A6E47; }
         .doc-state.is-revoked { background: #FBE9E7; color: #B3261E; }
         .doc-state.is-replaced { background: #FBF1DF; color: #8A5700; }
+        .doc-state.is-sent_for_signature { background: #E8EEFB; color: #2A4B9B; }
+        .doc-state.is-fully_signed { background: #E7F4EC; color: #14603C; }
+        .doc-party { font-size: 0.875rem; line-height: 1.4; color: var(--color-slate); }
+        .doc-party strong { display: block; color: var(--color-ink); }
+        .doc-link { font-size: 0.75rem; word-break: break-all; color: var(--color-muted); }
         .doc-toolbar { display: flex; gap: 2px; padding: 4px; border: 1px solid var(--color-line-strong); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--color-mist); }
         .doc-icon { display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; border: 0; border-radius: 6px; background: transparent; color: var(--color-slate, #4A5468); cursor: pointer; }
         .doc-icon:hover { background: var(--color-paper); }
@@ -58,7 +63,7 @@
         <div>
             <p class="doc-meta">
                 <span><strong>{{ $document->reference }}</strong></span>
-                <span class="doc-state is-{{ $document->status }}">{{ ucfirst($document->status) }}</span>
+                <span class="doc-state is-{{ $document->status }}">{{ ucfirst(str_replace('_', ' ', $document->status)) }}</span>
                 <span>{{ $kind }}</span>
                 <span>{{ $details['name'] }}</span>
             </p>
@@ -68,6 +73,10 @@
                     A draft. Nothing is fixed until you issue it; after that the PDF and its fingerprint never change.
                 @elseif ($document->status === 'issued')
                     Issued {{ $day($document->issued_at) }}. This is the file that went out.
+                @elseif ($document->status === 'sent_for_signature')
+                    Issued {{ $day($document->issued_at) }} and sent to {{ $party?->name }} to countersign.
+                @elseif ($document->status === 'fully_signed')
+                    Signed by every party on {{ $day($document->fully_signed_at) }}. The signed PDF is the one to rely on.
                 @elseif ($document->status === 'revoked')
                     Revoked {{ $day($document->revoked_at) }}: {{ $document->revoked_reason }}
                 @else
@@ -160,6 +169,30 @@
                         </div>
                     </div>
 
+                    @if ($isAgreement)
+                        {{-- The other party: who they are in print, and where their private signing link is sent --}}
+                        <div class="field">
+                            <span class="label">The other party</span>
+                            <p class="help">They sign online, from a private link emailed to the address below. Their name and role are printed under their signature.</p>
+                        </div>
+                        <div class="doc-two">
+                            @foreach (['name', 'role_title', 'email', 'company', 'registration'] as $key)
+                                <div class="field" wire:key="cp-{{ $key }}">
+                                    <label class="label" for="cp-{{ $key }}">{{ $counterpartyDefs[$key]['label'] }}</label>
+                                    <input id="cp-{{ $key }}" type="{{ $key === 'email' ? 'email' : 'text' }}" class="input"
+                                           wire:model="counterparty.{{ $key }}" placeholder="{{ $counterpartyDefs[$key]['placeholder'] ?? '' }}" maxlength="200">
+                                    @if (! empty($counterpartyDefs[$key]['help']))<p class="help">{{ $counterpartyDefs[$key]['help'] }}</p>@endif
+                                    @error('counterparty.' . $key)<p class="field-error">{{ $message }}</p>@enderror
+                                </div>
+                            @endforeach
+                        </div>
+                        <div class="field">
+                            <label class="label" for="cp-address">{{ $counterpartyDefs['address']['label'] }}</label>
+                            <textarea id="cp-address" class="input" rows="3" wire:model="counterparty.address" maxlength="500"></textarea>
+                            @error('counterparty.address')<p class="field-error">{{ $message }}</p>@enderror
+                        </div>
+                    @endif
+
                     @if ($freeBody)
                         <div class="field">
                             <label class="label" for="doc-brief">Ask Claude for a draft</label>
@@ -240,6 +273,52 @@
                 @endif
             </div>
 
+            @if ($isAgreement)
+                <div class="card mb-6">
+                    <h2 class="card-title">The other party’s signature</h2>
+                    @if (! $party || ! $party->name)
+                        <p class="help">Fill the other party in above and save, then issue the agreement and send it to them.</p>
+                    @else
+                        <p class="doc-party mb-3">
+                            <strong>{{ $party->name }}</strong>
+                            {{ $party->role_title }}@if ($party->company) · {{ $party->company }}@endif<br>
+                            {{ $party->email }}
+                        </p>
+
+                        @if ($party->hasSigned())
+                            <div class="doc-sign mb-3">
+                                @if ($party->dataUri())<img src="{{ $party->dataUri() }}" alt="">@endif
+                                <span class="doc-sign-name">{{ $party->signed_name }}<small>{{ $party->role_title }} · {{ $day($party->signed_at) }}@if ($party->ip_address) · from {{ $party->ip_address }}@endif</small></span>
+                            </div>
+                            <p class="help">The signed PDF keeps a signature record page: who signed, when, from where, and the fingerprint of the agreement as it was issued.</p>
+                        @elseif ($party->linkIsLive())
+                            <p class="help">
+                                Sent {{ $day($party->sent_at) }} ({{ $party->sent_count }} {{ $party->sent_count === 1 ? 'time' : 'times' }}).
+                                The link works until {{ $day($party->token_expires_at) }}, then it has to be sent again.
+                            </p>
+                            @if ($signingUrl)<p class="doc-link mt-3">{{ $signingUrl }}</p>@endif
+                        @else
+                            <p class="help">They have not been sent anything yet.</p>
+                        @endif
+
+                        @if ($canSend && ! $party->hasSigned())
+                            <div class="doc-actions mt-3">
+                                @if ($cannotSend === null)
+                                    <button type="button" class="btn btn-primary" wire:click="sendForSignature" wire:loading.attr="disabled" wire:target="sendForSignature">
+                                        <i data-lucide="send"></i> {{ $party->sent_count > 0 ? 'Send the link again' : 'Send for signature' }}
+                                    </button>
+                                @endif
+                                @if ($party->linkIsLive())
+                                    <button type="button" class="btn btn-secondary" wire:click="cancelSigning">Take the link back</button>
+                                @endif
+                            </div>
+                            @if ($cannotSend !== null)<p class="help mt-3">{{ $cannotSend }}</p>@endif
+                            @error('signing')<p class="field-error">{{ $message }}</p>@enderror
+                        @endif
+                    @endif
+                </div>
+            @endif
+
             @if ($canManage)
                 <div class="card mb-6">
                     <h2 class="card-title">Issuing</h2>
@@ -252,14 +331,18 @@
                         <p class="doc-meta">
                             <span>Issued <strong>{{ $day($document->issued_at) }}</strong></span>
                             @if ($document->file_sha256)<span>SHA-256 <strong>{{ substr($document->file_sha256, 0, 16) }}…</strong></span>@endif
+                            @if ($document->signed_file_sha256)<span>Signed SHA-256 <strong>{{ substr($document->signed_file_sha256, 0, 16) }}…</strong></span>@endif
                             @if ($document->replaces)<span>Replaces <strong>{{ $document->replaces->reference }}</strong></span>@endif
                         </p>
                         <div class="doc-actions mt-3">
-                            <a class="btn btn-secondary" href="{{ route('hq.letters.pdf', ['document' => $document->id, 'download' => 1]) }}"><i data-lucide="download"></i> Download the PDF</a>
-                            @if ($document->status === 'issued')
+                            <a class="btn btn-secondary" href="{{ route('hq.letters.pdf', ['document' => $document->id, 'download' => 1]) }}"><i data-lucide="download"></i> Download the {{ $hasSignedFile ? 'signed PDF' : 'PDF' }}</a>
+                            @if ($hasSignedFile)
+                                <a class="btn btn-secondary" href="{{ route('hq.letters.pdf', ['document' => $document->id, 'download' => 1, 'issued' => 1]) }}"><i data-lucide="file-clock"></i> The PDF as issued</a>
+                            @endif
+                            @if (in_array($document->status, ['issued', 'sent_for_signature', 'fully_signed'], true))
                                 <button type="button" class="btn btn-secondary" wire:click="$set('revoking', true)">Revoke it</button>
                             @endif
-                            @if (in_array($document->status, ['issued', 'revoked'], true))
+                            @if (in_array($document->status, ['issued', 'sent_for_signature', 'fully_signed', 'revoked'], true))
                                 <button type="button" class="btn btn-secondary" wire:click="replace">Replace it with a new version</button>
                             @endif
                             @if ($canFile && ! $document->isFiled())

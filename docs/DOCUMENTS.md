@@ -58,6 +58,7 @@ Templates live in `App\Support\Letters\LetterTypes` (what each one is called, th
 | Letter of introduction | `INT` | who is introduced, their role, what they are there to do, good until |
 | Employment letter | `EMP` | employee, job title, basis, started on, pay (left out when empty), what the letter is for |
 | Authority to act | `AUT` | who is authorised, their role, what they may do (a line each), what they may not, from, until |
+| Agreement | `AGR` | the other party (name, role, email, address, and their company and its number when they sign for one), and a rich-text body with headings, numbered clauses, lists and tables. Section 12. |
 
 Every kind also has: the organisation it is addressed to and their address, a salutation and a closing.
 
@@ -113,6 +114,8 @@ Both are limited again per token — 60 scans an hour, then `429 too_many` — o
 - `letter_signatures`: one per person. Name and role as printed, `kind` (drawn or uploaded), the JPEG as base64, **encrypted**.
 - `letter_document_signatures`: who signed what, with the signature as it was applied, and when, and from which address.
 - `letter_verification_hits`: scans per token, for the rate limit; older than a day, they are cleared as they are counted.
+- `letter_counterparties`: the other signatories of an agreement, one row each — who they are in print, their private link and when it runs out, the HMAC of the code they were emailed, and the signature they drew, encrypted. Section 12.
+- `letter_documents` also holds, for an agreement: `signed_file_path`, `signed_file_sha256`, `signed_file_bytes` and `fully_signed_at` — the countersigned PDF, which sits **beside** the issued one rather than replacing it.
 
 ## 9. Files
 
@@ -129,7 +132,8 @@ Both are limited again per token — 60 scans an hour, then `429 too_many` — o
 | Access | `config/access.php` (`letters`), `database/migrations/2026_11_04_960001_grant_letters_permissions.php` |
 | Claude | `config/ai.php` (`letter_draft`) |
 | The site | `praxis_site`: `app/Http/Controllers/VerifyController.php`, `resources/views/pages/verify.blade.php`, `app/Support/HqApi.php` (`document`, `documentFile`), `lang/{en,fr}/site.php` (`site.verify`), the `.vf-` rules in `resources/css/app.css`, `enhanceVerify()` in `resources/js/app.js` |
-| Tests | `tests/Feature/Letters/*`, `tests/Unit/Letters/QrTest.php`; `praxis_site/tests/Feature/VerifyDocumentTest.php` |
+| Agreements | `app/Support/Letters/Agreements.php`, `app/Models/Letters/LetterCounterparty.php`, `app/Livewire/Portal/AgreementSigning.php` and `resources/views/livewire/portal/agreement-signing.blade.php`, `app/Mail/AgreementMail.php` and `resources/views/emails/agreement.blade.php`, `lang/en/agreements.php`, `lang/en/emails/agreement.php`, `database/migrations/2026_11_05_970000_add_agreements_to_letters.php` |
+| Tests | `tests/Feature/Letters/*`, `tests/Unit/Letters/{QrTest,RichTextTablesTest}.php`; `praxis_site/tests/Feature/VerifyDocumentTest.php` |
 
 ## 10. Running it locally
 
@@ -153,3 +157,87 @@ DB_CONNECTION=mysql DB_HOST=127.0.0.1 DB_PORT=3307 DB_USERNAME=root DB_DATABASE=
 
 - The brand's own faces in the PDF: Newsreader and Plus Jakarta Sans exist only as woff2, which dompdf cannot read. Converting them to TTF and shipping them would replace DejaVu.
 - The owner ticks `letters.*` for whichever other roles should have it, on Roles and permissions.
+
+## 12. Agreements: a document both sides sign
+
+An **Agreement** (`JBS/AGR/2026/001`) is the one kind with a second signature box. JBS Praxis signs it in HQ and
+issues it exactly as it issues anything else; the other party then signs it online, from a private link, and the
+signed version comes back as a new PDF. Built 5 November 2026 for the firm's first project contractor agreement.
+
+### 12.1 What it is for
+
+A contract is not a letter: it has no salutation and no closing, it names its parties in its own words, it runs
+to several pages, and it is only finished when both sides have signed. So an agreement:
+
+- prints a **title block** — the title, the reference and the date — and then nothing but the body the author
+  wrote. Who the other party is prints under their signature at the end, not twice.
+- carries a **running head** on every page after the first: the reference on the left, "Page 2 of 7" on the
+  right, over a thin rule. The page number then belongs to the head, and the footer leaves it out rather than
+  printing it twice. Every other kind of document is drawn exactly as it was before.
+- keeps a **heading with the text under it**. dompdf does not understand `page-break-after: avoid`, so
+  `LetterBody::keepHeadingsWithText` wraps each heading and the short block below it in one `<div class="keep">`,
+  which the stylesheet tells dompdf not to break inside. Only a block of 600 characters or less is carried along:
+  a longer one is left to break where it will, so a heading near the foot of a page never pushes half a page of
+  white space ahead of it.
+- may use **tables** in its body, for a pay schedule or a list of milestones. `RichText::clean` keeps
+  `table/thead/tbody/tfoot/tr/th/td` and a cell's `colspan` and `rowspan` when they are small whole numbers, and
+  nothing else: no widths, no colours, no classes, so a pasted table takes the document's own look.
+
+### 12.2 The signature boxes
+
+Two boxes side by side at the end. The left is JBS Praxis: the applied signature of whoever signed it in HQ, or
+a pen line with the legal representative's name and role. The right is the other party: their name and role
+printed, and a pen line until they sign, so an unsigned copy can still be signed with a pen.
+
+`letter_counterparties` holds **one row per signatory**, each with its own link, its own code and its own
+signature, so an agreement between three parties needs no change to anything but the screen. The screen writes
+one today, and the document only becomes `fully signed` when every row has signed.
+
+### 12.3 Countersigning online
+
+The same mechanism a client signs a proposal or a statement of work with (`App\Support\Signing\SigningCodes`,
+docs/OPPORTUNITIES.md), not a new one:
+
+1. **Send for signature** (needs `letters.sign`, because it puts the firm's signature in front of somebody to
+   countersign) emails the other party a branded email with the issued PDF attached and a **private link**: a
+   48-character random token in the path, signed, good for **14 days**. The document becomes `sent for signature`.
+2. They open it, read the whole agreement on the page and download the PDF, type their **full name** and draw or
+   upload a **signature** — the pad is HQ's own (`resources/letters/documents.js`), so either way it arrives as a
+   JPEG on white, the only kind of picture dompdf can carry.
+3. The page then emails a **six-digit code** to the address the agreement names — never to one typed on the page,
+   so a forwarded link cannot be signed by somebody else. Three codes per link and per address every fifteen
+   minutes, five wrong codes, and the fifth throws the right one away. The row keeps an HMAC of the code with the
+   app key, never the code.
+4. The right code applies the signature. The document becomes `fully signed`, and a **new PDF** is rendered with
+   both signatures and a last **Signature record** page: who signed, when, from which address, when each code was
+   verified, and **the fingerprint of the document as it was issued**. That is how the signed version points back
+   at the one that went out: the issued file is never touched, and keeps its own SHA-256.
+5. Both sides are emailed the signed PDF.
+
+**Taking it back**: "Take the link back" (also `letters.sign`) clears the token at once and the agreement is
+simply `issued` again. **Sending it again** mints a fresh token, so the earlier email's link stops working.
+
+**Audit**: `AGREEMENT_SENT`, `AGREEMENT_RESENT`, `AGREEMENT_SIGNING_CANCELLED`, `AGREEMENT_CODE_SENT`,
+`AGREEMENT_COUNTERSIGNED`, `AGREEMENT_FULLY_SIGNED`, on top of the usual `LETTER_*` lines.
+
+### 12.4 On the register and the verify page
+
+The register has two more chips and two more filters: **Out for signature** and **Fully signed**. A signed
+agreement's download is the signed version; "The PDF as issued" hands over the first one, unchanged. Filing it in
+Company documents files the signed version, which is the one worth keeping.
+
+jbspraxis.com's verify page counts both new statuses as valid, and the Site API carries `countersigned`,
+`signed_at` and `signed_file_sha256` as well, so a reader who drops **either** file on the page — the one they
+were sent or the signed one — is told it is genuine. The counterparty is listed among the signatories once they
+have signed.
+
+### 12.5 The first one, and the pictures
+
+The firm's first agreement is the project contractor agreement of 5 November 2026. Its text is the test fixture
+(`praxis_core/tests/Feature/Letters/fixtures/contractor-agreement.md`), and `docs/documents/previews` holds a
+picture of every page of it, issued (7 pages) and signed (8). Rebuild them with
+`praxis_core/tests/Feature/Letters/AgreementPreviewTest.php` and `brand/build/agreement_previews.py`; the
+signatures in them are a specimen scribble, nobody's real one.
+
+Writing it in HQ: paste the body **without** its own "Reference / Date" lines and without its "Signatures"
+section — the document prints its reference, its date and both signature boxes itself.

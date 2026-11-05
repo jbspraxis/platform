@@ -279,6 +279,19 @@ Route::domain(Hosts::portal())->group(function () use ($notOwnRoute, $legacy) {
         Route::get('/proposals/{proposal}/pdf', [\App\Http\Controllers\ProposalPdfController::class, 'portal'])->whereUuid('proposal')
             ->middleware('signed:relative')->name('portal.proposals.pdf');
 
+        // An agreement on the company letterhead, countersigned by the other party (docs/DOCUMENTS.md section 12).
+        // The link's own 48-character token is the key; the page and the PDF check its expiry themselves, and the
+        // signature on the emailed link stops an old one being replayed after it has been sent again.
+        Route::get('/agreements/{token}', \App\Livewire\Portal\AgreementSigning::class)->where('token', '[A-Za-z0-9]{24,64}')
+            ->middleware('signed:relative')->name('portal.agreement');
+        Route::get('/agreements/{token}/pdf', [\App\Http\Controllers\LetterheadController::class, 'agreementPdf'])->where('token', '[A-Za-z0-9]{24,64}')
+            ->name('portal.agreement.pdf');
+        // The signature pad, the same script HQ's Documents screens load; no build step
+        Route::get('/agreements-signature.js', fn () => response()->file(resource_path('letters/documents.js'), [
+            'Content-Type' => 'application/javascript; charset=utf-8',
+            'Cache-Control' => 'public, max-age=86400',
+        ]))->name('portal.agreement.script');
+
         // One version of an opportunity's statement of work: read it, sign it with the one-time code or ask for changes; and its PDF (PR 5)
         Route::get('/sow/{sow}', \App\Livewire\Portal\SowReview::class)->whereUuid('sow')
             ->middleware('signed:relative')->name('portal.sow');

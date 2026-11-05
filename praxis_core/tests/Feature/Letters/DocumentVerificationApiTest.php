@@ -17,7 +17,7 @@ use Tests\TestCase;
  */
 class DocumentVerificationApiTest extends TestCase
 {
-    use LetterFixtures, UsesThrowawayDatabase;
+    use AgreementFixtures, LetterFixtures, UsesThrowawayDatabase;
 
     private const KEY_ID = 'test-key';
 
@@ -27,6 +27,43 @@ class DocumentVerificationApiTest extends TestCase
     {
         parent::setUp();
         config(['site_api.keys' => [self::KEY_ID => self::SECRET]]);
+    }
+
+    public function test_a_countersigned_agreement_names_both_parties_and_both_fingerprints(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+        $owner = $this->owner();
+        $this->actingAs($owner);
+        $this->signatureFor($owner);
+
+        $document = $this->agreement($owner, $this->company());
+        $document->forceFill(['show_qr' => true])->save();
+        Letters::sign($document, $owner);
+        Letters::issue($document->fresh(), $owner);
+
+        $party = \App\Support\Letters\Agreements::send($document->fresh(), $owner);
+        $code = \App\Support\Signing\SigningCodes::newCode();
+        \App\Support\Letters\Agreements::holdSignature($party, 'Jonathan Ndamzi Destiny', substr($this->jpeg(), 23), $code);
+        $this->assertTrue(\App\Support\Letters\Agreements::countersign($party->fresh(), $code, '102.89.33.10'));
+
+        $signed = $document->fresh();
+        auth()->logout();
+        $data = $this->signedGet('/documents/' . $signed->verify_token)->assertOk()->json('data');
+
+        $this->assertSame('fully_signed', $data['status']);
+        $this->assertTrue($data['countersigned']);
+        $this->assertSame($signed->file_sha256, $data['file_sha256'], 'the issued fingerprint never changes');
+        $this->assertSame($signed->signed_file_sha256, $data['signed_file_sha256']);
+        $this->assertNotSame($data['file_sha256'], $data['signed_file_sha256']);
+        $this->assertSame([
+            ['name' => 'Ada Test', 'title' => 'Director'],
+            ['name' => 'Jonathan Ndamzi Destiny', 'title' => 'Full-Stack Engineer'],
+        ], $data['signatories']);
+
+        // Nothing the other party was given privately: not their address, not their link
+        $json = json_encode($data);
+        $this->assertStringNotContainsString('jonathan@example.test', $json);
+        $this->assertStringNotContainsString((string) $party->fresh()->token, $json);
     }
 
     public function test_an_issued_document_answers_with_what_it_says_in_print(): void

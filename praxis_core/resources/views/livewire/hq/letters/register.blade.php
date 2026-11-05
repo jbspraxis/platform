@@ -1,8 +1,8 @@
 @php
     use App\Support\Letters\LetterTypes;
     $day = fn ($at) => $at ? \Carbon\Carbon::parse($at)->timezone('Africa/Lagos')->format('j M Y') : '—';
-    $tabs = ['all' => 'All', 'drafts' => 'Drafts', 'issued' => 'Issued', 'revoked' => 'Revoked', 'replaced' => 'Replaced'];
-    $badge = ['draft' => 'Draft', 'issued' => 'Issued', 'revoked' => 'Revoked', 'replaced' => 'Replaced'];
+    $tabs = ['all' => 'All', 'drafts' => 'Drafts', 'issued' => 'Issued', 'signing' => 'Out for signature', 'signed' => 'Fully signed', 'revoked' => 'Revoked', 'replaced' => 'Replaced'];
+    $badge = ['draft' => 'Draft', 'issued' => 'Issued', 'sent_for_signature' => 'Out for signature', 'fully_signed' => 'Fully signed', 'revoked' => 'Revoked', 'replaced' => 'Replaced'];
 @endphp
 <div class="docs">
     <style>
@@ -16,6 +16,8 @@
         .docs-state.is-issued { background: #E7F4EC; color: #1A6E47; }
         .docs-state.is-revoked { background: #FBE9E7; color: #B3261E; }
         .docs-state.is-replaced { background: #FBF1DF; color: #8A5700; }
+        .docs-state.is-sent_for_signature { background: #E8EEFB; color: #2A4B9B; }
+        .docs-state.is-fully_signed { background: #E7F4EC; color: #14603C; }
         .docs-blank { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
         .docs-blank + .docs-blank { margin-top: 10px; }
         .docs-blank strong { min-width: 190px; color: var(--color-ink); }

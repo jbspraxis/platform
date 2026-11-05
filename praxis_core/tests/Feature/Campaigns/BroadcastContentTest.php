@@ -29,8 +29,9 @@ class BroadcastContentTest extends TestCase
         $this->assertStringContainsString('<a href="mailto:intelligence@jbspraxis.com">mail</a>', $clean);
         $this->assertStringContainsString('bad link', $clean);
         $this->assertStringContainsString('<h2>Big</h2><h3>Small</h3><ul><li>One</li></ul>', $clean);
-        $this->assertStringContainsString('cell', $clean);
-        foreach (['script', 'onclick', 'onerror', 'javascript:', '<img', 'iframe', 'style=', 'target=', '<span', '<div', '<table', 'class='] as $gone) {
+        // Tables survive, structure only: they were added for an agreement's schedules (docs/DOCUMENTS.md 12)
+        $this->assertStringContainsString('<table><tr><td>cell</td></tr></table>', $clean);
+        foreach (['script', 'onclick', 'onerror', 'javascript:', '<img', 'iframe', 'style=', 'target=', '<span', '<div', 'class='] as $gone) {
             $this->assertStringNotContainsString($gone, $clean);
         }
         $this->assertSame('', RichText::clean('<p><br></p><p>&nbsp;</p>'));

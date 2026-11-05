@@ -48,6 +48,8 @@ class DocumentRegister extends Component
         'all' => null,
         'drafts' => [LetterDocument::DRAFT],
         'issued' => [LetterDocument::ISSUED],
+        'signing' => [LetterDocument::SENT_FOR_SIGNATURE],
+        'signed' => [LetterDocument::FULLY_SIGNED],
         'revoked' => [LetterDocument::REVOKED],
         'replaced' => [LetterDocument::REPLACED],
     ];
