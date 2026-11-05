@@ -109,7 +109,7 @@ final class LetterTypes
             ],
             'company_introduction' => [
                 'locale' => ['label' => 'Language', 'type' => 'select', 'required' => true,
-                    'options' => ['en' => 'English', 'fr' => 'Francais'],
+                    'options' => ['en' => 'English', 'fr' => 'Français'],
                     'help' => 'The whole letter, its date and its closing follow this.'],
                 'contact_person' => ['label' => 'Contact person', 'type' => 'text',
                     'help' => 'Left out of the salutation when it is empty.'],
