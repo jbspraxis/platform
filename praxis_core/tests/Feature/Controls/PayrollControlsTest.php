@@ -106,7 +106,7 @@ class PayrollControlsTest extends TestCase
         Livewire::test(PayrollManager::class)->call('approveRun', $paid)
             ->assertDispatched('praxis-toast', $this->toast('This payroll run has already been approved or paid, so it wasn’t changed.'));
         Livewire::test(PayrollManager::class)->call('rejectRun', $paid)
-            ->assertSee('Only a run awaiting approval or approved (not yet paid) can be returned to draft.');
+            ->assertDispatched('praxis-toast', $this->toast('Only a run awaiting approval or approved (not yet paid) can be returned to draft.'));
         $this->assertSame('Disbursed', $this->runStatus($paid));
         $this->assertSame(0, DB::table('system_audit_logs')->where('target_table', 'payroll_runs')->count());
     }
