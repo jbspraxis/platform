@@ -28,10 +28,15 @@
         .logo-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
         .logo-order { display: flex; gap: 4px; margin-left: auto; }
         .logo-form { max-width: 720px; }
+        .logo-form .form-actions { clear: both; margin-top: 18px; }
         .logo-pick { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
         .logo-pick .preview { display: flex; align-items: center; justify-content: center; width: 150px; height: 84px; border: 1px dashed var(--color-line); border-radius: 10px; background: var(--color-mist); }
         .logo-pick .preview img { max-height: 60px; max-width: 130px; }
-        .logo-checks { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+        /* The box sits beside its own words and the three wrap as a row of pairs. The .checkbox class is
+           sized 16x16 by app.css, so it belongs on the input: on the label it squashes the words. */
+        .logo-checks { display: flex; flex-wrap: wrap; gap: 10px 24px; }
+        .logo-checks label { display: inline-flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; }
+        .logo-checks .checkbox { flex: none; margin: 0; }
         @media (max-width: 600px) { .logo-grid { grid-template-columns: 1fr; } }
     </style>
 
@@ -106,9 +111,9 @@
             <div class="field">
                 <span class="label">Where it appears</span>
                 <div class="logo-checks">
-                    <label class="checkbox"><input type="checkbox" wire:model="onProfile"> Company profile</label>
-                    <label class="checkbox"><input type="checkbox" wire:model="onDeck"> Deck</label>
-                    <label class="checkbox"><input type="checkbox" wire:model="onWebsite"> Website</label>
+                    <label><input type="checkbox" class="checkbox" wire:model="onProfile"> Company profile</label>
+                    <label><input type="checkbox" class="checkbox" wire:model="onDeck"> Deck</label>
+                    <label><input type="checkbox" class="checkbox" wire:model="onWebsite"> Website</label>
                 </div>
             </div>
 
