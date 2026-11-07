@@ -101,7 +101,7 @@ final class KaizenService
             $calculatedReadTime = max(1, ceil(str_word_count($combinedText) / 200));
 
             // 3. The article, waiting for moderation
-            KaizenArticle::create([
+            $article = KaizenArticle::create([
                 'slug'                => Str::slug($in['article_title']) . '-' . Str::random(5),
                 'category'            => $in['category'],
                 'title'               => $in['article_title'],
@@ -115,6 +115,8 @@ final class KaizenService
                 'status'              => 'Pending Moderation',
                 'created_by'          => User::EDITORIAL_ID,
                 'contributor_id'      => $contributor->id,
+                // The language of the page it was sent from: the email about the decision is written in it
+                'submitted_locale'    => app()->getLocale() === 'fr' ? 'fr' : 'en',
             ]);
 
             // Tell the staff who moderate Kaizen there is an article to moderate
@@ -124,6 +126,8 @@ final class KaizenService
                     'id' => (string) Str::uuid(), 'user_id' => $adminId,
                     'title' => 'Kaizen article waiting for review',
                     'message' => "‘{$in['article_title']}’ was sent by {$in['full_name']}.",
+                    // Opens the article in the review screen (HQ → Marketing → Insights articles)
+                    'link_url' => route('hq.marketing.insights', ['article' => $article->id], false),
                     'type' => 'System', 'created_at' => now(),
                 ];
             }

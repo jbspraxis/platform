@@ -26,6 +26,9 @@ class KaizenArticle extends Model
         'published_at',
         'created_by',
         'contributor_id',
+        'submitted_locale',
+        'rejected_reason',
+        'rejected_at',
         'updated_by',
         'deleted_by'
     ];

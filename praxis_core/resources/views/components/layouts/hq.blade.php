@@ -234,9 +234,20 @@
                 @endif
             @endcan
 
-            @canany(['marketing.view', 'website.view'])
-                <a href="{{ $user->can('marketing.view') ? route('hq.marketing.campaigns') : route('hq.marketing.website') }}" class="rail-link {{ $on('hq.marketing.*') }}" wire:navigate>
+            @canany(['marketing.view', 'website.view', 'kaizen.view'])
+                @php
+                    $marketingHome = collect(['marketing.view' => 'hq.marketing.campaigns', 'website.view' => 'hq.marketing.website', 'kaizen.view' => 'hq.marketing.insights'])
+                        ->first(fn ($route, $perm) => $user->can($perm));
+                    // Articles sent through the website that nobody has decided on yet, for the people who decide
+                    try {
+                        $insightsWaiting = $user->can('kaizen.approve') ? \Illuminate\Support\Facades\DB::table('kaizen_articles')->where('status', 'Pending Moderation')->count() : 0;
+                    } catch (\Throwable) {
+                        $insightsWaiting = 0; // the count is a convenience: never stop a page for it
+                    }
+                @endphp
+                <a href="{{ route($marketingHome) }}" class="rail-link {{ $on('hq.marketing.*') }}" wire:navigate>
                     <i data-lucide="megaphone"></i> Marketing
+                    @if($insightsWaiting > 0)<span class="pill pill-warning num" style="margin-left: auto;" title="{{ $insightsWaiting }} Insights {{ $insightsWaiting === 1 ? 'article' : 'articles' }} waiting for review">{{ $insightsWaiting }}</span>@endif
                 </a>
                 @if (request()->routeIs('hq.marketing.*'))
                     <div class="rail-sub">
@@ -246,6 +257,9 @@
                         @endcan
                         @can('website.view')
                             <a href="{{ route('hq.marketing.website') }}" class="{{ $on('hq.marketing.website') }}" wire:navigate>Website settings</a>
+                        @endcan
+                        @can('kaizen.view')
+                            <a href="{{ route('hq.marketing.insights') }}" class="{{ $on('hq.marketing.insights') }}" wire:navigate>Insights articles@if($insightsWaiting > 0) <span class="num">({{ $insightsWaiting }} waiting)</span>@endif</a>
                         @endcan
                     </div>
                 @endif
