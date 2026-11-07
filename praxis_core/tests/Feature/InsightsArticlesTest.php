@@ -146,9 +146,10 @@ class InsightsArticlesTest extends TestCase
             ->assertSee('Closing the books in five days')
             ->assertSee('Publish');
         // A link to an article that is gone says so, and the list still opens
+        // (a page load draws its message itself, from the session, so it is not a toast event)
         Livewire::withQueryParams(['article' => (string) Str::uuid()])->test(InsightsArticles::class)
-            ->assertSet('readingArticleId', null)
-            ->assertDispatched('praxis-toast', $this->toast('We couldn’t find this article'));
+            ->assertSet('readingArticleId', null);
+        $this->assertStringContainsString('We couldn’t find this article', (string) session('error'));
     }
 
     public function test_publishing_a_contributors_article_emails_them_the_link_once(): void
@@ -408,7 +409,7 @@ class InsightsArticlesTest extends TestCase
         $this->article('Pending Moderation', ['title' => 'Older submission', 'created_at' => '2026-11-01 10:00:00']);
 
         $this->ledger($this->staff('sales', ['sales']))
-            ->assertSee('1 article is waiting for your review.')
+            ->assertSeeHtml('<strong class="num">1</strong> article is waiting for your review.')
             ->assertSeeInOrder(['Older submission', 'Live one']);
 
         // HR has no kaizen.view: no screen at all

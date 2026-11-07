@@ -259,7 +259,7 @@
                             <a href="{{ route('hq.marketing.website') }}" class="{{ $on('hq.marketing.website') }}" wire:navigate>Website settings</a>
                         @endcan
                         @can('kaizen.view')
-                            <a href="{{ route('hq.marketing.insights') }}" class="{{ $on('hq.marketing.insights') }}" wire:navigate>Insights articles@if($insightsWaiting > 0) <span class="num">({{ $insightsWaiting }} waiting)</span>@endif</a>
+                            <a href="{{ route('hq.marketing.insights') }}" class="{{ $on('hq.marketing.insights') }}" wire:navigate>Insights articles @if($insightsWaiting > 0)<span class="num">({{ $insightsWaiting }} waiting)</span>@endif</a>
                         @endcan
                     </div>
                 @endif
