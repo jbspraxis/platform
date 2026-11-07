@@ -148,6 +148,8 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
         Route::prefix('marketing')->group(function () {
             Route::get('/campaigns', \App\Livewire\Hq\Marketing\MarketingSync::class)->middleware('can:marketing.view')->name('hq.marketing.campaigns');
             Route::get('/website-settings', \App\Livewire\Hq\Marketing\WebsiteSettings::class)->middleware('can:website.view')->name('hq.marketing.website');
+            // Articles sent through Write for Insights on the website: read, correct, publish or reject (kaizen.view/edit/approve)
+            Route::get('/insights-articles', \App\Livewire\Hq\Marketing\InsightsArticles::class)->middleware('can:kaizen.view')->name('hq.marketing.insights');
         });
 
         // 6. OPERATIONS & DEPLOYMENT MATRIX
@@ -164,7 +166,7 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
             });
             Route::get('/qa-hub', \App\Livewire\Hq\Operations\QaHub::class)->middleware('can:qa.view')->name('hq.ops.qa');
             Route::get('/silent-timers', \App\Livewire\Hq\Operations\SilentTimers::class)->middleware('can:timesheets.view')->name('hq.ops.timers');
-            // Sign-offs and Kaizen moderation share this screen; each part checks its own module
+            // Sign-offs, and drafting case studies and Insights articles from them; reviewing articles is under Marketing → Insights articles
             Route::get('/project-signoffs', \App\Livewire\Hq\Operations\SignoffManager::class)->middleware('can:signoffs.view')->name('hq.ops.signoffs');
         });
 
