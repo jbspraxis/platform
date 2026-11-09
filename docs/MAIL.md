@@ -311,6 +311,7 @@ Each PR, when its tests pass and the owner has seen it locally:
   - **For PR 4**: the list's filters *Assigned to me / Open / Done* and its badges (assignee's first name or "You", a *Done* pill) read `mail_threads.assigned_to` and `status`, on shared mailboxes only. PR 4 dispatching `mail-thread-changed` refreshes the row and header.
   - **Pitfall for everyone**: accounts from `MailAccess::accounts()` carry an `access_level` attribute that is not a column, so saving one (or passing it to `MailSync::account()`, which saves on error) fails with "Unknown column access_level". Pass a fresh `MailAccount::find($id)`.
   - **Request (shared file, not changed)**: `App\Http\Middleware\SecurityHeaders` replaces every response's `Content-Security-Policy` with `frame-ancestors 'self'`, so attachments can't carry a `sandbox` policy. Not needed for safety (only safe types open in the browser, with `nosniff`), but if the owner agrees, the middleware could append to a policy a response already has.
+  - **Changed 9 Nov 2026 (bug fix, no contract change)**: `HtmlSanitizer` now drops a sender's `@media (prefers-color-scheme: dark)` blocks and `color-scheme` opt-ins, and `Inbox::document()` pins the frame with `color-scheme:light`. Calendar invitations were reading as near-white text on our white page (1.2:1). Full note in section 14 — anyone showing a sender's HTML in a frame must go on using `HtmlSanitizer::clean()`, which is where the fix lives.
   - **Local check**: on `http://hq.localhost:8096` with `Tests\Support\Mail\FakeMailServer` behind it (a scratch router for `php -S`, so actions, bodies and attachments worked with no real server), signed in as the Owner and Sales test accounts, desktop and 375 px: switcher and folder counts, list badges, filters and pages, HTML reader (script, form and `javascript:` link removed; remote picture held back, then loaded; cid logo; folded quote; frame fits its content), attachments open and download, archive with `e` and Undo, `j`/`k`, search, server search, older mail, phone list and reader.
 - **PR 3, 30 Oct 2026 (writing)**: built on branch `claude/mail-pr3-writing-fc74f0`, not merged or deployed yet.
   - **Code**: `app/Support/Mail/Compose/` (`Outbox` drafts and queue, `OutboxSender` sending and retries, `MessageBuilder` MIME, `Signatures`, `Recipients`, `HtmlCleaner`, `WriteWithAi`); `Composer`, `Signature`, `ComposeOutbox` (page `/mail/outbox`, route `hq.mail.compose.outbox`: your scheduled, unsent and unfinished messages); `resources/mail/compose.js` (editor, address chips, undo countdown; served by `hq.mail.compose.script`, loaded with `@assets`); `config/mail_compose.php`; migration `2026_10_31_300000_create_mail_signatures` (table `mail_signatures`: `user_id`, `phone`, `mobile`, the only part of a signature a person edits).
@@ -351,3 +352,24 @@ Each PR, when its tests pass and the owner has seen it locally:
   - **Untouched:** text without an invitation, including a passing mention of Google Calendar or a Meet link, comes back byte for byte.
 - **Tests**: `tests/Unit/Mail/CalendarInvitesTest.php` (MyCity's real message, a whole-message invitation, French with quote marks, two invitations in one thread, ordinary mail untouched, subjects); `ComposeSendTest::test_a_reply_leaves_a_quoted_calendar_invitation_out_and_a_forward_keeps_it`.
 - **Not covered**: Outlook and Teams invitations, which look different. Add them to `CalendarInvites` if one ever bounces.
+
+## 14. Reading a calendar invitation: the frame's colour scheme (9 Nov 2026)
+
+- **Why**: on 9 Nov 2026 a Google Calendar invitation opened in the Mail reader read as **near-white text on a white page** — the invitation body at **1.2:1**, muted text and the Meet link at **1.8–2.5:1**, against WCAG AA's 4.5:1. Every other message in the same mailbox measured 14–17:1, so only calendar mail was affected.
+- **Cause**: `prefers-color-scheme` inside the reader's sandboxed `<iframe srcdoc>` follows the **person's device**, not HQ (HQ is light-only and has no dark theme). Google Calendar invitations ship
+
+  ```css
+  @media (prefers-color-scheme: dark) {
+    .primary-text   { color:#e8eaed !important }   /* near-white */
+    .secondary-text { color:#9aa0a6 !important }   /* grey       */
+    .btn            { background:#8ab4f8 !important }
+  }
+  ```
+
+  which set **text and link colours only**: the dark canvas is supplied by the client around the message (Gmail). HQ supplies a **white** canvas (`Inbox::document()`: `html,body{background:#FFFFFF}`), the sender's `<style>` block is written **after** HQ's base CSS and carries `!important`, so on a dark-mode machine their light text landed on our white page. Calendar mail was the only sender in the mailbox shipping `prefers-color-scheme` rules.
+- **What HQ does**:
+  - **`App\Support\Mail\Read\HtmlSanitizer`** drops the dark half of a sender's colour-scheme work before the CSS is used: every `@media (… prefers-color-scheme: dark …)` block (top level, nested inside another query, or with braces that never balance) and any `color-scheme` / `supported-color-schemes` declaration that would tip the frame into the dark palette. It runs before pictures are counted, so a logo swapped in only for dark mode isn't offered as a held-back picture either. Email written for the light palette and every other media query — width, print, resolution — is untouched.
+  - **`Inbox::document()`** pins the frame: `html,body{margin:0;padding:0;background:#FFFFFF;color-scheme:light}`. The belt to the sanitiser's braces, and it also settles form controls and scrollbars.
+- **Not changed**: HQ still has no dark theme of its own, and an email is never recoloured element by element. An email that leaves text unstyled falls back to HQ's `color:#0C142B` on white.
+- **Tests**: `tests/Unit/Mail/ReadSanitizerTest.php` (a calendar invitation's dark rules dropped and its light rules kept; dark blocks top level, nested, combined with another condition and unclosed; a brace inside `content:"…"`; only the light palette's picture counted as held back); `tests/Feature/Mail/ReadInboxTest.php::test_a_calendar_invitation_shows_in_its_light_palette_on_the_readers_white_page` (the delivered frame document).
+- **Applies to** every HTML mail frame, since the sanitiser is shared: the Mail reader, mail older than 12 months read live from the server, and the Campaigns → Outreach reply preview (`App\Support\Campaigns\Outreach\ReplyText`).
