@@ -131,6 +131,30 @@ class ReadSanitizerTest extends TestCase
         $this->assertStringNotContainsString('cdn.test/dark.png', $allowed['styles']);
     }
 
+    /**
+     * Google Calendar's Yes / No / Maybe and its Meet button are `<a><table>…label…</table></a>`. An HTML4 parser
+     * closes the link at the table and leaves an empty `<a></a>`, so the label could not be clicked.
+     */
+    public function test_a_link_that_wraps_a_table_keeps_its_label_inside_the_link(): void
+    {
+        $out = $this->clean(
+            '<table><tr><td><a href="https://calendar.google.com/calendar/event?action=RESPOND&amp;rst=1" class="grey-button-text">'
+            . '<table><tr><td style="padding:6px 12px"><span>Yes</span></td></tr></table></a></td>'
+            . '<td><a href="https://calendar.google.com/calendar/event?action=RESPOND&amp;rst=2"><table><tr><td>No</td></tr></table></a></td></tr></table>'
+            . '<a href="https://meet.google.com/abc-defg-hij"><div><img src="data:image/png;base64,iVBORw0KGgo=" alt="">Join with Google Meet</div></a>'
+        );
+
+        // Read the string, not a re-parse: an HTML4 parser would split the link again
+        $this->assertDoesNotMatchRegularExpression('~<a\b[^>]*>\s*</a>~', $out['html'], 'No link is left empty');
+        foreach (['rst=1' => 'Yes', 'rst=2' => 'No', 'meet.google.com' => 'Join with Google Meet'] as $href => $label) {
+            $this->assertMatchesRegularExpression(
+                '~<a\b[^>]*' . preg_quote($href, '~') . '[^>]*>(?:(?!</a>).)*' . preg_quote($label, '~') . '~s',
+                $out['html'],
+                "{$label} sits inside its link"
+            );
+        }
+    }
+
     public function test_forms_frames_and_embedded_objects_are_removed(): void
     {
         $out = $this->clean(

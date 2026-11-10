@@ -73,9 +73,24 @@ final class HtmlSanitizer
         // The XML declaration makes libxml read the string as UTF-8 (MIME decoding already converted it). The sender's
         // own <meta charset> (Outlook: windows-1252) would win over it and garble the text ("donâ€™t"), so it goes first.
         $html = preg_replace('/<meta\b[^>]*\bcharset\b[^>]*>/i', '', $html) ?? $html;
+        // libxml's HTML4 parser closes a link at the first <table> or <div> inside it, which left Google Calendar's
+        // Yes / No / Maybe and Meet buttons (`<a><table>…label…</table></a>`) as empty links with the label beside
+        // them. Links go through it under another name, which it leaves alone, and are renamed straight after.
+        $html = preg_replace('~<(/?)a(?=[\s/>])~i', '<$1hqa', $html) ?? $html;
         $doc->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_NONET | LIBXML_COMPACT | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
         libxml_use_internal_errors($previous);
+
+        foreach (iterator_to_array($doc->getElementsByTagName('hqa')) as $placeholder) {
+            $link = $doc->createElement('a');
+            foreach (iterator_to_array($placeholder->attributes) as $attr) {
+                $link->setAttributeNode($placeholder->removeAttributeNode($attr));
+            }
+            while ($placeholder->firstChild) {
+                $link->appendChild($placeholder->firstChild);
+            }
+            $placeholder->parentNode?->replaceChild($link, $placeholder);
+        }
 
         // <style> in the head is the usual place for a newsletter's CSS
         foreach (iterator_to_array($doc->getElementsByTagName('style')) as $style) {
