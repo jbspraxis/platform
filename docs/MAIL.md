@@ -361,3 +361,10 @@ Each PR, when its tests pass and the owner has seen it locally:
 - **Pinning the frame is not the fix**: `Inbox::document()` sets `color-scheme:light` (light `light-dark()`, scrollbars, canvas), but in Chromium with a dark device `(prefers-color-scheme: dark)` still matched with that on the iframe element and in the inner document, so the rules have to go.
 - **Applies to** every frame that shows `HtmlSanitizer::clean()` output: the reader, mail older than 12 months read live, and the Campaigns → Outreach reply preview (`ReplyText`). An email that styles no text falls back to HQ's `#0C142B` on white.
 - **Tests**: `tests/Unit/Mail/DarkPaletteTest.php` (query forms), `ReadSanitizerTest` (a whole invitation; pictures), `ReadInboxTest` (the delivered frame).
+
+## 15. Links that wrap a table (10 Nov 2026)
+
+- **Bug**: in a Google Calendar invitation, Yes / No / Maybe, More options and the Meet button did nothing when clicked.
+- **Cause**: Google writes them as `<a href=…><table>…Yes…</table></a>`. libxml's HTML4 parser (`DOMDocument::loadHTML`) closes a link at the first `<table>` or `<div>` inside it, leaving an empty `<a></a>` with the label outside it.
+- **Fix**: `HtmlSanitizer::run()` parses links under the name `hqa`, which libxml leaves alone, and renames them to `a` straight after. `Masterminds\HTML5` was tried and rejected: it does not create a `<body>` for ordinary mail fragments, so every message would parse differently.
+- **Test**: `ReadSanitizerTest::test_a_link_that_wraps_a_table_keeps_its_label_inside_the_link`. Reading the sanitiser's output with `loadHTML` in a test splits the link again, so it matches the string.
