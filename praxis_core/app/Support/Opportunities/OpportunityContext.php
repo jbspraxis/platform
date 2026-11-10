@@ -7,6 +7,7 @@ use App\Models\Opportunity;
 use App\Models\Organization;
 use App\Models\Proposal;
 use App\Models\StatementOfWork;
+use App\Support\Leads\LeadIntel;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -25,10 +26,10 @@ use Illuminate\Support\Facades\DB;
  */
 final class OpportunityContext
 {
-    public const PARTS = ['profile', 'copq', 'meetings', 'internal', 'notes', 'transcripts', 'questionnaire', 'proposal', 'sow'];
+    public const PARTS = ['profile', 'copq', 'intel', 'meetings', 'internal', 'notes', 'transcripts', 'questionnaire', 'proposal', 'sow'];
 
     /** Full transcripts are read once (by the proposal); later documents read the notes (6.2, cost rule 4) */
-    public const DEFAULT = ['profile', 'copq', 'meetings', 'internal', 'notes', 'questionnaire', 'proposal', 'sow'];
+    public const DEFAULT = ['profile', 'copq', 'intel', 'meetings', 'internal', 'notes', 'questionnaire', 'proposal', 'sow'];
 
     public static function for(Opportunity $opportunity, array $include = self::DEFAULT): string
     {
@@ -40,6 +41,10 @@ final class OpportunityContext
         }
         if ($want('copq') && ($copq = self::copq($opportunity))) {
             $blocks[] = $copq;
+        }
+        // The lead's intel reports (docs/LEADS.md section 13): only those a person has checked and left switched on
+        if ($want('intel') && ($intel = LeadIntel::contextText($opportunity->organization_id))) {
+            $blocks[] = $intel;
         }
         if ($want('meetings') && ($meetings = self::meetings($opportunity, $want('internal'), $want('notes'), $want('transcripts')))) {
             $blocks[] = $meetings;

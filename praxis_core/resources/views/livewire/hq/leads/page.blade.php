@@ -70,6 +70,7 @@
             'meetings' => 'Meetings' . (($counts['meetings'] ?? 0) ? ' (' . $counts['meetings'] . ')' : ''),
             'emails' => 'Emails' . (($counts['emails'] ?? 0) ? ' (' . ($counts['emails'] >= \App\Support\Leads\LeadEmails::LIMIT ? $counts['emails'] . '+' : $counts['emails']) . ')' : ''),
             'opportunities' => 'Opportunities' . (($counts['opportunities'] ?? 0) ? ' (' . $counts['opportunities'] . ')' : ''),
+        ] + ($canEdit ? ['intel' => 'Intel' . (($counts['intel'] ?? 0) ? ' (' . $counts['intel'] . ')' : '')] : []) + [
             'activity' => 'Activity',
         ];
     @endphp
@@ -436,6 +437,9 @@
 
         @elseif ($tab === 'opportunities')
             @include('livewire.hq.leads.tabs.opportunities')
+
+        @elseif ($tab === 'intel' && $canEdit)
+            @include('livewire.hq.leads.tabs.intel')
 
         @elseif ($tab === 'activity')
             <section class="card" aria-labelledby="ld-activity-title">

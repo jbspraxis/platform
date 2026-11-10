@@ -45,7 +45,7 @@ use Livewire\Component;
 #[Layout('components.layouts.hq')]
 class LeadPage extends Component
 {
-    public const TABS = ['overview', 'meetings', 'emails', 'opportunities', 'activity'];
+    public const TABS = ['overview', 'meetings', 'emails', 'opportunities', 'intel', 'activity'];
 
     #[Locked]
     public string $leadId;
@@ -135,7 +135,8 @@ class LeadPage extends Component
         abort_unless($lead, 404);
         $this->leadId = $lead->id;
         $this->canEdit = LeadAccess::canEdit(Auth::user());
-        if (! in_array($this->tab, self::TABS, true)) {
+        // The Intel tab is for people who can edit leads (docs/LEADS.md section 13)
+        if (! in_array($this->tab, self::TABS, true) || ($this->tab === 'intel' && ! $this->canEdit)) {
             $this->tab = 'overview';
         }
         $this->syncStatus($lead);
@@ -164,7 +165,7 @@ class LeadPage extends Component
 
     public function show(string $tab): void
     {
-        $this->tab = in_array($tab, self::TABS, true) ? $tab : 'overview';
+        $this->tab = in_array($tab, self::TABS, true) && ($tab !== 'intel' || $this->canEdit) ? $tab : 'overview';
     }
 
     // --- Details ---
@@ -543,6 +544,7 @@ class LeadPage extends Component
                 'meetings' => LeadMeetings::count($lead->id),
                 'emails' => LeadEmails::count($user, $lead->id),
                 'opportunities' => $lead->opportunities()->count(),
+                'intel' => $this->canEdit ? \App\Models\LeadIntelReport::where('organization_id', $lead->id)->count() : 0,
             ],
             'copqLatest' => Copq::latest($lead->id),
             'recent' => $this->tab === 'overview' ? LeadTimeline::for($lead->id, null, 5) : collect(),

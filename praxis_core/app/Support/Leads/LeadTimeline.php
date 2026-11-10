@@ -53,6 +53,10 @@ final class LeadTimeline
         'free_audit_booked' => 'Free audit booked',
         // PR 3
         'imported' => 'Imported',
+        // Intel reports (docs/LEADS.md section 13): the line says only that one was added or removed, never what is in it,
+        // because everyone with Leads access reads the timeline and only crm.edit reads the intel
+        'intel_added' => 'Intel report added',
+        'intel_removed' => 'Intel report removed',
     ];
 
     /** What "Log activity" on the lead page offers */
