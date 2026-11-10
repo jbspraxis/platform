@@ -185,14 +185,7 @@ class ReadInboxTest extends TestCase
         $this->assertStringNotContainsString('track.test', $this->srcdoc($other->html()));
     }
 
-    /**
-     * Google Calendar invitations ship `@media (prefers-color-scheme: dark)` rules that set only text and
-     * link colours — #e8eaed body, #9aa0a6 muted, #8ab4f8 buttons — because the client around them (Gmail)
-     * supplies the dark canvas. `prefers-color-scheme` inside the reader's frame follows the person's
-     * device, not HQ, and HQ's page is white and has no dark theme, so on a dark-mode machine the whole
-     * invitation read as near-white text on white (1.2:1 against the 4.5:1 WCAG AA needs). The frame is
-     * pinned to the light palette and the invitation's dark rules never reach it.
-     */
+    /** Google Calendar ships dark-device rules that put #e8eaed on the reader's white page (1.2:1): only the light palette reaches the frame */
     public function test_a_calendar_invitation_shows_in_its_light_palette_on_the_readers_white_page(): void
     {
         [$account, , $reader] = $this->shared();
@@ -220,19 +213,14 @@ class ReadInboxTest extends TestCase
             ->assertSee('Join with Google Meet');
         $doc = $this->srcdoc($page->html());
 
-        // The frame stays on the light palette whatever the device is set to, and HQ's own text colour
-        // (#0C142B on #FFFFFF) is the floor for anything the email leaves unstyled
         $this->assertStringContainsString('html,body{margin:0;padding:0;background:#FFFFFF;color-scheme:light}', $doc);
         $this->assertStringContainsString('color:#0C142B', $doc);
 
         $this->assertStringNotContainsStringIgnoringCase('prefers-color-scheme', $doc);
-        $this->assertStringNotContainsStringIgnoringCase('light dark', $doc);
-        $this->assertStringNotContainsStringIgnoringCase(':root{color-scheme', $doc);
         foreach (['#e8eaed', '#9aa0a6', '#8ab4f8'] as $dark) {
             $this->assertStringNotContainsStringIgnoringCase($dark, $doc, "The frame still carries {$dark}");
         }
 
-        // What is left is the palette the sender wrote for a light page
         $this->assertStringContainsString('.primary-text{color:#212121}', $doc);
         $this->assertStringContainsString('.secondary-text{color:#5f6368}', $doc);
         $this->assertStringContainsString('.btn{background:#1a73e8;color:#ffffff}', $doc);

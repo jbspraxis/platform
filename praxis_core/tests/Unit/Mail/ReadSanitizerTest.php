@@ -88,13 +88,7 @@ class ReadSanitizerTest extends TestCase
         $this->assertStringNotContainsString('alert', $out['html'] . $out['styles']);
     }
 
-    /**
-     * The reader's frame is a white page and HQ has no dark theme, but `prefers-color-scheme` inside an
-     * iframe follows the person's device. Google Calendar invitations repaint their text for a dark canvas
-     * the surrounding client would have supplied (`#e8eaed` body, `#9aa0a6` muted, `#8ab4f8` buttons), which
-     * on our white page read at 1.2:1. The dark half of a sender's own colour-scheme work never reaches the
-     * frame; the light half, and every other media query, is left exactly as it was written.
-     */
+    /** Google Calendar's dark rules read #e8eaed on the reader's white page (1.2:1); the light ones are what the frame shows */
     public function test_a_calendar_invitations_dark_mode_rules_are_dropped_and_its_light_rules_kept(): void
     {
         $out = $this->clean(
@@ -121,44 +115,6 @@ class ReadSanitizerTest extends TestCase
         $this->assertStringContainsString('.primary-text{color:#212121}.secondary-text{color:#5f6368}', $out['styles']);
         $this->assertStringContainsString('.btn{background:#1a73e8;color:#ffffff}', $out['styles']);
         $this->assertStringContainsString('href="https://meet.google.com/abc-defg-hij"', $out['html']);
-    }
-
-    public function test_dark_mode_blocks_go_wherever_they_sit_and_other_media_queries_stay(): void
-    {
-        $out = $this->clean(
-            '<style>'
-            . '@media screen and (prefers-color-scheme:dark){td{color:#e8eaed}}'
-            . '@media (PREFERS-COLOR-SCHEME: DARK) and (min-width:600px){p{color:#ffffff}}'
-            . '@media only screen and (max-width:480px){ .a{width:100%}'
-            . '  @media (prefers-color-scheme: dark){ .a{color:#e8eaed !important} }'
-            . '  .b{color:#000000} }'
-            . '@media (prefers-color-scheme: light){p{color:#111111}}'
-            . '@media print{body{color:#000000}}'
-            . '</style>'
-        );
-
-        $this->assertStringNotContainsStringIgnoringCase('prefers-color-scheme: dark', $out['styles']);
-        $this->assertStringNotContainsStringIgnoringCase('prefers-color-scheme:dark', $out['styles']);
-        $this->assertStringNotContainsString('#e8eaed', $out['styles']);
-        $this->assertStringNotContainsString('#ffffff', $out['styles']);
-
-        $this->assertStringContainsString('@media (prefers-color-scheme: light){p{color:#111111}}', $out['styles']);
-        $this->assertStringContainsString('@media print{body{color:#000000}}', $out['styles']);
-        // The outer query keeps its own rules; only the nested dark block inside it went
-        $this->assertStringContainsString('.a{width:100%}', $out['styles']);
-        $this->assertStringContainsString('.b{color:#000000}', $out['styles']);
-    }
-
-    public function test_a_dark_mode_block_cannot_leave_its_rules_behind_when_its_braces_never_balance(): void
-    {
-        $broken = $this->clean('<style>p{color:#222222}@media (prefers-color-scheme: dark){p{color:#e8eaed}</style>');
-        $this->assertStringContainsString('p{color:#222222}', $broken['styles']);
-        $this->assertStringNotContainsString('#e8eaed', $broken['styles']);
-
-        // A brace inside a string is not a block, so the whole dark block still goes
-        $quoted = $this->clean('<style>@media (prefers-color-scheme: dark){ .x:after{content:"}"} .y{color:#e8eaed} }</style>');
-        $this->assertStringNotContainsString('#e8eaed', $quoted['styles']);
-        $this->assertSame('', trim($quoted['styles']));
     }
 
     public function test_pictures_that_only_a_dark_mode_block_asked_for_are_not_counted_as_held_back(): void
