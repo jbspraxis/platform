@@ -93,7 +93,7 @@ final class Milestones
     public static function canDelete(object $phase): bool
     {
         return ! DB::table('tasks')->where('phase_id', $phase->id)->whereNull('deleted_at')->exists()
-            && ! DB::table('invoices')->where('phase_id', $phase->id)->whereNull('deleted_at')->exists()
+            && ! \App\Support\Finance\MilestoneInvoices::any((string) $phase->id)
             && ! DB::table('meetings')->where('phase_id', $phase->id)->where('kind', 'client')->where('status', '!=', 'cancelled')->whereNull('deleted_at')->exists();
     }
 

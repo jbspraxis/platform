@@ -157,7 +157,7 @@ class InvoicePdfTest extends TestCase
         $this->actingAs($this->staff('finance', ['finance']));
 
         Livewire::test(InvoiceLedger::class)->set('showCreateModal', true)->set('new_project_id', $this->project)
-            ->set('new_amount_due', 100000)->set('new_description', 'M2')->call('draftSubsequentInvoice')->assertHasNoErrors()
+            ->call('addLine')->set('lines.0.description', 'M2')->set('lines.0.amount', 100000)->call('draftSubsequentInvoice')->assertHasNoErrors()
             ->assertDispatched('praxis-toast', $this->toast('Emailed with its PDF to ada@city.test, fin@city.test.'));
         $new = DB::table('invoices')->where('project_id', $this->project)->where('invoice_type', 'Tax Invoice - Phase Milestone')->first();
         $sent = Mail::sent(InvoiceMail::class);

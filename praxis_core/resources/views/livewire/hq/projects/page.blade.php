@@ -450,7 +450,7 @@
                                 <li wire:key="inv-{{ $inv->id }}" style="display: flex; justify-content: space-between; gap: 12px">
                                     <span style="min-width: 0; overflow-wrap: anywhere">
                                         <strong style="color: var(--color-ink); font-weight: 600">{{ $inv->invoice_number }}</strong>
-                                        <span class="pj-sub">{{ $inv->phase_number !== null ? 'M' . $inv->phase_number : __('projects.money.no_milestone') }} · {{ __('projects.invoice_statuses.' . $inv->status) }}{{ $inv->paid_at ? ' · ' . $day($inv->paid_at) : '' }}</span>
+                                        <span class="pj-sub">{{ $inv->milestones ?: __('projects.money.no_milestone') }} · {{ __('projects.invoice_statuses.' . $inv->status) }}{{ $inv->paid_at ? ' · ' . $day($inv->paid_at) : '' }}</span>
                                     </span>
                                     @if ($canSeeMoney)
                                         <span class="num" style="color: var(--color-ink)">{{ $money($inv->total_amount, $inv->currency) }}</span>

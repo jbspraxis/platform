@@ -129,7 +129,7 @@ class OwnerDecisionsTest extends TestCase
         $this->actingAs($this->staff('finance', ['finance']));
         Livewire::test(\App\Livewire\Hq\Finance\InvoiceLedger::class)->set('showCreateModal', true)->set('new_project_id', $project)
             ->assertSet('new_remittance_id', (string) $naira)->assertSee('Bank NGN-NG-0001')->assertDontSee('Bank USD-NG-0002')
-            ->set('new_remittance_id', (string) $cfa)->set('new_amount_due', 1000)->set('new_description', 'M1')
+            ->set('new_remittance_id', (string) $cfa)->call('addLine')->set('lines.0.description', 'M1')->set('lines.0.amount', 1000)
             ->call('draftSubsequentInvoice')->assertHasErrors(['new_remittance_id']);
 
         // Master data › Remittance accounts asks for both, and says when an account is shown to no client

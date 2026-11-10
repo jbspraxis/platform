@@ -182,9 +182,18 @@ class ProjectPage extends Component
                 ->orderByRaw("FIELD(qa_tickets.severity, 'Critical', 'Medium', 'Low')")->orderByDesc('qa_tickets.created_at')
                 ->get(['qa_tickets.id', 'qa_tickets.title', 'qa_tickets.severity', 'qa_tickets.status', 'qa_tickets.created_at', 'tasks.title as task_title'])],
             'money' => [
-                'invoices' => DB::table('invoices')->leftJoin('project_phases', 'project_phases.id', '=', 'invoices.phase_id')
-                    ->where('invoices.project_id', $this->projectId)->whereNull('invoices.deleted_at')->orderBy('invoices.issued_at')
-                    ->get(['invoices.id', 'invoices.invoice_number', 'invoices.status', 'invoices.total_amount', 'invoices.currency', 'invoices.due_date', 'invoices.paid_at', 'project_phases.phase_number']),
+                // Each invoice with the milestones it bills ("M2, M3" when its lines bill several)
+                'invoices' => (function () {
+                    $invoices = DB::table('invoices')->where('invoices.project_id', $this->projectId)->whereNull('invoices.deleted_at')->orderBy('invoices.issued_at')
+                        ->get(['invoices.id', 'invoices.invoice_number', 'invoices.status', 'invoices.total_amount', 'invoices.currency', 'invoices.due_date', 'invoices.paid_at']);
+                    $numbers = \App\Support\Finance\MilestoneInvoices::milestoneNumbers($invoices->pluck('id'));
+
+                    return $invoices->map(function ($inv) use ($numbers) {
+                        $inv->milestones = ($n = $numbers->get((string) $inv->id)) && $n->isNotEmpty() ? $n->map(fn ($x) => 'M' . $x)->implode(', ') : null;
+
+                        return $inv;
+                    });
+                })(),
                 'reports' => DB::table('change_reports')->where('project_id', $this->projectId)->whereNull('deleted_at')->orderBy('number')->get(),
                 'sow' => $data['opportunity'] ? DB::table('statements_of_work')->where('opportunity_id', $data['opportunity']->id)->whereNull('deleted_at')
                     ->orderByDesc('version')->first(['id', 'reference', 'version', 'status', 'signed_at']) : null,

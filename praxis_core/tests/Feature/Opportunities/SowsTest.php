@@ -713,7 +713,7 @@ class SowsTest extends TestCase
         $finance = $this->staff('owner', ['owner']);
         $this->actingAs($finance);
         Livewire::withQueryParams(['create' => 1, 'project' => $sow->project_id, 'phase' => $phases[0]->id])->test(\App\Livewire\Hq\Finance\InvoiceLedger::class)
-            ->assertSet('new_amount_due', 240.0)->assertSet('new_description', 'Diagnostic, on written acceptance, less the 40% deposit');
+            ->assertSet('picked', [$phases[0]->id])->assertSet('lines.0.amount', 240.0)->assertSet('lines.0.description', 'Diagnostic, on written acceptance, less the 40% deposit');
         $this->assertSame('400.00', $phases[0]->amount);
         Livewire::test(\App\Livewire\Hq\Projects\MilestoneDrawer::class, ['projectId' => $sow->project_id])->call('openMilestone', $phases[0]->id)
             ->assertSee("Its invoice: M1 · USD\u{00A0}400 less 40% deposit = USD\u{00A0}240, before VAT.");

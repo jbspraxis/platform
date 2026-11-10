@@ -245,8 +245,8 @@ class ProjectPageTest extends TestCase
         $this->actingAs($this->staff('owner', ['owner']));
 
         $ledger = Livewire::withQueryParams(['create' => 1, 'project' => $this->projectId, 'phase' => $this->phases[2]])->test(InvoiceLedger::class)
-            ->assertSet('showCreateModal', true)->assertSet('new_project_id', $this->projectId)->assertSet('new_phase_id', $this->phases[2]);
-        $this->assertEquals(333000.0, $ledger->get('new_amount_due')); // 9% of ₦3,700,000
+            ->assertSet('showCreateModal', true)->assertSet('new_project_id', $this->projectId)->assertSet('picked', [$this->phases[2]]);
+        $this->assertEquals(333000.0, $ledger->get('lines')[0]['amount']); // 9% of ₦3,700,000
         // Accepted milestones are offered; the one already invoiced (M1) is not
         $offered = collect($ledger->get('projectPhases'))->pluck('id');
         $this->assertTrue($offered->contains($this->phases[2]));

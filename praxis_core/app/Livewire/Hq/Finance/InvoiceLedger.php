@@ -30,13 +30,22 @@ class InvoiceLedger extends Component
     
     // Form Inputs
     public $new_project_id = '';
-    public $new_phase_id = '';
     public $new_invoice_type = 'Tax Invoice - Phase Milestone';
-    public $new_amount_due = 0.00;
     public $new_currency = 'USD';
     public $new_payment_terms = 'Net 10';
     public $new_remittance_id = '';
-    public $new_description = '';
+
+    /**
+     * One invoice, several milestones (owner, 10 Nov 2026): the milestones ticked (ids), and the invoice's lines, each
+     * ['phase_id' => milestone id or null for a free line, 'description', 'amount']. A ticked milestone adds its line,
+     * filled with its agreed amount less its deposit share; the amount and wording stay editable. "Add line" adds a
+     * free line. Every line becomes its own invoice line, with its milestone.
+     */
+    public array $picked = [];
+    public array $lines = [];
+
+    /** At most this many lines on one invoice */
+    private const MAX_LINES = 30;
 
     public function mount()
     {
@@ -60,17 +69,93 @@ class InvoiceLedger extends Component
             $this->updatedNewProjectId($project->id);
             $phase = collect($this->projectPhases)->firstWhere('id', (string) request()->query('phase'));
             if ($phase) {
-                // The milestone's agreed amount, to the unit (project_phases.amount; weight × total for an older row),
-                // less the SOW deposit's share when the project has one ("less deposit, every milestone": Deposit)
-                $due = \App\Support\Projects\Deposit::forMilestone($phase);
-                $this->new_phase_id = $phase->id;
-                $this->new_amount_due = $due['due'];
-                $this->new_description = Str::limit($due['deposit']
-                    ? __('projects.invoice_line_less', ['milestone' => $phase->title, 'percent' => \App\Support\Projects\Deposit::percentLabel($due['deposit']['percent'], app()->getLocale())])
-                    : __('projects.invoice_line', ['milestone' => $phase->title]), 250);
+                $this->picked = [(string) $phase->id];
+                $this->syncLines();
             }
         }
         $this->showCreateModal = true;
+    }
+
+    /**
+     * A milestone's line: its agreed amount, to the unit (project_phases.amount; weight × total for an older row), less
+     * the SOW deposit's share when the project has one ("less deposit, every milestone": Deposit)
+     */
+    private function milestoneLine(object $phase): array
+    {
+        $due = \App\Support\Projects\Deposit::forMilestone($phase);
+
+        return [
+            'phase_id' => (string) $phase->id,
+            'description' => Str::limit($due['deposit']
+                ? __('projects.invoice_line_less', ['milestone' => $phase->title, 'percent' => \App\Support\Projects\Deposit::percentLabel($due['deposit']['percent'], app()->getLocale())])
+                : __('projects.invoice_line', ['milestone' => $phase->title]), 250),
+            'amount' => $due['due'],
+        ];
+    }
+
+    /** Ticking or unticking milestones: their lines follow, in milestone order, before the free lines; edits are kept */
+    public function updatedPicked(): void
+    {
+        $this->syncLines();
+    }
+
+    private function syncLines(): void
+    {
+        $offered = collect($this->projectPhases)->keyBy(fn ($p) => (string) $p->id);
+        $picked = array_values(array_unique(array_filter(array_map('strval', $this->picked), fn ($id) => $offered->has($id))));
+        $this->picked = $picked;
+
+        $lines = collect($this->lines)->filter(fn ($l) => empty($l['phase_id']) || in_array((string) $l['phase_id'], $picked, true));
+        $have = $lines->pluck('phase_id')->filter()->map(fn ($id) => (string) $id)->all();
+        foreach ($picked as $id) {
+            if (! in_array($id, $have, true) && $lines->count() < self::MAX_LINES) {
+                $lines->push($this->milestoneLine($offered->get($id)));
+            }
+        }
+        $rank = $offered->keys()->flip();
+        $milestones = $lines->filter(fn ($l) => ! empty($l['phase_id']))->sortBy(fn ($l) => $rank[(string) $l['phase_id']] ?? PHP_INT_MAX)->values();
+        $free = $lines->filter(fn ($l) => empty($l['phase_id']))->values();
+        $this->lines = $milestones->concat($free)->values()->all();
+    }
+
+    /** A free line: any description and amount (a change order, an expense, part of a milestone) */
+    public function addLine(): void
+    {
+        if (count($this->lines) < self::MAX_LINES) {
+            $this->lines[] = ['phase_id' => null, 'description' => '', 'amount' => ''];
+        }
+    }
+
+    /** Removing a milestone's line unticks the milestone */
+    public function removeLine(int $index): void
+    {
+        $line = $this->lines[$index] ?? null;
+        if (! $line) {
+            return;
+        }
+        unset($this->lines[$index]);
+        $this->lines = array_values($this->lines);
+        if (! empty($line['phase_id'])) {
+            $this->picked = array_values(array_filter($this->picked, fn ($id) => (string) $id !== (string) $line['phase_id']));
+        }
+    }
+
+    /**
+     * The project's milestones no live invoice bills yet, in order, each with its board column (so Finance sees which
+     * are accepted: the SOW invoices on written acceptance) and the amount its line would carry. Any of them can be
+     * ticked (owner, 10 Nov 2026).
+     */
+    private function offeredPhases(string $projectId): \Illuminate\Support\Collection
+    {
+        $phases = DB::table('project_phases')->where('project_id', $projectId)->whereNull('deleted_at')->orderBy('phase_number')->get();
+        $billed = \App\Support\Finance\MilestoneInvoices::billed($phases->pluck('id'));
+
+        return $phases->reject(fn ($p) => in_array((string) $p->id, $billed, true))->values()->map(function ($p) {
+            $p->column = \App\Support\Projects\ProjectPlan::column($p);
+            $p->due = \App\Support\Projects\Deposit::forMilestone($p)['due'];
+
+            return $p;
+        });
     }
 
     public function setTab($tab)
@@ -95,14 +180,12 @@ class InvoiceLedger extends Component
     public function updatedNewProjectId($projectId)
     {
         // When a project is selected, fetch the phases (milestones) not invoiced yet and its currency. A milestone is
-        // invoiced on the client's acceptance, so accepted ones are offered too (docs/PROJECTS.md, decision 2)
+        // invoiced on the client's acceptance, so accepted ones are offered too (docs/PROJECTS.md, decision 2). Another
+        // project's ticks and milestone lines don't carry over; free lines do.
+        $this->picked = [];
+        $this->lines = array_values(array_filter($this->lines, fn ($l) => empty($l['phase_id'])));
         if (!empty($projectId)) {
-            $this->projectPhases = DB::table('project_phases')
-                ->where('project_id', $projectId)
-                ->whereNull('deleted_at')
-                ->whereNotIn('id', DB::table('invoices')->whereNotNull('phase_id')->whereNull('deleted_at')->where('status', '!=', 'Cancelled')->select('phase_id'))
-                ->orderBy('phase_number')
-                ->get();
+            $this->projectPhases = $this->offeredPhases((string) $projectId);
 
             $project = collect($this->activeProjects)->firstWhere('id', $projectId);
             if ($project) {
@@ -135,23 +218,35 @@ class InvoiceLedger extends Component
     {
         abort_unless(Auth::user()->can('finance.create'), 403);
 
+        // The milestones that may be on it are worked out again here, never taken from the form: this project's, and
+        // not already billed by a live invoice
+        $offered = $this->new_project_id ? $this->offeredPhases((string) $this->new_project_id)->pluck('id')->map(fn ($id) => (string) $id)->all() : [];
+        $this->lines = array_values(array_map(fn ($l) => [
+            'phase_id' => empty($l['phase_id']) ? null : (string) $l['phase_id'],
+            'description' => trim((string) ($l['description'] ?? '')),
+            'amount' => $l['amount'] ?? '',
+        ], $this->lines));
         $this->validate([
             'new_project_id' => 'required|exists:projects,id',
-            'new_phase_id' => 'nullable|exists:project_phases,id',
-            'new_amount_due' => 'required|numeric|min:1',
+            'lines' => 'required|array|min:1|max:' . self::MAX_LINES,
+            'lines.*.description' => 'required|string|max:255',
+            'lines.*.amount' => 'required|numeric|min:0.01|max:9999999999999',
+            'lines.*.phase_id' => ['nullable', 'distinct', Rule::in($offered)],
             'new_payment_terms' => 'required|string',
             'new_remittance_id' => ['required', Rule::in($this->matchingAccounts()->pluck('id')->map(fn ($id) => (string) $id)->all())],
-            'new_description' => 'required|string|max:255'
         ]);
 
         $project = DB::table('projects')->where('id', $this->new_project_id)->first();
         $org = DB::table('organizations')->where('id', $project->organization_id)->first();
-        
+        $lines = $this->lines;
+        $amountDue = round(array_sum(array_map(fn ($l) => round((float) $l['amount'], 2), $lines)), 2);
+        $milestoneIds = array_values(array_unique(array_filter(array_column($lines, 'phase_id'))));
+
         // 1. VAT: only when the company issuing it (the project's opportunity's billing company, else Nigeria's) charges
         // VAT today, at 0% for a client abroad (App\Support\Finance\Vat); the invoice records what it applied, and who
         $vat = Vat::for($org, null, Vat::projectEntity($project->id));
-        $vatAmount = $vat['applies'] ? round((float) $this->new_amount_due * $vat['rate'] / 100, 2) : 0.0;
-        $totalAmount = (float) $this->new_amount_due + $vatAmount;
+        $vatAmount = $vat['applies'] ? round($amountDue * $vat['rate'] / 100, 2) : 0.0;
+        $totalAmount = $amountDue + $vatAmount;
 
         // 2. Due date: handle "Receipt" and "Net X" terms
         if (stripos(strtolower($this->new_payment_terms), 'receipt') !== false) {
@@ -173,15 +268,25 @@ class InvoiceLedger extends Component
         $invNumber = 'INV-' . date('Ym') . '-' . rand(1000, 9999);
         $timestamp = now();
 
-        DB::transaction(function () use ($invoiceId, $invNumber, $project, $org, $vat, $vatAmount, $totalAmount, $dueDate, $fxRate, $timestamp) {
-            
+        DB::transaction(function () use ($invoiceId, $invNumber, $project, $org, $vat, $vatAmount, $totalAmount, $dueDate, $fxRate, $timestamp, $lines, $amountDue, $milestoneIds) {
+            // Someone else may have invoiced one of these milestones since the form opened: then nothing is created
+            if ($milestoneIds !== []) {
+                DB::table('project_phases')->whereIn('id', $milestoneIds)->lockForUpdate()->get(['id']);
+                if (\App\Support\Finance\MilestoneInvoices::billed($milestoneIds) !== []) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'lines' => 'A milestone on this invoice was invoiced a moment ago. Close this window, open Create invoice again and tick the milestones still to invoice.',
+                    ]);
+                }
+            }
+
             DB::table('invoices')->insert([
                 'id' => $invoiceId,
                 'project_id' => $project->id,
-                'phase_id' => empty($this->new_phase_id) ? null : $this->new_phase_id,
+                // An invoice for exactly one milestone names it, as before; with several, each line names its own
+                'phase_id' => count($milestoneIds) === 1 ? $milestoneIds[0] : null,
                 'invoice_type' => $this->new_invoice_type,
                 'invoice_number' => $invNumber,
-                'amount_due' => $this->new_amount_due,
+                'amount_due' => $amountDue,
                 'vat_amount' => $vatAmount,
                 'vat_rate' => $vat['rate'],
                 'vat_applied' => $vat['applies'],
@@ -204,15 +309,16 @@ class InvoiceLedger extends Component
                 'updated_at' => $timestamp
             ]);
 
-            // 3. INVOICE LINES (id is auto-increment and the table has no timestamps)
-            DB::table('invoice_lines')->insert([
+            // 3. INVOICE LINES, one per line in the form's order, each with its milestone (id is auto-increment; no timestamps)
+            DB::table('invoice_lines')->insert(array_map(fn ($line) => [
                 'invoice_id' => $invoiceId,
-                'description' => $this->new_description,
-                'metric_of_billing' => 'Phase Completion',
+                'phase_id' => $line['phase_id'],
+                'description' => Str::limit($line['description'], 252),
+                'metric_of_billing' => $line['phase_id'] ? 'Phase Completion' : 'Fixed Fee',
                 'quantity' => 1,
-                'unit_price' => $this->new_amount_due,
-                'total_price' => $this->new_amount_due,
-            ]);
+                'unit_price' => round((float) $line['amount'], 2),
+                'total_price' => round((float) $line['amount'], 2),
+            ], $lines));
 
             // Accrue the receivable in the general ledger, as the proposal gateway does for deposits
             \App\Livewire\Hq\Finance\GeneralLedgerManager::recordInvoiceIssued($invoiceId);
@@ -223,7 +329,7 @@ class InvoiceLedger extends Component
         $reached = $this->emailToClient($invoiceId);
 
         $this->showCreateModal = false;
-        $this->reset(['new_project_id', 'new_phase_id', 'new_amount_due', 'new_description']);
+        $this->reset(['new_project_id', 'picked', 'lines']);
         $this->loadInvoices();
         session()->flash('success', "Invoice {$invNumber} created for " . ($org->name ?? 'the client') . '. ' . $this->emailedLine($reached));
     }
@@ -394,11 +500,12 @@ class InvoiceLedger extends Component
     {
         return [
             'new_project_id' => 'project',
-            'new_phase_id' => 'phase',
-            'new_amount_due' => 'amount before VAT',
             'new_payment_terms' => 'payment terms',
             'new_remittance_id' => 'account to pay into',
-            'new_description' => 'description',
+            'lines' => 'lines',
+            'lines.*.description' => 'line description',
+            'lines.*.amount' => 'line amount',
+            'lines.*.phase_id' => 'milestone',
         ];
     }
 
@@ -406,7 +513,16 @@ class InvoiceLedger extends Component
     public function messages(): array
     {
         return [
-            'new_amount_due.min' => 'Enter an amount of 1 or more.',
+            'lines.required' => 'Tick a milestone or add a line.',
+            'lines.min' => 'Tick a milestone or add a line.',
+            'lines.max' => 'An invoice can have up to ' . self::MAX_LINES . ' lines.',
+            'lines.*.description.required' => 'Describe this line.',
+            'lines.*.description.max' => 'Keep this line to 255 characters.',
+            'lines.*.amount.required' => 'Enter this line’s amount before VAT.',
+            'lines.*.amount.numeric' => 'Enter this line’s amount as a number.',
+            'lines.*.amount.min' => 'Enter an amount above 0.',
+            'lines.*.phase_id.in' => 'This milestone is invoiced already or belongs to another project. Untick it.',
+            'lines.*.phase_id.distinct' => 'This milestone is on the invoice twice. Remove one of its lines.',
             'new_remittance_id.in' => 'Choose an account in the project’s currency held by the company that bills it.',
         ];
     }
@@ -420,6 +536,7 @@ class InvoiceLedger extends Component
             'vat' => $vat = $project ? Vat::for((string) $project->organization_id, null, Vat::projectEntity($project->id)) : null,
             'matchingAccounts' => $project ? $this->matchingAccounts() : collect(),
             'billingCompany' => $vat['company'] ?? null,
+            'linesTotal' => round(array_sum(array_map(fn ($l) => is_numeric($l['amount'] ?? null) ? round((float) $l['amount'], 2) : 0.0, $this->lines)), 2),
         ]);
     }
 }

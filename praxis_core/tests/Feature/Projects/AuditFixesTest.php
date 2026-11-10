@@ -133,7 +133,7 @@ class AuditFixesTest extends TestCase
 
         // Finance's Create invoice for M1 is pre-filled with its agreed amount, to the unit
         $ledger = Livewire::withQueryParams(['create' => 1, 'project' => $project, 'phase' => $m1])->test(InvoiceLedger::class);
-        $this->assertEquals(444000.0, $ledger->get('new_amount_due'));
+        $this->assertEquals(444000.0, $ledger->get('lines')[0]['amount']);
         // A new weight sets a new amount; other edits leave it alone
         Livewire::test(MilestoneDrawer::class, ['projectId' => $project])->dispatch('open-milestone', id: $m1)->set('notes', 'Signed off')->call('save')->assertHasNoErrors();
         $this->assertEquals(444000, DB::table('project_phases')->where('id', $m1)->value('amount'));
