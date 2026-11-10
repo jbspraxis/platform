@@ -93,6 +93,37 @@ class InvoicePdfTest extends TestCase
         $this->assertStringContainsString('Comment régler', $html);
     }
 
+    /** Owner, 10 Nov 2026: "on invoice we don't need two accounts"; the client portal keeps listing every one */
+    public function test_it_shows_only_the_account_the_invoice_names_and_every_matching_one_when_it_names_none(): void
+    {
+        DB::table('mdm_remittance_accounts')->insert(['type' => 'Bank', 'provider_name' => 'Nombank MFB', 'account_name' => 'JBS Praxis LLC',
+            'account_reference' => '7770002222', 'currency' => 'NGN', 'legal_entity_id' => $this->ng, 'is_active' => 1]);
+        $uba = DB::table('mdm_remittance_accounts')->where('account_reference', '1023456789')->value('id');
+        $nombank = DB::table('mdm_remittance_accounts')->where('account_reference', '7770002222')->value('id');
+
+        // Names none: both naira accounts, as before
+        [$html] = InvoicePdf::html($this->invoiceRow());
+        $this->assertStringContainsString('1023456789', $html);
+        $this->assertStringContainsString('7770002222', $html);
+
+        // Names Nombank: Nombank alone
+        DB::table('invoices')->where('id', $this->invoice)->update(['remittance_account_id' => $nombank]);
+        [$html] = InvoicePdf::html($this->invoiceRow());
+        $this->assertStringContainsString('Nombank MFB', $html);
+        $this->assertStringContainsString('7770002222', $html);
+        $this->assertStringNotContainsString('1023456789', $html, 'The other naira account is not on the invoice');
+
+        // The portal still lists both for the project
+        $project = DB::table('projects')->where('id', $this->project)->first();
+        $this->assertEqualsCanonicalizing([$uba, $nombank], \App\Support\Finance\ReceivingAccounts::forProject($project)->pluck('id')->all());
+
+        // Nombank deactivated since: the client still has somewhere to pay
+        DB::table('mdm_remittance_accounts')->where('id', $nombank)->update(['is_active' => 0]);
+        [$html] = InvoicePdf::html($this->invoiceRow());
+        $this->assertStringContainsString('1023456789', $html);
+        $this->assertStringNotContainsString('7770002222', $html);
+    }
+
     public function test_hq_downloads_it_with_finance_view_and_the_portal_for_billing_contacts_of_that_project(): void
     {
         $this->actingAs($this->staff('finance', ['finance']));

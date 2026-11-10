@@ -75,9 +75,8 @@ final class InvoicePdf
         if ($lines->isEmpty()) {
             $lines = collect([(object) ['description' => (string) $invoice->invoice_type, 'quantity' => 1, 'unit_price' => $invoice->amount_due, 'total_price' => $invoice->amount_due]]);
         }
-        // The account the invoice names first, then the others that match it (same currency, same company)
-        $accounts = ReceivingAccounts::for($invoice->currency, $issuer?->id)
-            ->sortBy(fn ($a) => (int) $a->id === (int) $invoice->remittance_account_id ? 0 : 1)->values();
+        // Only the account the invoice names; none named (or no longer usable): every one that matches it (ReceivingAccounts)
+        $accounts = ReceivingAccounts::forInvoice($invoice, $issuer?->id);
         $address = trim((string) $invoice->client_billing_address);
         $date = fn ($day) => $day ? Carbon::parse($day)->locale($language)->translatedFormat(__('proposals.formats.date')) : null;
 
