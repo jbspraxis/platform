@@ -66,6 +66,8 @@ class InvoiceLinesTest extends TestCase
     {
         $this->form()
             ->assertSee('Milestones to invoice')->assertSee('Accepted')->assertSee('not accepted yet')
+            // A title that starts with its code ("M1 · …", as imported) shows the code once
+            ->assertSee('M1 · Milestone 1')->assertDontSee('M1 · M1 ·')
             ->set('picked', [$this->m[2], $this->m[1]])
             // Milestone order, each with its agreed amount (no deposit on this project)
             ->assertSet('lines.0.phase_id', $this->m[1])->assertSet('lines.1.phase_id', $this->m[2])

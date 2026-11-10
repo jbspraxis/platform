@@ -157,7 +157,7 @@
                         @error('new_project_id') <span class="field-error">{{ $message }}</span> @enderror
                     </div>
 
-                    @php $milestoneCodes = collect($projectPhases)->mapWithKeys(fn ($p) => [(string) $p->id => 'M' . $p->phase_number . ' · ' . $p->title]); @endphp
+                    @php $milestoneCodes = collect($projectPhases)->mapWithKeys(fn ($p) => [(string) $p->id => \App\Support\Projects\ProjectPlan::code($p) . ' · ' . \App\Support\Projects\ProjectPlan::title($p)]); @endphp
                     @if(!empty($projectPhases) && count($projectPhases) > 0)
                         <fieldset class="field" aria-describedby="inv-ms-help">
                             <legend class="label">Milestones to invoice</legend>
@@ -167,7 +167,7 @@
                                     <label class="flex items-start gap-3" for="inv-ms-{{ $phase->id }}" wire:key="inv-ms-{{ $phase->id }}">
                                         <input id="inv-ms-{{ $phase->id }}" type="checkbox" class="checkbox" wire:model.live="picked" value="{{ $phase->id }}" style="margin-top: 0.2rem;">
                                         <span>
-                                            <span style="display: block;">M{{ $phase->phase_number }} · {{ $phase->title }}</span>
+                                            <span style="display: block;">{{ $milestoneCodes[(string) $phase->id] }}</span>
                                             <span class="help">{{ __('projects.columns.' . $phase->column) }} · {{ $new_currency }} {{ number_format((float) $phase->due, 2) }}@if($phase->column !== 'accepted') · not accepted yet (the SOW invoices on written acceptance)@endif</span>
                                         </span>
                                     </label>
