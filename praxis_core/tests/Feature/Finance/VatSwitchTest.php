@@ -134,7 +134,7 @@ class VatSwitchTest extends TestCase
             ?? DB::table('mdm_remittance_accounts')->insertGetId(['type' => 'Bank', 'provider_name' => 'Test bank', 'account_name' => 'JBS Praxis',
                 'account_reference' => (string) random_int(1000, 99999), 'is_active' => 1, 'currency' => $currency, 'legal_entity_id' => $company]);
         Livewire::test(InvoiceLedger::class)->set('showCreateModal', true)->set('new_project_id', $projectId)
-            ->set('new_amount_due', $amount)->set('new_remittance_id', $account)->set('new_description', 'M1')
+            ->set('new_remittance_id', $account)->call('addLine')->set('lines.0.description', 'M1')->set('lines.0.amount', $amount)
             ->call('draftSubsequentInvoice')->assertHasNoErrors();
 
         return DB::table('invoices')->where('project_id', $projectId)->where('invoice_type', 'Tax Invoice - Phase Milestone')->orderByDesc('created_at')->first();

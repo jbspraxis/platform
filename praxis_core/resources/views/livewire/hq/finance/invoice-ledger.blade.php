@@ -157,35 +157,70 @@
                         @error('new_project_id') <span class="field-error">{{ $message }}</span> @enderror
                     </div>
 
+                    @php $milestoneCodes = collect($projectPhases)->mapWithKeys(fn ($p) => [(string) $p->id => 'M' . $p->phase_number . ' · ' . $p->title]); @endphp
                     @if(!empty($projectPhases) && count($projectPhases) > 0)
-                        <div class="field">
-                            <label class="label" for="inv-phase">Phase (optional)</label>
-                            <select id="inv-phase" wire:model="new_phase_id" class="select">
-                                <option value="">Whole project</option>
+                        <fieldset class="field" aria-describedby="inv-ms-help">
+                            <legend class="label">Milestones to invoice</legend>
+                            <span id="inv-ms-help" class="help">Tick one or more. Each gets its own line below, with its agreed amount less any deposit share; you can change the wording and the amount.</span>
+                            <div class="flex flex-col gap-2" style="margin-top: 0.5rem;">
                                 @foreach($projectPhases as $phase)
-                                    <option value="{{ $phase->id }}">Phase {{ $phase->phase_number }}: {{ $phase->title }}</option>
+                                    <label class="flex items-start gap-3" for="inv-ms-{{ $phase->id }}" wire:key="inv-ms-{{ $phase->id }}">
+                                        <input id="inv-ms-{{ $phase->id }}" type="checkbox" class="checkbox" wire:model.live="picked" value="{{ $phase->id }}" style="margin-top: 0.2rem;">
+                                        <span>
+                                            <span style="display: block;">M{{ $phase->phase_number }} · {{ $phase->title }}</span>
+                                            <span class="help">{{ __('projects.columns.' . $phase->column) }} · {{ $new_currency }} {{ number_format((float) $phase->due, 2) }}@if($phase->column !== 'accepted') · not accepted yet (the SOW invoices on written acceptance)@endif</span>
+                                        </span>
+                                    </label>
                                 @endforeach
-                            </select>
-                        </div>
+                            </div>
+                        </fieldset>
                     @endif
 
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <div class="field">
-                            <label class="label" for="inv-amount">Amount before VAT ({{ $new_currency }})</label>
-                            <input id="inv-amount" type="number" wire:model="new_amount_due" step="0.01" min="0.01" class="input" style="font-variant-numeric: tabular-nums;" required>
-                            @error('new_amount_due') <span class="field-error">{{ $message }}</span> @enderror
+                    <div class="field">
+                        <div class="flex items-center justify-between gap-3">
+                            <span class="label" id="inv-lines-label">Lines</span>
+                            <button type="button" wire:click="addLine" class="btn btn-secondary btn-sm"><i data-lucide="plus" aria-hidden="true"></i> Add line</button>
                         </div>
-                        <div class="field">
-                            <label class="label" for="inv-terms">Payment terms</label>
-                            <select id="inv-terms" wire:model="new_payment_terms" class="select" required>
-                                <option value="Due on Receipt">Due on receipt</option>
-                                <option value="Net 7">7 days</option>
-                                <option value="Net 10">10 days</option>
-                                <option value="Net 15">15 days</option>
-                                <option value="Net 30">30 days</option>
-                            </select>
-                            <span class="help">Unpaid invoices past this date put the client’s portal access on hold.</span>
-                        </div>
+                        @forelse($lines as $i => $line)
+                            <div wire:key="inv-line-{{ $i }}-{{ $line['phase_id'] ?? 'free' }}" style="display: grid; grid-template-columns: minmax(0, 1fr) 9.5rem auto; gap: 0.5rem; align-items: start; margin-top: 0.75rem;">
+                                <div>
+                                    @if(!empty($line['phase_id']))
+                                        <span class="help" style="display: block;">{{ $milestoneCodes[(string) $line['phase_id']] ?? 'Milestone' }}</span>
+                                    @endif
+                                    <label class="sr-only" for="inv-line-desc-{{ $i }}">Line {{ $i + 1 }}: description</label>
+                                    <textarea id="inv-line-desc-{{ $i }}" wire:model="lines.{{ $i }}.description" class="textarea" rows="2" maxlength="255" placeholder="e.g. Change order: three extra reports"></textarea>
+                                    @error("lines.$i.description") <span class="field-error">{{ $message }}</span> @enderror
+                                    @error("lines.$i.phase_id") <span class="field-error">{{ $message }}</span> @enderror
+                                </div>
+                                <div>
+                                    <label class="sr-only" for="inv-line-amt-{{ $i }}">Line {{ $i + 1 }}: amount before VAT ({{ $new_currency }})</label>
+                                    <input id="inv-line-amt-{{ $i }}" type="number" inputmode="decimal" wire:model.live.debounce.400ms="lines.{{ $i }}.amount" step="0.01" min="0.01" class="input" style="font-variant-numeric: tabular-nums;" placeholder="Amount">
+                                    @error("lines.$i.amount") <span class="field-error">{{ $message }}</span> @enderror
+                                </div>
+                                <button type="button" wire:click="removeLine({{ $i }})" class="btn btn-ghost btn-sm" aria-label="Remove line {{ $i + 1 }}" title="Remove line {{ $i + 1 }}"><i data-lucide="trash-2" aria-hidden="true"></i></button>
+                            </div>
+                        @empty
+                            <p class="help" style="margin-top: 0.5rem;">Tick a milestone above, or add a line.</p>
+                        @endforelse
+                        @error('lines') <span class="field-error">{{ $message }}</span> @enderror
+                        @if(count($lines) > 0)
+                            <div class="flex items-center justify-between gap-3" style="margin-top: 0.75rem; font-variant-numeric: tabular-nums;">
+                                <span>Total before VAT</span>
+                                <strong>{{ $new_currency }} {{ number_format($linesTotal, 2) }}</strong>
+                            </div>
+                        @endif
+                    </div>
+
+                    <div class="field">
+                        <label class="label" for="inv-terms">Payment terms</label>
+                        <select id="inv-terms" wire:model="new_payment_terms" class="select" required>
+                            <option value="Due on Receipt">Due on receipt</option>
+                            <option value="Net 7">7 days</option>
+                            <option value="Net 10">10 days</option>
+                            <option value="Net 15">15 days</option>
+                            <option value="Net 30">30 days</option>
+                        </select>
+                        <span class="help">Unpaid invoices past this date put the client’s portal access on hold.</span>
                     </div>
 
                     <div class="field">
@@ -202,12 +237,6 @@
                             <span id="inv-remit-help" class="help">The client sees only accounts in the invoice’s currency held by the company that bills it.</span>
                         @endif
                         @error('new_remittance_id') <span class="field-error">{{ $message }}</span> @enderror
-                    </div>
-
-                    <div class="field">
-                        <label class="label" for="inv-desc">Description</label>
-                        <textarea id="inv-desc" wire:model="new_description" class="textarea" rows="2" placeholder="e.g. Phase 2 sign-off" required></textarea>
-                        @error('new_description') <span class="field-error">{{ $message }}</span> @enderror
                     </div>
 
                     <div class="callout text-sm">

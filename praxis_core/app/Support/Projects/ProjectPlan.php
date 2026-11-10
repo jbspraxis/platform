@@ -86,10 +86,8 @@ final class ProjectPlan
         $counts = DB::table('tasks')->whereIn('phase_id', $ids)->whereNull('deleted_at')->groupBy('phase_id')
             ->selectRaw("phase_id, COUNT(*) AS total, SUM(CASE WHEN status = 'Done' THEN 1 ELSE 0 END) AS done")
             ->get()->keyBy('phase_id');
-        $invoices = DB::table('invoices')->whereIn('phase_id', $ids)->whereNull('deleted_at')->where('status', '!=', 'Cancelled')
-            ->orderByDesc('issued_at')->orderByDesc('created_at')
-            ->get(['id', 'phase_id', 'invoice_number', 'status', 'total_amount', 'currency', 'due_date', 'paid_at'])
-            ->groupBy('phase_id')->map->first();
+        // Each milestone's latest live invoice, whether it bills that milestone alone or on one of its lines
+        $invoices = \App\Support\Finance\MilestoneInvoices::latest($ids);
         $links = DB::table('phase_dependencies')->whereIn('phase_id', $ids)->get()->groupBy('phase_id');
         $today = self::today();
 
