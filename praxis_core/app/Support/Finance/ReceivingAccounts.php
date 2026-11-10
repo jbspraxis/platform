@@ -23,6 +23,21 @@ class ReceivingAccounts
             ->where('legal_entity_id', $company)->orderBy('type')->orderBy('provider_name')->get();
     }
 
+    /**
+     * The accounts printed on one invoice (owner, 10 Nov 2026: "on invoice we don't need two accounts"): only the one
+     * the invoice names (Create invoice › Pay into account) while it still matches (active, the invoice's currency, the
+     * billing company). An invoice that names none, or one since deactivated or moved, shows every matching account,
+     * so the client always has somewhere to pay. The client portal keeps listing them all (forProject, owner's choice).
+     */
+    public static function forInvoice(object $invoice, ?string $entityId): Collection
+    {
+        $accounts = self::for($invoice->currency ?? null, $entityId);
+        $named = (string) ($invoice->remittance_account_id ?? '');
+        $chosen = $named === '' ? null : $accounts->first(fn ($a) => (string) $a->id === $named);
+
+        return $chosen ? collect([$chosen]) : $accounts;
+    }
+
     /** The accounts for a project's unpaid invoices; with none, for the project's own currency and billing company */
     public static function forProject(object $project): Collection
     {
