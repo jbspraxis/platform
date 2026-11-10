@@ -35,6 +35,10 @@ return [
         'outreach_email' => 'Outreach email',
         'outreach_reply' => 'Outreach reply sorting',
         'company_document_read' => 'Company document reading',
+        'lead_intel_read' => 'Intel report reading',
+        'lead_intel_prefill' => 'Add a lead: fill from report',
+        'lead_pitch_brief' => 'Pitch brief',
+        'consultation_prep' => 'Consultation line',
         'connection_test' => 'Key test',
     ],
 ];

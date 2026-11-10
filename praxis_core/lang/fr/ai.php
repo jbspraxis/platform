@@ -35,6 +35,10 @@ return [
         'outreach_email' => 'E-mail de prospection',
         'outreach_reply' => 'Tri des réponses de prospection',
         'company_document_read' => 'Lecture des documents de la société',
+        'lead_intel_read' => "Lecture des rapports de renseignement",
+        'lead_intel_prefill' => "Ajout d'un prospect : remplir depuis le rapport",
+        'lead_pitch_brief' => "Fiche d'approche",
+        'consultation_prep' => "Ligne avant la consultation",
         'connection_test' => "Test de la clé",
     ],
 ];

@@ -13,10 +13,14 @@ use App\Mail\FreeAuditDeclinedMail;
 use App\Mail\MeetingApprovedMail;
 // use App\Mail\CopqReportMail; // Commented out for now until logic is finalized
 use App\Support\MailLocale;
+use App\Support\Ai\Ai;
+use App\Support\Ai\AiUnavailable;
 use App\Support\Ai\CompanyBrief;
 use App\Support\Google\GoogleUnavailable;
 use App\Support\Google\GoogleWorkspace;
+use App\Support\Leads\LeadIntel;
 use App\Support\Leads\LeadMeetings;
+use Illuminate\Support\Facades\Cache;
 
 #[Layout('components.layouts.hq')]
 class LiveConsultation extends Component
@@ -314,37 +318,54 @@ class LiveConsultation extends Component
     private function processHistorySummary($orgId)
     {
         $notes = DB::table('crm_notes')->where('organization_id', $orgId)->orderBy('created_at', 'desc')->get();
-        
-        if ($this->leadData->ai_history_summary) {
-            $this->historySummary = $this->leadData->ai_history_summary;
-            $this->historyData = $notes->take(3); 
-            return;
-        }
 
-        if ($notes->count() > 2) {
-            $historyText = $notes->pluck('note_text')->implode(" | ");
-            $prompt = "Summarise the following notes from earlier conversations with this client in one short, plain paragraph for the JBS Praxis consultant who is about to join a call with them. Use British English and everyday business words. Do not add facts that are not in the notes. Notes: " . $historyText;
-
-            try {
-                $apiKey = config('services.gemini.api_key');
-                $response = Http::timeout(4)->withHeaders(['Content-Type' => 'application/json'])
-                    ->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", [
-                    "contents" => [["role" => "user", "parts" => [["text" => $prompt]]]],
-                    "generationConfig" => ["temperature" => 0.2, "maxOutputTokens" => 150]
-                ]);
-
-                if ($response->successful()) {
-                    $this->historySummary = $response->json('candidates.0.content.parts.0.text');
-                    DB::table('organizations')->where('id', $orgId)->update(['ai_history_summary' => trim($this->historySummary)]);
-                } else {
-                    $this->historySummary = null; 
-                }
-            } catch (\Exception $e) {
-                $this->historySummary = null; 
-            }
-        }
-        
+        $this->historySummary = $this->consultationLine($orgId, $notes);
         $this->historyData = $this->historySummary ? $notes->take(3) : $notes->take(5);
+    }
+
+    /**
+     * The line before a call (docs/LEADS.md section 13): who the client is, what is known, who to address and what to
+     * raise first, from the notes of earlier conversations and, for someone who may see it (crm.edit), the lead's intel.
+     * Claude Haiku writes it through the AI service (it was Gemini, once, and never refreshed). The answer is kept for 12
+     * hours for the same notes and intel, so reopening the call costs nothing; changed notes or intel write a new one.
+     * When the AI is off or over budget the page shows the latest notes instead, as before.
+     */
+    private function consultationLine($orgId, $notes): ?string
+    {
+        $intel = LeadIntel::canUse(Auth::user()) ? LeadIntel::contextText($orgId) : null;
+        if ($notes->count() <= 2 && $intel === null) {
+            return $this->leadData->ai_history_summary ?: null;
+        }
+
+        $material = ($notes->isNotEmpty()
+            ? "NOTES FROM EARLIER CONVERSATIONS (newest first):\n" . $notes->take(25)->map(fn ($n) => '- ' . Str::limit(trim((string) $n->note_text), 600))->implode("\n")
+            : 'No notes from earlier conversations yet.') . ($intel ? "\n\n" . $intel : '');
+
+        $key = 'consultation-prep:' . $orgId . ':' . md5($material);
+        $cached = Cache::get($key);
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
+
+        try {
+            $run = Ai::now('consultation_prep', ['type' => 'organization', 'id' => $orgId], ['material' => $material]);
+        } catch (AiUnavailable) {
+            return $this->leadData->ai_history_summary ?: null;
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $this->leadData->ai_history_summary ?: null;
+        }
+
+        $summary = $run->succeeded() ? trim((string) ($run->output['summary'] ?? '')) : '';
+        if ($summary === '') {
+            return $this->leadData->ai_history_summary ?: null;
+        }
+        Cache::put($key, $summary, now()->addHours(12));
+        // Kept for the screens that still read it; updated_at is left alone (this is not an edit of the organisation)
+        DB::table('organizations')->where('id', $orgId)->update(['ai_history_summary' => $summary, 'updated_at' => DB::raw('updated_at')]);
+
+        return $summary;
     }
 
     // ==========================================

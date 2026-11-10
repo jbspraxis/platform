@@ -61,12 +61,12 @@ class LeadScreensTest extends TestCase
         $this->actingAs($sales);
 
         // Nothing typed: the three required fields, and a way to reach them
-        Livewire::test(AddLead::class)->set('lead.next_step', '')->call('save')
+        Livewire::withQueryParams(['start' => 'blank'])->test(AddLead::class)->set('lead.next_step', '')->call('save')
             ->assertHasErrors(['lead.name', 'lead.industry'])->assertHasNoErrors('lead.country');
-        Livewire::test(AddLead::class)->set('lead.name', 'Lima Freight (test)')->set('lead.industry', 'Logistics')->call('save')
+        Livewire::withQueryParams(['start' => 'blank'])->test(AddLead::class)->set('lead.name', 'Lima Freight (test)')->set('lead.industry', 'Logistics')->call('save')
             ->assertHasErrors('lead.reach')->assertSee('Add at least one phone number or email address');
 
-        $screen = Livewire::test(AddLead::class)
+        $screen = Livewire::withQueryParams(['start' => 'blank'])->test(AddLead::class)
             ->assertSet('lead.next_step', 'Make first contact')
             ->set('lead.name', 'Lima Freight (test)')->set('lead.country', 'Cameroon')->set('lead.industry', 'Logistics')
             ->assertSet('lead.preferred_language', 'FR')
@@ -83,7 +83,7 @@ class LeadScreensTest extends TestCase
         $this->assertSame(['Bola', 'Ada'], $contacts->pluck('first_name')->all(), 'Bola is the main contact; the empty third block is dropped');
 
         // "Another country" is typed
-        Livewire::test(AddLead::class)->set('lead.name', 'Mike Mining (test)')->set('lead.industry', 'Logistics')->set('lead.email', 'info@mike.test')
+        Livewire::withQueryParams(['start' => 'blank'])->test(AddLead::class)->set('lead.name', 'Mike Mining (test)')->set('lead.industry', 'Logistics')->set('lead.email', 'info@mike.test')
             ->set('lead.country', AddLead::OTHER_COUNTRY)->call('save')->assertHasErrors('otherCountry')
             ->set('otherCountry', 'Mali')->call('save')->assertHasNoErrors();
         $this->assertSame('Mali', Organization::where('name', 'Mike Mining (test)')->value('country'));
@@ -95,7 +95,7 @@ class LeadScreensTest extends TestCase
         $this->actingAs($sales);
         $kilo = $this->lead(['name' => 'Kilo Logistics'], [['name' => 'Ada Test', 'email' => 'ada@kilo.test']], $sales);
 
-        Livewire::test(AddLead::class)->set('lead.name', 'Kilo Logistics Ltd')
+        Livewire::withQueryParams(['start' => 'blank'])->test(AddLead::class)->set('lead.name', 'Kilo Logistics Ltd')
             ->assertSee('This may already be in HQ')->assertSee('Same name')->assertSeeHtml(route('hq.crm.lead', ['organization' => $kilo->id]))->assertSee('Open it')
             ->set('lead.name', 'Brand New (test)')->assertDontSee('This may already be in HQ')
             ->set('contacts.0.email', 'ada@kilo.test')->assertSee('Same email')
@@ -104,7 +104,7 @@ class LeadScreensTest extends TestCase
         $this->assertSame(2, Organization::where('name', 'like', 'Kilo Logistics%')->count());
 
         // A contact whose email is someone else's is refused under the field, naming the lead
-        Livewire::test(AddLead::class)->set('lead.name', 'November Co (test)')->set('lead.industry', 'Logistics')
+        Livewire::withQueryParams(['start' => 'blank'])->test(AddLead::class)->set('lead.name', 'November Co (test)')->set('lead.industry', 'Logistics')
             ->set('contacts.0.name', 'Ada Copy')->set('contacts.0.email', 'ada@kilo.test')->call('save')
             ->assertHasErrors('contacts.0.email')->assertSee('already a contact of Kilo Logistics.');
     }
@@ -116,8 +116,9 @@ class LeadScreensTest extends TestCase
         $bottleneck = DB::table('mdm_copq_bottlenecks')->value('bottleneck_name');
         $industry = DB::table('mdm_copq_industries')->value('industry_name');
 
-        // More details starts closed; one figure filled means all are needed, and the section opens to show why
-        $screen = Livewire::test(AddLead::class)->assertSet('moreOpen', false)->assertDontSee('Annual turnover')
+        // More details starts closed (a blank lead leaves it out and "cost of poor quality discussed" opens it, so this
+        // goes in by the intel path); one figure filled means all are needed, and the section opens to show why
+        $screen = Livewire::withQueryParams(['start' => 'intel'])->test(AddLead::class)->assertSet('moreOpen', false)->assertDontSee('Annual turnover')
             ->set('lead.name', 'Oscar Retail (test)')->set('lead.industry', $industry)->set('lead.phone', '+234 800 000 0009')
             ->set('copq.turnover', '1000000')->call('save')->assertHasErrors(['copq.acv', 'copq.tool'])->assertSet('moreOpen', true)->assertSee('Annual turnover');
         $screen->set('copq.tool', $system)->set('copq.bottleneck', $bottleneck)->set('copq.currency', 'USD')

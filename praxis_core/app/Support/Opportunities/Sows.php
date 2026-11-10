@@ -170,7 +170,7 @@ final class Sows
         }
         $opportunity = $sow->opportunity;
         // The SOW part is left out: the AI reads earlier versions in MATERIAL, so the cached context stays the same
-        $parts = ['profile', 'copq', 'meetings', 'internal', 'notes', 'questionnaire', 'proposal'];
+        $parts = ['profile', 'copq', 'intel', 'meetings', 'internal', 'notes', 'questionnaire', 'proposal'];
 
         $run = Ai::queue('sow', $sow, [
             'context' => OpportunityContext::for($opportunity, include: $withTranscripts ? [...$parts, 'transcripts'] : $parts),
