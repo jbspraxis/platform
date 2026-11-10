@@ -737,10 +737,8 @@ class Inbox extends Component
         $img = "'self' {$self} data:" . ($remote ? ' https: http:' : '');
         $policy = "default-src 'none'; img-src {$img}; style-src 'unsafe-inline'; font-src data:" . ($remote ? ' https:' : '') . "; base-uri 'none'; form-action 'none'";
         // Brand tokens from resources/css/app.css (the frame can't read the page's variables)
-        // color-scheme:light keeps the frame on the light palette whatever the person's device is set to:
-        // `prefers-color-scheme` inside an iframe follows the OS, not HQ, and an email that repaints its
-        // text for a dark canvas would put light grey on this white page (HtmlSanitizer drops those rules;
-        // this is the belt to that braces, and it also settles form controls and scrollbars).
+        // color-scheme:light keeps light-dark(), scrollbars and the canvas on the light palette. It does not stop an
+        // email's `@media (prefers-color-scheme: dark)` from matching on a dark device: HtmlSanitizer removes those.
         $base = 'html,body{margin:0;padding:0;background:#FFFFFF;color-scheme:light}'
             . 'body{font-family:"Plus Jakarta Sans","Segoe UI",Arial,sans-serif;font-size:14px;line-height:1.55;color:#0C142B;overflow-wrap:anywhere;word-break:break-word}'
             . 'img{max-width:100%;height:auto}table{max-width:100%}pre{white-space:pre-wrap}a{color:#08707C}'

@@ -237,11 +237,8 @@ final class HtmlSanitizer
         $css = preg_replace('/\\\\(.)/s', '$1', $css) ?? '';
         $css = str_replace(['<', "\0"], '', $css);
 
-        // HQ's reader is a light page and never gives the message a dark canvas, so an email's dark palette
-        // would land on our white one (docs/MAIL.md, PR 2: Google Calendar invitations read #e8eaed on
-        // #FFFFFF, 1.2:1). Everything that only paints for a dark canvas goes, before pictures are counted,
-        // so a hidden dark logo isn't offered as a held-back picture either.
-        $css = self::withoutDarkPalette($css);
+        // Before pictures are counted, so a logo that only the dark palette asked for isn't held back either
+        $css = DarkPalette::strip($css);
 
         if (preg_match('/expression\s*\(|javascript:|vbscript:|-moz-binding|behaviou?r\s*:|@import|@charset|@namespace/i', $css)) {
             if (! $block) {
@@ -256,83 +253,6 @@ final class HtmlSanitizer
 
             return $url === null ? 'none' : 'url("' . str_replace(['"', '\\', "\n", "\r"], '', $url) . '")';
         }, $css) ?? '';
-    }
-
-    /**
-     * Drop the dark half of a sender's own colour-scheme work: every `@media (prefers-color-scheme: dark)`
-     * block, and any `color-scheme` / `supported-color-schemes` declaration that would tip the frame into
-     * the dark palette.
-     *
-     * Why: `prefers-color-scheme` inside the reader's iframe follows the person's device, not HQ, which has
-     * no dark theme of its own. Google Calendar invitations ship `@media (prefers-color-scheme: dark)`
-     * rules that set only text and link colours — `#e8eaed` body, `#9aa0a6` muted, `#8ab4f8` buttons —
-     * because the surrounding client (Gmail) supplies the dark canvas. HQ supplies a white one, the
-     * sender's block is written after HQ's own and carries `!important`, so on a dark-mode machine the
-     * invitation came out as near-white text on white (1.2:1). Email for the light palette, and every
-     * other media query — width, print, resolution — is left exactly as the sender wrote it.
-     */
-    private static function withoutDarkPalette(string $css): string
-    {
-        // The media query can only be reached by opting in, so the opt-in goes too: `:root{color-scheme:
-        // light dark}` outranks the frame's own `html{color-scheme:light}` and would reopen the dark half.
-        $css = preg_replace('/(^|[;{])\s*(?:-webkit-|-moz-)?(?:supported-)?color-schemes?\s*:[^;}]*/i', '$1', $css) ?? '';
-        $css = preg_replace('/\{\s*(?:;\s*)+/', '{', $css) ?? '';
-        $css = preg_replace('/^[;\s]+/', '', $css) ?? '';
-
-        $search = 0;
-        while (($at = strpos($css, '@', $search)) !== false) {
-            $name = substr($css, $at + 1, strcspn($css, " \t\r\n({;", $at + 1));
-            $open = strpos($css, '{', $at);
-            $end = strpos($css, ';', $at);
-
-            // Not `@media`, or an at-rule that never opens a block: leave it for the browser to drop
-            if (strcasecmp($name, 'media') !== 0 || $open === false || ($end !== false && $end < $open)) {
-                $search = $at + 1;
-                continue;
-            }
-
-            $dark = preg_match('/prefers-color-scheme\s*:\s*dark/i', substr($css, $at, $open - $at)) === 1;
-            $close = self::blockEnd($css, $open);
-
-            if ($close === null) {
-                // Braces that never balance: the rest of the sheet sits inside this block, so a dark one
-                // takes it with it rather than leaving its light text loose on our white page.
-                if ($dark) {
-                    $css = substr($css, 0, $at);
-                }
-                break;
-            }
-
-            if ($dark) {
-                $css = substr($css, 0, $at) . substr($css, $close + 1);
-                $search = $at;      // whatever followed the block now sits here
-
-                continue;
-            }
-
-            $search = $open + 1;    // keep the block, but look inside it for a nested one
-        }
-
-        return $css;
-    }
-
-    /** The `}` closing the block that opens at $open, or null when the braces never balance */
-    private static function blockEnd(string $css, int $open): ?int
-    {
-        $depth = 0;
-        for ($i = $open, $len = strlen($css); $i < $len; $i++) {
-            $char = $css[$i];
-
-            if ($char === '"' || $char === "'") {   // a brace inside content:"}" is not a block
-                $i = strpos($css, $char, $i + 1) ?: $len;
-            } elseif ($char === '{') {
-                $depth++;
-            } elseif ($char === '}' && --$depth === 0) {
-                return $i;
-            }
-        }
-
-        return null;
     }
 
     private function unwrap(DOMElement $node): void
