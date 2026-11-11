@@ -41,7 +41,9 @@ final class Ai
     public static function queue(string $purpose, Model|array $subject, array $input): AiRun
     {
         $run = self::start($purpose, $subject, $input);
-        RunAiJob::dispatch($run->id)->onConnection(config('ai.queue.connection'))->onQueue(config('ai.queue.name'));
+        // Bulk purposes (config/ai.php) wait behind anything a person is waiting for
+        $queue = empty(self::purpose($purpose)['bulk']) ? config('ai.queue.name') : config('ai.queue.bulk', config('ai.queue.name'));
+        RunAiJob::dispatch($run->id)->onConnection(config('ai.queue.connection'))->onQueue($queue);
 
         return $run->fresh();
     }

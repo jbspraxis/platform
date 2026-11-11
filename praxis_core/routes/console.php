@@ -9,6 +9,16 @@ use Illuminate\Support\Facades\Artisan;
 // while new mail waited for the commands above it
 Schedule::command('mail:sync')->everyMinute()->withoutOverlapping(10)->runInBackground();
 
+// Opportunities (docs/OPPORTUNITIES.md 8.3): AI jobs wait on their own queues and run here. The worker stays up for most
+// of the minute and looks for work every second, so a job someone is waiting for starts within seconds (it used to stop
+// as soon as the queue was empty, and the next job waited up to a minute for the next one); the bulk queue (outreach
+// drafts and reply sorting, config/ai.php) only when the first is empty. A long document keeps its worker until it is
+// done (no overlap). Only the AI queues: anything else in the jobs table is left alone. Each job is tried once
+// (RunAiJob). Runs left behind by a worker that stopped fail after 30 minutes, so screens stop waiting.
+Schedule::command('queue:work ' . config('ai.queue.connection') . ' --queue=' . implode(',', array_filter([config('ai.queue.name'), config('ai.queue.bulk')]))
+    . ' --sleep=1 --max-time=50 --tries=2')
+    ->everyMinute()->withoutOverlapping(30)->runInBackground();
+
 // The 6-Hour Shift Marketing Telemetry Cron Job
 Schedule::command('marketing:sync-telemetry')->everySixHours();
 
@@ -66,13 +76,6 @@ Schedule::command('backups:check')->hourlyAt(17)->withoutOverlapping(10);
 Schedule::command('mail:send-due')->everyMinute()->withoutOverlapping(5);
 Schedule::command('mail:prune')->dailyAt('03:40');
 
-// Opportunities (docs/OPPORTUNITIES.md 8.3): AI jobs wait on their own 'ai' queue and run here, a minute at most per
-// pass; a long document keeps its worker until it is done (no overlap). Only the 'ai' queue: anything else in the jobs
-// table is left alone. Each job is tried once (RunAiJob). Runs left behind by a worker that stopped fail after 30
-// minutes, so screens stop waiting.
-// In the background like mail:sync, so the commands after it don't wait for its minute
-Schedule::command('queue:work ' . config('ai.queue.connection') . ' --queue=' . config('ai.queue.name') . ' --stop-when-empty --max-time=50 --tries=2')
-    ->everyMinute()->withoutOverlapping(30)->runInBackground();
 Schedule::call(fn () => \App\Support\Ai\Ai::expireStuck())->name('ai:expire-stuck')->everyTenMinutes()->withoutOverlapping(5);
 
 // Meetings (docs/OPPORTUNITIES.md 6.1): ended meetings become held; transcripts are collected from Google from 20

@@ -125,11 +125,12 @@ class HealthChecks
 
     private static function queue(): array
     {
-        // AI jobs (queue 'ai') are run every minute by the scheduler; nothing else should wait here
-        $other = DB::table('jobs')->where('queue', '!=', config('ai.queue.name', 'ai'));
+        // AI jobs (queues 'ai' and 'ai-bulk') are run by the worker the scheduler keeps up; nothing else should wait here
+        $aiQueues = array_values(array_filter([config('ai.queue.name', 'ai'), config('ai.queue.bulk')]));
+        $other = DB::table('jobs')->whereNotIn('queue', $aiQueues);
         $waiting = (clone $other)->count();
         $oldest = $waiting ? (clone $other)->min('created_at') : null;
-        $ai = DB::table('jobs')->where('queue', config('ai.queue.name', 'ai'));
+        $ai = DB::table('jobs')->whereIn('queue', $aiQueues);
         $aiWaiting = (clone $ai)->count();
         $aiOldest = $aiWaiting ? (clone $ai)->min('created_at') : null;
         $failed = DB::table('failed_jobs')->count();
@@ -137,7 +138,7 @@ class HealthChecks
         $aiStale = $aiOldest && (time() - (int) $aiOldest) > 600;
         return ['label' => 'Background jobs', 'state' => $stale || $aiStale || $failed ? 'warn' : 'ok',
             'detail' => "{$aiWaiting} AI job(s) waiting" . ($aiOldest ? ' (oldest ' . self::ago(Carbon::createFromTimestamp((int) $aiOldest)) . ')' : '')
-                . ", {$waiting} other waiting" . ($oldest ? ' (oldest ' . self::ago(Carbon::createFromTimestamp((int) $oldest)) . ')' : '') . ", {$failed} failed. Emails are sent straight away; AI jobs start within a minute.",
+                . ", {$waiting} other waiting" . ($oldest ? ' (oldest ' . self::ago(Carbon::createFromTimestamp((int) $oldest)) . ')' : '') . ", {$failed} failed. Emails are sent straight away; AI jobs start within seconds.",
             'fix' => $aiStale ? 'AI jobs are not being picked up: check that the cron job runs "schedule:run" every minute.'
                 : ($stale ? 'Old waiting jobs outside the AI queue will never run (no worker for them). Review and clear them.' : null)];
     }

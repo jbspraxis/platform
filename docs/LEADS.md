@@ -305,7 +305,7 @@ Agreed with the owner on 10 Nov 2026, the day after the Head of Sales' meeting a
 
 ### Deploying it
 
-One migration, no new package and no new setting. The Claude key and budget are already in HQ. **Check the live PHP's `upload_max_filesize` and `post_max_size` are at least 12M** (cPanel › MultiPHP INI Editor): a 10 MB report over the default 2M limit fails in the browser. Livewire's temporary upload and the private disk need nothing else. After it is live: add one report to a test lead and open its Intel tab; Claude's layout should appear within a minute or two (the scheduler runs the `ai` queue every minute).
+One migration, no new package and no new setting. The Claude key and budget are already in HQ. **Check the live PHP's `upload_max_filesize` and `post_max_size` are at least 12M** (cPanel › MultiPHP INI Editor): a 10 MB report over the default 2M limit fails in the browser. Livewire's temporary upload and the private disk need nothing else. After it is live: add one report to a test lead and open its Intel tab; Claude's layout should appear within a minute or two (the scheduler keeps a worker on the `ai` queue).
 
 ### Tests
 
