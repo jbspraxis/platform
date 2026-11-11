@@ -71,4 +71,8 @@ return [
 
     // Visitor-typed text in visitor emails: the first name only, at most this many characters
     'email_first_name_max' => 40,
+
+    // The day the new jbspraxis.com went live. System health → Website enquiries counts from here while no
+    // enquiry has been recorded yet, so an empty history (a new site, or test enquiries cleared) is not a fault.
+    'live_since' => env('SITE_LIVE_SINCE', '2026-10-30'),
 ];
