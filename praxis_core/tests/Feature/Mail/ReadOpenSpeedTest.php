@@ -196,6 +196,39 @@ class ReadOpenSpeedTest extends TestCase
         $this->actingAs($outsider)->get($base . 'logo@x')->assertForbidden();
     }
 
+    public function test_sync_skips_a_folder_nothing_changed_in_but_sees_new_mail_and_flags_and_runs_a_full_pass_hourly(): void
+    {
+        [$account] = $this->shared();
+        $uid = $this->server->deliver(self::BOX, 'INBOX', FakeMailServer::message(subject: 'Quarterly numbers'));
+        // The first copy, then a first complete pass (which records the folder's change number)
+        MailSync::make()->account($account->fresh());
+        MailSync::make()->account($account->fresh());
+        $this->assertSame(1, MailMessage::count());
+
+        // HQ's copy loses a row behind sync's back: a minute later the server reports no change, so the folder isn't searched
+        MailMessage::query()->delete();
+        MailSync::make()->account($account->fresh());
+        $this->assertSame(0, MailMessage::count(), 'Unchanged folder: no window search');
+
+        // New mail moves UIDNEXT: a full pass, which also brings back what was missing
+        $this->server->deliver(self::BOX, 'INBOX', FakeMailServer::message(subject: 'Board pack'));
+        MailSync::make()->account($account->fresh());
+        $this->assertSame(['Board pack', 'Quarterly numbers'], MailMessage::orderBy('subject')->pluck('subject')->all());
+
+        // A flag set in another mail app raises the change number: picked up
+        $this->server->setFlags(self::BOX, 'INBOX', $uid, ['\\Flagged']);
+        MailSync::make()->account($account->fresh());
+        $this->assertTrue((bool) MailMessage::where('uid', $uid)->value('is_flagged'));
+
+        // Once the hour is up, a full pass runs even when nothing changed
+        MailMessage::where('subject', 'Board pack')->delete();
+        MailSync::make()->account($account->fresh());
+        $this->assertSame(1, MailMessage::count());
+        $this->travel(61)->minutes();
+        MailSync::make()->account($account->fresh());
+        $this->assertSame(2, MailMessage::count());
+    }
+
     /** @return list<int> UIDs of a conversation of $n unread messages in the shared Inbox */
     private function conversation(int $n): array
     {

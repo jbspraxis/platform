@@ -147,7 +147,9 @@ final class Threader
             return null;
         }
 
-        $own = strtolower((string) MailAccount::whereKey($message->account_id)->value('email'));
+        // The mailbox's own address, read once per mailbox (sync files messages one by one)
+        static $emails = [];
+        $own = $emails[$message->account_id] ??= strtolower((string) MailAccount::whereKey($message->account_id)->value('email'));
         $people = array_values(array_diff(self::emails($message), [$own]));
         if (! $people) {
             return null;
