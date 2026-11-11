@@ -15,6 +15,7 @@
     @assets
         <script src="{{ route('hq.mail.compose.script', ['v' => filemtime(resource_path('mail/compose.js'))]) }}"></script>
     @endassets
+    @assets
     <style>
         /* The composer (PR 3): a dialog on desktop, full screen on phones. Brand tokens only. */
         .mc-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: rgba(12, 20, 43, 0.5); }
@@ -111,6 +112,7 @@
             @keyframes mc-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
         }
     </style>
+    @endassets
 
     @if ($open && $outboxId)
         <div class="mc-backdrop" wire:key="mc-{{ $outboxId }}"

@@ -36,11 +36,12 @@ final class MailAccess
 
     public static function canUse(?User $user): bool
     {
-        if (! $user || ! $user->can('mail.view')) {
+        if (! $user) {
             return false;
         }
 
-        return self::isOpenToEveryone() || self::isOwner($user);
+        // Asked for every mailbox, thread and message checked in a request: once per person (flush() forgets it)
+        return self::$cache['use:' . $user->id] ??= $user->can('mail.view') && (self::isOpenToEveryone() || self::isOwner($user));
     }
 
     public static function isOpenToEveryone(): bool
@@ -96,16 +97,27 @@ final class MailAccess
 
     public static function canThread(?User $user, MailThread $thread, string $ability): bool
     {
-        $account = $thread->relationLoaded('account') ? $thread->account : MailAccount::find($thread->account_id);
+        $account = $thread->relationLoaded('account') ? $thread->account : self::account($thread->account_id);
 
         return $account !== null && self::can($user, $account, $ability);
     }
 
     public static function canMessage(?User $user, MailMessage $message, string $ability): bool
     {
-        $account = $message->relationLoaded('account') ? $message->account : MailAccount::find($message->account_id);
+        $account = $message->relationLoaded('account') ? $message->account : self::account($message->account_id);
 
         return $account !== null && self::can($user, $account, $ability);
+    }
+
+    /** A mailbox by id, read once per request for the checks above (flush() forgets it) */
+    private static function account(?string $id): ?MailAccount
+    {
+        if (! $id) {
+            return null;
+        }
+        $key = 'account:' . $id;
+
+        return array_key_exists($key, self::$cache) ? self::$cache[$key] : (self::$cache[$key] = MailAccount::find($id));
     }
 
     /**

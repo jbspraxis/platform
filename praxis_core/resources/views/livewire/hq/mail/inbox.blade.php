@@ -12,6 +12,7 @@
      data-account="{{ $account?->id }}" data-thread="{{ $openThread?->id }}" data-latest="{{ $latest['id'] ?? '' }}"
      data-draft="{{ ($latest['is_draft'] ?? false) ? '1' : '' }}" data-folder="{{ $role }}"
      data-organise="{{ $canOrganise ? '1' : '' }}" data-send="{{ $canSend ? '1' : '' }}" data-flagged="{{ $openThread && collect($messages)->contains(fn ($m) => $m['model']->is_flagged) ? '1' : '' }}">
+    @assets
     <style>
         /* HQ → Mail (PR 2). Brand tokens from app.css only; shared classes (btn, pill, tag, input, alert, modal) where they fit. */
         .mr { --mr-pane-h: calc(100dvh - 204px); }
@@ -159,6 +160,7 @@
             .mr-file-name { max-width: 150px; }
         }
     </style>
+    @endassets
 
     <div class="mr-head">
         <div style="min-width: 0;">

@@ -23,8 +23,16 @@ class Access
 
     private static array $cache = [];
 
-    /** Every permission in the catalogue: slug => [audience, module, action, name]. */
+    /**
+     * Every permission in the catalogue: slug => [audience, module, action, name]. Built once per request (every @can,
+     * can: middleware and $user->can() asks isPermission() first, often dozens of times per page); flush() forgets it.
+     */
     public static function catalogue(): array
+    {
+        return self::$cache['catalogue'] ??= self::buildCatalogue();
+    }
+
+    private static function buildCatalogue(): array
     {
         $out = [];
         foreach (config('access.modules') as $audience => $modules) {
@@ -127,7 +135,7 @@ class Access
 
     public static function isOwner(User $user): bool
     {
-        return DB::table('staff_roles')->join('roles', 'roles.id', '=', 'staff_roles.role_id')
+        return self::$cache['owner:' . $user->id] ??= DB::table('staff_roles')->join('roles', 'roles.id', '=', 'staff_roles.role_id')
             ->where('staff_roles.user_id', $user->id)->where('roles.is_protected', 1)->exists();
     }
 

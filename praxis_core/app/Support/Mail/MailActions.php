@@ -14,6 +14,8 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
+use function Illuminate\Support\defer;
+
 /**
  * Changes to mail (docs/MAIL.md, "Actions"): the server first, then HQ's copy, so HQ never shows something the
  * server doesn't have. Each call checks access, works on messages of one mailbox, and refreshes the counts of
@@ -38,13 +40,104 @@ final class MailActions
      */
     public function opened(User $user, MailMessage $message): void
     {
-        $this->authorize($user, collect([$message]), 'read');
-        if (! $message->seen_by) {
-            MailMessage::where('id', $message->id)->whereNull('seen_by')->update(['seen_by' => $user->id, 'seen_at' => now()]);
+        $this->openedMany($user, [$message]);
+    }
+
+    /**
+     * The person opened these messages of one mailbox (a conversation's unread ones and its latest): each is marked
+     * read for everyone and remembers who opened it first (owner decision 6). All of them in one go: one access
+     * check, one write per change, one recount and at most one mail server session, where opening a conversation
+     * used to sign in to the server once per unread message.
+     *
+     * When this PHP can finish the response before its work is done (PHP-FPM, LiteSpeed; see markReadAfterResponse),
+     * HQ's copy is marked read at once and the server's \Seen is written just after the reader is on screen. Otherwise
+     * (and in tests) the server comes first, as for every other action. Throws ImapException only in that case.
+     *
+     * @param  iterable<MailMessage>  $messages
+     */
+    public function openedMany(User $user, iterable $messages): void
+    {
+        $messages = collect($messages)->filter(fn ($m) => $m instanceof MailMessage)->values();
+        if ($messages->isEmpty()) {
+            return;
         }
-        if (! $message->is_seen) {
-            $this->markRead($user, [$message], true);
+        abort_if($messages->pluck('account_id')->unique()->count() > 1, 422, 'One mailbox at a time.');
+        $this->authorize($user, $messages, 'read');
+
+        $first = $messages->filter(fn (MailMessage $m) => ! $m->seen_by)->pluck('id');
+        if ($first->isNotEmpty()) {
+            MailMessage::whereIn('id', $first)->whereNull('seen_by')->update(['seen_by' => $user->id, 'seen_at' => now()]);
+            MailVersion::bump($messages->first()->account_id);
         }
+
+        $unread = $messages->filter(fn (MailMessage $m) => ! $m->is_seen)->pluck('id');
+        if ($unread->isEmpty()) {
+            return;
+        }
+        if (self::markReadAfterResponse()) {
+            $this->markReadLater($user, $unread->all());
+
+            return;
+        }
+        $this->markRead($user, $unread->all(), true);
+    }
+
+    /**
+     * Whether opening mail writes the server's \Seen after the response. Only where PHP can send the response first
+     * (fastcgi_finish_request under PHP-FPM, litespeed_finish_request under LiteSpeed / mod_lsapi): elsewhere the
+     * work would still hold the page, so the server is written first as before. config mail_client.mark_read_after_response
+     * (true or false) overrides the check, for tests.
+     */
+    public static function markReadAfterResponse(): bool
+    {
+        $setting = config('mail_client.mark_read_after_response');
+        if ($setting !== null) {
+            return (bool) $setting;
+        }
+
+        return ! app()->runningInConsole()
+            && (function_exists('fastcgi_finish_request') || function_exists('litespeed_finish_request'));
+    }
+
+    /**
+     * HQ's copy now (the reader, the list, the counts and every colleague see it read straight away), the server's
+     * \Seen once the response has gone (Laravel's defer, one session for all the messages). If the server refuses,
+     * HQ's copy goes back to unread, which is where the server-first order left it: the two never disagree for long,
+     * and sync (CONDSTORE CHANGEDSINCE) picks the flag up from the server once it is there.
+     *
+     * @param  list<int>  $ids
+     */
+    private function markReadLater(User $user, array $ids): void
+    {
+        $targets = MailMessage::with('account')->whereIn('id', $ids)->where('is_seen', false)->get();
+        if ($targets->isEmpty()) {
+            return;
+        }
+        $this->authorize($user, $targets, 'read');
+        $ids = $targets->pluck('id')->all();
+        $threads = $targets->pluck('thread_id')->all();
+        $folders = MailFolder::whereIn('id', $targets->pluck('folder_id')->unique())->get()->keyBy('id');
+
+        MailMessage::whereIn('id', $ids)->update(['is_seen' => true]);
+        $this->refresh($threads, $folders->all());
+
+        defer(function () use ($user, $targets, $folders, $ids, $threads) {
+            try {
+                $this->withSession($targets->first()->account, function (ImapSession $session) use ($targets, $folders) {
+                    foreach ($targets->groupBy('folder_id') as $folderId => $group) {
+                        $session->select($folders[$folderId]->path);
+                        $session->addFlags($group->pluck('uid')->map(fn ($u) => (int) $u)->all(), ['\\Seen']);
+                    }
+                });
+            } catch (\Throwable $e) {
+                MailMessage::whereIn('id', $ids)->where('is_seen', true)->update(['is_seen' => false]);
+                $this->refresh($threads, $folders->all());
+                MailNav::forget($user->id);
+                if (! $e instanceof ImapException) {
+                    report($e);
+                }
+            }
+        }, 'mail-seen:' . implode(',', $ids), always: true);
     }
 
     /** @param  iterable<MailMessage>|MailThread  $messages */

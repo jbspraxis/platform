@@ -1,4 +1,5 @@
 <div class="ms">
+    @assets
     <style>
         /* Mail → Signature (PR 3). Brand tokens only. */
         .ms { max-width: 960px; }
@@ -20,6 +21,7 @@
         .ms-stack { display: flex; flex-direction: column; gap: 24px; }
         @media (max-width: 900px) { .ms-grid { grid-template-columns: minmax(0, 1fr); } }
     </style>
+    @endassets
 
     <div class="page-header">
         <div>

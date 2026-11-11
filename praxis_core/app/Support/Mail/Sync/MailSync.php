@@ -223,7 +223,11 @@ final class MailSync
         $folder->forceFill($fill)->save();
 
         ThreadCounters::refresh($touchedThreads);
-        ThreadCounters::folder($folder);
+        // Recount only when this run changed something here: counting a large folder every minute for nothing
+        // was most of a quiet run's work (MailActions recount after their own changes)
+        if ($counts['added'] || $counts['removed'] || $counts['updated'] || $touchedThreads) {
+            ThreadCounters::folder($folder);
+        }
 
         if ($received) {
             usort($received, fn ($a, $b) => $a->received_at <=> $b->received_at);

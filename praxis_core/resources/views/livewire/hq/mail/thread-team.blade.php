@@ -1,5 +1,6 @@
 <div class="mt" @if ($thread) wire:poll.20s="heartbeat" @endif>
     @if ($thread)
+        @assets
         <style>
             /* Mail → teamwork bar in the reader (PR 4). Brand tokens only. */
             .mt { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
@@ -42,6 +43,7 @@
                 .mt-tools .btn { justify-content: center; padding-left: 6px; padding-right: 6px; }
             }
         </style>
+        @endassets
 
         @php
             $tz = 'Africa/Lagos';

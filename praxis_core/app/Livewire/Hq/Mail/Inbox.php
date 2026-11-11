@@ -12,6 +12,7 @@ use App\Support\Mail\MailAccess;
 use App\Support\Mail\MailActions;
 use App\Support\Mail\MailFetch;
 use App\Support\Mail\MailNav;
+use App\Support\Mail\MailVersion;
 use App\Support\Mail\Read\HtmlSanitizer;
 use App\Support\Mail\Read\ImageTrust;
 use App\Support\Mail\Read\TextFormatter;
@@ -46,6 +47,16 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 class Inbox extends Component
 {
     public const TZ = 'Africa/Lagos';
+
+    /** mail_messages columns the reader uses: all but body_text and body_html */
+    private const MESSAGE_COLUMNS = ['id', 'account_id', 'folder_id', 'thread_id', 'uid', 'message_id', 'message_id_hash',
+        'in_reply_to', 'references', 'subject', 'from_name', 'from_email', 'to', 'cc', 'bcc', 'reply_to', 'to_text',
+        'sent_at', 'received_at', 'size', 'is_seen', 'is_flagged', 'is_answered', 'is_draft', 'has_attachments',
+        'is_outbound', 'snippet', 'body_state', 'parts', 'list_unsubscribe', 'seen_by', 'seen_at', 'sent_by',
+        'created_at', 'updated_at'];
+
+    /** How long the reader keeps a message as it shows it (sanitised HTML in its frame document), in seconds */
+    private const VIEW_TTL = 21600;
 
     #[Url(as: 'box')]
     public ?string $box = null;
@@ -95,6 +106,18 @@ class Inbox extends Component
     #[Locked]
     public ?string $confirm = null;
 
+    /** The mailboxes' change stamps (MailVersion) this page was last drawn with, and polls skipped since */
+    #[Locked]
+    public string $drawnAt = '';
+
+    #[Locked]
+    public int $quietPolls = 0;
+
+    /** The open conversation's messages for this request (threadMessages), with the key they were read for */
+    private ?Collection $messagesMemo = null;
+
+    private ?string $messagesMemoKey = null;
+
     public function mount(): void
     {
         abort_unless(MailAccess::canUse($this->user()), 403);
@@ -119,7 +142,7 @@ class Inbox extends Component
         $this->box ??= $this->accounts->first()?->id;
 
         if ($this->thread) {
-            $this->showThread($this->thread);
+            $this->showThread($this->thread, mounting: true);
         }
     }
 
@@ -269,7 +292,10 @@ class Inbox extends Component
         }
 
         MailNav::forget($user->id);
-        $this->dispatch('mail-thread-changed', threadId: $thread->id);
+        $this->forgetMessages();
+        // This render already shows the change: the event is for the conversation's team bar (6.3), not for Inbox
+        // itself, which would otherwise answer it with a second full round trip
+        $this->dispatch('mail-thread-changed', threadId: $thread->id)->to(ThreadTeam::class);
 
         $moved = in_array($action, ['archive', 'spam', 'trash', 'inbox'], true) || str_starts_with($action, 'move:');
         $this->undo = $moved && $from ? ['ids' => $scope->pluck('id')->all(), 'folder' => $from] : null;
@@ -307,6 +333,7 @@ class Inbox extends Component
             return;
         }
         if ($this->attempt(fn () => MailActions::make()->move($this->user(), $messages, $folder))) {
+            $this->forgetMessages();
             MailNav::forget($this->user()->id);
             $this->notice('Moved back to ' . $folder->label() . '.');
         }
@@ -349,9 +376,20 @@ class Inbox extends Component
         };
     }
 
-    /** wire:poll: counts and the list follow the scheduler's copy */
+    /**
+     * wire:poll (every minute): counts and the list follow the scheduler's copy. When no mailbox on the page changed
+     * since it was drawn (MailVersion), nothing is drawn again: one cache read instead of the list, the counts and
+     * the reader. Every fifth quiet poll draws anyway, for anything a stamp can't see.
+     */
     public function tick(): void
     {
+        if ($this->drawnAt !== '' && $this->stamps() === $this->drawnAt && $this->quietPolls < 4) {
+            $this->quietPolls++;
+            $this->skipRender();
+
+            return;
+        }
+        $this->quietPolls = 0;
     }
 
     public function dismissFlash(): void
@@ -418,6 +456,7 @@ class Inbox extends Component
     #[On('mail-sent')]
     public function onSent(?string $accountId = null, ?int $threadId = null, ?string $outboxId = null, mixed ...$more): void
     {
+        $this->forgetMessages();
         if ($threadId && $threadId === $this->thread) {
             $latest = $this->threadMessages()->last();
             if ($latest && ! in_array($latest->id, $this->expanded, true)) {
@@ -429,6 +468,7 @@ class Inbox extends Component
     #[On('mail-thread-changed')]
     public function onThreadChanged(?int $threadId = null, mixed ...$more): void
     {
+        $this->forgetMessages();
         // re-rendered with the new state; a conversation that no longer exists closes
         if ($this->thread && ! MailThread::whereKey($this->thread)->exists()) {
             $this->closeThread();
@@ -498,6 +538,7 @@ class Inbox extends Component
         if ($this->thread && ! $thread) {
             $this->thread = null;
         }
+        $this->drawnAt = $this->stamps();
 
         return view('livewire.hq.mail.inbox', [
             'user' => $user,
@@ -574,39 +615,49 @@ class Inbox extends Component
         return $thread && MailAccess::canThread($this->user(), $thread, 'read') ? $thread : null;
     }
 
-    private function showThread(int $id): void
+    private function showThread(int $id, bool $mounting = false): void
     {
         $thread = MailThread::find($id);
         abort_unless($thread && $thread->account_id === $this->box && MailAccess::canThread($this->user(), $thread, 'read'), 404);
 
+        $again = ! $mounting && $this->thread === $id;
         $this->thread = $id;
         $messages = $this->threadMessages();
         // The unread ones and the latest are open; the rest fold
         $this->expanded = $messages->filter(fn (MailMessage $m) => ! $m->is_seen)->pluck('id')
             ->push($messages->last()?->id)->filter()->unique()->values()->all();
         $this->markOpened($messages->whereIn('id', $this->expanded));
-        $this->dispatch('mail-thread-opened', accountId: $thread->account_id, threadId: $thread->id);
+        // A newly opened conversation mounts its own team bar (keyed by the thread), which records "viewing" as it
+        // mounts: the event (6.3) would only bring it straight back for a second round trip. It is raised when the
+        // conversation already on screen is opened again, for the bar that is already there.
+        if ($again) {
+            $this->dispatch('mail-thread-opened', accountId: $thread->account_id, threadId: $thread->id);
+        }
     }
 
-    /** Opening marks read for everyone and records who opened it first (MailActions::opened) */
+    /**
+     * Opening marks read for everyone and records who opened it first: all of these messages in one call
+     * (MailActions::openedMany, one mail server session at most), then the copies on screen take the new state.
+     */
     private function markOpened(Collection $messages): void
     {
-        $user = $this->user();
-        $changed = false;
-        foreach ($messages as $message) {
-            if ($message->is_seen && $message->seen_by) {
-                continue;
-            }
-            try {
-                MailActions::make()->opened($user, $message);
-                $changed = true;
-            } catch (ImapException) {
-                // Shown as unread until the server takes it; reading goes on
-                $changed = true;
-            }
+        $messages = $messages->reject(fn (MailMessage $m) => $m->is_seen && $m->seen_by)->values();
+        if ($messages->isEmpty()) {
+            return;
         }
-        if ($changed) {
-            MailNav::forget($user->id);
+        $user = $this->user();
+        try {
+            MailActions::make()->openedMany($user, $messages);
+        } catch (ImapException) {
+            // Shown as unread until the server takes it; reading goes on
+        }
+        MailNav::forget($user->id);
+
+        $now = MailMessage::whereIn('id', $messages->pluck('id'))->get(['id', 'is_seen', 'seen_by', 'seen_at'])->keyBy('id');
+        foreach ($this->messagesMemo ?? [] as $m) {
+            if ($row = $now->get($m->id)) {
+                $m->forceFill(['is_seen' => $row->is_seen, 'seen_by' => $row->seen_by, 'seen_at' => $row->seen_at])->syncOriginal();
+            }
         }
     }
 
@@ -622,9 +673,17 @@ class Inbox extends Component
             return collect();
         }
         $current = $this->currentFolder?->id;
+        $key = $this->thread . '|' . $this->box . '|' . $current;
+        if ($this->messagesMemo !== null && $this->messagesMemoKey === $key) {
+            return $this->messagesMemo;
+        }
         $roles = $this->folders->pluck('role', 'id');
 
-        return MailMessage::with(['attachments', 'folder:id,role,name,path'])
+        // Every column but the bodies (up to 1 MB each): those are read for the open messages only (readerMessages)
+        $this->messagesMemoKey = $key;
+
+        return $this->messagesMemo = MailMessage::with(['attachments', 'folder:id,role,name,path'])
+            ->select(array_map(fn ($c) => 'mail_messages.' . $c, self::MESSAGE_COLUMNS))
             ->where('thread_id', $this->thread)->where('account_id', $this->box)
             ->orderBy('received_at')->orderBy('id')->get()
             ->groupBy(fn (MailMessage $m) => $m->message_id_hash ?? 'row:' . $m->id)
@@ -635,6 +694,12 @@ class Inbox extends Component
             })->first())
             ->sortBy(fn (MailMessage $m) => sprintf('%015d-%012d', $m->received_at?->timestamp ?? 0, $m->id))
             ->values();
+    }
+
+    private function forgetMessages(): void
+    {
+        $this->messagesMemo = null;
+        $this->messagesMemoKey = null;
     }
 
     /** What toolbar actions work on: the conversation's messages in this folder (in search, outside Sent and Drafts) */
@@ -694,21 +759,61 @@ class Inbox extends Component
         })->all();
     }
 
-    /** @return array{kind: string, html?: string, doc?: string, blocked?: int} */
+    /**
+     * A message's body as the reader shows it. Sanitising an HTML email takes tens of milliseconds, and the reader is
+     * drawn again on every click and on the minute's refresh, so the result is kept (file cache, VIEW_TTL; ten minutes
+     * for a body read from the server, as before): per message and pictures choice, and per version of the code that
+     * makes it, so a change to the sanitiser shows at once. The body itself is read only on a miss.
+     *
+     * @return array{kind: string, html?: string, doc?: string, blocked?: int}
+     */
     private function body(MailMessage $m, bool $remote): array
     {
+        $key = 'mail-read-view:' . sha1(implode('|', [$m->id, $m->message_id_hash, $m->created_at?->getTimestamp(), (int) $remote,
+            $m->body_state, self::viewVersion(), request()->getSchemeAndHttpHost()]));
+        $store = Cache::store('file');
+        try {
+            $cached = $store->get($key);
+        } catch (\Throwable) {
+            $cached = null;
+        }
+        if (is_array($cached)) {
+            return $cached;
+        }
+
         try {
             $body = $m->body_state === 'cached'
-                ? ['text' => (string) $m->body_text, 'html' => $m->body_html]
+                ? (MailMessage::whereKey($m->id)->first(['id', 'body_text', 'body_html'])?->only(['body_text', 'body_html']) ?? [])
                 : Cache::remember('mail-read-body:' . $m->id, 600, fn () => MailFetch::make()->body($this->user(), $m));
         } catch (ImapException) {
             return ['kind' => 'error'];
+        }
+        if ($m->body_state === 'cached') {
+            $body = ['text' => (string) ($body['body_text'] ?? ''), 'html' => $body['body_html'] ?? null];
         }
 
         $cid = fn (string $id) => $m->attachments->firstWhere('content_id', trim($id, '<> '))
             ? route('hq.mail.read.inline', ['message' => $m->id, 'cid' => trim($id, '<> ')], false) : null;
 
-        return self::present($body['text'] ?? '', $body['html'] ?? null, $remote, $cid);
+        $view = self::present($body['text'] ?? '', $body['html'] ?? null, $remote, $cid);
+        try {
+            $store->put($key, $view, $m->body_state === 'cached' ? self::VIEW_TTL : 600);
+        } catch (\Throwable) {
+            // the cache is a convenience: the reader works without it
+        }
+
+        return $view;
+    }
+
+    /** Changes when the code that turns a body into what the reader shows changes (a release), so kept views follow it */
+    private static function viewVersion(): string
+    {
+        static $version = null;
+
+        return $version ??= substr(md5(implode('|', array_map(fn ($f) => @filemtime($f) . ':' . @filesize($f), [
+            __FILE__, app_path('Support/Mail/Read/HtmlSanitizer.php'), app_path('Support/Mail/Read/DarkPalette.php'),
+            app_path('Support/Mail/Read/TextFormatter.php'),
+        ]))), 0, 12);
     }
 
     /** A body as the reader shows it: HTML in a sandboxed frame, text inline */
@@ -811,6 +916,12 @@ class Inbox extends Component
             'is_flagged' => (bool) ($item['is_flagged'] ?? false),
             'has_attachments' => (bool) ($item['has_attachments'] ?? false),
         ];
+    }
+
+    /** The change stamps of the mailboxes this page shows (the switcher's counts are all of them) */
+    private function stamps(): string
+    {
+        return MailVersion::of($this->accounts->pluck('id')->all());
     }
 
     /** Unread Inbox mail per mailbox, for the switcher */

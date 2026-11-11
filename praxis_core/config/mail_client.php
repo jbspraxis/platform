@@ -34,6 +34,11 @@ return [
     // Check the server's certificate (only ever turn off for a local test server)
     'verify_tls' => (bool) env('MAIL_CLIENT_VERIFY_TLS', true),
 
+    // Opening mail: write the server's \Seen after the response is sent, so the reader never waits for the mail
+    // server (App\Support\Mail\MailActions::openedMany). Unset: whenever PHP can send the response first (PHP-FPM,
+    // LiteSpeed); true or false forces it either way.
+    'mark_read_after_response' => env('MAIL_CLIENT_MARK_READ_AFTER_RESPONSE'),
+
     'sync' => [
         // Mail newer than this is copied into HQ (headers and text); older mail is read from the server when opened
         'months' => 12,

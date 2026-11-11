@@ -43,7 +43,9 @@ class ReadInboxTest extends TestCase
             ->assertSee('Budget review for Q4')
             ->assertSee('Could we move it to Thursday?')
             ->assertSee('Opened by')
-            ->assertDispatched('mail-thread-opened', accountId: $account->id, threadId: $thread->id);
+            // The conversation's team bar mounts with it and records "viewing" itself: no event, so no second round trip
+            ->assertNotDispatched('mail-thread-opened');
+        $this->assertSame('viewing', DB::table('mail_presence')->where('user_id', $reader->id)->where('thread_id', $thread->id)->value('state'));
 
         $message = MailMessage::firstOrFail();
         $this->assertTrue($message->is_seen);

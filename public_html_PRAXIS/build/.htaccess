@@ -1,0 +1,13 @@
+# HQ's and the Client Portal's built files (Vite, praxis_core/public/build/assets on deploy). Each name carries a hash
+# of its content, so a changed file always has a new name: browsers keep these for a year and never ask again.
+# Only headers here, no rewrite rules, so the web root's .htaccess still applies to this folder.
+<IfModule mod_headers.c>
+    Header set Cache-Control "public, max-age=31536000, immutable"
+</IfModule>
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresDefault "access plus 1 year"
+</IfModule>
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/css text/javascript application/javascript application/json image/svg+xml
+</IfModule>
