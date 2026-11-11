@@ -96,9 +96,21 @@ class ProposalReview extends Component
         }
     }
 
+    /** Read once per request (the action and the render share it); forgotten after anything that writes */
+    private ?Proposal $loaded = null;
+
+    /** The link's contact address, read once per request: [address] once read */
+    private ?array $linkEmailRead = null;
+
     private function proposal(): Proposal
     {
-        return Proposal::with('opportunity.organization')->findOrFail($this->proposalId);
+        return $this->loaded ??= Proposal::with('opportunity.organization')->findOrFail($this->proposalId);
+    }
+
+    /** Before a write: the render reads the version again, so it shows the new status */
+    private function changed(): void
+    {
+        $this->loaded = null;
     }
 
     public function openComment(string $section): void
@@ -132,7 +144,9 @@ class ProposalReview extends Component
     /** The address of the contact the link was sent to, if it has one: it approves as them, whatever is typed (D5) */
     private function linkEmail(): ?string
     {
-        return $this->contactId ? (DB::table('client_users')->where('id', $this->contactId)->whereNull('deleted_at')->value('email') ?: null) : null;
+        $this->linkEmailRead ??= [$this->contactId ? (DB::table('client_users')->where('id', $this->contactId)->whereNull('deleted_at')->value('email') ?: null) : null];
+
+        return $this->linkEmailRead[0];
     }
 
     /** Whoever the link was sent to approves for the organisation (D5); a link without a contact can't tell yet */
@@ -162,6 +176,7 @@ class ProposalReview extends Component
             return;
         }
         RateLimiter::hit($key, 3600);
+        $this->changed();
         if (! Proposals::comment($p, $this->commenting, ['name' => $this->name, 'email' => $person['email']], $this->body)) {
             $this->addError('body', __('proposals.portal.errors.full'));
 
@@ -210,6 +225,7 @@ class ProposalReview extends Component
         }
         $email = mb_strtolower(trim((string) $person['email']));
         $code = SigningCodes::newCode();
+        $this->changed();
         // The code is kept with the address it was sent to, so it approves for that address only
         if (! Proposal::whereKey($p->id)->where('status', Proposal::SENT)
             ->update(['auth_otp' => SigningCodes::hash($code . '|' . $email), 'otp_expires_at' => now()->addMinutes(SigningCodes::MINUTES)])) {
@@ -243,6 +259,7 @@ class ProposalReview extends Component
         }
         $this->code = trim($this->code);
         $this->validate(['code' => ['required', 'digits:6']], ['code.*' => __('proposals.portal.errors.code_format')]);
+        $this->changed();
         $refused = SigningCodes::check('approval', $p->id, $p->auth_otp ? (string) $p->auth_otp : null, $p->otp_expires_at, $this->code . '|' . $this->pending['email']);
         if ($refused) {
             if ($refused[0] === 'cancel') {
@@ -267,6 +284,7 @@ class ProposalReview extends Component
 
     private function finishApproval(Proposal $p, array $person): void
     {
+        $this->changed();
         if (! Proposals::approveForClient($p, ['name' => $person['name'], 'email' => $person['email']], $person['title'])) {
             $this->addError('mode', __('proposals.portal.errors.closed'));
 
@@ -295,6 +313,7 @@ class ProposalReview extends Component
         if (! ($person = $this->known($p))) {
             return;
         }
+        $this->changed();
         if (! Proposals::requestChanges($p, ['name' => $this->name, 'email' => $person['email']], $this->changeNote)) {
             $this->addError('mode', __('proposals.portal.errors.closed'));
 

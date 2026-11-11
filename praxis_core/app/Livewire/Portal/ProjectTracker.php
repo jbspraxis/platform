@@ -49,6 +49,11 @@ class ProjectTracker extends Component
     public $replyingToTask = null;
     public $mediaUpload;
 
+    // The latest messages are shown, older ones on "Show earlier messages" (a long project would send hundreds)
+    public const MESSAGE_PAGE = 100;
+    #[Locked]
+    public $messageLimit = self::MESSAGE_PAGE;
+
     // RATE LIMITING
     protected $lastMessageTime = null;
     protected const MESSAGE_COOLDOWN = 1; // seconds
@@ -118,12 +123,10 @@ class ProjectTracker extends Component
             return;
         }
 
-        usleep(500000); // 0.5s delay to prevent timing attacks
-        
-        $tracker = Tracker::findOrFail($this->trackerId);
-        
-        // Trim both sides to handle whitespace
-        if (trim((string) $pin) === trim((string) $tracker->pin_code)) {
+        $pinCode = Tracker::whereKey($this->trackerId)->value('pin_code');
+
+        // Trim both sides to handle whitespace; compared in constant time, so the timing gives nothing away
+        if (hash_equals(trim((string) $pinCode), trim((string) $pin))) {
             session()->put('tracker_auth_' . $this->trackerId, true);
             $this->isAuthorized = true;
             $this->pinError = false;
@@ -135,6 +138,7 @@ class ProjectTracker extends Component
                 'ip' => request()->ip()
             ]);
         } else {
+            usleep(500000); // A wrong PIN still waits 0.5 s (on top of the 5-per-15-minutes limit); a right one does not
             $this->pinError = true;
             $this->authAttempts++;
             $this->pinInput = '';
@@ -288,14 +292,10 @@ class ProjectTracker extends Component
     public function setReplyContext($taskId)
     {
         try {
-            // Validate task exists and belongs to tracker
-            $task = Tracker::findOrFail($this->trackerId)
-                ->milestones()
-                ->with('tasks')
-                ->get()
-                ->pluck('tasks')
-                ->flatten()
-                ->firstWhere('id', $taskId);
+            // Validate task exists and belongs to tracker (one query, not the whole milestone tree)
+            $task = TrackerTask::whereKey($taskId)
+                ->whereHas('milestone', fn ($q) => $q->where('tracker_id', $this->trackerId))
+                ->exists();
 
             if (!$task) {
                 throw new \Exception('Task not found');
@@ -312,6 +312,17 @@ class ProjectTracker extends Component
     public function clearReplyContext()
     {
         $this->replyingToTask = null;
+    }
+
+    // ============================================================================
+    // OLDER MESSAGES
+    // ============================================================================
+
+    public function showEarlierMessages()
+    {
+        if ($this->isAuthorized) {
+            $this->messageLimit += self::MESSAGE_PAGE;
+        }
     }
 
     // ============================================================================
@@ -389,23 +400,43 @@ class ProjectTracker extends Component
     public function render()
     {
         try {
+            // The PIN screen shows only the project's name: nothing else is read until the PIN is right
+            if (!$this->isAuthorized) {
+                return view('livewire.portal.project-tracker', [
+                    'tracker' => Tracker::select('id', 'project_name')->findOrFail($this->trackerId),
+                    'milestones' => collect(),
+                    'messages' => [],
+                    'hasEarlierMessages' => false,
+                    'projectDeadline' => null,
+                    'isAuthorized' => false,
+                    'isArchived' => $this->isArchived,
+                ])->title(__('gateway.tracker.page_title'));
+            }
+
             // Eager load milestones, tasks, and the newly linked assignee
             $tracker = Tracker::with([
                 'milestones' => function($q) { $q->orderBy('sort_order'); },
                 'milestones.tasks' => function($q) { $q->orderBy('sort_order'); },
-                'milestones.tasks.assignee' // Now successfully fetches from TrackerTask model
+                'milestones.tasks.assignee:id,name' // Now successfully fetches from TrackerTask model
             ])->findOrFail($this->trackerId);
             
             $messages = [];
+            $hasEarlierMessages = false;
             $projectDeadline = null;
             
             // Only load sensitive data if authorized
             if ($this->isAuthorized) {
-                // Fixed: Reverted staffSender back to sender to match your model
-                $messages = TrackerMessage::with(['sender', 'task']) 
+                // The latest messages (one more than shown, to know whether earlier ones exist), oldest first,
+                // with only what a bubble shows
+                $messages = TrackerMessage::with(['sender:id,name', 'task:id,title'])
+                    ->select('id', 'task_id', 'sender_type', 'sender_user_id', 'body', 'media_path', 'media_type', 'created_at')
                     ->where('tracker_id', $this->trackerId)
-                    ->orderBy('created_at', 'asc')
+                    ->orderByDesc('created_at')
+                    ->orderByDesc('id')
+                    ->limit((int) $this->messageLimit + 1)
                     ->get();
+                $hasEarlierMessages = $messages->count() > $this->messageLimit;
+                $messages = $messages->take((int) $this->messageLimit)->reverse()->values();
 
                 // Project deadline falls back to max task due_date if target_end_date is null
                 $projectDeadline = $tracker->target_end_date 
@@ -423,6 +454,7 @@ class ProjectTracker extends Component
                 'tracker' => $tracker,
                 'milestones' => $tracker->milestones,
                 'messages' => $messages,
+                'hasEarlierMessages' => $hasEarlierMessages,
                 'projectDeadline' => $projectDeadline,
                 'isAuthorized' => $this->isAuthorized,
                 'isArchived' => $this->isArchived,

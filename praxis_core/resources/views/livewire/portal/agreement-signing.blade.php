@@ -12,6 +12,8 @@
         <script src="{{ route('portal.agreement.script', ['v' => filemtime(resource_path('letters/documents.js'))]) }}"></script>
     @endassets
 
+    {{-- Static styles: sent once with the page, not again on every round trip --}}
+    @assets
     <style>
         .gateway-main { max-width: 880px; margin: 0 auto; padding: 24px 16px 48px; }
         @media (min-width: 768px) { .gateway-main { padding: 32px 32px 64px; } }
@@ -42,6 +44,7 @@
         .otp-input { max-width: 220px; font-size: 1.5rem; line-height: 2rem; font-variant-numeric: tabular-nums; text-align: center; letter-spacing: 0.2em; }
         @media (max-width: 560px) { .ag-buttons .btn { width: 100%; } }
     </style>
+    @endassets
 
     <x-portal.gateway-header :kicker="__('agreements.portal.eyebrow')" :width="880" />
 

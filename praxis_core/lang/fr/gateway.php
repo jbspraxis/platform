@@ -266,6 +266,7 @@ return [
         'task_fallback' => 'Tâche',
         'open_attachment' => 'Ouvrir la pièce jointe',
         'messages_empty' => 'Aucun message pour l’instant. Posez une question ou partagez un fichier avec l’équipe projet.',
+        'show_earlier' => 'Afficher les messages précédents',
         'queued' => 'En attente d’envoi',
         'replying_about' => 'Réponse à propos de',
         'cancel_reply' => 'Ne plus répondre à propos de cette tâche',

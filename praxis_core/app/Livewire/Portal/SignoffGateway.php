@@ -66,8 +66,14 @@ class SignoffGateway extends Component
             ->join('projects', 'project_signoffs.project_id', '=', 'projects.id')
             ->join('organizations', 'projects.organization_id', '=', 'organizations.id')
             ->where('project_signoffs.token', $this->token)
+            // Only what the page shows or signs: never the OTP, and not the signature images (up to 500 KB each),
+            // which would travel with every request; the signed page reads the client's in render()
             ->select(
-                'project_signoffs.*',
+                'project_signoffs.id', 'project_signoffs.project_id', 'project_signoffs.token', 'project_signoffs.status',
+                'project_signoffs.executive_summary', 'project_signoffs.roi_metrics_achieved',
+                'project_signoffs.signatory_email', 'project_signoffs.signatory_name', 'project_signoffs.signatory_job_title',
+                'project_signoffs.signatory_company', 'project_signoffs.signed_at', 'project_signoffs.client_ip_address',
+                'project_signoffs.client_signature_hash',
                 'projects.title as project_title',
                 'organizations.name as client_name'
             )
@@ -76,9 +82,6 @@ class SignoffGateway extends Component
         if (!$this->signoff) {
             abort(404, __('gateway.signoff.not_found'));
         }
-
-        // Never send the OTP to the browser
-        unset($this->signoff->auth_otp, $this->signoff->otp_expires_at);
 
         if ($this->isSealed()) {
             $this->viewState = 'completed';
@@ -260,7 +263,8 @@ class SignoffGateway extends Component
 
         session()->forget($this->otpSessionKey());
 
-        // 5. Update State
+        // 5. Update State (the drawn signature is stored now, so it stops travelling with each request)
+        $this->signatureBase64 = '';
         $this->loadDocument(); // Refresh to pull the new status
         $this->viewState = 'completed';
         session()->flash('success', __('gateway.signoff.signed'));
@@ -268,6 +272,12 @@ class SignoffGateway extends Component
 
     public function render()
     {
-        return view('livewire.portal.signoff-gateway')->title(__('gateway.signoff.page_title'));
+        // The signature image appears only on the signed record's PDF page
+        $signatureImage = $this->viewState === 'completed'
+            ? DB::table('project_signoffs')->where('id', $this->signoff->id)->value('client_signature_b64')
+            : null;
+
+        return view('livewire.portal.signoff-gateway', ['signatureImage' => $signatureImage])
+            ->title(__('gateway.signoff.page_title'));
     }
 }

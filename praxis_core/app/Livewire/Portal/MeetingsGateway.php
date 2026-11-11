@@ -77,9 +77,12 @@ class MeetingsGateway extends Component
         }
     }
 
+    /** Read once per request: the action and the render share it */
+    private ?Opportunity $loaded = null;
+
     private function opportunity(): Opportunity
     {
-        return Opportunity::with(['organization', 'lead'])->findOrFail($this->opportunityId);
+        return $this->loaded ??= Opportunity::with(['organization', 'lead'])->findOrFail($this->opportunityId);
     }
 
     public function choose(string $mode): void
@@ -269,7 +272,8 @@ class MeetingsGateway extends Component
     {
         $o = $this->opportunity();
         $meetings = Meeting::where('opportunity_id', $o->id)->where('kind', 'client')->where('status', '!=', 'cancelled')
-            ->with(['transcripts' => fn ($q) => $q->whereNotNull('minutes_sent_at')->orderBy('minutes_sent_at')])->orderBy('starts_at')->get();
+            // Only the minutes the client was sent: never the transcript's text, entries or notes (often hundreds of KB)
+            ->with(['transcripts' => fn ($q) => $q->select('id', 'meeting_id', 'minutes', 'minutes_sent_at')->whereNotNull('minutes_sent_at')->orderBy('minutes_sent_at')])->orderBy('starts_at')->get();
         $now = now();
 
         return view('livewire.portal.meetings-gateway', [

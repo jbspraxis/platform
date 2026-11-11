@@ -324,7 +324,8 @@ class ProposalGateway extends Component
             }
             if(!empty($notifications)) DB::table('notifications')->insert($notifications);
 
-            // 7. The signer becomes the primary portal account and gets the setup link (App\Support\Portal\SignerOnboarding)
+            // 7. The signer becomes the primary portal account and gets the setup link (App\Support\Portal\SignerOnboarding),
+            // emailed once this transaction is saved, so the locked rows are not held while the mail server answers
             SignerOnboarding::welcome($organization, $this->signerEmail, $proposal->title ?: $proposal->proposal_ref, $timestamp);
 
             return true;

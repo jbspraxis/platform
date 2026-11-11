@@ -32,7 +32,8 @@ class ContractVerification extends Component
             ->where('project_signoffs.client_signature_hash', $hash)
             ->value('organizations.preferred_language'));
 
-        // The check itself runs right after the page loads (executeVerificationScan)
+        // The check runs with the page itself (an indexed lookup), not in a second request once it has loaded
+        $this->executeVerificationScan();
     }
 
     public function executeVerificationScan()
