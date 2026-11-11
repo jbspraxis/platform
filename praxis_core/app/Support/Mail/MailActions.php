@@ -121,16 +121,24 @@ final class MailActions
         MailMessage::whereIn('id', $ids)->update(['is_seen' => true]);
         $this->refresh($threads, $folders->all());
 
-        defer(function () use ($user, $targets, $folders, $ids, $threads) {
+        $account = $targets->first()->account;
+        defer(function () use ($user, $account, $folders, $ids, $threads) {
+            // Where the messages are now: an action right after the open (Archive, Move, Mark unread) may have moved them
+            // or changed them back before this runs, so the server's copy that gets \Seen is the one HQ shows
+            $now = MailMessage::withoutBodies()->whereIn('id', $ids)->where('is_seen', true)->whereNotNull('uid')->get();
+            if ($now->isEmpty()) {
+                return;
+            }
+            $folders = $folders->union(MailFolder::whereIn('id', $now->pluck('folder_id')->unique()->diff($folders->keys()))->get()->keyBy('id'));
             try {
-                $this->withSession($targets->first()->account, function (ImapSession $session) use ($targets, $folders) {
-                    foreach ($targets->groupBy('folder_id') as $folderId => $group) {
+                $this->withSession($account, function (ImapSession $session) use ($now, $folders) {
+                    foreach ($now->groupBy('folder_id') as $folderId => $group) {
                         $session->select($folders[$folderId]->path);
                         $session->addFlags($group->pluck('uid')->map(fn ($u) => (int) $u)->all(), ['\\Seen']);
                     }
                 });
             } catch (\Throwable $e) {
-                MailMessage::whereIn('id', $ids)->where('is_seen', true)->update(['is_seen' => false]);
+                MailMessage::whereIn('id', $now->pluck('id'))->where('is_seen', true)->update(['is_seen' => false]);
                 $this->refresh($threads, $folders->all());
                 MailNav::forget($user->id);
                 if (! $e instanceof ImapException) {

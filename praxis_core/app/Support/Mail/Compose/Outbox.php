@@ -327,7 +327,12 @@ final class Outbox
             // HQ's copy of it goes now rather than at the next sync
             $folder = $outbox->account->folders()->where('path', $old['path'])->first();
             if ($folder) {
-                MailMessage::where('folder_id', $folder->id)->where('uid', (int) $old['uid'])->delete();
+                $gone = MailMessage::where('folder_id', $folder->id)->where('uid', (int) $old['uid']);
+                $threads = (clone $gone)->pluck('thread_id')->filter()->all();
+                $gone->delete();
+                // and the folder's and conversation's counts with it (Drafts no longer says 1)
+                \App\Support\Mail\Sync\ThreadCounters::refresh($threads);
+                \App\Support\Mail\Sync\ThreadCounters::folder($folder);
             }
         } catch (Throwable $e) {
             Log::warning('Mail: old draft not removed from the server', ['outbox' => $outbox->id, 'error' => $e->getMessage()]);

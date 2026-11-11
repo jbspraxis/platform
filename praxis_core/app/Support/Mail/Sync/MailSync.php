@@ -161,6 +161,7 @@ final class MailSync
         // and with CONDSTORE the same highest change number, which every flag change raises): the window search, the
         // read of every local UID and the flag check would all find nothing. A full pass still runs at least hourly,
         // which is what removes mail that has grown older than the window.
+        $serverTotalBefore = $folder->server_total;
         if ($this->unchanged($session, $folder, $box)) {
             $folder->forceFill(['synced_at' => now()])->save();
 
@@ -238,7 +239,8 @@ final class MailSync
         ThreadCounters::refresh($touchedThreads);
         // Recount only when this run changed something here: counting a large folder every minute for nothing
         // was most of a quiet run's work (MailActions recount after their own changes)
-        if ($counts['added'] || $counts['removed'] || $counts['updated'] || $touchedThreads) {
+        // or when the server's count moved (HQ removed a message itself, e.g. a discarded draft, and the server agrees)
+        if ($counts['added'] || $counts['removed'] || $counts['updated'] || $touchedThreads || (int) $box['exists'] !== (int) $serverTotalBefore) {
             ThreadCounters::folder($folder);
         }
 
