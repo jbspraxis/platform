@@ -209,6 +209,19 @@ class FlashMessagesTest extends TestCase
             ->call('quiet')
             ->assertNotDispatched('praxis-toast');
     }
+
+    public function test_the_bridge_works_in_a_fresh_process_as_on_the_live_site(): void
+    {
+        // Livewire wires component hooks once, when its own provider boots. In this process an earlier test may already
+        // have registered the bridge; a live request starts with nothing, so the toast test runs here in a PHP of its own,
+        // as the only test (it failed this way while the bridge was registered in AppServiceProvider::boot()).
+        $run = \Illuminate\Support\Facades\Process::path(base_path())->timeout(120)
+            ->env(['DB_CONNECTION' => 'sqlite', 'DB_DATABASE' => ':memory:'])
+            ->run([PHP_BINARY, 'vendor/bin/phpunit', '--filter', 'test_a_flash_from_a_livewire_action_arrives_as_a_toast_event', 'tests/Feature/FlashMessagesTest.php']);
+
+        $this->assertTrue($run->successful(), $run->output() . $run->errorOutput());
+        $this->assertStringContainsString('OK (1 test', $run->output());
+    }
 }
 
 /** A stand-in for any HQ or Client Portal screen: it flashes, and the bridge does the rest. */

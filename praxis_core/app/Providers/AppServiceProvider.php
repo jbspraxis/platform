@@ -18,6 +18,14 @@ class AppServiceProvider extends ServiceProvider
         }
         $this->app->singleton('filesystem', fn ($app) => new \App\Support\FilesystemManager($app));
 
+        // Every flash message becomes a toast in the corner, on a Livewire update as well as on a page load
+        // (App\Support\Flash\Toasts, resources/views/components/flash.blade.php). Registered here, not in boot():
+        // Livewire wires its component hooks once, when its own provider boots (ComponentHookRegistry::boot), which is
+        // before this provider's boot(). Registered there, a fresh process (every live request) never ran the hook, so
+        // an action's confirmation stayed in the session until the next page; tests only passed after an earlier test
+        // in the same process had registered it.
+        \Livewire\Livewire::componentHook(\App\Support\Flash\ToastBridge::class);
+
         // Company profile (docs/COMPANY_PROFILE.md). The logo wall is the library managed in HQ (PR 3,
         // section 9), in place of PR 1's DirectoryClientLogos, which read a folder; the renderer is PR 2's
         // designed profile (docs/company-profile/DESIGN.md), in place of the stub below.
@@ -37,9 +45,6 @@ class AppServiceProvider extends ServiceProvider
             \App\Http\Middleware\ClientActive::class,
         ]);
 
-        // Every flash message becomes a toast in the corner, on a Livewire update as well as on a page load
-        // (App\Support\Flash\Toasts, resources/views/components/flash.blade.php).
-        \Livewire\Livewire::componentHook(\App\Support\Flash\ToastBridge::class);
 
         // Permissions from config/access.php: $user->can('finance.view'), @can, can: middleware.
         // Anything that isn't a catalogue permission falls through to normal gates/policies.
