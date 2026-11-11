@@ -69,10 +69,13 @@ return [
                 'public_html/nfelia.lpc.cm/uploads', 'public_html/nfelia.lpc.cm/storage'],
             'exclude' => ['framework', 'release', 'tmp'],
         ],
+        // HOD Lekki moved from hodlc.lpc.cm to its own domain on 11 Nov 2026: the app now lives in
+        // public_html/hodlekki (public_html/hodlc.lpc.cm holds only a redirect). The key stays `hodlc` so
+        // the Drive folders and file names carry on.
         'hodlc' => [
-            'label' => 'hodlc.lpc.cm',
+            'label' => 'hodlekki.org (was hodlc.lpc.cm)',
             'databases' => ['smartqaq_hodlc'],
-            'files' => ['public_html/hodlc.lpc.cm/uploads'],
+            'files' => ['public_html/hodlekki/uploads', 'public_html/hodlekki/assets/uploads'],
         ],
         'smartls' => [
             'label' => 'smartls.cm (the account’s main domain)',
