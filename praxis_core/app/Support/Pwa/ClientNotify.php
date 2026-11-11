@@ -236,10 +236,35 @@ class ClientNotify
         return DB::table('client_notifications')->where('client_user_id', $clientUserId)->where('is_read', 0)->count();
     }
 
-    /** Whether the portal's tables are there (on the server the code arrives a few minutes before the migration). */
+    /**
+     * Whether the portal's tables are there (on the server the code arrives a few minutes before the migration).
+     * Asked of the schema (two information_schema reads) until the answer is yes; the yes is then remembered in the
+     * cache, so the portal's pages and HQ's actions no longer ask on every request.
+     */
     public static function ready(): bool
     {
-        return self::$ready ??= Schema::hasTable('client_notifications') && Schema::hasColumn('push_subscriptions', 'client_user_id');
+        if (self::$ready !== null) {
+            return self::$ready;
+        }
+        $key = 'pwa.client_notify_ready';
+        try {
+            if (\Illuminate\Support\Facades\Cache::get($key)) {
+                return self::$ready = true;
+            }
+        } catch (\Throwable) {
+            // No cache table yet (a new server before its migrations): the schema answers
+        }
+
+        self::$ready = Schema::hasTable('client_notifications') && Schema::hasColumn('push_subscriptions', 'client_user_id');
+        if (self::$ready) {
+            try {
+                \Illuminate\Support\Facades\Cache::forever($key, true);
+            } catch (\Throwable) {
+                // Not remembered: asked again on the next request, as before
+            }
+        }
+
+        return self::$ready;
     }
 
     /** Forget the table check (tests). */

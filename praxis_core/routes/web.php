@@ -46,8 +46,8 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
         Route::get('/dashboard/workspace', \App\Livewire\Hq\Dashboards\MyWorkspace::class)->name('hq.dash.workspace');
         // Each person's own profile (the avatar menu): phone numbers and password; open to every staff member
         Route::get('/profile', \App\Livewire\Hq\Account\MyProfile::class)->name('hq.profile');
-        // People's photos (uploaded on My profile), for signed-in staff only
-        Route::get('/avatar/{user}', fn (string $user) => \App\Support\Avatars::response($user))
+        // People's photos (uploaded on My profile), for signed-in staff only; ?s=160 is the small copy lists and the top bar use
+        Route::get('/avatar/{user}', fn (string $user) => \App\Support\Avatars::response($user, request()->query('s')))
             ->where('user', '[0-9a-f-]{36}')->name('hq.avatar');
         Route::get('/dashboard/investor', \App\Livewire\Hq\Dashboards\InvestorTerminal::class)->middleware('can:dashboard.view')->name('hq.dash.investor');
         Route::get('/dashboard/audit', \App\Livewire\Hq\Dashboards\AuditTerminal::class)->middleware('can:audit.view')->name('hq.dash.audit');
@@ -292,10 +292,11 @@ Route::domain(Hosts::portal())->group(function () use ($notOwnRoute, $legacy) {
             ->middleware('signed:relative')->name('portal.agreement');
         Route::get('/agreements/{token}/pdf', [\App\Http\Controllers\LetterheadController::class, 'agreementPdf'])->where('token', '[A-Za-z0-9]{24,64}')
             ->name('portal.agreement.pdf');
-        // The signature pad, the same script HQ's Documents screens load; no build step
+        // The signature pad, the same script HQ's Documents screens load; no build step. Versioned by ?v=<file time>
+        // in the page, so each address is kept for a year
         Route::get('/agreements-signature.js', fn () => response()->file(resource_path('letters/documents.js'), [
             'Content-Type' => 'application/javascript; charset=utf-8',
-            'Cache-Control' => 'public, max-age=86400',
+            'Cache-Control' => 'public, max-age=31536000, immutable',
         ]))->name('portal.agreement.script');
 
         // One version of an opportunity's statement of work: read it, sign it with the one-time code or ask for changes; and its PDF (PR 5)

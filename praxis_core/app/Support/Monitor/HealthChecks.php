@@ -15,12 +15,18 @@ use Illuminate\Support\Str;
  */
 class HealthChecks
 {
-    public static function all(): array
+    /** @param  ?array  $backupSites  Backups\Status::sites() when the caller has read it already (System health's table) */
+    public static function all(?array $backupSites = null): array
     {
         $checks = [];
-        foreach (['scheduler', 'errors', 'email', 'ai', 'integrations', 'backups', 'queue', 'logs', 'leads', 'rates', 'config', 'push'] as $key) {
+        $keys = ['scheduler', 'errors', 'email', 'ai', 'integrations', 'backups', 'queue', 'logs', 'leads', 'rates', 'config', 'push'];
+        // How the web server runs PHP can only be seen from a page: the cron's command-line PHP has its own settings
+        if (PHP_SAPI !== 'cli' && PHP_SAPI !== 'phpdbg') {
+            $keys[] = 'speed';
+        }
+        foreach ($keys as $key) {
             try {
-                $checks[] = ['key' => $key] + self::$key();
+                $checks[] = ['key' => $key] + ($key === 'backups' ? self::backups($backupSites) : self::$key());
             } catch (\Throwable $e) {
                 $checks[] = ['key' => $key, 'label' => ucfirst($key), 'state' => 'unknown', 'detail' => 'This check could not run: ' . mb_substr($e->getMessage(), 0, 160), 'fix' => null];
             }
@@ -118,18 +124,19 @@ class HealthChecks
     }
 
     /** Server backups (docs/BACKUPS.md): every site's last database and files backup, and the weekly restore test */
-    private static function backups(): array
+    private static function backups(?array $sites = null): array
     {
-        return \App\Support\Backups\Status::check();
+        return \App\Support\Backups\Status::check($sites);
     }
 
     private static function queue(): array
     {
-        // AI jobs (queue 'ai') are run every minute by the scheduler; nothing else should wait here
-        $other = DB::table('jobs')->where('queue', '!=', config('ai.queue.name', 'ai'));
+        // AI jobs (queues 'ai' and 'ai-bulk') are run by the worker the scheduler keeps up; nothing else should wait here
+        $aiQueues = array_values(array_filter([config('ai.queue.name', 'ai'), config('ai.queue.bulk')]));
+        $other = DB::table('jobs')->whereNotIn('queue', $aiQueues);
         $waiting = (clone $other)->count();
         $oldest = $waiting ? (clone $other)->min('created_at') : null;
-        $ai = DB::table('jobs')->where('queue', config('ai.queue.name', 'ai'));
+        $ai = DB::table('jobs')->whereIn('queue', $aiQueues);
         $aiWaiting = (clone $ai)->count();
         $aiOldest = $aiWaiting ? (clone $ai)->min('created_at') : null;
         $failed = DB::table('failed_jobs')->count();
@@ -137,7 +144,7 @@ class HealthChecks
         $aiStale = $aiOldest && (time() - (int) $aiOldest) > 600;
         return ['label' => 'Background jobs', 'state' => $stale || $aiStale || $failed ? 'warn' : 'ok',
             'detail' => "{$aiWaiting} AI job(s) waiting" . ($aiOldest ? ' (oldest ' . self::ago(Carbon::createFromTimestamp((int) $aiOldest)) . ')' : '')
-                . ", {$waiting} other waiting" . ($oldest ? ' (oldest ' . self::ago(Carbon::createFromTimestamp((int) $oldest)) . ')' : '') . ", {$failed} failed. Emails are sent straight away; AI jobs start within a minute.",
+                . ", {$waiting} other waiting" . ($oldest ? ' (oldest ' . self::ago(Carbon::createFromTimestamp((int) $oldest)) . ')' : '') . ", {$failed} failed. Emails are sent straight away; AI jobs start within seconds.",
             'fix' => $aiStale ? 'AI jobs are not being picked up: check that the cron job runs "schedule:run" every minute.'
                 : ($stale ? 'Old waiting jobs outside the AI queue will never run (no worker for them). Review and clear them.' : null)];
     }
@@ -190,6 +197,58 @@ class HealthChecks
         return ['label' => 'Live settings', 'state' => $problems ? 'bad' : 'ok',
             'detail' => $problems ? implode('; ', $problems) . '.' : 'Production mode, debug off, warning-level logs.',
             'fix' => $problems ? 'Fix these lines in praxis_core/.env.' : null];
+    }
+
+    /** How this web server runs HQ (performance pass, 11 Nov 2026). Shown on System health only; never 'bad'. */
+    private static function speed(): array
+    {
+        $opcache = function_exists('opcache_get_status') ? @opcache_get_status(false) : false;
+        $stats = is_array($opcache) ? ($opcache['opcache_statistics'] ?? []) : [];
+
+        return self::speedFrom([
+            'sapi' => PHP_SAPI,
+            'early_finish' => function_exists('fastcgi_finish_request') || function_exists('litespeed_finish_request'),
+            'opcache' => is_array($opcache) && ! empty($opcache['opcache_enabled']),
+            'opcache_full' => is_array($opcache) && ! empty($opcache['cache_full']),
+            'hit_rate' => isset($stats['opcache_hit_rate']) ? (float) $stats['opcache_hit_rate'] : null,
+            'free_mb' => isset($opcache['memory_usage']['free_memory']) ? (int) round($opcache['memory_usage']['free_memory'] / 1048576) : null,
+            'cached_files' => isset($stats['num_cached_scripts']) ? (int) $stats['num_cached_scripts'] : null,
+            'laravel_caches' => app()->configurationIsCached() && app()->routesAreCached() && app()->eventsAreCached(),
+        ]);
+    }
+
+    /**
+     * The speed check from what was measured, so it can be tested: whether PHP can answer before slow work is done
+     * (opening a mail marks it read on the mail server after the page has answered; pushes go after the response),
+     * whether OPcache keeps compiled code in memory, and whether the deploy built Laravel's caches.
+     */
+    public static function speedFrom(array $facts): array
+    {
+        $problems = $fixes = [];
+        if (empty($facts['early_finish'])) {
+            $problems[] = "PHP runs as {$facts['sapi']}, which can't answer a page before slow work is done, so opening a mail waits for the mail server";
+            $fixes[] = 'cPanel → MultiPHP Manager: switch hq.jbspraxis.com and portal.jbspraxis.com to PHP-FPM.';
+        }
+        if (empty($facts['opcache'])) {
+            $problems[] = 'OPcache is off, so every page compiles HQ\'s code again';
+            $fixes[] = 'Ask the host to switch OPcache on (opcache.enable=1, memory_consumption=256, max_accelerated_files=32531).';
+        } elseif (! empty($facts['opcache_full']) || (isset($facts['hit_rate']) && $facts['hit_rate'] < 95)) {
+            $problems[] = 'OPcache is full or misses often' . (isset($facts['hit_rate']) ? ' (' . round($facts['hit_rate'], 1) . '% from memory)' : '');
+            $fixes[] = 'Ask the host for more OPcache memory (memory_consumption=256, max_accelerated_files=32531).';
+        }
+        if (empty($facts['laravel_caches'])) {
+            $problems[] = 'Laravel\'s caches are not built';
+            $fixes[] = 'The deployer builds them after every release; to build them now, run "php artisan optimize" in praxis_core.';
+        }
+
+        $ok = 'PHP (' . $facts['sapi'] . ') answers before slow work is done; OPcache serves '
+            . (isset($facts['hit_rate']) ? round($facts['hit_rate'], 1) . '% of code from memory' : 'code from memory')
+            . (isset($facts['cached_files']) ? ' (' . number_format($facts['cached_files']) . ' files' . (isset($facts['free_mb']) ? ', ' . $facts['free_mb'] . ' MB free' : '') . ')' : '')
+            . "; Laravel's caches are built.";
+
+        return ['label' => 'Server speed settings', 'state' => $problems ? 'warn' : 'ok',
+            'detail' => $problems ? implode('; ', $problems) . '.' : $ok,
+            'fix' => $fixes ? implode(' ', $fixes) : null];
     }
 
     // HQ app notifications (docs/PWA.md). Never 'bad': a phone missing a notification is not an emergency.

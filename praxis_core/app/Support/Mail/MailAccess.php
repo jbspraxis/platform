@@ -36,11 +36,12 @@ final class MailAccess
 
     public static function canUse(?User $user): bool
     {
-        if (! $user || ! $user->can('mail.view')) {
+        if (! $user) {
             return false;
         }
 
-        return self::isOpenToEveryone() || self::isOwner($user);
+        // Asked for every mailbox, thread and message checked in a request: once per person (flush() forgets it)
+        return self::$cache['use:' . $user->id] ??= $user->can('mail.view') && (self::isOpenToEveryone() || self::isOwner($user));
     }
 
     public static function isOpenToEveryone(): bool
@@ -96,16 +97,27 @@ final class MailAccess
 
     public static function canThread(?User $user, MailThread $thread, string $ability): bool
     {
-        $account = $thread->relationLoaded('account') ? $thread->account : MailAccount::find($thread->account_id);
+        $account = $thread->relationLoaded('account') ? $thread->account : self::mailbox($thread->account_id);
 
         return $account !== null && self::can($user, $account, $ability);
     }
 
     public static function canMessage(?User $user, MailMessage $message, string $ability): bool
     {
-        $account = $message->relationLoaded('account') ? $message->account : MailAccount::find($message->account_id);
+        $account = $message->relationLoaded('account') ? $message->account : self::mailbox($message->account_id);
 
         return $account !== null && self::can($user, $account, $ability);
+    }
+
+    /** A mailbox by id, read once per request for access checks (flush() forgets it) */
+    public static function mailbox(?string $id): ?MailAccount
+    {
+        if (! $id) {
+            return null;
+        }
+        $key = 'account:' . $id;
+
+        return array_key_exists($key, self::$cache) ? self::$cache[$key] : (self::$cache[$key] = MailAccount::find($id));
     }
 
     /**
@@ -118,6 +130,11 @@ final class MailAccess
         if (! self::canUse($user)) {
             return collect();
         }
+        // The Mail page, the rail's unread count and Ask about your mail all ask in one request: read once
+        $key = 'accounts:' . $user->id . ':' . $ability;
+        if (isset(self::$cache[$key])) {
+            return self::$cache[$key];
+        }
 
         $query = MailAccount::query()->where(function ($q) use ($user) {
             $q->where(fn ($p) => $p->where('kind', 'personal')->where('owner_user_id', $user->id));
@@ -129,7 +146,7 @@ final class MailAccess
             }
         });
 
-        return $query->get()
+        return self::$cache[$key] = $query->get()
             ->each(fn (MailAccount $a) => $a->setAttribute('access_level', self::level($user, $a)))
             ->filter(fn (MailAccount $a) => self::can($user, $a, $ability))
             ->sortBy(fn (MailAccount $a) => ($a->isShared() ? '1' : '0') . $a->email)

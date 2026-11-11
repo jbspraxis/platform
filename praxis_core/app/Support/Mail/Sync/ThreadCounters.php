@@ -5,6 +5,7 @@ namespace App\Support\Mail\Sync;
 use App\Models\Mail\MailFolder;
 use App\Models\Mail\MailMessage;
 use App\Models\Mail\MailThread;
+use App\Support\Mail\MailVersion;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -34,9 +35,14 @@ final class ThreadCounters
                     'mail_messages.is_outbound', 'mail_messages.snippet', 'mail_folders.role as folder_role'])
                 ->groupBy('thread_id');
 
-            foreach ($threads as $id => $thread) {
-                self::one($thread, $messages->get($id, collect()));
-            }
+            // One change stamp for the chunk once it is written (MailVersion), rather than one per saved thread: their
+            // messages changed (a flag, a move, new mail) even where a thread's own fields didn't
+            MailThread::withoutEvents(function () use ($threads, $messages) {
+                foreach ($threads as $id => $thread) {
+                    self::one($thread, $messages->get($id, collect()));
+                }
+            });
+            MailVersion::bump($threads->pluck('account_id'));
         }
     }
 
@@ -113,6 +119,10 @@ final class ThreadCounters
         $folder->forceFill([
             'total_count' => (int) ($counts->total ?? 0),
             'unread_count' => (int) ($counts->unread ?? 0),
-        ])->save();
+        ]);
+        if ($folder->isDirty()) {
+            $folder->save();
+            MailVersion::bump($folder->account_id);
+        }
     }
 }

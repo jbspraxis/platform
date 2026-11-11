@@ -4,7 +4,6 @@ namespace App\Services\Site;
 
 use App\Support\Campaigns\Marketing;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Broadcast email bookkeeping, for the old tracking routes (routes/web.php) and the site API
@@ -17,8 +16,6 @@ use Illuminate\Support\Facades\Schema;
  */
 final class TrackingService
 {
-    private static ?bool $hasSignedColumn = null;
-
     /** The token of one recipient's links in one campaign */
     public static function token(string $campaignId, string $userId): string
     {
@@ -31,10 +28,10 @@ final class TrackingService
             && hash_equals(self::token($campaignId, $userId), strtolower($token));
     }
 
-    /** True once the database can mark emails sent with tokens (the migration has run) */
+    /** The database can mark emails sent with tokens: broadcast_logs.signed_links (2026_10_30_400001) is there everywhere */
     public static function canSign(): bool
     {
-        return self::$hasSignedColumn ??= Schema::hasColumn('broadcast_logs', 'signed_links');
+        return true;
     }
 
     /**

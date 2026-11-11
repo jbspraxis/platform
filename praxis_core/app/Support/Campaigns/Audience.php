@@ -5,7 +5,6 @@ namespace App\Support\Campaigns;
 use App\Support\MailLocale;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Who a broadcast reaches (docs/CAMPAIGNS.md 4.2): the people a segment's rules pick, one per address, minus the
@@ -56,7 +55,20 @@ final class Audience
     /** Live numbers for HQ: total, per kind, per language, and how many addresses the do-not-email list left out */
     public static function summary(?array $rules): array
     {
+        return self::numbers(self::resolve(self::rules($rules)));
+    }
+
+    /** summary() and the first $take recipients, worked out once (the broadcast editor's Audience step showed both) */
+    public static function preview(?array $rules, int $take): array
+    {
         $resolved = self::resolve(self::rules($rules));
+
+        return ['summary' => self::numbers($resolved), 'recipients' => $resolved['recipients']->take($take)];
+    }
+
+    /** @param  array{recipients: Collection, suppressed: int}  $resolved */
+    private static function numbers(array $resolved): array
+    {
         $people = $resolved['recipients'];
 
         return [
@@ -78,7 +90,8 @@ final class Audience
         }
         $definitions = SegmentFilters::definitions();
         foreach ($rules['filters'] as $key => $values) {
-            $options = SegmentFilters::options($key);
+            // A list whose values are their own labels (industry, country) needs no query to name them
+            $options = empty($definitions[$key]['values_are_labels']) ? SegmentFilters::options($key) : [];
             $parts[] = $definitions[$key]['label'] . ': ' . implode(', ', array_map(fn ($v) => $options[$v] ?? $v, $values));
         }
 
@@ -114,11 +127,21 @@ final class Audience
             $optedOut[$r['email']] = true;
         }
         // Always the same order for the same people (the database returns contacts in no set order): which row wins a
-        // shared address, and the order the sender queues and sends them in
+        // shared address, and the order the sender queues and sends them in. Plain comparisons and a set of the addresses
+        // seen, in the same order as sortBy() and unique('email'), whose data_get() per comparison and scan of every
+        // address kept for each row took most of the time (about 0.3 s for 3,000 people)
+        $seen = [];
         $recipients = $rows->reject(fn ($r) => isset($optedOut[$r['email']]))
-            ->sortBy([['kind_order', 'asc'], ['contact_id', 'asc']])
-            ->unique('email')
-            ->sortBy([['kind_order', 'asc'], ['last_name', 'asc'], ['first_name', 'asc'], ['email', 'asc']])
+            ->sort(fn ($a, $b) => [$a['kind_order'], $a['contact_id']] <=> [$b['kind_order'], $b['contact_id']])
+            ->filter(function ($r) use (&$seen) {
+                if (isset($seen[$r['email']])) {
+                    return false;
+                }
+
+                return $seen[$r['email']] = true;
+            })
+            ->sort(fn ($a, $b) => [$a['kind_order'], $a['last_name'], $a['first_name'], $a['email']]
+                <=> [$b['kind_order'], $b['last_name'], $b['first_name'], $b['email']])
             ->map(fn ($r) => array_diff_key($r, ['kind_order' => 1, 'opted_out' => 1]))
             ->values();
 
@@ -132,10 +155,8 @@ final class Audience
             ->join('organizations as o', 'o.id', '=', 'cu.organization_id')
             ->whereNull('cu.deleted_at')->whereNull('o.deleted_at')
             ->where('cu.status', 'Active')
-            ->whereNotNull('cu.email')->where('cu.email', '<>', '');
-        if (self::hasTestFlag()) {
-            $query->where('o.is_test', 0);
-        }
+            ->whereNotNull('cu.email')->where('cu.email', '<>', '')
+            ->where('o.is_test', 0);
 
         if ($group === 'kaizen') {
             $query->where('cu.lifecycle_stage', 'Public Contributor')->where('o.status', 'Internal');
@@ -196,12 +217,5 @@ final class Audience
         }
 
         return $found;
-    }
-
-    private static function hasTestFlag(): bool
-    {
-        static $has = null;
-
-        return $has ??= Schema::hasColumn('organizations', 'is_test');
     }
 }

@@ -57,9 +57,10 @@ final class Companies
         return $key === self::GROUP || $key === '' ? null : $key;
     }
 
-    public static function label(?string $entityId): string
+    /** @param  ?array  $companies  all(), when the caller has it already */
+    public static function label(?string $entityId, ?array $companies = null): string
     {
-        foreach (self::all() as $c) {
+        foreach ($companies ?? self::all() as $c) {
             if ($c['id'] === $entityId) {
                 return $c['label'];
             }

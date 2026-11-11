@@ -41,7 +41,9 @@ final class Ai
     public static function queue(string $purpose, Model|array $subject, array $input): AiRun
     {
         $run = self::start($purpose, $subject, $input);
-        RunAiJob::dispatch($run->id)->onConnection(config('ai.queue.connection'))->onQueue(config('ai.queue.name'));
+        // Bulk purposes (config/ai.php) wait behind anything a person is waiting for
+        $queue = empty(self::purpose($purpose)['bulk']) ? config('ai.queue.name') : config('ai.queue.bulk', config('ai.queue.name'));
+        RunAiJob::dispatch($run->id)->onConnection(config('ai.queue.connection'))->onQueue($queue);
 
         return $run->fresh();
     }
@@ -52,11 +54,14 @@ final class Ai
             throw new LogicException("The AI purpose '{$purpose}' is too long to run while the page waits: use Ai::queue()");
         }
 
-        return self::run(self::start($purpose, $subject, $input));
+        return self::run(self::start($purpose, $subject, $input), waiting: true);
     }
 
-    /** Runs a queued job (RunAiJob calls this). Never throws: the outcome is on the run. */
-    public static function run(AiRun $run): AiRun
+    /**
+     * Runs a queued job (RunAiJob calls this). Never throws: the outcome is on the run. $waiting: a page waits for it
+     * (now()), so the request is sync (AiRequest: a short timeout, no retries).
+     */
+    public static function run(AiRun $run, bool $waiting = false): AiRun
     {
         if ($run->isFinished()) {
             return $run;
@@ -65,7 +70,7 @@ final class Ai
 
         try {
             $config = self::purpose($run->purpose);
-            $request = self::request($run->purpose, $run->input ?? []);
+            $request = self::request($run->purpose, $run->input ?? [], $waiting);
             if (! Budget::allows($request)) {
                 throw new AiUnavailable('budget');
             }
@@ -120,8 +125,8 @@ final class Ai
         return $run;
     }
 
-    /** The request a purpose makes from its input; also what the budget estimates */
-    public static function request(string $purpose, array $input): AiRequest
+    /** The request a purpose makes from its input; also what the budget estimates. $waiting: see run(). */
+    public static function request(string $purpose, array $input, bool $waiting = false): AiRequest
     {
         $config = self::purpose($purpose);
         $system = [];
@@ -152,6 +157,9 @@ final class Ai
             stream: (bool) ($config['stream'] ?? false),
             expectedChars: (int) ($config['expected_chars'] ?? 4000),
             attachments: self::attachments((array) ($input['files'] ?? [])),
+            // The purpose's sync flag, for a run a page waits for: a sync purpose queued (client_minutes, with a whole
+            // transcript) keeps the background job's time and retries
+            sync: $waiting && ! empty($config['sync']),
         );
     }
 

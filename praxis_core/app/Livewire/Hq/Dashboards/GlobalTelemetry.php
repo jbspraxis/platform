@@ -12,25 +12,13 @@ use App\Livewire\Hq\HqMoney;
 #[Layout('components.layouts.hq')]
 class GlobalTelemetry extends Component
 {
-    public $kpis = [];
-    public $recentLeads = [];
-    public $criticalAlerts = [];
-    
-    // Dynamic Chart Data Arrays
-    public $chartLabels = [];
-    public $chartRevenue = [];
-    public $chartBurn = [];
+    // Nothing is kept in the page's state: the figures are read when the page draws (render) and for the CSV
 
-    public function mount()
-    {
-        $this->loadTelemetry();
-    }
-
-    public function loadTelemetry()
+    /** The headline figures. Money totals are kept per currency (['NGN' => 3332.5, 'USD' => 322.5]), never added across currencies. */
+    private function kpis(): array
     {
         // SAFETY NET: Pre-initialize to prevent undefined array keys.
-        // Money totals are kept per currency (['NGN' => 3332.5, 'USD' => 322.5]), never added across currencies.
-        $this->kpis = [
+        $kpis = [
             'capital_cleared' => [],
             'ar_pipeline' => [],
             'active_deployments' => 0,
@@ -38,44 +26,56 @@ class GlobalTelemetry extends Component
             'strike_capacity' => 0,
             'proposal_win_rate' => 0
         ];
-        $this->recentLeads = collect([]);
-        $this->criticalAlerts = collect([]);
-        $this->chartLabels = ['Jan'];
-        $this->chartRevenue = [];
-        $this->chartBurn = [0];
 
-        $currentYear = Carbon::now()->year;
-        $currentMonth = Carbon::now()->month;
-
-        // Each block has its own try/catch, so one failure does not erase figures that loaded correctly
         try {
             // 1. Core Financial & Operational Aggregation
-            $this->kpis['capital_cleared'] = HqMoney::sumByCurrency(DB::table('invoices')->where('status', 'Paid'), 'total_amount');
+            $kpis['capital_cleared'] = HqMoney::sumByCurrency(DB::table('invoices')->where('status', 'Paid'), 'total_amount');
             // Unpaid = sent and not yet paid, whether or not someone has marked it overdue on Invoices
-            $this->kpis['ar_pipeline'] = HqMoney::sumByCurrency(DB::table('invoices')->whereIn('status', ['Pending', 'Overdue']), 'total_amount');
-            $this->kpis['active_deployments'] = DB::table('projects')->where('status', 'Active')->count();
-            $this->kpis['total_leads'] = DB::table('organizations')->where('status', 'Lead')->count();
+            $kpis['ar_pipeline'] = HqMoney::sumByCurrency(DB::table('invoices')->whereIn('status', ['Pending', 'Overdue']), 'total_amount');
+            $kpis['active_deployments'] = DB::table('projects')->where('status', 'Active')->count();
+            $kpis['total_leads'] = DB::table('organizations')->where('status', 'Lead')->count();
 
             // Staff with a running time log (who is working right now)
-            $this->kpis['strike_capacity'] = DB::table('task_time_logs')->whereNull('end_time')->distinct('user_id')->count();
+            $kpis['strike_capacity'] = DB::table('task_time_logs')->whereNull('end_time')->distinct('user_id')->count();
         } catch (\Exception $e) {
             report($e);
         }
 
+        return $kpis;
+    }
+
+    /** Everything the page shows */
+    private function telemetry(): array
+    {
+        $data = [
+            'kpis' => $this->kpis(),
+            'recentLeads' => collect([]),
+            'criticalAlerts' => collect([]),
+            'chartLabels' => ['Jan'],
+            'chartRevenue' => [],
+            'chartBurn' => [0],
+        ];
+
+        $currentMonth = Carbon::now()->month;
+        // This year as a date range rather than YEAR(column), so the database can use an index on the date
+        $yearStart = Carbon::now()->startOfYear();
+        $nextYear = $yearStart->copy()->addYear();
+
+        // Each block has its own try/catch, so one failure does not erase figures that loaded correctly
         try {
-            // 2. Newest leads
-            $this->recentLeads = DB::table('organizations')
+            // 2. Newest leads: only the columns the table shows
+            $data['recentLeads'] = DB::table('organizations')
                 ->where('status', 'Lead')
                 ->orderBy('created_at', 'desc')
                 ->limit(6)
-                ->get();
+                ->get(['name', 'industry', 'source', 'created_at']);
         } catch (\Exception $e) {
             report($e);
         }
 
         try {
             // 3. Unpaid invoices more than 30 days past their due date (invoices link to clients through their project)
-            $this->criticalAlerts = DB::table('invoices')
+            $data['criticalAlerts'] = DB::table('invoices')
                 ->join('projects', 'invoices.project_id', '=', 'projects.id')
                 ->join('organizations', 'projects.organization_id', '=', 'organizations.id')
                 ->whereIn('invoices.status', ['Pending', 'Overdue'])
@@ -97,7 +97,7 @@ class GlobalTelemetry extends Component
             $revenues = DB::table('invoices')
                 ->selectRaw("MONTH(paid_at) as month, UPPER(COALESCE(currency, '')) as cur, SUM(total_amount) as total")
                 ->where('status', 'Paid')
-                ->whereYear('paid_at', $currentYear)
+                ->where('paid_at', '>=', $yearStart)->where('paid_at', '<', $nextYear)
                 ->groupBy('month', 'cur')
                 ->get();
 
@@ -109,7 +109,7 @@ class GlobalTelemetry extends Component
 
             $burns = DB::table('task_time_logs')
                 ->selectRaw('MONTH(start_time) as month, SUM(cost_calculated) as total')
-                ->whereYear('start_time', $currentYear)
+                ->where('start_time', '>=', $yearStart)->where('start_time', '<', $nextYear)
                 ->groupBy('month')
                 ->get();
 
@@ -117,12 +117,14 @@ class GlobalTelemetry extends Component
                 if ($burn->month) $burnData[$burn->month - 1] = (float) $burn->total;
             }
 
-            $this->chartLabels = array_slice($months, 0, $currentMonth);
-            $this->chartRevenue = array_map(fn ($series) => array_slice($series, 0, $currentMonth), $revenueData);
-            $this->chartBurn = array_slice($burnData, 0, $currentMonth);
+            $data['chartLabels'] = array_slice($months, 0, $currentMonth);
+            $data['chartRevenue'] = array_map(fn ($series) => array_slice($series, 0, $currentMonth), $revenueData);
+            $data['chartBurn'] = array_slice($burnData, 0, $currentMonth);
         } catch (\Exception $e) {
             report($e);
         }
+
+        return $data;
     }
 
     public function exportTelemetry()
@@ -138,24 +140,28 @@ class GlobalTelemetry extends Component
             'created_at' => now()
         ]);
 
-        return Response::streamDownload(function () {
+        // The figures as they are now. The page itself doesn't change, so it isn't drawn again.
+        $kpis = $this->kpis();
+        $this->skipRender();
+
+        return Response::streamDownload(function () use ($kpis) {
             $handle = fopen('php://output', 'w');
-            
+
             fputcsv($handle, ['JBS Praxis company overview']);
             fputcsv($handle, ['Created (UTC)', now()->toDateTimeString()]);
             fputcsv($handle, []);
-            
+
             fputcsv($handle, ['Measure', 'Currency', 'Value']);
             // One row per currency, and a 0 row when there are none, so the file always has the same measures
-            foreach ((array) $this->kpis['capital_cleared'] ?: ['' => 0] as $currency => $total) {
+            foreach ((array) $kpis['capital_cleared'] ?: ['' => 0] as $currency => $total) {
                 fputcsv($handle, ['Paid invoices, total', $currency, $total]);
             }
-            foreach ((array) $this->kpis['ar_pipeline'] ?: ['' => 0] as $currency => $total) {
+            foreach ((array) $kpis['ar_pipeline'] ?: ['' => 0] as $currency => $total) {
                 fputcsv($handle, ['Unpaid invoices', $currency, $total]);
             }
-            fputcsv($handle, ['Active projects', '', $this->kpis['active_deployments']]);
-            fputcsv($handle, ['Open leads', '', $this->kpis['total_leads']]);
-            
+            fputcsv($handle, ['Active projects', '', $kpis['active_deployments']]);
+            fputcsv($handle, ['Open leads', '', $kpis['total_leads']]);
+
             fclose($handle);
         }, $fileName, [
             'Content-Type' => 'text/csv',
@@ -165,6 +171,6 @@ class GlobalTelemetry extends Component
 
     public function render()
     {
-        return view('livewire.hq.dashboards.global-telemetry');
+        return view('livewire.hq.dashboards.global-telemetry', $this->telemetry());
     }
 }

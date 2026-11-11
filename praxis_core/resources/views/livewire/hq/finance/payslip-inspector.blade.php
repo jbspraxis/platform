@@ -1,4 +1,5 @@
 <div>
+    @assets
     <style>
         /* Payslip document */
         .payslip { max-width: 900px; margin: 0 auto; padding: 40px; }
@@ -18,6 +19,7 @@
             #printable-payslip { position: absolute; left: 0; top: 0; width: 100%; max-width: 100%; margin: 0; padding: 0; border: none !important; background: #FFF !important; }
         }
     </style>
+    @endassets
 
     <div class="page-header">
         <div>

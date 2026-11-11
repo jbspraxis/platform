@@ -11,99 +11,108 @@ use Carbon\Carbon;
 #[Layout('components.layouts.hq')]
 class MyWorkspace extends Component
 {
-    public $activeTasks = [];
-    public $activeTimer = null;
-    public $pendingApprovals = [];
-    public $upcomingAppointments = [];
-    public $recentNotifications = [];
-    
-    public $stats = [
-        'tasks_open' => 0,
-        'hours_this_week' => 0,
-        'approvals_count' => 0,
-    ];
+    // Nothing is kept in the page's state: the lists are read when the page draws (render), with only the columns it
+    // shows, so the landing page and each Start or Stop timer carry no task or appointment rows back and forth
 
-    public function mount()
+    /** The person's running timer, with its task's title, or null */
+    private function openTimer(string $userId): ?object
     {
-        $this->loadWorkspaceData();
+        return DB::table('task_time_logs')
+            ->join('tasks', 'task_time_logs.task_id', '=', 'tasks.id')
+            ->where('task_time_logs.user_id', $userId)
+            ->whereNull('task_time_logs.end_time')
+            ->select('task_time_logs.id', 'task_time_logs.task_id', 'task_time_logs.start_time', 'tasks.title as task_title')
+            ->first();
     }
 
-    public function loadWorkspaceData()
+    /** Everything the page shows */
+    private function workspaceData(): array
     {
         $userId = Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c'; // Fallback to your ID if session edge-case
 
+        $data = [
+            'activeTasks' => collect([]),
+            'activeTimer' => null,
+            'pendingApprovals' => collect([]),
+            'upcomingAppointments' => collect([]),
+            'recentNotifications' => collect([]),
+            'stats' => [
+                'tasks_open' => 0,
+                'hours_this_week' => 0,
+                'approvals_count' => 0,
+            ],
+        ];
+
         try {
-            $now = Carbon::now();
             $startOfWeek = Carbon::now()->startOfWeek();
 
-            // 1. Personal Stats
-            $this->stats['tasks_open'] = DB::table('tasks')
+            // 1. Personal Stats (a deleted task is not open work)
+            $data['stats']['tasks_open'] = DB::table('tasks')
                 ->where('assigned_to', $userId)
                 ->whereIn('status', ['To-Do', 'In-Progress', 'Failed'])
+                ->whereNull('deleted_at')
                 ->count();
 
             $minutesThisWeek = DB::table('task_time_logs')
                 ->where('user_id', $userId)
                 ->where('start_time', '>=', $startOfWeek)
                 ->sum('duration_minutes');
-            $this->stats['hours_this_week'] = round($minutesThisWeek / 60, 1);
+            $data['stats']['hours_this_week'] = round($minutesThisWeek / 60, 1);
 
-            // 2. Active Tasks (Backlog)
-            $this->activeTasks = DB::table('tasks')
+            // 2. Active Tasks (Backlog), without deleted tasks
+            $data['activeTasks'] = DB::table('tasks')
                 ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
                 ->join('projects', 'project_phases.project_id', '=', 'projects.id')
                 ->where('tasks.assigned_to', $userId)
                 ->whereIn('tasks.status', ['To-Do', 'In-Progress', 'Failed'])
-                ->select('tasks.*', 'projects.title as project_title', 'project_phases.title as phase_title')
+                ->whereNull('tasks.deleted_at')
+                ->select('tasks.id', 'tasks.title', 'tasks.status', 'projects.title as project_title', 'project_phases.title as phase_title')
                 ->orderBy('tasks.created_at', 'desc')
                 ->get();
 
             // 3. Active Timer
-            $this->activeTimer = DB::table('task_time_logs')
-                ->join('tasks', 'task_time_logs.task_id', '=', 'tasks.id')
-                ->where('task_time_logs.user_id', $userId)
-                ->whereNull('task_time_logs.end_time')
-                ->select('task_time_logs.*', 'tasks.title as task_title')
-                ->first();
+            $data['activeTimer'] = $this->openTimer($userId);
 
             // 4. Proposals awaiting client signature (overview-level widget: dashboard.view)
             if (Auth::user()->can('dashboard.view')) {
-                $this->pendingApprovals = DB::table('proposals')
+                $data['pendingApprovals'] = DB::table('proposals')
                     ->join('organizations', 'proposals.organization_id', '=', 'organizations.id')
                     ->where('proposals.status', 'Pending Auth')
                     ->select('proposals.id', 'proposals.title', 'proposals.total_value', 'proposals.currency', 'organizations.name as client_name', DB::raw("'Proposal' as type"))
                     ->orderBy('proposals.created_at', 'desc')
                     ->get();
-                
-                $this->stats['approvals_count'] = count($this->pendingApprovals);
+
+                $data['stats']['approvals_count'] = count($data['pendingApprovals']);
             }
 
             // 5. Upcoming Appointments (Calendar Sync)
             // Appointment times are stored as Lagos wall-clock time (WAT), so compare with Lagos time, not UTC
-            $this->upcomingAppointments = DB::table('appointments')
+            $data['upcomingAppointments'] = DB::table('appointments')
                 ->leftJoin('organizations', 'appointments.organization_id', '=', 'organizations.id')
                 ->where('appointments.start_time', '>=', Carbon::now('Africa/Lagos')->format('Y-m-d H:i:s'))
                 ->whereIn('appointments.status', ['Scheduled'])
                 // Assuming you might be the host, or you want to see all executive appointments
-                ->select('appointments.*', 'organizations.name as client_name')
+                ->select('appointments.title', 'appointments.start_time', 'organizations.name as client_name')
                 ->orderBy('appointments.start_time', 'asc')
                 ->limit(4)
                 ->get();
 
             // 6. Recent Notifications
-            $this->recentNotifications = DB::table('notifications')
+            $data['recentNotifications'] = DB::table('notifications')
                 ->where('user_id', $userId)
                 ->orderBy('created_at', 'desc')
                 ->limit(5)
-                ->get();
+                ->get(['type', 'title', 'message', 'created_at']);
 
         } catch (\Exception $e) {
-            $this->activeTasks = collect([]);
-            $this->activeTimer = null;
-            $this->pendingApprovals = collect([]);
-            $this->upcomingAppointments = collect([]);
-            $this->recentNotifications = collect([]);
+            $data['activeTasks'] = collect([]);
+            $data['activeTimer'] = null;
+            $data['pendingApprovals'] = collect([]);
+            $data['upcomingAppointments'] = collect([]);
+            $data['recentNotifications'] = collect([]);
         }
+
+        return $data;
     }
 
     // --- INTERACTIVE WORKSPACE ACTIONS ---
@@ -111,7 +120,7 @@ class MyWorkspace extends Component
     public function startTimer($taskId)
     {
         $userId = Auth::id();
-        
+
         // Your own assigned tasks, or any task if you may log time
         $ownTask = DB::table('tasks')->where('id', $taskId)->where('assigned_to', $userId)->exists();
         if (! $ownTask && ! Auth::user()->can('timesheets.create')) {
@@ -119,8 +128,8 @@ class MyWorkspace extends Component
             return;
         }
 
-        // Prevent starting if a timer is already running
-        if ($this->activeTimer) {
+        // Prevent starting if a timer is already running (read now, so one started in another tab counts too)
+        if ($this->openTimer($userId)) {
             session()->flash('error', 'A timer is already running. Stop it before you start another.');
             return;
         }
@@ -134,33 +143,31 @@ class MyWorkspace extends Component
 
         // Update task status to In-Progress
         DB::table('tasks')->where('id', $taskId)->update(['status' => 'In-Progress']);
-
-        $this->loadWorkspaceData();
     }
 
     public function stopTimer()
     {
         $userId = Auth::id();
-        
-        if (!$this->activeTimer) return;
 
-        $startTime = Carbon::parse($this->activeTimer->start_time);
+        // Your own running timer, read now
+        $timer = $this->openTimer($userId);
+        if (! $timer) return;
+
+        $startTime = Carbon::parse($timer->start_time);
         $endTime = now();
         $durationMinutes = $startTime->diffInMinutes($endTime);
 
         DB::table('task_time_logs')
-            ->where('id', $this->activeTimer->id)
+            ->where('id', $timer->id)
             ->where('user_id', $userId) // only your own timer
             ->update([
                 'end_time' => $endTime,
                 'duration_minutes' => $durationMinutes
             ]);
-
-        $this->loadWorkspaceData();
     }
 
     public function render()
     {
-        return view('livewire.hq.dashboards.my-workspace');
+        return view('livewire.hq.dashboards.my-workspace', $this->workspaceData());
     }
 }

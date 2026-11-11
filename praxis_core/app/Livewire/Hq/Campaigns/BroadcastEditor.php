@@ -313,16 +313,26 @@ class BroadcastEditor extends Component
         ]);
     }
 
-    /** Polled while a draft or a translation runs; applies it when it is done */
+    /** Polled every 2 s while a draft or a translation runs: nothing is redrawn until it is done, then it is applied */
     public function checkAi(): void
     {
+        if (! $this->applyAi()) {
+            $this->skipRender();
+        }
+    }
+
+    /** Applies the finished draft or translation; false while it still runs (or when there is none) */
+    private function applyAi(): bool
+    {
         if (! $this->aiRunId) {
-            return;
+            return false;
         }
-        $run = AiRun::find($this->aiRunId);
-        if ($run && ! $run->isFinished()) {
-            return;
+        // The status alone while it runs; the row (input holds the whole brief) only once it has finished
+        $status = AiRun::whereKey($this->aiRunId)->value('status');
+        if ($status !== null && ! in_array($status, ['done', 'failed'], true)) {
+            return false;
         }
+        $run = $status === null ? null : AiRun::whereKey($this->aiRunId)->first(['id', 'status', 'output', 'error']);
         $target = $this->aiTarget;
         $kind = $this->aiKind;
         $this->aiRunId = $this->aiKind = $this->aiTarget = null;
@@ -330,7 +340,7 @@ class BroadcastEditor extends Component
         if (! $run || ! $run->succeeded() || ! $this->editable()) {
             session()->flash('error', (string) ($run?->errorMessage() ?: __('ai.errors.failed')));
 
-            return;
+            return true;
         }
         $out = (array) $run->output;
         $buttonUrl = collect($this->content[$target]['blocks'])->firstWhere('type', 'button')['url'] ?? null;
@@ -349,6 +359,8 @@ class BroadcastEditor extends Component
         session()->flash('success', $kind === 'translate'
             ? ($target === 'fr' ? 'French' : 'English') . ' version translated. Read it through and adjust it before you send it.'
             : 'Draft written. Read it through, check every fact and figure, and adjust it before you send it.');
+
+        return true;
     }
 
     private function startAi(string $purpose, string $target, array $input): void
@@ -363,7 +375,7 @@ class BroadcastEditor extends Component
         $this->aiRunId = $run->id;
         $this->aiKind = $purpose === 'broadcast_translate' ? 'translate' : 'draft';
         $this->aiTarget = $target;
-        $this->checkAi(); // on the sync queue (tests) it has already finished
+        $this->applyAi(); // on the sync queue (tests) it has already finished
     }
 
     // ------------------------------------------------------------------ test and send
@@ -560,15 +572,17 @@ class BroadcastEditor extends Component
         $drawPreview = $this->step === 'write' && ! $this->previewDrawn;
         $this->previewDrawn = $this->step === 'write';
         $segment = $this->segmentId ? Segment::find($this->segmentId) : null;
+        // Audience: the numbers and the first 25 people from one pass over the segment; Send: the numbers
+        $audience = $segment && $this->step === 'audience' ? Audience::preview($segment->rules, 25) : null;
 
         return view('livewire.hq.campaigns.broadcast-editor', [
             'broadcast' => $broadcast,
             'version' => $this->content[$this->tab],
             'previewHtml' => $drawPreview ? $this->previewHtml() : '',
-            'segments' => Segment::orderBy('name')->get(),
+            'segments' => $this->step === 'audience' ? Segment::orderBy('name')->get() : collect(),
             'segment' => $segment,
-            'summary' => $segment && $this->step !== 'write' ? Audience::summary($segment->rules) : null,
-            'recipients' => $segment && $this->step === 'audience' ? Audience::recipients($segment->rules)->take(25) : collect(),
+            'summary' => $audience['summary'] ?? ($segment && $this->step === 'send' ? Audience::summary($segment->rules) : null),
+            'recipients' => $audience['recipients'] ?? collect(),
             'problems' => $this->step === 'send' ? Broadcasts::problems($broadcast) : [],
         ] + $this->segmentView())->title($broadcast->title() . ' · Broadcasts');
     }

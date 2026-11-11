@@ -1,4 +1,5 @@
 <div class="qn">
+    @assets
     <style>
         /* The Questionnaire tab (docs/OPPORTUNITIES.md section 4, row 3): only what the shared classes don't cover. Brand tokens only. */
         .qn { display: flex; flex-direction: column; gap: 16px; }
@@ -57,6 +58,7 @@
             .qn-foot .btn { flex: 1 1 100%; }
         }
     </style>
+    @endassets
 
     @php
         $locale = app()->getLocale();

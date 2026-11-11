@@ -1,4 +1,5 @@
 <div class="fu">
+    @assets
     <style>
         /* My follow-ups: only what the shared component classes don't cover. Brand tokens only. */
         .fu { max-width: 1040px; }
@@ -40,6 +41,7 @@
         .fu-edit { grid-column: 1 / -1; display: grid; gap: 12px; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; align-items: end; padding: 12px; border-radius: var(--radius-card); background: var(--color-mist); }
         .fu-edit .field { margin: 0; }
         .fu-edit-actions { display: flex; gap: 8px; }
+        .fu-more { display: flex; justify-content: center; padding: 12px 20px; border-top: 1px solid var(--color-line); }
         @media (max-width: 720px) {
             .fu-row { grid-template-columns: minmax(0, 1fr); padding: 14px 16px; }
             .fu-group-head { padding: 12px 16px; flex-wrap: wrap; }
@@ -49,6 +51,7 @@
             .fu-owner { width: 100%; }
         }
     </style>
+    @endassets
 
     <a href="{{ route('hq.crm.leads') }}" class="fu-back" wire:navigate><i data-lucide="arrow-left"></i> All leads</a>
 
@@ -81,7 +84,7 @@
             'later' => ['Later', 'calendar', '', ''],
             'none' => ['No next step', 'flag', 'is-none', 'Every open lead needs one: what happens next, and by when.'],
         ];
-        $total = collect($groups)->sum(fn ($g) => $g->count());
+        $total = array_sum($counts);
     @endphp
 
     @if ($total === 0)
@@ -95,18 +98,18 @@
     @else
         <ul class="fu-counts" aria-label="Summary">
             @foreach ($sections as $key => [$label])
-                @if ($groups[$key]->isNotEmpty())
-                    <li><a href="#fu-{{ $key }}" @class(['is-danger' => $key === 'overdue', 'is-warning' => $key === 'none'])>{{ $label }} <strong>{{ $groups[$key]->count() }}</strong></a></li>
+                @if ($counts[$key] > 0)
+                    <li><a href="#fu-{{ $key }}" @class(['is-danger' => $key === 'overdue', 'is-warning' => $key === 'none'])>{{ $label }} <strong>{{ number_format($counts[$key]) }}</strong></a></li>
                 @endif
             @endforeach
         </ul>
 
         @foreach ($sections as $key => [$label, $icon, $tone, $note])
-            @continue($groups[$key]->isEmpty())
+            @continue($counts[$key] === 0)
             <section class="card fu-group {{ $tone }}" id="fu-{{ $key }}" aria-labelledby="fu-{{ $key }}-title" wire:key="fu-group-{{ $key }}">
                 <div class="fu-group-head">
                     <i data-lucide="{{ $icon }}" aria-hidden="true"></i>
-                    <h2 id="fu-{{ $key }}-title">{{ $label }} ({{ $groups[$key]->count() }})</h2>
+                    <h2 id="fu-{{ $key }}-title">{{ $label }} ({{ number_format($counts[$key]) }})</h2>
                     @if ($note) <p>{{ $note }}</p> @endif
                 </div>
                 <ul class="fu-list">
@@ -173,6 +176,14 @@
                         </li>
                     @endforeach
                 </ul>
+                {{-- Later and No next step list the first leads only --}}
+                @if ($counts[$key] > $groups[$key]->count())
+                    <div class="fu-more">
+                        <button type="button" class="btn btn-secondary btn-sm" wire:click="showMore('{{ $key }}')" wire:loading.attr="disabled" wire:target="showMore">
+                            Show {{ number_format(min($counts[$key] - $groups[$key]->count(), \App\Livewire\Hq\Leads\FollowUps::SHOW_MORE)) }} more of {{ number_format($counts[$key]) }}
+                        </button>
+                    </div>
+                @endif
             </section>
         @endforeach
     @endif

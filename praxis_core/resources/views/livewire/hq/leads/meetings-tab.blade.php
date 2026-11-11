@@ -1,6 +1,7 @@
 {{-- A lead's Meetings tab (App\Livewire\Hq\Leads\MeetingsTab, docs/LEADS.md section 9). HQ is English. The meeting styles,
      the AI's notes and the transcript block are the opportunity Meetings tab's partials. --}}
-<div class="mtg" @if ($pending) wire:poll.4s @endif>
+<div class="mtg" @if ($pending) wire:poll.4s="check" @endif>
+    @assets
     @include('livewire.hq.opportunities.partials.meetings-styles')
     <style>
         .lm-typed { border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
@@ -16,6 +17,7 @@
             .mtg-row { grid-template-columns: 1fr; }
         }
     </style>
+    @endassets
     @php
         $tz = \App\Support\Opportunities\Meetings::TIME_ZONE;
         $day = fn ($at, $zone = null) => \Illuminate\Support\Carbon::parse($at)->setTimezone($zone ?: $tz)->format('D j M Y');

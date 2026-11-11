@@ -1,4 +1,5 @@
 <div class="ig">
+    @assets
     <style>
         /* System › Integrations: only what the shared component classes don't cover. Brand tokens only. */
         .ig { max-width: 960px; display: flex; flex-direction: column; gap: 24px; }
@@ -13,6 +14,7 @@
         .ig-section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
         .ig-section-head h2 { margin: 0; }
     </style>
+    @endassets
 
     <div class="page-header" style="margin-bottom: 0">
         <div>

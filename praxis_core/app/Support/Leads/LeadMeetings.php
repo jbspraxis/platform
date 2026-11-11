@@ -65,15 +65,20 @@ final class LeadMeetings
             || ($user !== null && $user->status === 'Active' && $lead->assigned_to === $user->id && LeadAccess::canEdit($user));
     }
 
+    /** A transcript's columns but its text and lines (up to 500,000 characters each): what a list of meetings needs */
+    public const TRANSCRIPT_LIST = MeetingTranscript::WITHOUT_TEXT;
+
     /**
      * The lead's meetings, by start: its own (no opportunity) and the client meetings of its opportunities, which are
-     * shown here and managed on the opportunity. Cancelled ones of an opportunity are left out.
+     * shown here and managed on the opportunity. Cancelled ones of an opportunity are left out. Without $transcriptText,
+     * the transcripts come without their text and lines (TRANSCRIPT_LIST).
      */
-    public static function of(string $organizationId): Collection
+    public static function of(string $organizationId, bool $transcriptText = true): Collection
     {
         return Meeting::where('organization_id', $organizationId)
             ->where(fn ($q) => $q->whereNull('opportunity_id')->orWhere(fn ($o) => $o->where('kind', 'client')->where('status', '!=', 'cancelled')))
-            ->with(['attendees' => fn ($q) => $q->orderByRaw("FIELD(role, 'staff', 'client', 'guest')")->orderBy('name'), 'transcripts', 'opportunity:id,title,stage,lead_user_id'])
+            ->with(['attendees' => fn ($q) => $q->orderByRaw("FIELD(role, 'staff', 'client', 'guest')")->orderBy('name'),
+                'transcripts' => fn ($q) => $transcriptText ? $q : $q->select(self::TRANSCRIPT_LIST), 'opportunity:id,title,stage,lead_user_id'])
             ->orderBy('starts_at')->get();
     }
 

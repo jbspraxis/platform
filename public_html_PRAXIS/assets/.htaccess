@@ -1,0 +1,16 @@
+# Logos, app icons and splash screens: the same file on every page, so browsers keep it for a week and then check
+# in the background (they change rarely, and a changed one shows within a day). Only headers here, no rewrite
+# rules, so the web root's .htaccess still applies to this folder.
+<IfModule mod_headers.c>
+    Header set Cache-Control "public, max-age=604800, stale-while-revalidate=86400"
+</IfModule>
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresDefault "access plus 7 days"
+</IfModule>
+<IfModule mod_deflate.c>
+    # AddOutputFilterByType belongs to mod_filter on Apache 2.4: guarded, so a missing module never fails the folder
+    <IfModule mod_filter.c>
+        AddOutputFilterByType DEFLATE image/svg+xml
+    </IfModule>
+</IfModule>

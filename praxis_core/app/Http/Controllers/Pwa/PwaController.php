@@ -109,9 +109,10 @@ class PwaController extends Controller
         $source = Pwa::file('sw.js');
         abort_unless($source, 404);
 
-        // hq-pwa.js and hq-pwa.css only once they exist: a precache that fails would stop the worker installing
+        // hq-pwa.js only once it exists: a precache that fails would stop the worker installing. hq-pwa.css is part
+        // of the compiled stylesheet (app.css), which the worker keeps like the other built files.
         $precache = ['/offline'];
-        foreach (['hq-pwa.js', 'hq-pwa.css', self::BADGE] as $path) {
+        foreach (['hq-pwa.js', self::BADGE] as $path) {
             if (Pwa::file($path)) {
                 $precache[] = Pwa::asset($path);
             }

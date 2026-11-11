@@ -3,6 +3,7 @@
     $pathLabels = ['intel' => 'an intel report', 'copq' => 'cost of poor quality discussed', 'blank' => 'a blank lead'];
 @endphp
 <div class="lf">
+    @assets
     <style>
         /* Add a lead: only what the shared component classes don't cover. Brand tokens only. */
         .lf { max-width: 880px; }
@@ -41,6 +42,7 @@
         @media (max-width: 600px) { .lf-actions .btn, .lf-fill .btn { flex: 1 1 100%; } }
         @media (prefers-reduced-motion: reduce) { .lf-more summary svg, .lf-choice { transition: none; } }
     </style>
+    @endassets
 
     <a href="{{ route('hq.crm.leads') }}" class="lf-back" wire:navigate><i data-lucide="arrow-left"></i> All leads</a>
 

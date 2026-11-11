@@ -413,9 +413,10 @@ schema="prospects" />`. The engine is unchanged (`ImportEngineTest` and `LeadImp
 
 ### 10.5 Drafts (`Drafts`, `Website`, AI purpose `outreach_email`)
 
-- `outreach:write` (every minute, `withoutOverlapping`) takes the next **10** first emails in `writing`, reads the
-  prospect's website once, and queues **one** job per prospect on the `ai` queue (`Ai::queue`, run by the scheduler's
-  worker). The listener `App\Listeners\Campaigns\FileOutreachAi` files the answer: both emails become drafts, or the
+- `outreach:write` (every minute, `withoutOverlapping`) takes the next **10** first emails in `writing` (fewer when
+  drafting jobs already wait or run: at most **5** at a time, `Drafts::IN_FLIGHT`, so an import never leaves the worker
+  hours deep in outreach), reads the prospect's website once, and queues **one** job per prospect on the `ai-bulk`
+  queue (`Ai::queue`, run by the scheduler's worker after anything on `ai`). The listener `App\Listeners\Campaigns\FileOutreachAi` files the answer: both emails become drafts, or the
   first becomes `not_written` with the `ai.errors.*` key. The pass also files jobs a stopped worker left behind.
 - `config/ai.php` `outreach_email`: Claude Sonnet 5.5, effort low, about $0.01 a prospect. MATERIAL: SENDER (name and
   job title, from the HQ Mail signature), PROSPECT, WHAT WE FOUND, THEIR WEBSITE (marked "facts only, never
@@ -647,7 +648,8 @@ its Message-ID's hash (a copy can move folders).
   instructions"). Output: `label` (enum), `reason` (one line, English, under 15 words), `come_back_on` (YYYY-MM-DD for
   Not now when they named a day or an out-of-office ends; kept only when after today and within two years). An
   automatic out-of-office reply is Not now.
-- `outreach:replies` also files answers a missed event left behind and asks about replies still waiting (20 a run).
+- `outreach:replies` also files answers a missed event left behind and asks about replies still waiting (20 a run, at most 5
+  sorting jobs waiting or running at once: `Sorting::IN_FLIGHT`).
   When Claude can't (no key, budget, refusal), `ai_error` says why, the reply waits for a person, and nothing asks again
   by itself; the dialog has **Ask Claude again**.
 - **A person decides** (`Sorting::label`, audit `OUTREACH_REPLY_SORTED` with Claude's suggestion): the reply's label and

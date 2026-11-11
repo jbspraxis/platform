@@ -71,6 +71,15 @@ class ComplianceMatrix extends Component
 
         $employees = $query->get();
 
+        // Each region's tax configuration and bands, and this month's payroll variables, read once for everyone
+        $period = Carbon::create($targetYear, $targetMonth, 1)->toDateString();
+        $configs = DB::table('tax_configurations')->whereIn('region_code', $employees->pluck('tax_region')->unique()->values()->all())
+            ->get()->unique('region_code')->keyBy('region_code');
+        $bandsByConfig = DB::table('tax_bands')->whereIn('tax_configuration_id', $configs->pluck('id')->all())
+            ->orderBy('lower_limit', 'asc')->get()->groupBy('tax_configuration_id');
+        $variablesByEmployee = DB::table('monthly_payroll_variables')->whereIn('mdm_employee_id', $employees->pluck('id')->all())
+            ->where('payroll_period', $period)->get()->unique('mdm_employee_id')->keyBy('mdm_employee_id');
+
         $kpis = [
             'headcount' => 0, 'total_gross' => 0.00, 'total_net' => 0.00,
             'total_paye_irpp' => 0.00, 'total_pension_cnps_employee' => 0.00,
@@ -81,14 +90,11 @@ class ComplianceMatrix extends Component
         $statutory_remittance = [];
 
         foreach ($employees as $emp) {
-            $config = DB::table('tax_configurations')->where('region_code', $emp->tax_region)->first();
-            $bands = DB::table('tax_bands')->where('tax_configuration_id', $config->id ?? null)->orderBy('lower_limit', 'asc')->get();
+            $config = $configs->get($emp->tax_region);
+            $bands = $bandsByConfig->get($config->id ?? null, collect())->values();
 
             $proratedComp = ProrationService::calculateProratedGross($emp->id, $targetMonth, $targetYear);
-            $variables = DB::table('monthly_payroll_variables')
-                ->where('mdm_employee_id', $emp->id)
-                ->where('payroll_period', Carbon::create($targetYear, $targetMonth, 1)->toDateString())
-                ->first();
+            $variables = $variablesByEmployee->get($emp->id);
 
             $payload = array_merge((array)$emp, $proratedComp);
             if ($variables) {

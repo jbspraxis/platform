@@ -1,4 +1,6 @@
 {{-- The document tabs' styles (Proposals, SOW, Project draft: docs/OPPORTUNITIES.md section 4, rows 4 and 5): only what the shared classes don't cover. Brand tokens only. --}}
+{{-- Sent once per page (@assets), not again with every update of the tab --}}
+@assets
     <style>
         .pp { display: flex; flex-direction: column; gap: 16px; }
         .pp .alert, .pp .callout { margin: 0; }
@@ -88,3 +90,4 @@
             .pp-totals { max-width: none; }
         }
     </style>
+@endassets

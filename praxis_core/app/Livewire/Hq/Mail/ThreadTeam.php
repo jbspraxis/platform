@@ -10,6 +10,8 @@ use App\Support\Mail\MailAccess;
 use App\Support\Mail\Team\MailPresence;
 use App\Support\Mail\Team\MailTeam;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -26,6 +28,13 @@ class ThreadTeam extends Component
 {
     public ?int $threadId = null;
 
+    /** What the bar showed when it was last drawn (others here, assignment, status, notes): the poll skips drawing it again */
+    #[Locked]
+    public string $drawn = '';
+
+    /** The conversation for this request (thread()), false when it isn't one this bar shows */
+    private MailThread|false|null $current = null;
+
     public string $note = '';
 
     /** '' (closed), 'notes' or 'activity' */
@@ -41,11 +50,18 @@ class ThreadTeam extends Component
         }
     }
 
-    /** The poll: keeps "viewing" alive and picks up others' changes */
+    /**
+     * The poll: keeps "viewing" alive and picks up others' changes. Drawing the bar means the assignee list (a
+     * permission check per person who can read the mailbox), the notes and the presence: when none of what it shows
+     * changed since it was drawn, it isn't drawn again.
+     */
     public function heartbeat(): void
     {
         if ($thread = $this->thread()) {
             MailPresence::touch(Auth::user(), $thread);
+            if ($this->drawn !== '' && $this->fingerprint($thread) === $this->drawn) {
+                $this->skipRender();
+            }
         }
     }
 
@@ -117,14 +133,17 @@ class ThreadTeam extends Component
         }
         $account = $thread->account;
         $notes = MailTeam::notes($user, $thread);
+        $canSend = MailAccess::can($user, $account, 'send');
+        $this->drawn = $this->fingerprint($thread);
 
         return view('livewire.hq.mail.thread-team', [
             'thread' => $thread,
             'account' => $account,
             'me' => $user,
-            'canSend' => MailAccess::can($user, $account, 'send'),
+            'canSend' => $canSend,
             'canManage' => MailAccess::can($user, $account, 'manage'),
-            'assignees' => MailTeam::assignees($account),
+            // Only people who can assign see the list (and building it checks everyone who can read the mailbox)
+            'assignees' => $canSend ? MailTeam::assignees($account) : collect(),
             'assignee' => $thread->assignee,
             'doneBy' => $thread->done_by ? User::find($thread->done_by) : null,
             'others' => MailPresence::others($user, $thread),
@@ -133,8 +152,17 @@ class ThreadTeam extends Component
         ]);
     }
 
-    /** The conversation when it is in a shared mailbox this person can read, else null */
+    /** The conversation when it is in a shared mailbox this person can read, else null (read once per request) */
     private function thread(): ?MailThread
+    {
+        if ($this->current === null) {
+            $this->current = $this->findThread() ?? false;
+        }
+
+        return $this->current ?: null;
+    }
+
+    private function findThread(): ?MailThread
     {
         if (! $this->threadId || ! MailAccess::canUse(Auth::user())) {
             return null;
@@ -145,6 +173,20 @@ class ThreadTeam extends Component
         }
 
         return MailAccess::can(Auth::user(), $thread->account, 'read') ? $thread : null;
+    }
+
+    /** Everything the bar shows that others can change: who else is here and how, assignment, status, notes, activity */
+    private function fingerprint(MailThread $thread): string
+    {
+        $others = DB::table('mail_presence')->where('thread_id', $thread->id)->where('user_id', '!=', Auth::id())
+            ->where('expires_at', '>', now())->orderBy('user_id')->get(['user_id', 'state'])
+            ->map(fn ($r) => $r->user_id . ':' . $r->state)->implode(',');
+        $notes = DB::table('mail_thread_notes')->where('thread_id', $thread->id)
+            ->selectRaw('COUNT(*) AS n, MAX(id) AS last, MAX(updated_at) AS edited, MAX(deleted_at) AS removed')->first();
+        $activity = $this->panel === 'activity' ? DB::table('mail_thread_activity')->where('thread_id', $thread->id)->max('id') : null;
+
+        return md5(implode('|', [$others, $thread->assigned_to, $thread->status, $thread->done_by, $thread->updated_at?->getTimestamp(),
+            $notes->n ?? 0, $notes->last ?? 0, $notes->edited ?? '', $notes->removed ?? '', $activity, $this->panel, (string) $this->error]));
     }
 
     private function act(callable $fn, bool $changed = true): void

@@ -4,6 +4,7 @@ namespace App\Livewire\ClientOs;
 
 use App\Support\Pwa\ClientNotify;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
@@ -22,10 +23,15 @@ class NotificationBell extends Component
 
     public int $unreadTotal = 0;
 
-    public function mount(): void
+    /** $locale: the language the dashboard already worked out for this page (no second look at the organisation) */
+    public function mount(?string $locale = null): void
     {
-        $client = Auth::guard('client')->user();
-        $this->applyOrganisationLocale($client ? DB::table('organizations')->where('id', $client->organization_id)->value('preferred_language') : null);
+        if (in_array($locale, self::$portalLocales, true)) {
+            App::setLocale($locale);
+        } else {
+            $client = Auth::guard('client')->user();
+            $this->applyOrganisationLocale($client ? DB::table('organizations')->where('id', $client->organization_id)->value('preferred_language') : null);
+        }
         $this->load();
     }
 

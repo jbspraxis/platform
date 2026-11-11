@@ -27,6 +27,19 @@ class StatementOfWork extends Model
 
     public const SUPERSEDED = 'superseded';
 
+    /**
+     * Every column but the two drawn signatures (base64 PNGs of up to 400 KB each, shown nowhere in HQ: the PDF and the
+     * tab show the signatures as text): what Sows::versions reads for the SOW tab
+     */
+    public const WITHOUT_SIGNATURES = [
+        'id', 'opportunity_id', 'proposal_id', 'reference', 'title', 'version', 'previous_version_id', 'sections', 'milestones', 'vat_rate', 'vat_applied',
+        'billing_entity_id', 'status', 'ai_run_id', 'validity_days', 'changes_summary', 'approved_by', 'approved_at', 'sent_at', 'recipients', 'recipients_unsent',
+        'token_hash', 'auth_otp', 'otp_expires_at', 'hq_signer_name', 'hq_signature_hash', 'hq_ip_address', 'hq_signed_at', 'provider_legal_name',
+        'signed_by_name', 'signed_by_title', 'signed_by_email', 'client_signature_hash', 'client_ip_address', 'ip_security_flag', 'signed_at',
+        'changes_request', 'changes_requested_by', 'changes_requested_at', 'deposit_invoice_id', 'project_id',
+        'created_by', 'updated_by', 'deleted_by', 'created_at', 'updated_at', 'deleted_at',
+    ];
+
     protected $table = 'statements_of_work';
 
     protected $guarded = ['id'];
@@ -69,9 +82,10 @@ class StatementOfWork extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
+    /** The job drafting it: where it stands, without its input or output (AiRun::LIGHT; Sows::sync reads the output) */
     public function aiRun(): BelongsTo
     {
-        return $this->belongsTo(AiRun::class);
+        return $this->belongsTo(AiRun::class)->select(AiRun::LIGHT);
     }
 
     /** A draft nobody has approved (signed for HQ) yet: the only state in which it can be changed */

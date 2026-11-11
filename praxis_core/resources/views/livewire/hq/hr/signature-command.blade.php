@@ -109,8 +109,7 @@ HTML;
     @endforelse
 
     <script>
-        document.addEventListener('livewire:navigated', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); });
-        document.addEventListener('DOMContentLoaded', () => { if(typeof lucide !== 'undefined') lucide.createIcons(); });
+        // Icons are drawn by the app bundle (resources/js/app.js) on load, on wire:navigate and after every update
         
         function copySig(id) {
             var copyText = document.getElementById(id);

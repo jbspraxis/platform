@@ -7,8 +7,12 @@
 #   3. backs up every file it replaces or removes (~/deploy/backups/<time>_<sha>/), then copies the new files,
 #   4. builds new packages (only if a composer.lock changed) in a staging folder before any live change, and
 #      swaps that vendor folder in next to the file copy; runs migrations (only if one was added or changed),
-#      clears the caches, and checks HQ, the portal and the site answer 200,
+#      clears Laravel's caches and builds them again from the new files (config, routes, events, views:
+#      `artisan optimize`), and checks HQ, the portal and the site answer 200,
 #   5. on any failure restores the backup (and the old vendor folder) and logs an error in HQ (System health emails it).
+# With the config cached, Laravel reads .env only when the cache is built: so on every run (also when nothing was
+# released) an app whose .env changed since its caches were built (an edit in cPanel's File Manager) gets them
+# built again, and the edit takes effect within a minute, as it did without the cache.
 # Pause:  touch ~/deploy/PAUSED      Dry run:  DRY=1 ~/deploy/jbspraxis-deploy.sh
 # A failed release is not retried; the next release (a new push to main) is.
 # Test: deploy/server/tests/deploy-test.sh runs this against a throwaway home with stubs (DEPLOY_HOME, DEPLOY_PHP).
@@ -27,6 +31,35 @@ log() { echo "$(date '+%F %T') $*" >> "$LOG"; [ "$DRY" = 1 ] && echo "$*"; retur
 exec 9>"$STATE/deploy.lock"
 flock -n 9 || exit 0
 [ -f "$STATE/PAUSED" ] && [ "$DRY" != 1 ] && exit 0
+
+# Laravel's caches for one app (praxis_core or praxis_site): cleared, then built again from the files now live, so
+# no request pays to read every config file, register every route, scan app/Listeners or compile a Blade view.
+# If building them fails the app runs without them (slower, as before this step existed) and the run says so.
+# The .env it was built from is remembered (~/deploy/env-<app>.sha1) for the check below.
+warm() {
+  local app=$1 dir="$H/$1"
+  [ -f "$dir/artisan" ] || return 0
+  (cd "$dir" && $PHP artisan optimize:clear >/dev/null 2>&1)
+  if (cd "$dir" && $PHP artisan optimize >> "$LOG" 2>&1); then
+    env_sum "$app" > "$STATE/env-$app.sha1"
+    return 0
+  fi
+  (cd "$dir" && $PHP artisan optimize:clear >/dev/null 2>&1)
+  # Remembered all the same: without caches the app reads this .env itself, and a failing build isn't retried every minute
+  env_sum "$app" > "$STATE/env-$app.sha1"
+  log "  $app: artisan optimize failed; it runs without Laravel's caches until the next release or .env change"
+  return 1
+}
+env_sum() { if [ -f "$H/$1/.env" ]; then sha1sum < "$H/$1/.env" | cut -c1-40; else echo none; fi; }
+if [ "$DRY" != 1 ]; then
+  for app in praxis_core praxis_site; do
+    [ -f "$H/$app/artisan" ] || continue
+    if [ "$(env_sum "$app")" != "$(cat "$STATE/env-$app.sha1" 2>/dev/null)" ]; then
+      log "$app: .env changed since its caches were built (or they never were): building them"
+      warm "$app" || true
+    fi
+  done
+fi
 
 cd "$REPO" || { log "repo missing: $REPO"; exit 1; }
 git fetch -q origin production 2>>"$LOG" || { log "fetch failed"; exit 1; }
@@ -160,13 +193,25 @@ rollback() {
   rm -rf "$STAGE"
   while read -r f; do [ -n "$f" ] && rm -f "$f"; done < "$BK/added.txt"
   (cd "$BK/files" 2>/dev/null && find . -type f | while read -r f; do mkdir -p "$(dirname "/${f#./}")"; cp -p "$f" "/${f#./}"; done)
-  (cd "$H/praxis_core" && $PHP artisan optimize:clear >/dev/null 2>&1)
-  (cd "$H/praxis_site" && $PHP artisan optimize:clear >/dev/null 2>&1)
+  # The old release's caches, built again from its restored files (cleared and left so if that fails)
+  warm praxis_core; warm praxis_site
   uapi NginxCaching clear_cache >/dev/null 2>&1
   echo "$NEW" > "$STATE/FAILED"
   alert "release ${NEW:0:7} failed and was rolled back to ${OLD:0:7}: $1. Log: ~/deploy/logs."
   exit 1
 }
+
+# Before any file changes: the apps about to change drop their config, route and event caches (not the app cache or
+# compiled views), so that while files, packages and migrations change they run on the files themselves, as without
+# caches, and never on caches of the release going out (a new route the layout links to would fail on the old route
+# cache). warm() builds them again once everything is in place.
+declare -A CHANGING=()
+for p in "${PLAN[@]}"; do
+  case "${p#*|}" in praxis_core/*|public_html_PRAXIS/*) CHANGING[praxis_core]=1 ;; praxis_site/*) CHANGING[praxis_site]=1 ;; esac
+done
+for app in "${!CHANGING[@]}"; do
+  [ -f "$H/$app/artisan" ] && (cd "$H/$app" && $PHP artisan optimize:clear --except=cache,views >> "$LOG" 2>&1)
+done
 
 # Apply, with a backup of everything replaced or removed and a list of what was added
 CORE=0; SITE=0; MIGRATE=0
@@ -203,8 +248,10 @@ rm -rf "$STAGE"
 if [ "$MIGRATE" = 1 ]; then
   (cd "$H/praxis_core" && $PHP artisan migrate --force >> "$LOG" 2>&1) || rollback "migrations failed (check the database by hand)"
 fi
-[ "$CORE" = 1 ] && (cd "$H/praxis_core" && $PHP artisan optimize:clear >/dev/null 2>&1)
-[ "$SITE" = 1 ] && (cd "$H/praxis_site" && $PHP artisan optimize:clear >/dev/null 2>&1)
+# Caches built from the new files; a failure leaves that app without them (it still works) and is reported
+WARM_FAILED=()
+if [ "$CORE" = 1 ]; then warm praxis_core || WARM_FAILED+=(praxis_core); fi
+if [ "$SITE" = 1 ]; then warm praxis_site || WARM_FAILED+=(praxis_site); fi
 uapi NginxCaching clear_cache >/dev/null 2>&1
 
 ok() { local code; for i in 1 2 3; do code=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$1"); [ "$code" = 200 ] && return 0; sleep 3; done; log "  $1 answered $code"; return 1; }
@@ -215,6 +262,9 @@ done
 # Healthy: the old vendor folders are no longer needed (they are the size of the app's packages)
 for app in "${SWAPPED[@]}"; do rm -rf "$BK/vendor-$app"; done
 echo "$NEW" > "$STATE/LIVE"; rm -f "$STATE/FAILED"
+if [ "${#WARM_FAILED[@]}" -gt 0 ]; then
+  alert "release ${NEW:0:7} is live, but artisan optimize failed for ${WARM_FAILED[*]}: it answers without Laravel's caches (slower). Log: ~/deploy/logs."
+fi
 printf '{"live":"%s","previous":"%s","deployed_at":"%s","files":%d,"backup":"%s"}\n' "$NEW" "$OLD" "$(date -Is)" "${#PLAN[@]}" "$BK" > "$STATE/status.json"
 log "LIVE ${NEW:0:7}: ${#PLAN[@]} file(s), migrations=$MIGRATE, new packages: ${STAGED[*]:-none}"
 exit 0

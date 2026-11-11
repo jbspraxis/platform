@@ -21,12 +21,13 @@ class LetterheadController extends Controller
 {
     /**
      * An issued document's PDF is the file that was stored when it was issued, byte for byte, because that is
-     * the file the reader's own copy is checked against. A draft is rendered afresh each time it is asked for.
+     * the file the reader's own copy is checked against. A draft is drawn from its fields (and kept until they
+     * change, LetterPdf::render). The signatures, with their images, are read only when the page is drawn.
      */
     public function documentPdf(Request $request, string $document): Response
     {
         Gate::authorize('letters.view');
-        $record = LetterDocument::with('signatures')->findOrFail($document);
+        $record = LetterDocument::findOrFail($document);
 
         // A signed agreement has two files: the one that was issued, which never changes, and the countersigned
         // version. The countersigned one is what the screen shows; ?issued=1 asks for the first one instead.
@@ -53,7 +54,8 @@ class LetterheadController extends Controller
         abort_unless($party && $party->token_expires_at, 404);
         abort_if($party->token_expires_at->isPast() && ! $party->hasSigned(), 410, 'This link has run out.');
 
-        $record = LetterDocument::with('signatures', 'counterparties')->findOrFail($party->document_id);
+        // Only stored files are handed over here, so nothing is drawn and no signature image is read
+        $record = LetterDocument::findOrFail($party->document_id);
         abort_unless($record->isIssued(), 404);
 
         $signed = Agreements::signedFile($record);

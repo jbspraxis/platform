@@ -1,4 +1,5 @@
 <div class="ld">
+    @assets
     <style>
         /* One lead (Lead 360): only what the shared component classes don't cover. Brand tokens only. */
         .ld { max-width: 1120px; }
@@ -55,6 +56,7 @@
             .ld-merge-row { grid-template-columns: 1fr; }
         }
     </style>
+    @endassets
 
     @php
         $tz = 'Africa/Lagos';

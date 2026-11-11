@@ -20,7 +20,8 @@
         return ['pill-warning', $r->ai_run_id ? 'Sorting…' : 'To sort', false];
     };
 @endphp
-<div class="orp" @if ($busy) wire:poll.4s @endif>
+<div class="orp" @if ($busy) wire:poll.4s="tick" @endif>
+    @assets
     <style>
         /* Outreach replies (docs/CAMPAIGNS.md section 12): only what the shared component classes don't cover. Brand tokens only. */
         .orp-back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 0.875rem; color: var(--color-deep-teal); text-decoration: none; }
@@ -87,6 +88,7 @@
             .orp-actions .orp-left { margin-right: 0; flex-basis: 100%; }
         }
     </style>
+    @endassets
 
     @if ($page)
         <a href="{{ route('hq.campaigns.outreach') }}" class="orp-back" wire:navigate><i data-lucide="arrow-left"></i> Outreach</a>

@@ -19,6 +19,19 @@ class MailMessage extends Model
 
     protected $hidden = ['body_text', 'body_html'];
 
+    /** Every column but the bodies (body_text, body_html: up to 1 MB each), for code that never reads them */
+    public const LIGHT_COLUMNS = ['id', 'account_id', 'folder_id', 'thread_id', 'uid', 'message_id', 'message_id_hash',
+        'in_reply_to', 'references', 'subject', 'from_name', 'from_email', 'to', 'cc', 'bcc', 'reply_to', 'to_text',
+        'sent_at', 'received_at', 'size', 'is_seen', 'is_flagged', 'is_answered', 'is_draft', 'has_attachments',
+        'is_outbound', 'snippet', 'body_state', 'parts', 'list_unsubscribe', 'seen_by', 'seen_at', 'sent_by',
+        'created_at', 'updated_at'];
+
+    /** Without the bodies: flags, moves and lists read ids, folders and UIDs, never the text */
+    public function scopeWithoutBodies(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->select(array_map(fn (string $c) => $this->qualifyColumn($c), self::LIGHT_COLUMNS));
+    }
+
     protected function casts(): array
     {
         return [

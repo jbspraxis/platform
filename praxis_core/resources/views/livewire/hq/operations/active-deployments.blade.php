@@ -1,4 +1,5 @@
-<div x-data="{ openCreateDrawer: false }">
+{{-- Opening the Create project panel loads its client list (ActiveDeployments::$creating); closing drops it with the next request --}}
+<div x-data="{ openCreateDrawer: false }" x-init="$watch('openCreateDrawer', open => $wire.$set('creating', open, open))">
     @php
         // Stored project statuses (database values) and what people read
         $statusLabels = ['Active' => 'Active', 'Scoping' => 'Scoping', 'Locked' => 'On hold', 'Completed' => 'Completed', 'Cancelled' => 'Cancelled'];
@@ -79,7 +80,8 @@
 
     <!-- Tab 1: active projects -->
     @if($activeTab === 'matrix')
-        <div wire:poll.30s="loadData">
+        {{-- Only while the cards are on screen (Livewire also slows it down in a background tab) --}}
+        <div wire:poll.30s.visible="loadData">
             <div class="mb-6 grid gap-4 sm:grid-cols-2 {{ $canSeeMoney ? 'xl:grid-cols-4' : '' }}">
                 <div class="card">
                     <div class="stat-label">Active projects</div>

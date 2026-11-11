@@ -1,3 +1,5 @@
+{{-- Sent once per page (@assets), not again with every update of the tab --}}
+@assets
 <style>
     /* Meetings and transcripts of an opportunity: only what the shared component classes don't cover. Brand tokens only. */
     .mtg-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
@@ -88,3 +90,4 @@
     }
     @media (prefers-reduced-motion: reduce) { .mtg-progress > span { transition: none; } }
 </style>
+@endassets

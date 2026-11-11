@@ -3,7 +3,9 @@
 namespace App\Support\Letters;
 
 use App\Models\Letters\LetterDocument;
+use App\Support\Opportunities\ProposalPdf;
 use Carbon\CarbonImmutable;
+use Composer\InstalledVersions;
 use Dompdf\Adapter\CPDF;
 use Dompdf\Dompdf;
 use Dompdf\FontMetrics;
@@ -23,9 +25,19 @@ use Illuminate\Support\Facades\File;
  * reference on the left of every page after the first, "Page 2 of 7" on the right, over a thin rule. The page
  * number then belongs to the head, and the footer leaves it out rather than printing it twice. Every other kind
  * of document is drawn exactly as it was before.
+ *
+ * A draft's preview and the blank letterhead are kept once drawn, under a hash of exactly what is drawn (see
+ * kept()), so opening the same draft again, or the same blank letterhead, is the stored file instead of a new
+ * dompdf render. An issued or countersigned PDF is always drawn afresh: it is stored once, as the record.
  */
 final class LetterPdf
 {
+    /** Bump when fromHtml() changes how a page is drawn, so PDFs kept by the previous code are not served again */
+    private const CACHE_FORMAT = '1';
+
+    /** Days a kept PDF stays after it was last served */
+    private const CACHE_DAYS = 30;
+
     /** A4 in points, and the text column between the left and right margins */
     private const LEFT = 56.0;
 
@@ -43,11 +55,14 @@ final class LetterPdf
 
         $cache = storage_path('framework/cache/dompdf');
         File::ensureDirectoryExists($cache);
+        $head = self::headerLine($document);
+        $locale = LetterBody::locale($document);
+        $draw = fn () => self::fromHtml($html, $details['footer_legal'], $details['footer_contact'], $cache, $head, $locale);
 
-        return self::fromHtml(
-            $html, $details['footer_legal'], $details['footer_contact'], $cache,
-            self::headerLine($document), LetterBody::locale($document),
-        );
+        // A draft is previewed again and again (every open of its page and every save); the record is drawn once
+        return $final || $countersigned
+            ? $draw()
+            : self::kept([$html, $details['footer_legal'], $details['footer_contact'], $head, $locale], $draw);
     }
 
     /** The running head of a multi-page agreement; null for every other kind, which keeps the letterhead as it was */
@@ -160,6 +175,61 @@ final class LetterPdf
             'logo' => Letterhead::logoDataUri(),
         ])->render();
 
-        return self::fromHtml($html, $details['footer_legal'], $details['footer_contact'], $cache);
+        return self::kept([$html, $details['footer_legal'], $details['footer_contact'], null, 'en'],
+            fn () => self::fromHtml($html, $details['footer_legal'], $details['footer_contact'], $cache));
+    }
+
+    /**
+     * The PDF kept for exactly this page, or $draw's, kept for next time. The key is a hash of everything fromHtml()
+     * draws from (the HTML, the footer lines, the running head, the language) with the dompdf version, so any change
+     * to the document, the company's details, the template or dompdf draws it anew. The files sit beside the
+     * proposal, SOW and invoice PDFs (ProposalPdf::cacheFolder), written to a temporary file then renamed, so a
+     * reader never gets half a PDF; a failure to keep one only means it is drawn again next time.
+     *
+     * @param  list<?string>  $page  what fromHtml() is given: the HTML, the two footer lines, the running head, the language
+     */
+    private static function kept(array $page, \Closure $draw): string
+    {
+        $folder = ProposalPdf::cacheFolder();
+        if ($folder === null) {
+            return $draw();
+        }
+        $file = $folder . '/letter-' . hash('sha256', serialize([self::CACHE_FORMAT, self::dompdfVersion(), ...$page])) . '.pdf';
+        if (is_file($file) && ($pdf = @file_get_contents($file)) !== false && str_starts_with($pdf, '%PDF-')) {
+            @touch($file); // Still in use: pruning goes by the last time a file was served
+
+            return $pdf;
+        }
+
+        $pdf = $draw();
+        if (! is_dir($folder) && ! @mkdir($folder, 0775, true) && ! is_dir($folder)) {
+            return $pdf;
+        }
+        $temporary = $file . '.' . bin2hex(random_bytes(6)) . '.tmp';
+        if (@file_put_contents($temporary, $pdf) !== strlen($pdf) || ! @rename($temporary, $file)) {
+            @unlink($temporary);
+
+            return $pdf;
+        }
+
+        // Pruned now and then, when a new one is kept: letter PDFs not served for 30 days go
+        $before = time() - self::CACHE_DAYS * 86400;
+        foreach (glob("{$folder}/letter-*.pdf") ?: [] as $old) {
+            if (($at = @filemtime($old)) !== false && $at < $before) {
+                @unlink($old);
+            }
+        }
+
+        return $pdf;
+    }
+
+    /** The installed dompdf (an update may draw differently); its file's date if Composer can't say */
+    private static function dompdfVersion(): string
+    {
+        try {
+            return (string) InstalledVersions::getReference('dompdf/dompdf') ?: (string) InstalledVersions::getVersion('dompdf/dompdf');
+        } catch (\Throwable) {
+            return (string) @filemtime((new \ReflectionClass(Dompdf::class))->getFileName());
+        }
     }
 }

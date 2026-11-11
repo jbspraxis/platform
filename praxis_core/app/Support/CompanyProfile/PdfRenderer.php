@@ -2,6 +2,8 @@
 
 namespace App\Support\CompanyProfile;
 
+use App\Support\Opportunities\ProposalPdf;
+use Composer\InstalledVersions;
 use Dompdf\Adapter\CPDF;
 use Dompdf\Dompdf;
 use Dompdf\FontMetrics;
@@ -28,6 +30,9 @@ use Throwable;
  *
  * The reference and the version are drawn on every page by a page script rather than by the page, which
  * is the only way to be certain they are on all of them.
+ *
+ * A finished book is kept (kept()): a published version is downloaded from HQ and opened from share links
+ * again and again, and each time it would otherwise be laid out anew, which takes one to three seconds.
  */
 final class PdfRenderer implements CompanyProfileRenderer
 {
@@ -36,18 +41,33 @@ final class PdfRenderer implements CompanyProfileRenderer
 
     private const FOOTER_SIZE = 6.6;
 
+    /** Bump when the drawing changes in a way kept() cannot see, so books kept by the previous code are not served */
+    private const CACHE_FORMAT = '1';
+
+    /** Days a kept book stays after it was last served */
+    private const CACHE_DAYS = 30;
+
     public function pdf(array $data): string
     {
         $prepared = $this->prepare($data);
-        $cache = $this->cache();
-        $roots = Assets::chroot($prepared);
         $pages = Layout::pages($prepared);
+        $html = $this->render($prepared, $pages);
+        $roots = Assets::chroot($prepared);
+
+        return $this->kept($html, $this->footer($prepared), $this->footerPlacement($pages), $roots,
+            fn () => $this->draw($prepared, $pages, $html, $roots));
+    }
+
+    /** The book itself: planned, checked against dompdf, and evened out (fit(), reflow(), balance()) */
+    private function draw(array $prepared, array $pages, string $html, array $roots): string
+    {
+        $cache = $this->cache();
 
         // The book is rendered to find out whether the plan was right, and when it was - which is the
         // usual case, because Layout counts the pages from the same font metrics dompdf sets them with
         // - those are the bytes to send. Rendering it again to say the same thing is the difference
         // between a download that takes a second and one that takes three.
-        $book = $this->book($prepared, $pages, $cache, $roots);
+        $book = $this->book($prepared, $pages, $cache, $roots, $html);
 
         if ($book['pages'] === count($pages)) {
             $balanced = $this->balance($prepared, $pages, $cache, $roots);
@@ -69,10 +89,10 @@ final class PdfRenderer implements CompanyProfileRenderer
      * @param  list<array{view: string, surface: string, data: array<string, mixed>}>  $pages
      * @return array{pdf: string, pages: int}
      */
-    private function book(array $prepared, array $pages, string $cache, array $roots): array
+    private function book(array $prepared, array $pages, string $cache, array $roots, ?string $html = null): array
     {
         $pdf = $this->fromHtml(
-            $this->render($prepared, $pages),
+            $html ?? $this->render($prepared, $pages),
             $this->footer($prepared),
             $this->footerPlacement($pages),
             $cache,
@@ -420,6 +440,74 @@ final class PdfRenderer implements CompanyProfileRenderer
         }
 
         return $placement;
+    }
+
+    /**
+     * The book kept for exactly this content, or $draw's, kept for next time. The key is a hash of what the book is
+     * drawn from: the planned pages' HTML (every word, every setting of the template, every file path), the footer
+     * and where it goes, the folders dompdf may read, the size and date of every file the pages place (a logo
+     * replaced under the same name), the renderer's own code (which moves items between pages after the plan) and
+     * the dompdf version. A new version, a logo, an edit or a deploy draws it anew. The files sit beside the other
+     * kept PDFs (ProposalPdf::cacheFolder), written to a temporary file then renamed so a reader never gets half a
+     * book; failing to keep one only means it is drawn again next time.
+     *
+     * @param  array<int, array{colour: list<float>, y: float}>  $placement
+     * @param  list<string>  $roots
+     */
+    private function kept(string $html, string $footer, array $placement, array $roots, \Closure $draw): string
+    {
+        $folder = ProposalPdf::cacheFolder();
+        if ($folder === null) {
+            return $draw();
+        }
+
+        $files = [];
+        preg_match_all('/(?:src="|url\(\')([^"\']+)/', $html, $found);
+        $code = array_map(fn ($class) => (new \ReflectionClass($class))->getFileName(), [self::class, Layout::class, Measure::class, Assets::class]);
+        foreach (array_unique([...array_map('html_entity_decode', $found[1]), ...$code]) as $path) {
+            if (is_file($path)) {
+                $files[$path] = filesize($path) . ':' . filemtime($path);
+            }
+        }
+        $key = hash('sha256', serialize([self::CACHE_FORMAT, self::dompdfVersion(), $html, $footer, $placement, $roots, $files]));
+        $file = "{$folder}/profile-{$key}.pdf";
+
+        if (is_file($file) && ($pdf = @file_get_contents($file)) !== false && str_starts_with($pdf, '%PDF-')) {
+            @touch($file); // Still in use: pruning goes by the last time a file was served
+
+            return $pdf;
+        }
+
+        $pdf = $draw();
+        if (! is_dir($folder) && ! @mkdir($folder, 0775, true) && ! is_dir($folder)) {
+            return $pdf;
+        }
+        $temporary = $file . '.' . bin2hex(random_bytes(6)) . '.tmp';
+        if (@file_put_contents($temporary, $pdf) !== strlen($pdf) || ! @rename($temporary, $file)) {
+            @unlink($temporary);
+
+            return $pdf;
+        }
+
+        // Pruned now and then, when a new one is kept: books not served for 30 days go
+        $before = time() - self::CACHE_DAYS * 86400;
+        foreach (glob("{$folder}/profile-*.pdf") ?: [] as $old) {
+            if (($at = @filemtime($old)) !== false && $at < $before) {
+                @unlink($old);
+            }
+        }
+
+        return $pdf;
+    }
+
+    /** The installed dompdf (an update may set type differently); its file's date if Composer can't say */
+    private static function dompdfVersion(): string
+    {
+        try {
+            return (string) InstalledVersions::getReference('dompdf/dompdf') ?: (string) InstalledVersions::getVersion('dompdf/dompdf');
+        } catch (\Throwable) {
+            return (string) @filemtime((new \ReflectionClass(Dompdf::class))->getFileName());
+        }
     }
 
     private function cache(): string

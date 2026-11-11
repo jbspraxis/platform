@@ -1,7 +1,9 @@
 @use('App\Livewire\Portal\Concerns\GatewayFormat', 'F')
 {{-- The public check behind the QR code on a signed sign-off: does this SHA-256 fingerprint match a signed record?
-     Behaviour lives in App\Livewire\Portal\ContractVerification; the check runs as soon as the page has loaded. --}}
-<div class="gateway verify-gateway" x-data="verificationScanner()">
+     Behaviour lives in App\Livewire\Portal\ContractVerification; the check runs with the page itself (no second request). --}}
+<div class="gateway verify-gateway">
+    {{-- Static styles: sent once with the page, not again on every round trip --}}
+    @assets
     <style>
         .gateway-main { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
         @media (min-width: 768px) { .gateway-main { padding: 32px 32px 64px; } }
@@ -16,6 +18,7 @@
         @keyframes verify-spin { to { transform: rotate(360deg); } }
         @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
     </style>
+    @endassets
 
     <x-portal.gateway-header :kicker="__('gateway.verify.kicker')" :width="720" />
 
@@ -84,17 +87,4 @@
             @endif
         </section>
     </main>
-
-    <script>
-        // Run the check once the page has loaded
-        function verificationScanner() {
-            return {
-                init() {
-                    if (@js($verificationState) === 'scanning') {
-                        @this.call('executeVerificationScan');
-                    }
-                }
-            }
-        }
-    </script>
 </div>

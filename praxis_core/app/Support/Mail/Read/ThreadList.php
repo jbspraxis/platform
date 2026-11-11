@@ -8,6 +8,8 @@ use App\Models\Mail\MailMessage;
 use App\Models\Mail\MailThread;
 use App\Models\User;
 use App\Support\Mail\MailAccess;
+use App\Support\Mail\MailVersion;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -139,7 +141,12 @@ final class ThreadList
         }
         self::filter($query, $user, $filter);
 
-        $total = (clone $query)->count();
+        // The count groups the whole folder like the page does: outside search it is kept until the mailbox changes
+        // (its MailVersion stamp moves with every write that could change it), so a click in Mail pays for one pass
+        $count = fn () => (clone $query)->count();
+        $total = $search ? $count() : (int) rescue(fn () => Cache::remember(
+            'mail-list-total:' . md5(implode('|', [$accountId, $query->toRawSql(), MailVersion::of([$accountId])])), 600, $count,
+        ), $count, false);
         $page = max(1, min($page, (int) ceil(max($total, 1) / self::PER_PAGE)));
         $rows = $query->with('assignee:id,first_name,last_name')
             ->orderByDesc('agg.row_last_at')->orderByDesc('mail_threads.id')

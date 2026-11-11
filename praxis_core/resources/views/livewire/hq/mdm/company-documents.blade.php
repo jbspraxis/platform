@@ -1,4 +1,5 @@
 <div class="cd">
+    @assets
     <style>
         .cd-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-bottom: 16px; }
         .cd-tools .segmented { flex: 1 1 auto; }
@@ -47,6 +48,7 @@
             .cd .modal-actions .btn { flex: 1 1 auto; }
         }
     </style>
+    @endassets
 
     @php
         $kindLabel = fn ($k) => $kinds[$k] ?? 'Other';

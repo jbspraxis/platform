@@ -1,9 +1,9 @@
 /* HQ as an app (docs/PWA.md), the "client" part: the install and notification cards, the offline notice, the
    install steps for iPhone, iPad and Mac Safari, the app actions in the bell menu, the notification settings
    panel, and the safe areas now that HQ uses viewport-fit=cover (notch, status bar, home indicator).
-   Served on the HQ host only and loaded before the compiled stylesheet (app.css), whose tokens and classes it
-   reuses. Its unlayered rules beat app.css's layered ones; rules that override app.css's 900px media query
-   start with "html" so they win whatever the order. Motion: opacity and transform only (docs/BRAND.md 11). */
+   Part of the compiled stylesheet: resources/css/app.css imports it ahead of its own rules, whose tokens and
+   classes it reuses. Its unlayered rules beat app.css's layered ones; rules that override app.css's 900px media
+   query start with "html" so they win whatever the order. Motion: opacity and transform only (docs/BRAND.md 11). */
 
 :root {
     --hqp-safe-top: env(safe-area-inset-top, 0px);

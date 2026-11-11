@@ -33,8 +33,9 @@
      x-data="{ isExecMode: true, step: {{ $viewState === 'review' ? 0 : 4 }} }"
      @reinit-deck.window="step = 4">
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-
+    {{-- Static styles: sent once with the page (in <head>), not again on every round trip. The PDF library is
+         fetched only when the client clicks Download (triggerPdfDownload below), so it no longer holds up the page. --}}
+    @assets
     <style>
         .gateway-main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 48px; }
         @media (min-width: 768px) { .gateway-main { padding: 32px 32px 64px; } }
@@ -125,6 +126,7 @@
             .a4-page { border: none !important; margin: 0 !important; }
         }
     </style>
+    @endassets
 
     <x-portal.gateway-header :kicker="__('gateway.proposal.kicker')" />
 
@@ -679,6 +681,19 @@
         }
 
         // --- PDF download (the A4 pages, one to one) ---
+        // The library is fetched on the first click only (once; a failed fetch is tried again on the next click)
+        const html2pdfLibrary = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+        function loadPdfLibrary(src) {
+            const loaded = (window.praxisPdfLibraries = window.praxisPdfLibraries || {});
+            return loaded[src] = loaded[src] || new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.onload = resolve;
+                script.onerror = () => { delete loaded[src]; script.remove(); reject(new Error('Could not load ' + src)); };
+                document.head.append(script);
+            });
+        }
         async function triggerPdfDownload() {
             const btn = document.getElementById('downloadPdfBtn');
             if (!btn) return;
@@ -690,6 +705,7 @@
             await new Promise(r => setTimeout(r, 100));
 
             try {
+                await loadPdfLibrary(html2pdfLibrary);
                 const wrapper = document.getElementById('full-document-wrapper');
                 const renderZone = document.getElementById('pdf-render-zone');
 

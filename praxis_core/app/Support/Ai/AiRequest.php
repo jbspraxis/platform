@@ -9,6 +9,10 @@ namespace App\Support\Ai;
  *
  * $attachments: files the model reads with the message (a PDF as a document block, a JPG or PNG as an image block),
  * each ['media_type' => …, 'data' => base64, 'pages' => n]. Company documents send the uploaded certificate this way.
+ *
+ * $sync: a page is waiting for the answer (Ai::now, purposes marked sync): the provider gives up after SYNC_TIMEOUT
+ * seconds and never retries, so a slow or overloaded API can't hold one of the server's few PHP workers for minutes.
+ * The page then shows its usual fallback, as when the AI is unavailable.
  */
 final class AiRequest
 {
@@ -17,6 +21,12 @@ final class AiRequest
 
     /** An image is resized to fit the model's limit first; the budget counts the largest it can be */
     public const TOKENS_PER_IMAGE = 5000;
+
+    /**
+     * Seconds a request made while a page waits may take, connecting included: room for the longest sync draft (a
+     * letter, up to 3,000 tokens) and still inside the web server's usual 60 s proxy limit
+     */
+    public const SYNC_TIMEOUT = 50;
 
     /**
      * @param  list<string>  $system
@@ -33,6 +43,7 @@ final class AiRequest
         public readonly bool $stream = false,
         public readonly int $expectedChars = 4000,
         public readonly array $attachments = [],
+        public readonly bool $sync = false,
     ) {}
 
     /** Characters sent, for the budget's estimate of the input tokens (attachments are counted apart) */

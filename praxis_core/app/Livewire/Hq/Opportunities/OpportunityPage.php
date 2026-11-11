@@ -246,37 +246,31 @@ class OpportunityPage extends Component
     {
         $o = $this->opportunity();
         $user = Auth::user();
-
-        $meetings = $o->meetings()->withCount('transcripts')->with('attendees')->get();
-        $proposals = $o->proposals()->get(['id', 'opportunity_id', 'proposal_ref', 'title', 'status', 'total_value', 'currency', 'version', 'signing_mode', 'created_at']);
-        $copq = DB::table('copq_assessments')->where('organization_id', $o->organization_id)->orderByDesc('created_at')->first();
-        $contact = DB::table('client_users')->where('organization_id', $o->organization_id)->whereNull('deleted_at')
-            ->orderByDesc('is_primary_client')->orderBy('created_at')->first(['first_name', 'last_name', 'email', 'job_title']);
-        $history = DB::table('system_audit_logs')
-            ->leftJoin('users', 'users.id', '=', 'system_audit_logs.user_id')
-            ->where('target_table', 'opportunities')->where('target_id', $o->id)
-            ->orderByDesc('system_audit_logs.created_at')->orderByDesc('system_audit_logs.id')->limit(10)
-            ->get(['system_audit_logs.action', 'system_audit_logs.description', 'system_audit_logs.created_at', 'users.first_name', 'users.last_name']);
+        // The tab labels' counts, in one query (the same relations, cancelled meetings included)
+        $o->loadCount(['meetings', 'proposals', 'statementsOfWork']);
+        $overview = $this->tab === 'overview';
 
         return view('livewire.hq.opportunities.page', [
             'o' => $o,
-            'meetings' => $meetings,
-            'proposals' => $proposals,
-            'sows' => $o->statementsOfWork()->get(['id', 'opportunity_id', 'reference', 'version', 'status', 'signed_at', 'created_at']),
-            'project' => $o->project_id ? DB::table('projects')->where('id', $o->project_id)->first(['id', 'title', 'status', 'start_date', 'target_end_date']) : null,
-            // The project draft (PR 5) shows until Create project
-            'draftOpen' => $o->projectDrafts()->where('status', '!=', 'created')->exists(),
-            'copq' => $copq,
-            'contact' => $contact,
-            'history' => $history,
-            'team' => Team::of($o),
-            'canApprove' => OpportunityAccess::canApprove($user, $o),
+            'counts' => ['meetings' => $o->meetings_count, 'proposals' => $o->proposals_count, 'sow' => $o->statements_of_work_count],
+            // The Project tab: the project draft (PR 5) shows until Create project, then the project
+            'project' => $this->tab === 'project' && $o->project_id ? DB::table('projects')->where('id', $o->project_id)->first(['id', 'title', 'status', 'start_date', 'target_end_date']) : null,
+            'draftOpen' => $this->tab === 'project' && $o->projectDrafts()->where('status', '!=', 'created')->exists(),
+            // The Overview's cards, read only while it is shown
+            'copq' => $overview ? DB::table('copq_assessments')->where('organization_id', $o->organization_id)->orderByDesc('created_at')->first() : null,
+            'contact' => $overview ? DB::table('client_users')->where('organization_id', $o->organization_id)->whereNull('deleted_at')
+                ->orderByDesc('is_primary_client')->orderBy('created_at')->first(['first_name', 'last_name', 'email', 'job_title']) : null,
+            'history' => $overview ? DB::table('system_audit_logs')
+                ->leftJoin('users', 'users.id', '=', 'system_audit_logs.user_id')
+                ->where('target_table', 'opportunities')->where('target_id', $o->id)
+                ->orderByDesc('system_audit_logs.created_at')->orderByDesc('system_audit_logs.id')->limit(10)
+                ->get(['system_audit_logs.action', 'system_audit_logs.description', 'system_audit_logs.created_at', 'users.first_name', 'users.last_name']) : collect(),
+            'team' => $overview ? Team::of($o) : collect(),
             'billingCompany' => Vat::companyName($o->billing_entity_id ?? Vat::issuer(null)?->id),
-            'billingCompanies' => $this->editing ? Vat::companies() : collect(),
-            'canChooseBilling' => OpportunityAccess::canApprove($user, $o),
+            'billingCompanies' => $this->editing && $overview ? Vat::companies() : collect(),
+            'canChooseBilling' => $this->editing && $overview && OpportunityAccess::canApprove($user, $o),
             'canFlagTest' => $user && Access::isOwner($user),
-            'canReadTranscripts' => OpportunityAccess::canReadTranscripts($user, $o),
             'canOpenProjects' => (bool) $user?->can('projects.view'),
-        ] + ($this->editing ? $this->staffPickers() : []))->title($o->title . ' · ' . __('opportunities.title'));
+        ] + ($this->editing && $overview ? $this->staffPickers() : []))->title($o->title . ' · ' . __('opportunities.title'));
     }
 }

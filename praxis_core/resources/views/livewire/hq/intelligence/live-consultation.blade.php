@@ -57,6 +57,7 @@
         $when = fn ($time) => \Carbon\Carbon::parse($time)->format('D j M Y, H:i') . ' WAT';
     @endphp
 
+    @assets
     <style>
         .privacy-on .sensitive-data { filter: blur(6px); user-select: none; }
         .privacy-on .sensitive-data:hover { filter: none; }
@@ -64,6 +65,7 @@
         .lc-option:hover { border-color: var(--color-deep-teal); background: var(--color-teal-tint); }
         .lc-option svg { width: 24px; height: 24px; color: var(--color-deep-teal); }
     </style>
+    @endassets
 
     <div class="page-header">
         <div>
@@ -277,6 +279,12 @@
 
                 <section class="card">
                     <h2 class="card-title" style="margin-bottom: 16px;">History</h2>
+                    @if($lineWaiting)
+                        {{-- The page opened without waiting for the assistant: it writes today's line now --}}
+                        <p class="text-small text-muted flex items-center gap-2" style="margin: 0 0 16px;" role="status" wire:init="loadConsultationLine">
+                            <i data-lucide="loader" class="animate-spin"></i> The assistant is reading the earlier notes for today’s call…
+                        </p>
+                    @endif
                     @if($historySummary)
                         <div class="callout" style="margin-bottom: 16px;">
                             <div class="stat-label" style="margin-bottom: 4px;">Summary of earlier notes, written by the assistant</div>

@@ -134,6 +134,9 @@
                 </tbody>
             </table>
         </div>
+        @if($invoices->hasPages())
+            <div class="p-4">{{ $invoices->links() }}</div>
+        @endif
     </div>
 
     @if($showCreateModal)

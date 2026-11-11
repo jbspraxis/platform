@@ -191,12 +191,14 @@ class PushDispatcher
 
     /**
      * Whether the PWA tables are there. On the server the code is uploaded a few minutes before the
-     * migration runs; until then pushing does nothing. Checked once per process.
+     * migration runs; until then pushing does nothing. Checked once per process, with one look at the
+     * database's catalogue rather than four: the migration that makes the four tables
+     * (2026_10_30_300000_create_pwa_tables) creates pwa_settings last and its rollback drops it first,
+     * so pwa_settings is there only when the other three are.
      */
     public static function ready(): bool
     {
-        return self::$ready ??= Schema::hasTable('pwa_settings') && Schema::hasTable('push_deliveries')
-            && Schema::hasTable('push_subscriptions') && Schema::hasTable('push_preferences');
+        return self::$ready ??= Schema::hasTable('pwa_settings');
     }
 
     /** Forget the table check (tests). */

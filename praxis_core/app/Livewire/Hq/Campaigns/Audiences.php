@@ -10,6 +10,7 @@ use App\Support\MailLocale;
 use App\Support\WebsiteSettings;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
@@ -69,6 +70,25 @@ class Audiences extends Component
     {
         $this->resetPage();
         $this->search = '';
+        unset($this->segmentNumbers); // back on Segments: counted again
+    }
+
+    /**
+     * Each segment's numbers (Audience::summary), by segmentKey(). Counted when the page or the Segments tab opens and
+     * kept for a minute while the person stays on it, so ticking a box in the builder counts only the segment being
+     * built, not every saved one again. A segment saved since has a new key, and render() counts them all again.
+     */
+    #[Computed(persist: true, seconds: 60)]
+    public function segmentNumbers(): array
+    {
+        return Segment::orderBy('name')->get(['id', 'rules'])
+            ->mapWithKeys(fn (Segment $s) => [self::segmentKey($s) => Audience::summary($s->rules)])->all();
+    }
+
+    /** A segment as it stands: its id and its rules */
+    private static function segmentKey(Segment $segment): string
+    {
+        return $segment->id . ':' . md5((string) json_encode($segment->rules));
     }
 
     public function updatingSearch(): void
@@ -202,7 +222,13 @@ class Audiences extends Component
         $data = ['countries' => WebsiteSettings::COUNTRIES];
 
         if ($this->tab === 'segments') {
-            $data['segments'] = Segment::orderBy('name')->get()->map(fn ($s) => ['segment' => $s, 'summary' => Audience::summary($s->rules)]);
+            $segments = Segment::orderBy('name')->get();
+            $numbers = $this->segmentNumbers;
+            if ($segments->contains(fn ($s) => ! isset($numbers[self::segmentKey($s)]))) {
+                unset($this->segmentNumbers); // one added or edited since they were counted
+                $numbers = $this->segmentNumbers;
+            }
+            $data['segments'] = $segments->map(fn ($s) => ['segment' => $s, 'summary' => $numbers[self::segmentKey($s)] ?? Audience::summary($s->rules)]);
         } elseif ($this->tab === 'subscribers') {
             $data['subscribers'] = Subscriber::query()
                 ->when($search !== '', fn ($q) => $q->where(fn ($w) => $w->where('email', 'like', "%{$search}%")->orWhere('first_name', 'like', "%{$search}%")

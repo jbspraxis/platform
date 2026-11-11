@@ -14,6 +14,7 @@ use App\Support\Campaigns\Outreach\Senders;
 use App\Support\Campaigns\RichText;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -64,6 +65,10 @@ class OutreachCampaignPage extends Component
 
     #[Locked]
     public bool $canReview = false;
+
+    /** This campaign's emails and replies as last drawn (stamp()): the 4 s refresh redraws only when they moved */
+    #[Locked]
+    public string $drawnAt = '';
 
     public const FILTERS = [
         'review' => 'To review', 'writing' => 'Not ready', 'approved' => 'Approved', 'sent' => 'Sent', 'stopped' => 'Not sent', 'all' => 'All',
@@ -347,6 +352,24 @@ class OutreachCampaignPage extends Component
 
     // ------------------------------------------------------------------ the page
 
+    /** wire:poll while Claude writes: two small counts, and a redraw only when an email or a reply changed */
+    public function tick(): void
+    {
+        if ($this->stamp() === $this->drawnAt) {
+            $this->skipRender();
+        }
+    }
+
+    /** Where this campaign's emails and replies stand: how many, how many are being written, the latest change */
+    private function stamp(): string
+    {
+        $emails = DB::table('outreach_emails')->where('campaign_id', $this->campaignId)
+            ->selectRaw("COUNT(*) AS n, SUM(status = 'writing') AS writing, SUM(ai_run_id IS NOT NULL) AS busy, MAX(updated_at) AS changed")->first();
+        $replies = DB::table('outreach_replies')->where('campaign_id', $this->campaignId)->selectRaw('COUNT(*) AS n, MAX(updated_at) AS changed')->first();
+
+        return md5(implode('|', [...array_values((array) $emails), ...array_values((array) $replies)]));
+    }
+
     /** The first emails the table shows, with their prospect and follow-up */
     private function rows(): Builder
     {
@@ -370,6 +393,8 @@ class OutreachCampaignPage extends Component
 
     public function render()
     {
+        // Taken before the page is read, so a change made while it is drawn shows on the next tick
+        $this->drawnAt = $this->stamp();
         $campaign = $this->campaign();
         $sender = User::find($campaign->sender_id);
         $stats = Outreach::stats([$campaign->id])[$campaign->id];

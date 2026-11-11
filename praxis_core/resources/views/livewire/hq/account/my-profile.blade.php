@@ -1,4 +1,6 @@
 <div class="mp">
+    {{-- Static styles: sent once with the page, not again on every round trip --}}
+    @assets
     <style>
         /* My profile: only what the shared component classes don't cover. Brand tokens only. */
         .mp { max-width: 820px; }
@@ -21,6 +23,7 @@
         .mp-section-title { margin: 0 0 4px; font-size: 1rem; line-height: 1.5rem; font-weight: 600; color: var(--color-ink); }
         .mp-section-help { margin: 0 0 16px; }
     </style>
+    @endassets
 
     <div class="page-header">
         <div>

@@ -33,10 +33,10 @@ class QuestionnaireQuestion extends Model
         return $this->belongsTo(Questionnaire::class);
     }
 
-    /** The job redrafting it, while it runs (or the failed one, until dismissed) */
+    /** The job redrafting it, while it runs (or the failed one, until dismissed): where it stands only (AiRun::LIGHT) */
     public function aiRun(): BelongsTo
     {
-        return $this->belongsTo(AiRun::class);
+        return $this->belongsTo(AiRun::class)->select(AiRun::LIGHT);
     }
 
     public function isAnswered(): bool

@@ -17,8 +17,6 @@ class ProposalBuilder extends Component
 {
     // --- 1. WORKSPACE STATE ---
     public $activeTab = 'ledger'; // ledger, setup, ai_engine, preview
-    public $proposalsLedger = [];
-    public $availableLeads = [];
     public $selectedLeadId = '';
     
     // --- 2. ACTIVE PROPOSAL STATE ---
@@ -26,6 +24,7 @@ class ProposalBuilder extends Component
     // Saving and signing also re-read the status from the database (proposalIsLocked()).
     #[Locked]
     public $proposalId;
+    // The proposal's row without the signature images (PROPOSAL_COLUMNS): render() reads those for the preview
     #[Locked]
     public $proposal;
     #[Locked]
@@ -35,9 +34,9 @@ class ProposalBuilder extends Component
     public $magicLinkUrl = '';
     
     // --- 3. MDM DATA ---
-    public $financialDictionary = [];
-    public $exchangeRates = [];
-    public $techCatalog = []; // Grouped by Category
+    // The proposals and organisations of All proposals, the currencies, the financial dictionary and the technology
+    // catalogue are read in render(), for the tab that shows them, with the columns it prints: not kept in the page's
+    // state, which every click sends back and forth.
     
     // --- 4. SETUP PARAMETERS (TAB 1) ---
     public $title = 'Proposal';
@@ -83,9 +82,14 @@ public $paymentSchedule = '40_30_30';
 
     protected $validationAttributes = ['hqSignerName' => 'your name', 'hqSignatureBase64' => 'signature'];
 
+    /** What the page keeps of the open proposal: everything it reads but the signature images (up to tens of KB each) */
+    private const PROPOSAL_COLUMNS = ['id', 'organization_id', 'opportunity_id', 'proposal_ref', 'token_hash', 'archetype_id', 'title',
+        'exclusions', 'validity_days', 'vat_rate', 'vat_applied', 'billing_entity_id', 'currency', 'payment_schedule_type',
+        'custom_deposit_percent', 'status', 'signing_mode', 'hq_signer_name', 'hq_signature_hash', 'hq_ip_address', 'hq_signed_at',
+        'signed_by_name', 'client_signature_hash', 'signed_at', 'updated_at'];
+
     public function mount($id = null)
     {
-        $this->loadMdmData();
         $this->hqSignerName = Auth::user()->first_name . ' ' . Auth::user()->last_name;
 
         if ($id) {
@@ -97,7 +101,6 @@ public $paymentSchedule = '40_30_30';
             $this->loadProposalData();
         } else {
             $this->activeTab = 'ledger';
-            $this->loadLedgerData();
         }
     }
 
@@ -134,7 +137,6 @@ public $paymentSchedule = '40_30_30';
         }
         $this->activeTab = $tab;
         
-        if ($tab === 'ledger') $this->loadLedgerData();
         if ($tab === 'preview') {
             $this->calculateCommercials();
             // TELL THE BROWSER TO WAKE UP THE CANVAS
@@ -146,25 +148,27 @@ public $paymentSchedule = '40_30_30';
     // I. DATA HYDRATION & MDM
     // =========================================================================
 
-    private function loadMdmData()
+    /** The lists the open tab shows, with the columns it prints (render) */
+    private function tabData(): array
     {
-        $this->financialDictionary = DB::table('mdm_financial_dictionary')->where('is_active', 1)->get()->toArray();
-        $this->exchangeRates = DB::table('mdm_exchange_rates')->get()->toArray();
-        
-        // Group Tech Catalog by Category
-        $rawTech = DB::table('mdm_tech_catalog')->where('is_active', 1)->get();
-        $this->techCatalog = collect($rawTech)->groupBy('category')->toArray();
-    }
-
-    private function loadLedgerData()
-    {
-        $this->proposalsLedger = DB::table('proposals')
-            ->join('organizations', 'proposals.organization_id', '=', 'organizations.id')
-            ->select('proposals.*', 'organizations.name as client_name')
-            ->orderBy('proposals.created_at', 'desc')
-            ->get()->toArray();
-
-        $this->availableLeads = DB::table('organizations')->orderBy('name', 'asc')->get()->toArray();
+        return match ($this->activeTab) {
+            'ledger' => [
+                'proposalsLedger' => DB::table('proposals')
+                    ->join('organizations', 'proposals.organization_id', '=', 'organizations.id')
+                    ->orderBy('proposals.created_at', 'desc')
+                    ->get(['proposals.id', 'proposals.proposal_ref', 'proposals.status', 'proposals.currency', 'proposals.total_value', 'proposals.created_at', 'organizations.name as client_name']),
+                'availableLeads' => DB::table('organizations')->orderBy('name', 'asc')->get(['id', 'name', 'status']),
+            ],
+            'setup' => [
+                'exchangeRates' => DB::table('mdm_exchange_rates')->get(['currency_code']),
+                'financialDictionary' => DB::table('mdm_financial_dictionary')->where('is_active', 1)->get(['id', 'item_code', 'description']),
+            ],
+            // Grouped by category
+            'ai_engine', 'preview' => [
+                'techCatalog' => DB::table('mdm_tech_catalog')->where('is_active', 1)->get(['id', 'category', 'tech_name', 'description'])->groupBy('category')->toArray(),
+            ],
+            default => [],
+        };
     }
 
     public function initiateForLead()
@@ -227,10 +231,10 @@ public $paymentSchedule = '40_30_30';
 
     private function loadProposalData()
     {
-        $this->proposal = DB::table('proposals')->where('id', $this->proposalId)->first();
+        $this->proposal = DB::table('proposals')->where('id', $this->proposalId)->first(self::PROPOSAL_COLUMNS);
         if (!$this->proposal) return;
 
-        $this->organization = DB::table('organizations')->where('id', $this->proposal->organization_id)->first();
+        $this->organization = DB::table('organizations')->where('id', $this->proposal->organization_id)->first(['id', 'name', 'email']);
         $narrative = DB::table('proposal_ai_narratives')->where('proposal_id', $this->proposalId)->first();
         
         // 'Pending Auth' is locked too, so the page shows the signing link instead of the editor
@@ -323,7 +327,7 @@ public $paymentSchedule = '40_30_30';
 
         try {
             $apiKey = config('services.gemini.api_key'); 
-            $response = Http::timeout(30)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", [
+            $response = Http::timeout(30)->connectTimeout(3)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", [
                 "contents" => [["parts" => [["text" => $prompt]]]], 
                 "generationConfig" => ["response_mime_type" => "application/json"]
             ]);
@@ -585,6 +589,7 @@ public $paymentSchedule = '40_30_30';
             return;
         }
         $this->logProposalStep('PROPOSAL_SIGNED_BY_HQ', 'Draft', 'Pending Auth', "Signed proposal {$this->proposal->proposal_ref} and sent it for the client’s signature.");
+        $this->hqSignatureBase64 = ''; // stored with the proposal: the page needn't carry the drawing any more
         // The client's approvers with a portal account find it in their portal, with its signing link (docs/PWA.md)
         \App\Support\Pwa\ClientNotify::proposal($this->proposalId);
         session()->flash('dispatch_success', 'Proposal signed and locked. Send the client the signing link below.');
@@ -657,5 +662,13 @@ public $paymentSchedule = '40_30_30';
         ]);
     }
 
-    public function render() { return view('livewire.hq.intelligence.proposal-builder'); }
+    public function render()
+    {
+        // The signature images, only where the signed preview shows them
+        $signatures = $this->activeTab === 'preview' && $this->proposalId
+            ? DB::table('proposals')->where('id', $this->proposalId)->first(['hq_signature_b64', 'client_signature_b64'])
+            : null;
+
+        return view('livewire.hq.intelligence.proposal-builder', $this->tabData() + ['signatures' => $signatures]);
+    }
 }

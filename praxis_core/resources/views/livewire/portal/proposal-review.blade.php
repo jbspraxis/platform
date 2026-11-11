@@ -8,6 +8,8 @@
     $general = \App\Support\Opportunities\Proposals::GENERAL;
 @endphp
 <div class="gateway pr-gateway">
+    {{-- Static styles: sent once with the page, not again on every round trip --}}
+    @assets
     <style>
         .gateway-main { max-width: 880px; margin: 0 auto; padding: 24px 16px 48px; }
         @media (min-width: 768px) { .gateway-main { padding: 32px 32px 64px; } }
@@ -55,6 +57,7 @@
             .pr-totals { max-width: none; }
         }
     </style>
+    @endassets
 
     <x-portal.gateway-header :kicker="__('proposals.portal.kicker')" :width="880" />
 

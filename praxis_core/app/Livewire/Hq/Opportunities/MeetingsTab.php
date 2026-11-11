@@ -17,6 +17,7 @@ use App\Support\Opportunities\OpportunityAccess;
 use App\Support\Opportunities\PortalLinks;
 use App\Support\Opportunities\Transcripts;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -129,6 +130,10 @@ class MeetingsTab extends Component
     public string $newPointTitle = '';
 
     public string $newPointSeverity = 'Medium';
+
+    /** Where the AI's work stood when the tab was last drawn: the poll draws it again only once that moves on (check()) */
+    #[Locked]
+    public string $polled = '';
 
     /** The last action's outcome, shown above the list */
     public ?string $notice = null;
@@ -960,17 +965,69 @@ class MeetingsTab extends Component
         return Str::limit(implode("\n\n", $blocks), 5000, '');
     }
 
+    /**
+     * wire:poll while the AI writes notes, minutes or a handover's points: a few small queries, and the tab is drawn
+     * again only when a run moved on, a transcript came or changed, or points were filed
+     */
+    public function check(): void
+    {
+        $meetings = Meeting::where('opportunity_id', $this->opportunityId)
+            ->with(['transcripts' => fn ($q) => $q->select(['id', 'meeting_id', 'updated_at'])])->get(['id', 'kind', 'phase_id']);
+        if ($this->aiState($meetings)['stamp'] === $this->polled) {
+            $this->skipRender();
+        }
+    }
+
+    /**
+     * The AI's latest runs on the meetings' transcripts (notes and minutes; a handover's points), whether one is under
+     * way, each handover meeting's points by status, and all of it with the transcripts as one short string (stamp)
+     */
+    private function aiState(Collection $meetings): array
+    {
+        $transcripts = $meetings->flatMap->transcripts;
+        $runs = Transcripts::latestRuns($transcripts->pluck('id')->all());
+        $handovers = $meetings->filter->isHandover();
+        $pointCounts = $handovers->isEmpty() ? collect() : MeetingPoint::whereIn('meeting_id', $handovers->pluck('id')->all())
+            ->selectRaw('meeting_id, status, count(*) as total')->groupBy('meeting_id', 'status')->get()->groupBy('meeting_id')
+            ->map(fn ($rows) => $rows->pluck('total', 'status')->map(fn ($n) => (int) $n));
+        $pointRuns = Handovers::latestRuns($handovers->flatMap->transcripts->pluck('id')->all());
+        $pending = collect($runs)->flatten()->contains(fn ($r) => ! $r->isFinished()) || collect($pointRuns)->contains(fn ($r) => Handovers::isPending($r));
+        $state = fn ($r) => [$r->id, $r->status, (int) $r->progress];
+
+        return ['runs' => $runs, 'pointRuns' => $pointRuns, 'pending' => $pending, 'pointCounts' => $pointCounts, 'stamp' => md5(json_encode([
+            $transcripts->mapWithKeys(fn ($t) => [$t->id => $t->getRawOriginal('updated_at')])->sortKeys()->all(),
+            collect($runs)->map(fn ($byPurpose) => collect($byPurpose)->map($state)->sortKeys()->all())->sortKeys()->all(),
+            collect($pointRuns)->map($state)->sortKeys()->all(),
+            $pointCounts->map(fn ($counts) => $counts->sortKeys()->all())->sortKeys()->all(),
+            $pending,
+        ]))];
+    }
+
+    /** The open meeting's transcripts in full, for those who may read them; every other transcript is listed without its text */
+    private function withText(?Meeting $meeting): void
+    {
+        if (! $meeting || ! $this->canReadTranscripts || $meeting->transcripts->isEmpty()) {
+            return;
+        }
+        $texts = MeetingTranscript::whereIn('id', $meeting->transcripts->pluck('id'))->pluck('text', 'id');
+        $meeting->transcripts->each(fn (MeetingTranscript $t) => $t->setRawAttributes(['text' => (string) ($texts[$t->id] ?? '')] + $t->getAttributes(), true));
+    }
+
     public function render()
     {
         $o = $this->opportunity();
         $meetings = Meeting::where('opportunity_id', $o->id)
-            ->with(['attendees' => fn ($q) => $q->orderByRaw("FIELD(role, 'staff', 'client', 'guest')")->orderBy('name'), 'transcripts'])
+            ->with(['attendees' => fn ($q) => $q->orderByRaw("FIELD(role, 'staff', 'client', 'guest')")->orderBy('name'),
+                'transcripts' => fn ($q) => $q->select(MeetingTranscript::WITHOUT_TEXT)])
             ->orderBy('starts_at')->get();
+        $this->withText($this->open !== '' ? $meetings->firstWhere('id', $this->open) : null);
         $now = now();
         // A client's request stays on top until the lead schedules or declines it, even once its first time has passed
         [$upcoming, $past] = $meetings->partition(fn ($m) => $m->status === 'requested' || ($m->status === 'scheduled' && $m->ends_at->greaterThanOrEqualTo($now)));
         $transcripts = $meetings->flatMap->transcripts;
-        $runs = Transcripts::latestRuns($transcripts->pluck('id')->all());
+        $ai = $this->aiState($meetings);
+        $runs = $ai['runs'];
+        $this->polled = $ai['pending'] ? $ai['stamp'] : '';
 
         // Minutes boxes start from what HQ holds, and follow a new draft unless someone has edited them
         foreach ($transcripts as $t) {
@@ -980,7 +1037,7 @@ class MeetingsTab extends Component
                 $this->minutesSeen[$t->id] = $t->minutes;
             }
         }
-        $pending = collect($runs)->flatten()->contains(fn ($r) => ! $r->isFinished());
+        $pending = $ai['pending'];
 
         // Milestone handovers: which milestone, how many points each, and the open one's points with their tickets.
         // Internal meetings can be about a milestone too (the team's meeting): their tag names it.
@@ -988,11 +1045,8 @@ class MeetingsTab extends Component
         $linked = $meetings->pluck('phase_id')->filter()->unique()->values();
         $milestones = $linked->isEmpty() ? collect() : DB::table('project_phases')->whereIn('id', $linked->all())->get(['id', 'title'])->keyBy('id');
         $canLinkMilestone = $this->canManage && $o->project_id && Handovers::canSeeProject($o);
-        $pointCounts = $handovers->isEmpty() ? collect() : MeetingPoint::whereIn('meeting_id', $handovers->pluck('id')->all())
-            ->selectRaw('meeting_id, status, count(*) as total')->groupBy('meeting_id', 'status')->get()->groupBy('meeting_id')
-            ->map(fn ($rows) => $rows->pluck('total', 'status')->map(fn ($n) => (int) $n));
-        $pointRuns = Handovers::latestRuns($handovers->flatMap->transcripts->pluck('id')->all());
-        $pending = $pending || collect($pointRuns)->contains(fn ($r) => Handovers::isPending($r));
+        $pointCounts = $ai['pointCounts'];
+        $pointRuns = $ai['pointRuns'];
         $shown = $this->open !== '' ? $handovers->firstWhere('id', $this->open) : null;
         $pointList = $shown ? Handovers::points($shown) : collect();
         foreach ($pointList->where('status', 'draft') as $p) {

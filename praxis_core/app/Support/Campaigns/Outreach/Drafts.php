@@ -18,8 +18,9 @@ use Illuminate\Support\Facades\DB;
  * 'outreach_email'), in the background:
  *
  *   1. an import leaves the first email in 'writing' with no AI job;
- *   2. outreach:write (every minute) takes the next PER_RUN of them, reads the prospect's website once (Website, safely)
- *      and queues the job on the 'ai' queue (Ai::queue, run by the scheduler's worker);
+ *   2. outreach:write (every minute) takes the next PER_RUN of them while fewer than IN_FLIGHT jobs wait or run, reads
+ *      the prospect's website once (Website, safely) and queues the job on the 'ai-bulk' queue (Ai::queue, run by the
+ *      scheduler's worker);
  *   3. when the job ends, FileOutreachAi files it: both emails become drafts to review, or the first becomes
  *      'not_written' with the reason (ai.errors.*), and Try again starts it over.
  *
@@ -32,15 +33,25 @@ final class Drafts
 
     public const PER_RUN = 10;
 
+    /**
+     * Drafting jobs waiting or running at most: an import of hundreds is drafted a few at a time, so the worker is never
+     * hours deep in outreach, and websites are read only for jobs about to start
+     */
+    public const IN_FLIGHT = 5;
+
     /** The scheduler's pass: starts the next drafts and files jobs a missed event left behind; returns how many it started */
     public static function writeDue(): int
     {
         self::fileFinished();
 
+        $room = self::IN_FLIGHT - AiRun::where('purpose', self::PURPOSE)->whereIn('status', ['queued', 'running'])->count();
+        if ($room <= 0) {
+            return 0;
+        }
         $started = 0;
         $firsts = OutreachEmail::where('kind', 'first')->where('status', 'writing')->whereNull('ai_run_id')
             ->whereIn('campaign_id', OutreachCampaign::where('status', '!=', 'archived')->select('id'))
-            ->orderBy('id')->limit(self::PER_RUN)->get();
+            ->orderBy('id')->limit(min(self::PER_RUN, $room))->get();
         foreach ($firsts as $first) {
             $started += self::start($first) ? 1 : 0;
         }

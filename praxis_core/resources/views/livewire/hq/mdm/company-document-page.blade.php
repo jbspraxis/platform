@@ -1,4 +1,5 @@
 <div class="cdp" @if ($reading && $reading['state'] === 'reading') wire:poll.3s="checkReading" @endif>
+    @assets
     <style>
         .cdp-back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px; font-size: 0.875rem; color: var(--color-deep-teal); text-decoration: none; }
         .cdp-back svg { width: 16px; height: 16px; }
@@ -71,6 +72,7 @@
             .cdp .modal-actions .btn { flex: 1 1 auto; }
         }
     </style>
+    @endassets
 
     @php
         $day = fn ($d) => $d ? \App\Support\CompanyDocuments\Documents::day($d->format('Y-m-d')) : null;

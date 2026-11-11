@@ -94,9 +94,21 @@ class SowReview extends Component
         }
     }
 
+    /** Read once per request (the action and the render share it); forgotten after anything that writes */
+    private ?StatementOfWork $loaded = null;
+
+    /** The link's contact address, read once per request: [address] once read */
+    private ?array $linkEmailRead = null;
+
     private function sow(): StatementOfWork
     {
-        return StatementOfWork::with(['opportunity.organization', 'proposal'])->findOrFail($this->sowId);
+        return $this->loaded ??= StatementOfWork::with(['opportunity.organization', 'proposal'])->findOrFail($this->sowId);
+    }
+
+    /** Before a write: the render reads the version again, so it shows the new status */
+    private function changed(): void
+    {
+        $this->loaded = null;
     }
 
     public function choose(string $mode): void
@@ -112,7 +124,8 @@ class SowReview extends Component
     /** Whoever the link was sent to signs for the organisation (D5); a link without a contact can't tell yet */
     private function contactMaySign(StatementOfWork $s): bool
     {
-        $email = $this->contactId ? DB::table('client_users')->where('id', $this->contactId)->value('email') : null;
+        $this->linkEmailRead ??= [$this->contactId ? DB::table('client_users')->where('id', $this->contactId)->value('email') : null];
+        $email = $this->linkEmailRead[0];
 
         return ! $email || Proposals::isApprover($s->opportunity, (string) $email);
     }
@@ -144,6 +157,7 @@ class SowReview extends Component
             return;
         }
         $code = SigningCodes::newCode();
+        $this->changed();
         if (! Sows::holdSignature($s, ['name' => $this->name, 'title' => $this->jobTitle, 'email' => $person['email']], $this->signature, $code)) {
             $this->addError('mode', __('sow.portal.errors.closed'));
 
@@ -176,6 +190,7 @@ class SowReview extends Component
         }
         $this->code = trim($this->code);
         $this->validate(['code' => ['required', 'digits:6']], ['code.*' => __('sow.portal.errors.code_format')]);
+        $this->changed();
         $refused = SigningCodes::check('sow', $s->id, $s->auth_otp ? (string) $s->auth_otp : null, $s->otp_expires_at, $this->code);
         if ($refused) {
             if ($refused[0] === 'cancel') {
@@ -217,6 +232,7 @@ class SowReview extends Component
         if (! ($person = $this->known($s))) {
             return;
         }
+        $this->changed();
         if (! Sows::requestChanges($s, ['name' => $this->name, 'email' => $person['email']], $this->changeNote)) {
             $this->addError('mode', __('sow.portal.errors.closed'));
 

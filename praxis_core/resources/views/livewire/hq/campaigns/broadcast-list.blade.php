@@ -7,6 +7,7 @@
     $countOf = ['all' => $counts->sum(), 'drafts' => $counts['Draft'] ?? 0, 'scheduled' => $counts['Scheduled'] ?? 0, 'sending' => $counts['Sending'] ?? 0, 'sent' => ($counts['Completed'] ?? 0) + ($counts['Cancelled'] ?? 0)];
 @endphp
 <div class="bcl">
+    @assets
     <style>
         /* Broadcasts list (docs/CAMPAIGNS.md): only what the shared component classes don't cover. Brand tokens only. */
         .bcl-layouts { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 16px; }
@@ -24,6 +25,7 @@
         .bcl-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
         .bcl-modal { max-width: 720px; }
     </style>
+    @endassets
 
     <div class="page-header">
         <div>

@@ -6,6 +6,7 @@ use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\WithFileUploads;
+use Livewire\WithPagination;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -14,14 +15,16 @@ use Illuminate\Support\Str;
 class CashRequestManager extends Component
 {
     use WithFileUploads;
+    use WithPagination;
 
     public $activeTab = 'pending_auth'; // pending_auth, pending_clearance, history
-    
-    // Loaded on the server only; the browser must not change them
+
+    /** Closed and rejected requests shown per page (the history only grows) */
+    private const HISTORY_PER_PAGE = 25;
+
+    // The request open in a dialog; its row is read again from the database on each round trip (never kept in the page)
     #[Locked]
-    public $requests = [];
-    #[Locked]
-    public $selectedRequest = null;
+    public ?string $selectedId = null;
 
     // Authorization State (Seal B)
     public $showAuthModal = false;
@@ -31,30 +34,37 @@ class CashRequestManager extends Component
     public $showClearanceModal = false;
     public $receipt_file;
 
-    public function mount()
-    {
-        $this->loadRequests();
-    }
-
     public function setTab($tab)
     {
         $this->activeTab = $tab;
-        $this->loadRequests();
+        $this->resetPage();
     }
 
-    public function loadRequests()
+    /**
+     * Cash requests with who asked and what for. Never the two signature images (base64 PNGs of 5-30 KB each): no
+     * list or dialog shows them, and they would travel with every click.
+     */
+    private function rows()
     {
-        $query = DB::table('cash_requests')
+        return DB::table('cash_requests')
             ->join('users', 'cash_requests.requester_id', '=', 'users.id')
             ->join('mdm_financial_dictionary', 'cash_requests.financial_dictionary_id', '=', 'mdm_financial_dictionary.id')
             ->leftJoin('projects', 'cash_requests.project_id', '=', 'projects.id')
             ->select(
-                'cash_requests.*', 
-                'users.first_name', 'users.last_name', 
+                'cash_requests.id', 'cash_requests.reference', 'cash_requests.requester_id', 'cash_requests.project_id',
+                'cash_requests.financial_dictionary_id', 'cash_requests.amount_requested', 'cash_requests.currency', 'cash_requests.purpose',
+                'cash_requests.disbursement_method', 'cash_requests.disbursement_details', 'cash_requests.status', 'cash_requests.receipt_url',
+                'cash_requests.created_at',
+                'users.first_name', 'users.last_name',
                 'mdm_financial_dictionary.item_code', 'mdm_financial_dictionary.category',
                 'projects.title as project_title'
-            )
-            ->orderBy('cash_requests.created_at', 'desc');
+            );
+    }
+
+    /** The current tab's requests, newest first */
+    private function tabRows()
+    {
+        $query = $this->rows()->orderBy('cash_requests.created_at', 'desc');
 
         if ($this->activeTab === 'pending_auth') {
             $query->where('cash_requests.status', 'Pending Auth');
@@ -64,12 +74,24 @@ class CashRequestManager extends Component
             $query->whereIn('cash_requests.status', ['Cleared', 'Rejected']);
         }
 
-        $this->requests = $query->get();
+        return $query;
+    }
+
+    /** The request open in a dialog, as it is now in the database (null when none, or gone) */
+    private function selected(): ?object
+    {
+        return $this->selectedId ? $this->rows()->where('cash_requests.id', $this->selectedId)->first() : null;
+    }
+
+    /** A dialog opens on a request of the tab it was clicked in */
+    private function select($id): void
+    {
+        $this->selectedId = $this->tabRows()->where('cash_requests.id', (string) $id)->value('cash_requests.id');
     }
 
     public function openAuthModal($id)
     {
-        $this->selectedRequest = collect($this->requests)->firstWhere('id', $id);
+        $this->select($id);
         $this->authorizer_signature = null;
         $this->showAuthModal = true;
         
@@ -81,16 +103,14 @@ class CashRequestManager extends Component
     {
         abort_unless(Auth::user()->can('expenses.approve'), 403);
 
-        // UX micro-delay
-        sleep(1);
-
         $this->validate([
             'authorizer_signature' => 'required|string'
         ], [
             'authorizer_signature.required' => 'Sign in the signature box, then approve the request again.'
         ]);
 
-        if (! $this->ensureDecidable()) {
+        $request = $this->selected();
+        if (! $this->ensureDecidable($request)) {
             return;
         }
 
@@ -99,11 +119,11 @@ class CashRequestManager extends Component
         $timestamp = now()->toDateTimeString();
 
         // Generate Dual-Seal Hash (Seal B)
-        $rawData = $this->selectedRequest->reference . $userId . $ipAddress . $timestamp . substr($this->authorizer_signature, -50);
+        $rawData = $request->reference . $userId . $ipAddress . $timestamp . substr($this->authorizer_signature, -50);
         $hash = hash('sha256', $rawData);
 
         // Update the request (only while it is still awaiting approval)
-        $updated = DB::table('cash_requests')->where('id', $this->selectedRequest->id)->where('status', 'Pending Auth')->update([
+        $updated = DB::table('cash_requests')->where('id', $request->id)->where('status', 'Pending Auth')->update([
             'status' => 'Authorized',
             'authorizer_id' => $userId,
             'authorizer_signature' => $this->authorizer_signature,
@@ -116,38 +136,38 @@ class CashRequestManager extends Component
         if (! $updated) {
             $this->addError('decision', 'This request has already been approved or rejected, so it was not changed. The list has been refreshed.');
             $this->showAuthModal = false;
-            $this->loadRequests();
             return;
         }
 
-        $this->logDecision('AUTHORIZED_CASH_REQUEST', 'Pending Auth', 'Authorized', "Approved cash request {$this->selectedRequest->reference}.");
+        $this->logDecision($request, 'AUTHORIZED_CASH_REQUEST', 'Pending Auth', 'Authorized', "Approved cash request {$request->reference}.");
 
         // --- NOTIFICATION ENGINE ---
         // Notify the Requester that their funds are authorized
         DB::table('notifications')->insert([
             'id' => Str::uuid()->toString(),
-            'user_id' => $this->selectedRequest->requester_id,
+            'user_id' => $request->requester_id,
             'type' => 'System',
             'title' => 'Cash request approved',
-            'message' => "Your cash request {$this->selectedRequest->reference} was approved. Upload the receipt in Cash requests once you have spent the money.",
+            'message' => "Your cash request {$request->reference} was approved. Upload the receipt in Cash requests once you have spent the money.",
             'link_url' => '#',
             'is_read' => 0,
             'created_at' => now(),
         ]);
 
         $this->showAuthModal = false;
-        $this->loadRequests();
+        $this->authorizer_signature = null; // stored with the request; no need to carry it in the page any more
     }
 
     public function rejectRequest()
     {
         abort_unless(Auth::user()->can('expenses.approve'), 403);
 
-        if (! $this->ensureDecidable()) {
+        $request = $this->selected();
+        if (! $this->ensureDecidable($request)) {
             return;
         }
 
-        $updated = DB::table('cash_requests')->where('id', $this->selectedRequest->id)->where('status', 'Pending Auth')->update([
+        $updated = DB::table('cash_requests')->where('id', $request->id)->where('status', 'Pending Auth')->update([
             'status' => 'Rejected',
             'updated_at' => now(),
         ]);
@@ -155,35 +175,34 @@ class CashRequestManager extends Component
         if (! $updated) {
             $this->addError('decision', 'This request has already been approved or rejected, so it was not changed. The list has been refreshed.');
             $this->showAuthModal = false;
-            $this->loadRequests();
             return;
         }
 
-        $this->logDecision('REJECTED_CASH_REQUEST', 'Pending Auth', 'Rejected', "Rejected cash request {$this->selectedRequest->reference}.");
+        $this->logDecision($request, 'REJECTED_CASH_REQUEST', 'Pending Auth', 'Rejected', "Rejected cash request {$request->reference}.");
 
         // Notify Requester of Rejection
         DB::table('notifications')->insert([
             'id' => Str::uuid()->toString(),
-            'user_id' => $this->selectedRequest->requester_id,
+            'user_id' => $request->requester_id,
             'type' => 'System',
             'title' => 'Cash request rejected',
-            'message' => "Your cash request {$this->selectedRequest->reference} was rejected. Ask Finance for the reason before you send a new one.",
+            'message' => "Your cash request {$request->reference} was rejected. Ask Finance for the reason before you send a new one.",
             'link_url' => '#',
             'is_read' => 0,
             'created_at' => now(),
         ]);
 
         $this->showAuthModal = false;
-        $this->loadRequests();
+        $this->authorizer_signature = null;
     }
 
     // --- AUDIT CLEARANCE (Part 3) ---
 
     public function openClearanceModal($id)
     {
-        $this->selectedRequest = collect($this->requests)->firstWhere('id', $id);
+        $this->select($id);
         $this->receipt_file = null;
-        if (! $this->ensureClearable()) {
+        if (! $this->ensureClearable($this->selected())) {
             return;
         }
         $this->showClearanceModal = true;
@@ -193,7 +212,8 @@ class CashRequestManager extends Component
     {
         abort_unless(Auth::user()->can('expenses.approve'), 403);
 
-        if (! $this->ensureClearable()) {
+        $request = $this->selected();
+        if (! $this->ensureClearable($request)) {
             return;
         }
 
@@ -203,12 +223,12 @@ class CashRequestManager extends Component
 
         $path = $this->receipt_file->store('receipts', 'local');
 
-        DB::table('cash_requests')->where('id', $this->selectedRequest->id)->update([
+        DB::table('cash_requests')->where('id', $request->id)->update([
             'receipt_url' => $path,
             'updated_at' => now()
         ]);
 
-        $this->selectedRequest->receipt_url = $path; // Update local state to immediately show button
+        // The dialog reads the request again when it renders, so the Close request button shows at once
         session()->flash('message', 'Receipt uploaded. Check it matches the amount paid, then close the request.');
     }
 
@@ -219,14 +239,15 @@ class CashRequestManager extends Component
         $userId = Auth::id(); // always signed in here (auth middleware); approvals are never attributed to anyone else
 
         // Only an approved request can be closed, only once, and not by the person who raised it
-        if (! $this->ensureClearable()) {
+        $request = $this->selected();
+        if (! $this->ensureClearable($request)) {
             return;
         }
 
-        DB::transaction(function () use ($userId) {
+        DB::transaction(function () use ($userId, $request) {
             
             // 1. Clear the Cash Request
-            $closed = DB::table('cash_requests')->where('id', $this->selectedRequest->id)->where('status', 'Authorized')->update([
+            $closed = DB::table('cash_requests')->where('id', $request->id)->where('status', 'Authorized')->update([
                 'status' => 'Cleared',
                 'cleared_by' => $userId,
                 'cleared_at' => now(),
@@ -234,33 +255,32 @@ class CashRequestManager extends Component
             ]);
 
             if ($closed) {
-                $this->logDecision('CLEARED_CASH_REQUEST', 'Authorized', 'Cleared', "Checked the receipt and closed cash request {$this->selectedRequest->reference}.");
+                $this->logDecision($request, 'CLEARED_CASH_REQUEST', 'Authorized', 'Cleared', "Checked the receipt and closed cash request {$request->reference}.");
             }
 
             // 2. Add the amount to the project budget’s spending (once, only if this call closed it)
-            if ($closed && $this->selectedRequest->project_id && $this->selectedRequest->financial_dictionary_id) {
+            if ($closed && $request->project_id && $request->financial_dictionary_id) {
                 DB::table('project_budgets')
-                    ->where('project_id', $this->selectedRequest->project_id)
-                    ->where('dict_id', $this->selectedRequest->financial_dictionary_id)
-                    ->increment('total_spent', $this->selectedRequest->amount_requested);
+                    ->where('project_id', $request->project_id)
+                    ->where('dict_id', $request->financial_dictionary_id)
+                    ->increment('total_spent', $request->amount_requested);
             }
             
             // Phase 10 will add the strict IFRS Double-Entry Journal execution here later.
         });
 
         $this->showClearanceModal = false;
-        $this->loadRequests();
     }
 
     /** Each decision goes to the audit log: who made it, on which request, from which status to which */
-    private function logDecision(string $action, string $from, string $to, string $description): void
+    private function logDecision(object $request, string $action, string $from, string $to, string $description): void
     {
         DB::table('system_audit_logs')->insert([
             'user_id' => Auth::id(),
             'action' => $action,
             'description' => $description,
             'target_table' => 'cash_requests',
-            'target_id' => $this->selectedRequest->id,
+            'target_id' => $request->id,
             'old_values' => json_encode(['status' => $from]),
             'new_values' => json_encode(['status' => $to]),
             'ip_address' => request()?->ip(),
@@ -271,17 +291,13 @@ class CashRequestManager extends Component
     /**
      * Approving or rejecting needs a request that is still awaiting approval,
      * and nobody may decide on their own request (separation of duties).
+     * $current: the request as it is now in the database (selected()).
      */
-    private function ensureDecidable(): bool
+    private function ensureDecidable(?object $current): bool
     {
-        $current = $this->selectedRequest
-            ? DB::table('cash_requests')->where('id', $this->selectedRequest->id)->first()
-            : null;
-
         if (! $current || $current->status !== 'Pending Auth') {
             $this->addError('decision', 'This request has already been approved or rejected, so it was not changed. The list has been refreshed.');
             $this->showAuthModal = false;
-            $this->loadRequests();
             return false;
         }
 
@@ -296,17 +312,13 @@ class CashRequestManager extends Component
     /**
      * Checking the receipt and closing a request needs an approved request, and the person who
      * spent the money may not sign off their own receipt (separation of duties).
+     * $current: the request as it is now in the database (selected()).
      */
-    private function ensureClearable(): bool
+    private function ensureClearable(?object $current): bool
     {
-        $current = $this->selectedRequest
-            ? DB::table('cash_requests')->where('id', $this->selectedRequest->id)->first()
-            : null;
-
         if (! $current || $current->status !== 'Authorized') {
             $this->addError('decision', 'Only an approved request can be closed. This one has changed since you opened it; the list has been refreshed.');
             $this->showClearanceModal = false;
-            $this->loadRequests();
             return false;
         }
 
@@ -321,6 +333,10 @@ class CashRequestManager extends Component
 
     public function render()
     {
-        return view('livewire.hq.finance.cash-request-manager');
+        return view('livewire.hq.finance.cash-request-manager', [
+            // Approvals and receipts to check stay short (they leave the tab once decided); the history is paged
+            'requests' => $this->activeTab === 'history' ? $this->tabRows()->paginate(self::HISTORY_PER_PAGE) : $this->tabRows()->get(),
+            'selectedRequest' => $this->showAuthModal || $this->showClearanceModal ? $this->selected() : null,
+        ]);
     }
 }

@@ -58,6 +58,10 @@ class OutreachReplies extends Component
 
     public int $limit = 50;
 
+    /** The replies shown as last drawn (stamp()): the 4 s refresh while Claude sorts redraws only when they moved */
+    #[Locked]
+    public string $drawnAt = '';
+
     public const FILTERS = [
         'sort' => 'To sort', 'interested' => 'Interested', 'not_now' => 'Not now', 'not_interested' => 'Not interested',
         'unsubscribe' => 'Unsubscribed', 'notices' => 'Bounced and spam', 'all' => 'All replies',
@@ -241,6 +245,23 @@ class OutreachReplies extends Component
 
     // ------------------------------------------------------------------ the page
 
+    /** wire:poll while Claude sorts: one small count, and a redraw only when a reply changed */
+    public function tick(): void
+    {
+        if ($this->stamp($this->campaignIds()) === $this->drawnAt) {
+            $this->skipRender();
+        }
+    }
+
+    /** Where the replies of these campaigns stand: how many, how many Claude is sorting, the latest change */
+    private function stamp(array $campaignIds): string
+    {
+        $row = $campaignIds ? DB::table('outreach_replies')->whereIn('campaign_id', $campaignIds)
+            ->selectRaw('COUNT(*) AS n, SUM(ai_run_id IS NOT NULL) AS busy, MAX(updated_at) AS changed')->first() : null;
+
+        return md5(implode('|', [implode(',', $campaignIds), ...array_values((array) $row)]));
+    }
+
     /** Replies (or notices) for the filter, newest first */
     private function rows(array $campaignIds, string $filter): Builder
     {
@@ -277,6 +298,8 @@ class OutreachReplies extends Component
     {
         $user = Auth::user();
         $ids = $this->campaignIds();
+        // Taken before the page is read, so a change made while it is drawn shows on the next tick
+        $this->drawnAt = $this->stamp($ids);
         $counts = $this->counts($ids);
         $filter = $this->filter !== '' ? $this->filter : ($counts['sort'] > 0 ? 'sort' : 'all');
         $total = (clone $this->rows($ids, $filter))->count();

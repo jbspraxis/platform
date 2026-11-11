@@ -87,6 +87,13 @@ class AddLead extends Component
 
     public ?string $fillWarning = null;
 
+    /** The duplicates panel: what it last looked for (name, emails, phones) and what it found, so a change to another field reads nothing */
+    #[Locked]
+    public string $matchedFor = '';
+
+    #[Locked]
+    public array $matched = [];
+
     public function mount(): void
     {
         abort_unless(LeadAccess::canCreate(Auth::user()), 403);
@@ -462,16 +469,28 @@ class AddLead extends Component
         }
     }
 
+    /** Leads and clients like the one typed: looked for again only when the name, an email or a phone changed */
+    private function matches(): array
+    {
+        $emails = collect($this->contacts)->pluck('email')->push($this->lead['email'] ?? '')->filter(fn ($e) => filter_var(trim((string) $e), FILTER_VALIDATE_EMAIL))->values()->all();
+        $phones = collect($this->contacts)->pluck('phone')->push($this->lead['phone'] ?? '')->filter()->values()->all();
+        $name = trim((string) ($this->lead['name'] ?? ''));
+        $name = mb_strlen($name) >= 3 ? $name : null;
+        $for = md5(json_encode([$name, $emails, $phones]));
+        if ($for !== $this->matchedFor) {
+            $this->matched = $name !== null || $emails || $phones ? Duplicates::find($name, $emails, $phones)->all() : [];
+            $this->matchedFor = $for;
+        }
+
+        return $this->matched;
+    }
+
     public function render()
     {
-        $emails = collect($this->contacts)->pluck('email')->push($this->lead['email'] ?? '')->filter(fn ($e) => filter_var(trim((string) $e), FILTER_VALIDATE_EMAIL))->all();
-        $phones = collect($this->contacts)->pluck('phone')->push($this->lead['phone'] ?? '')->filter()->all();
-        $name = trim((string) ($this->lead['name'] ?? ''));
-
         return view('livewire.hq.leads.add-lead', [
             'canIntel' => LeadIntel::canUse(Auth::user()),
             'maxMb' => LeadIntel::MAX_KB / 1024,
-            'matches' => mb_strlen($name) >= 3 || $emails || $phones ? Duplicates::find(mb_strlen($name) >= 3 ? $name : null, $emails, $phones) : collect(),
+            'matches' => collect($this->matches()),
             'industries' => Leads::industries(),
             'countries' => Countries::NAMES,
             'sources' => array_intersect_key(Sources::LABELS, array_flip(Sources::BY_HAND)),

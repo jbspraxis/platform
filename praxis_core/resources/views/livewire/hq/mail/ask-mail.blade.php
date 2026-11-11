@@ -1,5 +1,6 @@
 <div class="am">
     @if ($enabled)
+        @assets
         <style>
             /* Mail → Ask about your mail (PR 4). Side panel on desktop, full screen on phones. Brand tokens only. */
             .am-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(12, 20, 43, 0.4); display: flex; justify-content: flex-end; }
@@ -43,6 +44,7 @@
                 .am-open-label { display: none; }
             }
         </style>
+        @endassets
 
         <button type="button" class="btn btn-secondary" wire:click="openPanel" aria-haspopup="dialog" aria-label="Ask about your mail" title="Ask about your mail">
             <i data-lucide="sparkles"></i> <span class="am-open-label">Ask about your mail</span>

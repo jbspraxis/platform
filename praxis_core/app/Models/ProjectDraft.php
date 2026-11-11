@@ -28,8 +28,9 @@ class ProjectDraft extends Model
         return $this->belongsTo(StatementOfWork::class, 'sow_id');
     }
 
+    /** The job drafting it: where it stands, without its input or output (AiRun::LIGHT; ProjectDrafts::sync reads the output) */
     public function aiRun(): BelongsTo
     {
-        return $this->belongsTo(AiRun::class);
+        return $this->belongsTo(AiRun::class)->select(AiRun::LIGHT);
     }
 }

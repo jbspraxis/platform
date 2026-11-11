@@ -207,7 +207,7 @@ final class Proposals
             }
             $applied = DB::transaction(function () use ($proposal, $column, $runId, $apply) {
                 $locked = Proposal::whereKey($proposal->id)->lockForUpdate()->first();
-                $run = AiRun::find($runId);
+                $run = AiRun::find($runId, AiRun::RESULT);
                 if (! $locked || ! $run || $locked->{$column} !== $runId) {
                     return false;
                 }
@@ -1038,15 +1038,28 @@ final class Proposals
         return $lines;
     }
 
-    /** Replaces the version's line items and sets its subtotal and total (VAT at its rate; today's while not sent: followVat()) */
+    /**
+     * Replaces the version's line items and sets its subtotal and total (VAT at its rate; today's while not sent:
+     * followVat()). Lines stored just as they are already (a blur on the title or a section) are left alone; otherwise
+     * they are all written again, in one statement.
+     */
     private static function writeLines(Proposal $proposal, array $lines): void
     {
-        DB::table('proposal_line_items')->where('proposal_id', $proposal->id)->delete();
+        $rows = [];
         foreach (array_values($lines) as $i => $line) {
-            DB::table('proposal_line_items')->insert([
+            $rows[] = [
                 'proposal_id' => $proposal->id, 'code' => $line['code'], 'description' => $line['description'], 'quantity' => $line['quantity'],
                 'unit_price' => $line['unit_price'], 'total_price' => round(self::units($line['quantity']) * (float) $line['unit_price'], 2), 'sort_order' => $i,
-            ]);
+            ];
+        }
+        $same = fn ($r) => [(int) $r['sort_order'], (string) $r['code'], (string) $r['description'], (string) $r['quantity'], round((float) $r['unit_price'], 2), round((float) $r['total_price'], 2)];
+        $stored = DB::table('proposal_line_items')->where('proposal_id', $proposal->id)->orderBy('sort_order')->orderBy('id')
+            ->get(['sort_order', 'code', 'description', 'quantity', 'unit_price', 'total_price'])->map(fn ($r) => $same((array) $r))->all();
+        if ($stored !== array_map($same, $rows)) {
+            DB::table('proposal_line_items')->where('proposal_id', $proposal->id)->delete();
+            if ($rows) {
+                DB::table('proposal_line_items')->insert($rows);
+            }
         }
         self::followVat($proposal);
         $totals = self::totals($lines, (float) $proposal->vat_rate);

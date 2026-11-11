@@ -111,7 +111,13 @@ class CompanyDocumentPage extends Component
     public function checkReading(): void
     {
         $this->document->refresh();
+        $before = $this->panelFor;
         $this->syncPanel();
+        // Claude is still reading the same version, as three seconds ago: nothing on the page changes, so it isn't sent again
+        $version = (string) $this->document->current_version_id;
+        if ($this->panelFor === $before && $version !== '' && str_starts_with($before, $version . ':reading:') && Reader::reads($this->document)) {
+            $this->skipRender();
+        }
     }
 
     public function readAgain(): void
@@ -312,8 +318,8 @@ class CompanyDocumentPage extends Component
             'versions' => $versions,
             'people' => $people,
             'status' => Documents::status($doc),
-            'companyLabel' => Companies::label($doc->legal_entity_id),
-            'companies' => Companies::all(),
+            'companyLabel' => Companies::label($doc->legal_entity_id, $companies = Companies::all()),
+            'companies' => $companies,
             'kinds' => Documents::KINDS,
             'reading' => $reading,
             'reviewed' => $reviewed,

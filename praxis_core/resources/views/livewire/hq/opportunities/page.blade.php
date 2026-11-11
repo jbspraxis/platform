@@ -1,4 +1,5 @@
 <div class="opp">
+    @assets
     <style>
         /* One opportunity: only what the shared component classes don't cover. Brand tokens only. */
         .opp { max-width: 1120px; }
@@ -31,6 +32,7 @@
             .opp-actions .btn { flex: 1 1 100%; }
         }
     </style>
+    @endassets
 
     @php
         $tone = fn (string $stage) => match ($stage) { 'won' => 'pill-success', 'lost' => 'pill-danger', 'on_hold' => 'pill-warning', default => 'pill-info' };
@@ -43,10 +45,10 @@
         $person = fn ($u) => $u ? trim($u->first_name . ' ' . $u->last_name) : __('opportunities.no_lead');
         $tabs = [
             'overview' => __('opportunities.tabs.overview'),
-            'meetings' => __('opportunities.tabs.meetings') . ($meetings->count() ? ' (' . $meetings->count() . ')' : ''),
+            'meetings' => __('opportunities.tabs.meetings') . ($counts['meetings'] ? ' (' . $counts['meetings'] . ')' : ''),
             'questionnaire' => __('opportunities.tabs.questionnaire'),
-            'proposals' => __('opportunities.tabs.proposals') . ($proposals->count() ? ' (' . $proposals->count() . ')' : ''),
-            'sow' => __('opportunities.tabs.sow') . ($sows->count() ? ' (' . $sows->count() . ')' : ''),
+            'proposals' => __('opportunities.tabs.proposals') . ($counts['proposals'] ? ' (' . $counts['proposals'] . ')' : ''),
+            'sow' => __('opportunities.tabs.sow') . ($counts['sow'] ? ' (' . $counts['sow'] . ')' : ''),
             'project' => __('opportunities.tabs.project'),
         ];
     @endphp

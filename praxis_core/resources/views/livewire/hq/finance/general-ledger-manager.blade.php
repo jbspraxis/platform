@@ -137,6 +137,9 @@
                 </div>
             </div>
         @endforelse
+        @if($entries->hasPages())
+            <div>{{ $entries->links() }}</div>
+        @endif
     </div>
 
     @if($showReversalModal)

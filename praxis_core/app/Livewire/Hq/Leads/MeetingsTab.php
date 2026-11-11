@@ -136,6 +136,10 @@ class MeetingsTab extends Component
     #[Locked]
     public string $titleSuggested = '';
 
+    /** What the AI's runs looked like when the tab was last drawn (see check()) */
+    #[Locked]
+    public string $polled = '';
+
     public ?string $notice = null;
 
     public string $noticeTone = 'success';
@@ -678,17 +682,53 @@ class MeetingsTab extends Component
         return [array_values($good), $bad];
     }
 
+    /**
+     * wire:poll while the AI writes notes: two small queries, and the tab is drawn again only when a run moved on, a
+     * transcript came or its notes were written
+     */
+    public function check(): void
+    {
+        $notes = MeetingTranscript::whereHas('meeting', fn ($q) => $q->where('organization_id', $this->leadId)->whereNull('opportunity_id'))
+            ->selectRaw('id, notes IS NOT NULL AS has_notes')->pluck('has_notes', 'id')->map(fn ($n) => (int) $n)->all();
+        if ($this->stamp($notes, Transcripts::latestRuns(array_keys($notes))) === $this->polled) {
+            $this->skipRender();
+        }
+    }
+
+    /** The lead's transcripts (id => whether it has notes) and their latest runs (status and progress), as one string */
+    private function stamp(array $notes, array $runs): string
+    {
+        ksort($notes);
+        ksort($runs);
+
+        return md5(json_encode([$notes, collect($runs)->map(fn ($byPurpose) => collect($byPurpose)->map(fn ($r) => [$r->id, $r->status, (int) $r->progress]))]));
+    }
+
+    /** The open meeting's transcripts in full, for those who may read them; every other transcript is listed without its text */
+    private function withText(?Meeting $meeting): void
+    {
+        if (! $meeting || ! $this->canReadTranscripts || $meeting->transcripts->isEmpty()) {
+            return;
+        }
+        $texts = MeetingTranscript::whereIn('id', $meeting->transcripts->pluck('id'))->pluck('text', 'id');
+        $meeting->transcripts->each(fn (MeetingTranscript $t) => $t->setRawAttributes(['text' => (string) ($texts[$t->id] ?? '')] + $t->getAttributes(), true));
+    }
+
     public function render()
     {
         $lead = $this->lead();
-        $all = LeadMeetings::of($lead->id);
+        $all = LeadMeetings::of($lead->id, transcriptText: false);
         [$own, $inOpportunities] = $all->partition(fn ($m) => $m->opportunity_id === null);
+        $this->withText($this->open !== '' ? $own->firstWhere('id', $this->open) : null);
         $now = now();
         // A booking waiting for approval stays on top until Free audits approves or declines it
         [$upcoming, $past] = $own->partition(fn ($m) => $m->status === 'requested' || ($m->status === 'scheduled' && $m->ends_at->greaterThanOrEqualTo($now)));
         $transcripts = $own->flatMap->transcripts;
         $runs = Transcripts::latestRuns($transcripts->pluck('id')->all());
+        $this->polled = $this->stamp($transcripts->mapWithKeys(fn ($t) => [$t->id => (int) ($t->getRawOriginal('notes') !== null)])->all(), $runs);
         $formOpen = $this->form !== '';
+        // Which opportunities this person may open, for their meetings' links: one query for all of them
+        $visible = LeadAccess::opportunitiesVisible(Auth::user(), $inOpportunities->pluck('opportunity'));
 
         return view('livewire.hq.leads.meetings-tab', [
             'lead' => $lead,
@@ -699,7 +739,7 @@ class MeetingsTab extends Component
             'pending' => collect($runs)->flatten()->contains(fn ($r) => ! $r->isFinished()),
             'googleConnected' => app(GoogleWorkspace::class)->isConnected(),
             'canOpenIntegrations' => (bool) Auth::user()?->can('integrations.manage'),
-            'canSeeOpportunity' => fn ($o) => $o && OpportunityAccess::canView(Auth::user(), $o),
+            'canSeeOpportunity' => fn ($o) => $o && ($visible[$o->id] ?? false),
             'staffList' => $formOpen ? User::where('status', 'Active')->whereNull('deleted_at')->whereNotNull('email')->orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name', 'job_title']) : collect(),
             'contactList' => $formOpen ? Contacts::of($lead->id) : collect(),
             'editing' => $this->editingId !== '' ? $own->firstWhere('id', $this->editingId) : null,

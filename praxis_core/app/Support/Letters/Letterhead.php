@@ -17,6 +17,9 @@ use Illuminate\Support\Facades\DB;
  * The logo is resources/brand/letterhead-logo.svg, read as a data URI: dompdf draws SVG with php-svg-lib and
  * needs no gd extension, which the live PHP has not got. It is the brand kit horizontal logo with its nested
  * <svg> elements flattened into groups, which is the one part of SVG php-svg-lib does not place correctly.
+ * Its outlines were then thinned (Douglas-Peucker at 0.05 of a unit, about 0.01 pt at the 186 pt it is drawn,
+ * coordinates to two decimals): 1,405 points instead of 13,932 and 19 KB instead of 210 KB, the same logo at
+ * 600 dpi, and about 140 ms less of dompdf drawing it on every letter.
  */
 final class Letterhead
 {
@@ -63,8 +66,14 @@ final class Letterhead
         $registration = self::clean($company['registration_number'] ?? null);
         $tax = self::clean($company['tax_identification_number'] ?? null);
         $address = self::clean($company['registered_address'] ?? null);
-        $phone = self::clean($company['contact_phone'] ?? null) ?? self::settingsPhone($region);
-        $email = self::clean($company['contact_email'] ?? null) ?? (string) WebsiteSettings::get('contact.email', 'info@jbspraxis.com');
+        $phone = self::clean($company['contact_phone'] ?? null);
+        $email = self::clean($company['contact_email'] ?? null);
+        if ($phone === null || $email === null) {
+            // Website settings fill what the legal entity leaves out: read once for both
+            $contact = (array) WebsiteSettings::get('contact', []);
+            $phone ??= self::settingsPhone($region, (array) ($contact['phones'] ?? []));
+            $email ??= (string) ($contact['email'] ?? 'info@jbspraxis.com');
+        }
         $website = Hosts::site();
 
         // "RC 9985884" in Nigeria, "RC/RCCM" in Cameroon: the label the papers use, then the tax number
@@ -120,10 +129,9 @@ final class Letterhead
     }
 
     /** A phone number from Website settings for the company's country, when the legal entity has none */
-    private static function settingsPhone(string $region): ?string
+    private static function settingsPhone(string $region, array $phones): ?string
     {
         $labels = ['NG' => 'Nigeria', 'CM' => 'Cameroon'];
-        $phones = (array) WebsiteSettings::get('contact.phones', []);
         foreach ($phones as $row) {
             $number = self::clean($row['number'] ?? null);
             if ($number && (! isset($labels[$region]) || trim((string) ($row['label'] ?? '')) === $labels[$region])) {

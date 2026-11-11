@@ -34,6 +34,7 @@
         $tabs = ['ledger' => 'All proposals', 'setup' => '1. Setup', 'ai_engine' => '2. Narrative and phases', 'preview' => '3. Review and sign'];
     @endphp
 
+    @assets
     <style>
         .pb-lines td { vertical-align: middle; }
         .pb-lines .input { padding: 6px 8px; }
@@ -58,6 +59,7 @@
         .pb-slide-in { transform: translateX(0); }
         @media (max-width: 768px) { .pb-doc { padding: 24px; } }
     </style>
+    @endassets
 
     <div class="page-header">
         <div>
@@ -580,7 +582,7 @@
                         <div class="font-semibold text-ink">{{ $isLocked ? 'Signed for JBS Praxis' : 'Not signed by JBS Praxis yet' }}</div>
                         @if($isLocked)
                             <div style="height: 60px; display: flex; justify-content: center;">
-                                <img src="{{ $proposal->hq_signature_b64 }}" alt="Signature of {{ $proposal->hq_signer_name }}" style="max-height: 100%; object-fit: contain;">
+                                <img src="{{ $signatures?->hq_signature_b64 }}" alt="Signature of {{ $proposal->hq_signer_name }}" style="max-height: 100%; object-fit: contain;">
                             </div>
                             <dl>
                                 <dt class="text-muted">Signed by</dt><dd>{{ $proposal->hq_signer_name }}</dd>
@@ -599,9 +601,9 @@
                     <div class="pb-sign {{ $clientSigned ? 'is-signed' : '' }}">
                         <div class="font-semibold text-ink">{{ $clientSigned ? 'Signed by the client' : 'Not signed by the client yet' }}</div>
                         @if($clientSigned)
-                            @if(!empty($proposal->client_signature_b64))
+                            @if(!empty($signatures?->client_signature_b64))
                                 <div style="height: 60px; display: flex; justify-content: center;">
-                                    <img src="{{ $proposal->client_signature_b64 }}" alt="Signature of {{ $proposal->signed_by_name }}" style="max-height: 100%; object-fit: contain;">
+                                    <img src="{{ $signatures->client_signature_b64 }}" alt="Signature of {{ $proposal->signed_by_name }}" style="max-height: 100%; object-fit: contain;">
                                 </div>
                             @endif
                             <dl>

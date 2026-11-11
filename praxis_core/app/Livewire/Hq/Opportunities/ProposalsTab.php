@@ -75,6 +75,13 @@ class ProposalsTab extends Component
     #[Locked]
     public string $notice = '';
 
+    /** Where the AI's work stood when the tab was last drawn: the poll draws it again only once that moves on (check()) */
+    #[Locked]
+    public string $polled = '';
+
+    /** The opportunity, read once per request (Livewire makes a new component object for each one); render() adds its organisation and lead */
+    private ?Opportunity $opp = null;
+
     public function mount(string $opportunityId): void
     {
         $opportunity = Opportunity::findOrFail($opportunityId);
@@ -95,7 +102,13 @@ class ProposalsTab extends Component
 
     private function opportunity(): Opportunity
     {
-        return Opportunity::with(['organization', 'lead'])->findOrFail($this->opportunityId);
+        return $this->opp ??= Opportunity::findOrFail($this->opportunityId);
+    }
+
+    /** The opportunity's stage as it is now: an action may have moved it since opportunity() read it */
+    private function stageNow(): ?string
+    {
+        return Opportunity::whereKey($this->opportunityId)->value('stage');
     }
 
     /** The version on screen: the one chosen, else the latest */
@@ -184,7 +197,8 @@ class ProposalsTab extends Component
         } catch (AiUnavailable $e) {
             $this->addError('draft', $e->getMessage());
         }
-        if ($this->opportunity()->stage !== $stage) {
+        if ($this->stageNow() !== $stage) {
+            $this->opp = null;
             $this->dispatch('opportunity-stage-changed');
         }
     }
@@ -363,7 +377,8 @@ class ProposalsTab extends Component
         }
         $this->sendTo = [];
         $this->notice = $unsent ? __('proposals.send.partly', ['emails' => implode(', ', $unsent)]) : __('proposals.send.done');
-        if ($this->opportunity()->stage !== $stage) {
+        if ($this->stageNow() !== $stage) {
+            $this->opp = null;
             $this->dispatch('opportunity-stage-changed');
         }
         $this->dispatch('proposals-changed');
@@ -440,8 +455,28 @@ class ProposalsTab extends Component
         Proposals::resolve($comment, $resolved, Auth::user());
     }
 
-    /** wire:poll while the AI works: render() applies what it finished */
-    public function check(): void {}
+    /**
+     * wire:poll while the AI works: two small queries, and the tab is drawn again (render() applies what the AI
+     * finished) only when the version or its runs moved on: a new status, more progress, the draft filed
+     */
+    public function check(): void
+    {
+        $versions = Proposal::where('opportunity_id', $this->opportunityId)->where('signing_mode', 'approve')->orderByDesc('version')
+            ->get(['id', 'status', 'ai_run_id', 'changes_run_id', 'updated_at']);
+        $proposal = $versions->firstWhere('id', $this->versionId) ?? $versions->first();
+        $runs = $proposal ? AiRun::whereKey(array_filter([$proposal->ai_run_id, $proposal->changes_run_id]))->get(['id', 'status', 'progress']) : [];
+        if ($proposal && self::stamp($proposal, $runs) === $this->polled) {
+            $this->skipRender();
+        }
+    }
+
+    /** The version on screen and its runs, as one short string (the same from check() and from render()) */
+    private static function stamp(Proposal $proposal, iterable $runs): string
+    {
+        $runs = collect($runs)->filter()->map(fn (AiRun $r) => [$r->id, $r->status, (int) $r->progress])->sortBy(0)->values()->all();
+
+        return md5(json_encode([$proposal->id, $proposal->status, $proposal->getRawOriginal('updated_at'), $proposal->ai_run_id, $proposal->changes_run_id, $runs]));
+    }
 
     /** Writes the fields to the draft; a version that can no longer change is reloaded instead */
     private function persist(): void
@@ -471,9 +506,10 @@ class ProposalsTab extends Component
     private function repriceLines(): void
     {
         $dictionary = Proposals::dictionary();
+        $known = Proposals::currencies()->contains($this->currency);
         foreach ($this->lines as $i => $line) {
             $item = $dictionary->get($line['code'] ?? '');
-            if ($item && Proposals::currencies()->contains($this->currency)) {
+            if ($item && $known) {
                 $this->lines[$i]['unit_price'] = Proposals::lineFor($item, $this->currency)['unit_price'];
             }
         }
@@ -506,7 +542,7 @@ class ProposalsTab extends Component
 
     public function render()
     {
-        $opportunity = $this->opportunity();
+        $opportunity = $this->opportunity()->loadMissing(['organization', 'lead']);
         $user = Auth::user();
         $versions = Proposals::versions($opportunity);
         $proposal = $versions->firstWhere('id', $this->versionId) ?? $versions->first();
@@ -518,6 +554,7 @@ class ProposalsTab extends Component
                 $proposal = $versions->firstWhere('id', $proposal->id);
             }
             $proposal->load(['aiRun', 'changesRun', 'approver', 'previousVersion', 'comments']);
+            $proposal->setRelation('opportunity', $opportunity); // Proposals::vat reads its billing company: not read again
             if ($proposal->aiRun && ! $proposal->aiRun->isFinished()) {
                 // The AI is rewriting it (the worker may file it, not this page): load what is saved once it is done
                 $this->loaded = '';
@@ -542,12 +579,17 @@ class ProposalsTab extends Component
 
         $drafting = $proposal?->aiRun && ! $proposal->aiRun->isFinished();
         $summarising = $proposal?->changesRun && ! $proposal->changesRun->isFinished();
+        $this->polled = $proposal && ($drafting || $summarising) ? self::stamp($proposal, [$proposal->aiRun, $proposal->changesRun]) : '';
         $latest = $versions->first();
         $canEdit = Proposals::canEdit($user, $opportunity);
-        // The AI's reasons for the line items it suggested, from its last draft of this version
-        $reasons = $proposal ? collect((array) (AiRun::where('subject_type', 'proposal')->where('subject_id', $proposal->id)->where('purpose', 'proposal')
+        $editing = $canEdit && $proposal?->isEditable() && ! $drafting;
+        // The version's text, lines and totals show in the editor, or read only once the AI isn't rewriting it
+        $body = $proposal && ($editing || ! $drafting);
+        // The AI's reasons for the line items it suggested, from its last draft of this version (shown in the editor)
+        $reasons = $editing ? collect((array) (AiRun::where('subject_type', 'proposal')->where('subject_id', $proposal->id)->where('purpose', 'proposal')
             ->where('status', 'done')->latest('finished_at')->value('output')['suggested_line_items'] ?? []))->pluck('reason', 'code')->all() : [];
         $previous = $proposal?->previousVersion;
+        $readLines = $body && ! $editing ? Proposals::lines($proposal) : collect();
 
         return view('livewire.hq.opportunities.proposals-tab', [
             'o' => $opportunity,
@@ -559,7 +601,7 @@ class ProposalsTab extends Component
             'canDraft' => Proposals::canDraftWithAi($user, $opportunity),
             'canApprove' => Proposals::canApprove($user, $opportunity),
             'canOpenLegacy' => (bool) $user?->can('crm.view'),
-            'editing' => $canEdit && $proposal?->isEditable() && ! $drafting,
+            'editing' => $editing,
             'drafting' => $drafting,
             'summarising' => $summarising,
             'draftError' => $proposal?->aiRun?->status === 'failed' ? $proposal->aiRun->errorMessage() : null,
@@ -567,16 +609,20 @@ class ProposalsTab extends Component
             'polling' => $drafting || $summarising,
             'comments' => $proposal ? $proposal->comments->where('author_type', 'client')->groupBy('section_key') : collect(),
             // While a later version is written, the client's comments on the one they have show under its sections
-            'previousComments' => $proposal?->isEditable() && $previous ? $previous->comments()->where('author_type', 'client')->get()->groupBy('section_key') : collect(),
-            'readLines' => $proposal ? Proposals::lines($proposal) : collect(),
+            'previousComments' => $editing && $previous ? $previous->comments()->where('author_type', 'client')->get()->groupBy('section_key') : collect(),
+            'readLines' => $readLines,
             // VAT is the issuing company's to decide (App\Support\Finance\Vat): today's until the version is sent, then its own
-            'vat' => $vat = $proposal ? Proposals::vat($proposal) : null,
-            'totals' => $proposal ? Proposals::totals($proposal->isEditable() ? $this->lines : Proposals::lines($proposal), (float) $vat['rate']) : null,
-            'dictionary' => $canEdit && $proposal?->isEditable() ? Proposals::dictionary()->groupBy('category') : collect(),
-            'currencies' => Proposals::currencies(),
-            'people' => $canEdit ? Proposals::people($opportunity) : [],
+            'vat' => $vat = $body ? Proposals::vat($proposal) : null,
+            'totals' => $body ? Proposals::totals($proposal->isEditable() ? $this->lines : $readLines, (float) $vat['rate']) : null,
+            'dictionary' => $editing ? Proposals::dictionary()->groupBy('category') : collect(),
+            // The currency is chosen on the start form and in the editor
+            'currencies' => ($canEdit && ! $proposal) || $editing ? Proposals::currencies() : collect(),
+            // Who to send to: an approved draft, or a sent version's link sent again
+            'people' => $canEdit && $proposal && ($proposal->status === Proposal::SENT || ($proposal->status === Proposal::DRAFT && $proposal->approved_at))
+                ? Proposals::people($opportunity) : [],
             'reasons' => $reasons,
-            'questionnaireComplete' => $opportunity->questionnaires()->where('status', 'complete')->exists(),
+            // The start form says when the questionnaire isn't complete yet
+            'questionnaireComplete' => $canEdit && ! $proposal ? $opportunity->questionnaires()->where('status', 'complete')->exists() : true,
             'canStartVersion' => $canEdit && $latest && in_array($latest->status, [Proposal::SENT, Proposal::CHANGES_REQUESTED], true)
                 && ! $versions->contains(fn ($v) => in_array($v->status, [Proposal::DRAFT, Proposal::CLIENT_APPROVED], true)),
             'approvedVersion' => $versions->firstWhere('status', Proposal::CLIENT_APPROVED),

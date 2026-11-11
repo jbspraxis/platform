@@ -53,11 +53,21 @@ class ProjectPage extends Component
     // The project lead (projects.lead_user_id): set by managers (projects.create)
     public string $leadUserId = '';
 
+    // mount() or refresh() has just checked access: render() in the same request doesn't ask again (private, so
+    // worked out afresh for every request; saveLead() changes who leads, so it leaves this unset)
+    private ?bool $canView = null;
+
+    private function canView(): bool
+    {
+        return $this->canView ??= ProjectRules::canView($this->projectId);
+    }
+
     public function mount(string $project): void
     {
-        $row = ProjectPlan::project($project);
+        // render() reads the whole project; here only whether it exists and who leads it
+        $row = DB::table('projects')->where('id', $project)->whereNull('deleted_at')->first(['id', 'lead_user_id']);
         abort_unless($row, 404);
-        abort_unless(ProjectRules::canView($project), 403, __('projects.errors.no_access'));
+        abort_unless($this->canView = ProjectRules::canView($project), 403, __('projects.errors.no_access'));
         $this->projectId = $project;
         $this->leadUserId = (string) $row->lead_user_id;
         if (! in_array($this->tab, self::TABS, true)) {
@@ -83,11 +93,23 @@ class ProjectPage extends Component
         $this->tab = in_array($tab, self::TABS, true) ? $tab : 'overview';
     }
 
-    /** A drawer changed something: draw the page again */
+    /**
+     * A drawer changed something: draw the page again. $kind says what: a step, comment, watch or due-date proposal
+     * ('activity') shows only in the Overview's recent activity, and a change report not yet decided ('report') only
+     * there and on Meetings and money, so any other tab stays as it is.
+     */
     #[On('project-changed')]
-    public function refresh(): void
+    public function refresh(string $kind = 'task'): void
     {
-        abort_unless(ProjectRules::canView($this->projectId), 403, __('projects.errors.no_access'));
+        abort_unless($this->canView = ProjectRules::canView($this->projectId), 403, __('projects.errors.no_access'));
+        $shows = match ($kind) {
+            'activity' => ['overview'],
+            'report' => ['overview', 'money'],
+            default => self::TABS,
+        };
+        if (! in_array($this->tab, $shows, true)) {
+            $this->skipRender();
+        }
     }
 
     public function clearFilters(): void
@@ -101,7 +123,7 @@ class ProjectPage extends Component
      */
     public function moveMilestone(string $phaseId, string $column): void
     {
-        abort_unless(ProjectRules::canManage($this->projectId), 403);
+        abort_unless(ProjectRules::canManage($this->projectId, $this->canView()), 403);
         $phase = Milestones::find($this->projectId, $phaseId);
         if (! $phase || ! in_array($column, ProjectPlan::COLUMNS, true)) {
             return;
@@ -143,7 +165,7 @@ class ProjectPage extends Component
         $project = ProjectPlan::project($this->projectId);
         abort_unless($project, 404);
         $milestones = ProjectPlan::milestones($this->projectId);
-        $canManage = ProjectRules::canManage($this->projectId);
+        $canManage = ProjectRules::canManage($this->projectId, $this->canView());
         $opportunity = Opportunity::query()
             ->where(fn ($q) => $q->where('project_id', $this->projectId)->when($project->opportunity_id, fn ($q) => $q->orWhere('id', $project->opportunity_id)))
             ->orderByDesc('updated_at')->first();
@@ -157,7 +179,7 @@ class ProjectPage extends Component
             'overdueTasks' => ProjectPlan::overdueTasks($this->projectId),
             'openQa' => ProjectPlan::openQaCount($this->projectId),
             'canManage' => $canManage,
-            'canSeeMoney' => ProjectRules::canSeeMoney($this->projectId),
+            'canSeeMoney' => ProjectRules::canSeeMoney($this->projectId, $canManage),
             'opportunity' => $opportunity,
             // The opportunity's team opens it too (OpportunityAccess, PR #14)
             'canOpenOpportunity' => $opportunity && OpportunityAccess::canView(Auth::user(), $opportunity),

@@ -62,12 +62,24 @@ class AgreementSigning extends Component
         }
     }
 
+    /** Read once per request (the action and the render share it); forgotten after anything that writes */
+    private ?LetterCounterparty $loaded = null;
+
     private function party(): LetterCounterparty
     {
-        $party = Agreements::findByToken($this->token);
-        abort_unless($party, 404);
+        if ($this->loaded === null) {
+            $party = Agreements::findByToken($this->token);
+            abort_unless($party, 404);
+            $this->loaded = $party;
+        }
 
-        return $party;
+        return $this->loaded;
+    }
+
+    /** Before a write: the render reads the party again, so it shows what changed */
+    private function changed(): void
+    {
+        $this->loaded = null;
     }
 
     /** The pad and the file picker both end here, exactly as they do on HQ's My signature */
@@ -116,6 +128,7 @@ class AgreementSigning extends Component
         }
 
         $code = SigningCodes::newCode();
+        $this->changed();
         if (! Agreements::holdSignature($party, $this->signedName, $image, $code)) {
             $this->addError('signedName', __('agreements.portal.errors.closed'));
 
@@ -151,6 +164,7 @@ class AgreementSigning extends Component
 
         $this->code = trim($this->code);
         $this->validate(['code' => ['required', 'digits:6']], ['code.*' => __('agreements.portal.errors.code_format')]);
+        $this->changed();
 
         $refused = SigningCodes::check(Agreements::KIND, $party->id, $party->otp ? (string) $party->otp : null, $party->otp_expires_at, $this->code);
         if ($refused) {

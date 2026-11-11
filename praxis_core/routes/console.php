@@ -4,6 +4,21 @@ use Illuminate\Support\Facades\Schedule;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 
+// HQ Mail (docs/MAIL.md): copy new mail from every connected mailbox. First and in the background: a run takes up to
+// 50 s, and in the foreground every command below waited for it each minute (scheduled sends, the AI queue, pushes),
+// while new mail waited for the commands above it
+Schedule::command('mail:sync')->everyMinute()->withoutOverlapping(10)->runInBackground();
+
+// Opportunities (docs/OPPORTUNITIES.md 8.3): AI jobs wait on their own queues and run here. The worker stays up for most
+// of the minute and looks for work every second, so a job someone is waiting for starts within seconds (it used to stop
+// as soon as the queue was empty, and the next job waited up to a minute for the next one); the bulk queue (outreach
+// drafts and reply sorting, config/ai.php) only when the first is empty. A long document keeps its worker until it is
+// done (no overlap). Only the AI queues: anything else in the jobs table is left alone. Each job is tried once
+// (RunAiJob). Runs left behind by a worker that stopped fail after 30 minutes, so screens stop waiting.
+Schedule::command('queue:work ' . config('ai.queue.connection') . ' --queue=' . implode(',', array_filter([config('ai.queue.name'), config('ai.queue.bulk')]))
+    . ' --sleep=1 --max-time=50 --tries=2')
+    ->everyMinute()->withoutOverlapping(30)->runInBackground();
+
 // The 6-Hour Shift Marketing Telemetry Cron Job
 Schedule::command('marketing:sync-telemetry')->everySixHours();
 
@@ -57,17 +72,10 @@ Schedule::command('backups:files')->sundays()->at('03:00')->timezone('Africa/Lag
     ->appendOutputTo(storage_path('logs/backups.log'));
 Schedule::command('backups:check')->hourlyAt(17)->withoutOverlapping(10);
 
-// HQ Mail (docs/MAIL.md): copy new mail from every connected mailbox, send what is due, tidy up
-Schedule::command('mail:sync')->everyMinute()->withoutOverlapping(10);
+// HQ Mail (docs/MAIL.md): send what is due, tidy up (mail:sync is at the top of this file)
 Schedule::command('mail:send-due')->everyMinute()->withoutOverlapping(5);
 Schedule::command('mail:prune')->dailyAt('03:40');
 
-// Opportunities (docs/OPPORTUNITIES.md 8.3): AI jobs wait on their own 'ai' queue and run here, a minute at most per
-// pass; a long document keeps its worker until it is done (no overlap). Only the 'ai' queue: anything else in the jobs
-// table is left alone. Each job is tried once (RunAiJob). Runs left behind by a worker that stopped fail after 30
-// minutes, so screens stop waiting.
-Schedule::command('queue:work ' . config('ai.queue.connection') . ' --queue=' . config('ai.queue.name') . ' --stop-when-empty --max-time=50 --tries=2')
-    ->everyMinute()->withoutOverlapping(30);
 Schedule::call(fn () => \App\Support\Ai\Ai::expireStuck())->name('ai:expire-stuck')->everyTenMinutes()->withoutOverlapping(5);
 
 // Meetings (docs/OPPORTUNITIES.md 6.1): ended meetings become held; transcripts are collected from Google from 20

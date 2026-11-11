@@ -157,6 +157,17 @@ final class MailSync
             $folder->forceFill(['uidnext' => null, 'highestmodseq' => null, 'initial_synced_at' => null])->save();
         }
 
+        // Nothing moved on the server since this folder's last complete pass (same next UID, same number of messages,
+        // and with CONDSTORE the same highest change number, which every flag change raises): the window search, the
+        // read of every local UID and the flag check would all find nothing. A full pass still runs at least hourly,
+        // which is what removes mail that has grown older than the window.
+        $serverTotalBefore = $folder->server_total;
+        if ($this->unchanged($session, $folder, $box)) {
+            $folder->forceFill(['synced_at' => now()])->save();
+
+            return $counts;
+        }
+
         $since = CarbonImmutable::now()->subMonths((int) config('mail_client.sync.months', 12))->startOfDay();
         $serverUids = $box['exists'] > 0 ? $session->search('SINCE ' . $since->format('j-M-Y')) : [];
         $serverSet = array_flip($serverUids);
@@ -221,9 +232,17 @@ final class MailSync
             $fill['highestmodseq'] = $box['highestmodseq'];
         }
         $folder->forceFill($fill)->save();
+        if ($complete && $flagsSynced) {
+            rescue(fn () => Cache::put(self::fullPassKey($folder), true, self::FULL_PASS_EVERY), null, false);
+        }
 
         ThreadCounters::refresh($touchedThreads);
-        ThreadCounters::folder($folder);
+        // Recount only when this run changed something here: counting a large folder every minute for nothing
+        // was most of a quiet run's work (MailActions recount after their own changes)
+        // or when the server's count moved (HQ removed a message itself, e.g. a discarded draft, and the server agrees)
+        if ($counts['added'] || $counts['removed'] || $counts['updated'] || $touchedThreads || (int) $box['exists'] !== (int) $serverTotalBefore) {
+            ThreadCounters::folder($folder);
+        }
 
         if ($received) {
             usort($received, fn ($a, $b) => $a->received_at <=> $b->received_at);
@@ -236,6 +255,24 @@ final class MailSync
         }
 
         return $counts;
+    }
+
+    /** Seconds between full passes of a folder that hasn't changed (the 12-month window moves once a day) */
+    private const FULL_PASS_EVERY = 3600;
+
+    private function unchanged(ImapSession $session, MailFolder $folder, array $box): bool
+    {
+        return $folder->initial_synced_at !== null
+            && $folder->uidnext !== null && isset($box['uidnext']) && (int) $box['uidnext'] === (int) $folder->uidnext
+            && $folder->server_total !== null && (int) $box['exists'] === (int) $folder->server_total
+            && $session->hasCapability('CONDSTORE') && $folder->highestmodseq && ! empty($box['highestmodseq'])
+            && (int) $box['highestmodseq'] === (int) $folder->highestmodseq
+            && (bool) rescue(fn () => Cache::get(self::fullPassKey($folder)), false, false);
+    }
+
+    private static function fullPassKey(MailFolder $folder): string
+    {
+        return 'mail-sync-full-pass:' . $folder->id . ':' . $folder->uidvalidity;
     }
 
     /** @return array{0: int, 1: list<int>, 2: bool} rows updated, their threads, whether every flag was checked */

@@ -26,9 +26,8 @@ class SignoffManager extends Component
     public $mainTab = 'ledger';
     public $marketingTab = 'portfolio_gen';
 
-    public $signoffs = [];
-    public $eligibleProjects = [];
-    public $portfolioLedger = [];
+    // The sign-offs, the projects ready for one and the case studies are read when the page draws (render), for the
+    // open tab only, and never kept in the page's state
 
     public $isGenerating = false;
     public $draftSignatoryEmail = '';
@@ -53,15 +52,20 @@ class SignoffManager extends Component
         if (! $this->canPushKaizen) {
             $this->marketingTab = 'portfolio_ledger';
         }
-        $this->loadLedgers();
     }
 
-    public function loadLedgers()
+    /** Every sign-off, newest first, with only the columns the list and the "Signed project" choice show */
+    private function signoffs(): array
     {
-        $this->signoffs = DB::table('project_signoffs')
+        return DB::table('project_signoffs')
             ->join('projects', 'project_signoffs.project_id', '=', 'projects.id')
             ->join('organizations', 'projects.organization_id', '=', 'organizations.id')
-            ->select('project_signoffs.*', 'projects.title as project_title', 'organizations.name as client_name')
+            ->select(
+                'project_signoffs.id', 'project_signoffs.status', 'project_signoffs.token', 'project_signoffs.signatory_email',
+                'project_signoffs.signatory_name', 'project_signoffs.signatory_job_title', 'project_signoffs.client_signature_hash',
+                'project_signoffs.client_ip_address', 'project_signoffs.signed_at', 'project_signoffs.created_at', 'project_signoffs.is_pushed_to_kaizen',
+                'projects.title as project_title', 'organizations.name as client_name'
+            )
             ->orderBy('project_signoffs.created_at', 'desc')
             ->get()
             // The sign-off link works like a client password: only people who issue sign-offs receive it
@@ -72,9 +76,13 @@ class SignoffManager extends Component
                 return $signoff;
             })
             ->toArray();
+    }
 
+    /** Active or locked projects whose tasks are all Done and that have no sign-off yet */
+    private function eligibleProjects(): array
+    {
         // FIXED: Bridging through project_phases to check task eligibility
-        $this->eligibleProjects = DB::table('projects')
+        return DB::table('projects')
             ->join('organizations', 'projects.organization_id', '=', 'organizations.id')
             ->whereIn('projects.status', ['Active', 'Locked'])
             ->whereNotExists(function ($query) {
@@ -97,14 +105,10 @@ class SignoffManager extends Component
             })
             ->select('projects.id', 'projects.title', 'organizations.name as client_name')
             ->get()->toArray();
-
-        if ($this->canViewKaizen) {
-            $this->portfolioLedger = DB::table('portfolio_case_studies')->orderBy('created_at', 'desc')->get()->toArray();
-        }
     }
 
-    public function switchMainTab($tab) { $this->mainTab = $tab; $this->loadLedgers(); }
-    public function switchMarketingTab($tab) { $this->marketingTab = $tab; $this->loadLedgers(); }
+    public function switchMainTab($tab) { $this->mainTab = $tab; }
+    public function switchMarketingTab($tab) { $this->marketingTab = $tab; }
 
     public function generateSignoffDraft()
     {
@@ -118,25 +122,24 @@ class SignoffManager extends Component
         $this->isGenerating = true;
 
         $project = DB::table('projects')->where('id', $this->draftProjectId)->first();
-        
+
+        // The totals are added up by the database, not by loading every task and time entry of the project
         // FIXED: Bridging through project_phases
-        $tasks = DB::table('tasks')
+        $totalPoints = (int) DB::table('tasks')
             ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
             ->where('project_phases.project_id', $this->draftProjectId)
-            ->get();
-            
-        $timeLogs = DB::table('task_time_logs')
+            ->sum('tasks.story_points');
+
+        $minutes = DB::table('task_time_logs')
             ->join('tasks', 'task_time_logs.task_id', '=', 'tasks.id')
             ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
             ->where('project_phases.project_id', $this->draftProjectId)
-            ->get();
-            
-        $qaTickets = DB::table('qa_tickets')->where('project_id', $this->draftProjectId)->get();
+            ->selectRaw('COALESCE(SUM(task_time_logs.duration_minutes), 0) as total, COALESCE(SUM(CASE WHEN task_time_logs.is_rework = 1 THEN task_time_logs.duration_minutes ELSE 0 END), 0) as rework')
+            ->first();
 
-        $totalPoints = $tasks->sum('story_points');
-        $totalHours = $timeLogs->sum('duration_minutes') / 60;
-        $reworkHours = $timeLogs->where('is_rework', 1)->sum('duration_minutes') / 60;
-        $bugsReported = $qaTickets->count();
+        $totalHours = (int) $minutes->total / 60;
+        $reworkHours = (int) $minutes->rework / 60;
+        $bugsReported = DB::table('qa_tickets')->where('project_id', $this->draftProjectId)->count();
 
         $prompt = "You are a senior consultant at JBS Praxis writing a project sign-off document that the client will read and sign.
         Write in plain, measured British English, in sentence case, with no hype, no exclamation marks and no military or technical jargon.
@@ -193,7 +196,6 @@ class SignoffManager extends Component
         }
 
         $this->isGenerating = false;
-        $this->loadLedgers();
     }
 
     public function generateMarketingAsset()
@@ -284,7 +286,6 @@ class SignoffManager extends Component
 
         DB::table('project_signoffs')->where('id', $this->selectedSignoffForMarketing)->update(['is_pushed_to_kaizen' => 1]);
         $this->generatedTitle = ''; $this->generatedNarrative = ''; $this->generatedQuote = ''; $this->generatedDallePrompt = '';
-        $this->loadLedgers();
         session()->flash('success', 'Draft saved. It stays unpublished until someone publishes it under Marketing, Insights articles.');
     }
 
@@ -299,12 +300,23 @@ class SignoffManager extends Component
             DB::table('project_signoffs')->where('id', $signoffId)->update(['status' => 'Signed', 'frozen_at' => null]);
             DB::table('projects')->where('id', $signoff->project_id)->update(['status' => 'Active', 'updated_at' => now()]);
         });
-        $this->loadLedgers();
         session()->flash('success', 'Sign-off unfrozen. The project is active again and its sprint board is open.');
     }
 
     public function render()
     {
-        return view('livewire.hq.operations.signoff-manager');
+        // What the open tab shows, with the rights the view checks before it shows a tab
+        $ledgerTab = $this->mainTab === 'ledger';
+        $marketing = $this->mainTab === 'marketing' && $this->canViewKaizen;
+        $drafting = $marketing && in_array($this->marketingTab, ['portfolio_gen', 'kaizen_gen'], true) && $this->canPushKaizen;
+
+        return view('livewire.hq.operations.signoff-manager', [
+            // The list on the first tab; the "Signed project" choice when drafting a case study or an article
+            'signoffs' => $ledgerTab || $drafting ? $this->signoffs() : [],
+            'eligibleProjects' => $ledgerTab && $this->canDraft ? $this->eligibleProjects() : [],
+            'portfolioLedger' => $marketing && $this->marketingTab === 'portfolio_ledger'
+                ? DB::table('portfolio_case_studies')->orderBy('created_at', 'desc')->get(['title', 'client_pseudonym', 'is_published', 'created_at'])->toArray()
+                : [],
+        ]);
     }
 }

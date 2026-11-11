@@ -9,6 +9,7 @@
     $day = fn ($at) => $at ? \Carbon\Carbon::parse($at)->timezone('Africa/Lagos')->format('j M, H:i') : '—';
 @endphp
 <div class="bcr" @if ($sending) wire:poll.15s @endif>
+    @assets
     <style>
         /* Broadcast report (docs/CAMPAIGNS.md 4.7): only what the shared component classes don't cover. Brand tokens only. */
         .bcr-back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 0.875rem; color: var(--color-deep-teal); text-decoration: none; font-weight: 500; }
@@ -25,6 +26,7 @@
         .bcr-table td small { display: block; color: var(--color-muted); font-size: 0.8125rem; }
         .bcr-frame { width: 100%; height: 720px; border: 1px solid var(--color-line); border-radius: var(--radius-card); background: #F2F5F7; }
     </style>
+    @endassets
 
     <div class="page-header">
         <div>

@@ -1,4 +1,5 @@
 <div class="mb">
+    @assets
     <style>
         /* Mail → Mailboxes: only what the shared component classes don't cover. Brand tokens only. */
         .mb { max-width: 960px; }
@@ -43,6 +44,7 @@
             .mb-row-actions { width: 100%; }
         }
     </style>
+    @endassets
 
     <div class="page-header">
         <div>

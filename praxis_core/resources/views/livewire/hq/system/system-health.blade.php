@@ -1,4 +1,5 @@
 <div class="sh">
+    @assets
     <style>
         /* System Health: only what the shared component classes don’t cover. Brand tokens only. */
         .sh-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 16px; }
@@ -17,6 +18,7 @@
         @media (max-width: 700px) { .sh-hide-sm { display: none; } }
         [x-cloak] { display: none !important; }
     </style>
+    @endassets
 
     @php
         $stateLabels = ['ok' => 'All good', 'warn' => 'Needs attention', 'bad' => 'Problem', 'unknown' => 'Unknown'];

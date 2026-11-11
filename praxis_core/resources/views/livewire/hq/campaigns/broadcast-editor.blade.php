@@ -32,6 +32,7 @@
     @assets
         <script src="{{ route('hq.campaigns.script', ['v' => filemtime(resource_path('campaigns/editor.js'))]) }}"></script>
     @endassets
+    @assets
     <style>
         /* Broadcast editor (docs/CAMPAIGNS.md 4.4): only what the shared component classes don't cover. Brand tokens only. */
         .bce-back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 0.875rem; color: var(--color-deep-teal); text-decoration: none; font-weight: 500; }
@@ -113,6 +114,7 @@
             .bce-steps .tab span { margin-right: 4px; }
         }
     </style>
+    @endassets
 
     <div class="page-header">
         <div>

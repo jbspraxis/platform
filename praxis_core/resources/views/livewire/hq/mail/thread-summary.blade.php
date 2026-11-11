@@ -1,5 +1,6 @@
 <div class="ms">
     @if ($thread)
+        @assets
         <style>
             /* Mail → Summarise card above a conversation (PR 4). Brand tokens only. */
             .ms { margin-bottom: 16px; }
@@ -23,6 +24,7 @@
             @keyframes ms-spin { to { transform: rotate(360deg); } }
             @media (prefers-reduced-motion: reduce) { .ms-busy svg { animation: none; } .ms-head button.ms-toggle svg { transition: none; } }
         </style>
+        @endassets
 
         @if ($summary)
             <section class="ms-card" aria-labelledby="ms-title-{{ $thread->id }}">

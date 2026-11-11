@@ -34,13 +34,17 @@ final class SignerOnboarding
 
         // Only contacts who have never set a password get the setup email; a returning client already has access
         if ($clientUser->password === null) {
-            try {
-                $locale = session()->has('locale') ? MailLocale::forVisitor() : MailLocale::forRecipient($organization->preferred_language ?? null);
-                Mail::to($clientUser->email)->locale($locale)->send(new UserInvitation($clientUser->first_name, $invitationToken, true, $title));
-            } catch (\Exception $e) {
-                // Never the setup link itself: anyone who can read the log could take the account. HQ can send a new one.
-                Log::warning('Portal setup email failed after signing', ['client_user_id' => $clientUser->id, 'message' => $e->getMessage()]);
-            }
+            // Sent once the signing's transaction is saved (at once when there is none): the rows it locks are not
+            // held while the mail server answers, and a signing that is rolled back sends no setup link
+            DB::afterCommit(function () use ($organization, $clientUser, $invitationToken, $title) {
+                try {
+                    $locale = session()->has('locale') ? MailLocale::forVisitor() : MailLocale::forRecipient($organization->preferred_language ?? null);
+                    Mail::to($clientUser->email)->locale($locale)->send(new UserInvitation($clientUser->first_name, $invitationToken, true, $title));
+                } catch (\Exception $e) {
+                    // Never the setup link itself: anyone who can read the log could take the account. HQ can send a new one.
+                    Log::warning('Portal setup email failed after signing', ['client_user_id' => $clientUser->id, 'message' => $e->getMessage()]);
+                }
+            });
         }
     }
 }

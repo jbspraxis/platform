@@ -1,4 +1,6 @@
 <div class="plan">
+    {{-- Sent once per page, not with every update (each poll while the AI drafts) --}}
+    @assets
     <style>
         /* Plan milestones (PR 5b): only what the shared classes don't cover. Brand tokens only. */
         .plan-grid { display: grid; gap: 24px; align-items: start; }
@@ -51,6 +53,7 @@
         @media (prefers-reduced-motion: reduce) { .plan-spin { animation: none; } .plan-ms > summary svg { transition: none; } }
         @media (max-width: 600px) { .plan-save .btn, .plan-stack > .btn { width: 100%; } .plan-diff { margin-left: 0; } .plan-diff-row { grid-template-columns: minmax(0, 1fr); } }
     </style>
+    @endassets
 
     @php
         $locale = app()->getLocale();
@@ -84,7 +87,8 @@
         </div>
     @else
         @if ($drafting)
-            <div wire:poll.3s="check" hidden></div>
+            {{-- check() draws the page again only when the AI has moved on (Planner::draftingState) --}}
+            <div wire:poll.5s="check" hidden></div>
         @endif
 
         <div class="plan-grid">

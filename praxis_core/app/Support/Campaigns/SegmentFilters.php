@@ -4,7 +4,6 @@ namespace App\Support\Campaigns;
 
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * The filters a segment can use (docs/CAMPAIGNS.md 4.2). Each one says which groups of people it narrows and how:
@@ -46,6 +45,7 @@ final class SegmentFilters
                 'groups' => ['leads'],
                 'narrows_only' => true,
                 'column' => 'o.pipeline_stage',
+                'values_are_labels' => true,
                 'options' => fn () => self::distinct('pipeline_stage', fn ($q) => $q->where('status', 'Lead')),
             ];
         }
@@ -55,6 +55,7 @@ final class SegmentFilters
                 'label' => 'Industry',
                 'groups' => self::CONTACT_GROUPS,
                 'column' => 'o.industry',
+                'values_are_labels' => true,
                 'options' => fn () => self::distinct('industry'),
             ],
             'country' => [
@@ -62,6 +63,7 @@ final class SegmentFilters
                 'groups' => [...self::CONTACT_GROUPS, 'subscribers'],
                 'column' => 'o.country',
                 'subscriber_column' => 's.country',
+                'values_are_labels' => true,
                 'options' => fn () => self::countries(),
             ],
             'language' => [
@@ -113,12 +115,13 @@ final class SegmentFilters
 
     private static ?bool $hasLeadStatus = null;
 
+    /** organizations.lead_status is there once Leads PR 1's migration has run (it has, everywhere): no schema query per request */
     public static function hasLeadStatus(): bool
     {
-        return self::$hasLeadStatus ??= Schema::hasColumn('organizations', 'lead_status');
+        return self::$hasLeadStatus ?? true;
     }
 
-    /** Tests: pretend the column is there (true), isn't (false), or look again (null) */
+    /** Tests: pretend the column is there (true), isn't (false), or as it is (null) */
     public static function assumeLeadStatus(?bool $has): void
     {
         self::$hasLeadStatus = $has;

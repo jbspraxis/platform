@@ -320,6 +320,8 @@ class Mailboxes extends Component
     public function render()
     {
         $user = Auth::user();
+        // This screen changes mailboxes (rename, password, people, remove): always the list as it is now
+        MailAccess::flush();
         $accounts = MailAccess::accounts($user);
         $personal = $accounts->first(fn (MailAccount $a) => ! $a->isShared());
         $shared = $accounts->filter(fn (MailAccount $a) => $a->isShared())->values();

@@ -34,10 +34,10 @@ class Questionnaire extends Model
         return $this->hasMany(QuestionnaireQuestion::class)->orderBy('position');
     }
 
-    /** The job drafting the questions */
+    /** The job drafting the questions: where it stands, without its input or output (AiRun::LIGHT) */
     public function aiRun(): BelongsTo
     {
-        return $this->belongsTo(AiRun::class);
+        return $this->belongsTo(AiRun::class)->select(AiRun::LIGHT);
     }
 
     public function completedBy(): BelongsTo

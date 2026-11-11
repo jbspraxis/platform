@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Hq\Opportunities;
 
+use App\Models\AiRun;
 use App\Models\Opportunity;
 use App\Models\Questionnaire;
 use App\Models\QuestionnaireQuestion;
@@ -59,6 +60,10 @@ class QuestionnaireTab extends Component
     /** This screen showed the draft in progress, so it says when the questions are in (whoever filed them) */
     #[Locked]
     public bool $awaitingDraft = false;
+
+    /** Where the AI's work stood when the tab was last drawn: the poll draws it again only once that moves on (check()) */
+    #[Locked]
+    public string $polled = '';
 
     public function mount(string $opportunityId): void
     {
@@ -254,8 +259,30 @@ class QuestionnaireTab extends Component
         $this->notice = __('questionnaire.restart.done');
     }
 
-    /** wire:poll while the AI works: render() applies what it finished */
-    public function check(): void {}
+    /**
+     * wire:poll while the AI works: three small queries, and the tab is drawn again (render() applies what the AI
+     * finished and says the questions are in) only when the draft or a redraft moved on
+     */
+    public function check(): void
+    {
+        $questionnaire = Questionnaire::where('opportunity_id', $this->opportunityId)->latest()->first(['id', 'status', 'ai_run_id']);
+        $questions = $questionnaire ? QuestionnaireQuestion::where('questionnaire_id', $questionnaire->id)->whereNotNull('ai_run_id')->get(['id', 'ai_run_id']) : collect();
+        $ids = array_filter([$questionnaire?->ai_run_id, ...$questions->pluck('ai_run_id')->all()]);
+        $runs = $ids ? AiRun::whereKey($ids)->get(['id', 'status', 'progress'])->keyBy('id') : collect();
+        $redrafts = $questions->map(fn ($q) => [$q, $runs->get($q->ai_run_id)]);
+        if ($questionnaire && self::stamp($questionnaire, $runs->get((string) $questionnaire->ai_run_id), $redrafts) === $this->polled) {
+            $this->skipRender();
+        }
+    }
+
+    /** The questionnaire, its run and the questions being redrafted with theirs, as one short string (the same from check() and from render()) */
+    private static function stamp(Questionnaire $questionnaire, ?AiRun $run, iterable $redrafts): string
+    {
+        $state = fn (?AiRun $r) => $r ? [$r->id, $r->status, (int) $r->progress] : null;
+        $redrafts = collect($redrafts)->map(fn ($pair) => [$pair[0]->id, $pair[0]->ai_run_id, $state($pair[1])])->sortBy(0)->values()->all();
+
+        return md5(json_encode([$questionnaire->id, $questionnaire->status, $questionnaire->ai_run_id, $state($run), $redrafts]));
+    }
 
     private function authorizeAnswer(): Opportunity
     {
@@ -306,6 +333,9 @@ class QuestionnaireTab extends Component
         $this->awaitingDraft = $drafting;
         $questions = $questionnaire && $questionnaire->status !== 'drafting' ? $questionnaire->questions : collect();
         $redrafting = $questions->filter(fn (QuestionnaireQuestion $q) => $q->aiRun && ! $q->aiRun->isFinished());
+        $polling = $drafting || $redrafting->isNotEmpty();
+        $this->polled = $polling ? self::stamp($questionnaire, $run, $questionnaire->questions->whereNotNull('ai_run_id')->map(fn ($q) => [$q, $q->aiRun])) : '';
+        $showForm = ! $questionnaire || ($questionnaire->status === 'drafting' && ! $drafting);
 
         return view('livewire.hq.opportunities.questionnaire-tab', [
             'o' => $opportunity,
@@ -315,10 +345,11 @@ class QuestionnaireTab extends Component
             'drafting' => $drafting,
             // A draft that failed (or whose job is gone) shows its message above the form
             'draftError' => $questionnaire?->status === 'drafting' && ! $drafting ? ($run?->errorMessage() ?? __('ai.errors.failed')) : null,
-            'showForm' => ! $questionnaire || ($questionnaire->status === 'drafting' && ! $drafting),
-            'polling' => $drafting || $redrafting->isNotEmpty(),
+            'showForm' => $showForm,
+            'polling' => $polling,
             'answered' => $questions->filter(fn (QuestionnaireQuestion $q) => $q->isAnswered())->count(),
-            'hasNotes' => DB::table('meeting_transcripts')->join('meetings', 'meetings.id', '=', 'meeting_transcripts.meeting_id')
+            // The form says when no meeting has notes yet
+            'hasNotes' => ! $showForm || ! $this->canAnswer || DB::table('meeting_transcripts')->join('meetings', 'meetings.id', '=', 'meeting_transcripts.meeting_id')
                 ->where('meetings.opportunity_id', $opportunity->id)->whereNull('meetings.deleted_at')->whereNull('meeting_transcripts.deleted_at')->whereNotNull('meeting_transcripts.notes')->exists(),
             'lead' => $opportunity->lead ? trim($opportunity->lead->first_name . ' ' . $opportunity->lead->last_name) : null,
         ]);

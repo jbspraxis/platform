@@ -5,6 +5,7 @@
     $badge = ['draft' => 'Draft', 'issued' => 'Issued', 'sent_for_signature' => 'Out for signature', 'fully_signed' => 'Fully signed', 'revoked' => 'Revoked', 'replaced' => 'Replaced'];
 @endphp
 <div class="docs">
+    @assets
     <style>
         /* HQ › Documents (docs/DOCUMENTS.md): only what the shared component classes don't cover. Brand tokens only. */
         .docs-tools { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 16px; margin-bottom: 16px; }
@@ -34,6 +35,7 @@
             .docs .modal-actions .btn { width: 100%; }
         }
     </style>
+    @endassets
 
     <div class="page-header">
         <div>

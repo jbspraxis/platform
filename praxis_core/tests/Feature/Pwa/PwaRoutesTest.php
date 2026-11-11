@@ -204,11 +204,10 @@ class PwaRoutesTest extends TestCase
 
         $this->assertSame(1, preg_match('/^const PRECACHE = (\[.*\]);$/m', $js, $m));
         $expected = ['/offline'];
-        // The client part's files are kept only once they exist (a missing one would stop the worker installing)
-        foreach (['hq-pwa.js', 'hq-pwa.css'] as $path) {
-            if (Pwa::file($path)) {
-                $expected[] = Pwa::asset($path);
-            }
+        // The client part's script is kept only once it exists (a missing one would stop the worker installing).
+        // Its stylesheet is part of app.css, which the worker keeps with the other built files.
+        if (Pwa::file('hq-pwa.js')) {
+            $expected[] = Pwa::asset('hq-pwa.js');
         }
         $expected[] = Pwa::asset('img/badge-96.png');
         $this->assertSame($expected, json_decode($m[1], true));
@@ -217,6 +216,11 @@ class PwaRoutesTest extends TestCase
         foreach ($expected as $path) {
             $this->get($this->hq($path))->assertOk();
         }
+
+        // Where the browser can (Chrome, Edge), POSTs such as Livewire's updates never wake the worker; the
+        // fetch handler still steps aside for them everywhere else
+        $this->assertStringContainsString("event.addRoutes([{ condition: { requestMethod: 'POST' }, source: 'network' }])", $js);
+        $this->assertStringContainsString("if (request.method !== 'GET') {", $js);
     }
 
     public function test_the_offline_page_is_self_contained(): void

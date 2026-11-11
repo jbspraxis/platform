@@ -10,6 +10,8 @@
      delivery team (works offline: messages wait in the browser). Behaviour lives in App\Livewire\Portal\ProjectTracker. --}}
 <div x-data="executiveTracker()" x-init="initEngine()" class="app-wrapper" :class="{ 'is-offline': !isOnline }">
 
+    {{-- Static styles: sent once with the page, not again on every round trip --}}
+    @assets
     <style>
         .app-wrapper { min-height: 100vh; max-width: 600px; margin: 0 auto; position: relative; overflow-x: hidden; background: var(--color-mist); color: var(--color-slate); }
         @media (min-width: 600px) { .app-wrapper { border-left: 1px solid var(--color-line); border-right: 1px solid var(--color-line); } }
@@ -132,7 +134,9 @@
         .archived-lock svg { width: 16px; height: 16px; margin-top: 3px; flex-shrink: 0; }
         .spin { animation: tracker-spin 0.8s linear infinite; }
         @keyframes tracker-spin { to { transform: rotate(360deg); } }
+        .chat-earlier { align-self: center; }
     </style>
+    @endassets
 
     <div class="offline-banner" role="status">
         <i data-lucide="wifi-off"></i>
@@ -281,6 +285,12 @@
                 </div>
 
                 <div class="chat-scroller" x-ref="chatBody">
+                    @if($hasEarlierMessages)
+                        <button type="button" class="btn btn-ghost btn-sm chat-earlier" wire:click="showEarlierMessages" wire:loading.attr="disabled" wire:target="showEarlierMessages">
+                            {{ __('gateway.tracker.show_earlier') }}
+                        </button>
+                    @endif
+
                     @forelse($messages as $msg)
                         <div class="bubble {{ $msg->sender_type === 'client' ? 'bubble-client' : 'bubble-staff' }}">
 
@@ -439,8 +449,8 @@
                     this.pinCode = this.pinCode.replace(/[^0-9]/g, '').substring(0, 4);
 
                     if (this.pinCode.length === 4) {
-                        @this.verifyPin(this.pinCode);
-                        setTimeout(() => { if(@this.pinError) this.pinCode = ''; }, 600);
+                        // Cleared once the server has answered, so a wrong PIN can be typed again
+                        @this.verifyPin(this.pinCode).then(() => { if(@this.pinError) this.pinCode = ''; });
                     }
                 },
 

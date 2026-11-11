@@ -71,6 +71,19 @@ class EmployeeRegistry extends Component
     public $bik_vehicle_provided = false;
     public $bik_domestic_staff = false;
 
+    /** The JBS Praxis organisation's id, looked up once per request (false: not yet); staff belong to it */
+    private string|false|null $jbsOrgId = false;
+
+    /** Organisations hold every CRM lead too, and the name is not indexed: one lookup serves the whole request */
+    private function jbsOrgId(): ?string
+    {
+        if ($this->jbsOrgId === false) {
+            $this->jbsOrgId = DB::table('organizations')->where('name', 'JBS Praxis')->value('id');
+        }
+
+        return $this->jbsOrgId;
+    }
+
     public function mount()
     {
         $this->loadEmployees();
@@ -78,9 +91,8 @@ class EmployeeRegistry extends Component
         $this->hire_date = date('Y-m-d');
         
         // PATCH: Restrict Line Managers to JBS Praxis internal staff only
-        $jbsOrgId = DB::table('organizations')->where('name', 'JBS Praxis')->value('id');
         $this->allManagers = DB::table('users')
-            ->where('organization_id', $jbsOrgId)
+            ->where('organization_id', $this->jbsOrgId())
             ->where('status', 'Active')
             ->select('id', 'first_name', 'last_name')
             ->get();
@@ -94,13 +106,10 @@ class EmployeeRegistry extends Component
 
     public function loadEmployees()
     {
-        // PATCH: Fetch the internal organization ID
-        $jbsOrgId = DB::table('organizations')->where('name', 'JBS Praxis')->value('id');
-
         $query = DB::table('mdm_employees as emp')
             ->join('users as u', 'emp.user_id', '=', 'u.id')
             ->leftJoin('users as m', 'emp.line_manager_id', '=', 'm.id')
-            ->where('u.organization_id', $jbsOrgId) 
+            ->where('u.organization_id', $this->jbsOrgId())
             ->select(
                 'emp.*', 
                 'u.first_name', 'u.last_name', 'u.email', 'u.avatar_path',
@@ -117,13 +126,11 @@ class EmployeeRegistry extends Component
 
     public function loadAvailableUsers()
     {
-        // PATCH: Fetch the internal organization ID
-        $jbsOrgId = DB::table('organizations')->where('name', 'JBS Praxis')->value('id');
         $existingEmployeeUserIds = DB::table('mdm_employees')->pluck('user_id')->toArray();
         
         $this->availableUsers = DB::table('users')
             ->whereNotIn('id', $existingEmployeeUserIds)
-            ->where('organization_id', $jbsOrgId) // PATCH: Prevent clients from showing in dropdown
+            ->where('organization_id', $this->jbsOrgId()) // PATCH: Prevent clients from showing in dropdown
             ->where('status', 'Active')
             ->select('id', 'first_name', 'last_name', 'email')
             ->get();

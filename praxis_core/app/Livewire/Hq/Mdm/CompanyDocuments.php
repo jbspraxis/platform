@@ -66,9 +66,17 @@ class CompanyDocuments extends Component
 
     public string $flash = '';
 
+    /** The companies, read once per request (Companies::all() is up to three queries; not kept between requests) */
+    private ?array $companies = null;
+
+    private function companies(): array
+    {
+        return $this->companies ??= Companies::all();
+    }
+
     public function mount(): void
     {
-        if ($this->company !== '' && ! in_array($this->company, Companies::keys(), true)) {
+        if ($this->company !== '' && ! in_array($this->company, array_column($this->companies(), 'key'), true)) {
             $this->company = '';
         }
         if (! in_array($this->tab, ['documents', 'calendar'], true)) {
@@ -82,9 +90,9 @@ class CompanyDocuments extends Component
         if ($this->company !== '') {
             return $this->company;
         }
-        $home = collect(Companies::all())->firstWhere('region', Vat::HOME);
+        $home = collect($this->companies())->firstWhere('region', Vat::HOME);
 
-        return $home['key'] ?? (Companies::keys()[0] ?? Companies::GROUP);
+        return $home['key'] ?? ($this->companies()[0]['key'] ?? Companies::GROUP);
     }
 
     public function openUpload(): void
@@ -248,7 +256,7 @@ class CompanyDocuments extends Component
     public function render()
     {
         $today = Documents::today();
-        $companies = Companies::all();
+        $companies = $this->companies();
         $labels = collect($companies)->mapWithKeys(fn ($c) => [$c['key'] => $c['label']])->all();
 
         $order = ['expired' => 0, 'soon' => 1, 'valid' => 2, 'none' => 3, 'archived' => 4];
@@ -263,14 +271,16 @@ class CompanyDocuments extends Component
             ->sortBy(fn ($d) => [$order[$d->status['key']], $d->expires_on?->format('Y-m-d') ?? '9999', $d->title])->values();
         $versions = CompanyDocumentVersion::whereIn('id', $documents->pluck('current_version_id')->filter())->get()->keyBy('id');
 
-        $deadlines = $this->scoped(CompanyDeadline::query())->whereNull('archived_at')->orderBy('due_on')->get()
-            ->map(function (CompanyDeadline $d) use ($today) {
-                $d->setAttribute('status', Calendar::status($d, $today));
+        // Every open deadline, and only the last ten done: the done ones pile up over the years
+        $withStatus = function (CompanyDeadline $d) use ($today) {
+            $d->setAttribute('status', Calendar::status($d, $today));
 
-                return $d;
-            });
-        $open = $deadlines->reject(fn ($d) => $d->isDone())->values();
-        $done = $deadlines->filter(fn ($d) => $d->isDone())->sortByDesc('done_at')->take(10)->values();
+            return $d;
+        };
+        $open = $this->scoped(CompanyDeadline::query())->whereNull('archived_at')->whereNull('done_at')->orderBy('due_on')->get()
+            ->map($withStatus)->values();
+        $done = $this->scoped(CompanyDeadline::query())->whereNull('archived_at')->whereNotNull('done_at')
+            ->orderByDesc('done_at')->orderBy('due_on')->limit(10)->get()->map($withStatus)->values();
         $people = DB::table('users')->whereIn('id', $done->pluck('done_by')->filter()->unique())->get(['id', 'first_name', 'last_name'])
             ->mapWithKeys(fn ($u) => [$u->id => trim($u->first_name . ' ' . $u->last_name)]);
 

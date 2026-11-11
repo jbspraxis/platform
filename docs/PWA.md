@@ -27,7 +27,7 @@ Browser (HQ host only)                         Laravel (praxis_core)
 -----------------------                        ----------------------------------------------
 <head> pwa.head  ── manifest link ───────────► GET /manifest.webmanifest   PwaController@manifest
                  ── startup images ──────────► GET /pwa/v/{ver}/startup/… PwaController@asset
-                 ── hq-pwa.css / hq-pwa.js ──► GET /pwa/v/{ver}/…         PwaController@asset
+                 ── hq-pwa.js ───────────────► GET /pwa/v/{ver}/…         PwaController@asset
 hq-pwa.js ── register('/sw.js') ─────────────► GET /sw.js                  PwaController@serviceWorker
           ── subscribe / unsubscribe / test ─► POST /pwa/push/…            PushSubscriptionController
 sw.js     ── offline fallback ───────────────► GET /offline (precached)    PwaController@offline
@@ -40,6 +40,7 @@ MonitorAlerts::newErrors()/health() ─► bell notifications for staff with sys
 ```
 
 - **No Vite, no Composer, no npm changes.** The app's own files live in `praxis_core/resources/pwa/` and are served by Laravel on the HQ host only at `/pwa/v/{version}/{path}` (`App\Support\Pwa\Pwa::asset()`), so they never depend on the shared Vite build and never exist on the portal or the public site. `{version}` is a 10-character hash of the files in `resources/pwa` (paths, sizes, times); a new version means new addresses, so each one is cached for a year.
+  - Since 11 November 2026 one exception: `hq-pwa.css` is part of the compiled stylesheet. `resources/css/app.css` imports it ahead of its own rules (the order it had as its own file), so pages load one stylesheet instead of two before they can show anything. It stays in `resources/pwa/`; a change to it needs `npm run build`, which every release runs.
 - **Web push is implemented in PHP** (`App\Support\Pwa\WebPush`: RFC 8291 aes128gcm payload encryption, RFC 8292 VAPID ES256 JWT) with OpenSSL, sent with Laravel's HTTP client. No new packages: the server has no Composer and no terminal.
 - **VAPID keys** are made on first use and kept in `pwa_settings` (private key encrypted with APP_KEY). `.env` can override them (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`).
 - **Push follows the bell.** About 35 places insert rows into `notifications` with the query builder. None of them changes: `PwaServiceProvider` listens for `insert into notifications` and runs the dispatcher after the response has been sent (or the command has finished). The scheduler runs `pwa:push-pending` every minute for anything missed. `push_deliveries` (one row per notification, primary key = notification id) makes sure each notification is pushed at most once, whichever path gets there first. The migration writes a `baseline` row for every existing notification, so the first run never pushes old ones.
@@ -172,8 +173,8 @@ Elements that hq-pwa.js renders into Livewire views carry `wire:ignore` so morph
 
 ### Service worker (`resources/pwa/sw.js`)
 
-- Caches: `hq-shell-<version>` (precache: `/offline`, `hq-pwa.js`, `hq-pwa.css`, the notification badge; old versions deleted on activate) and `hq-static-v1` (runtime, at most 80 entries: `/build/assets/*`, `/assets/*`, `/icons/*`, `/livewire-*/livewire*.js`).
-- Install: precache, `skipWaiting()`. Activate: delete old caches, `clients.claim()`, enable navigation preload.
+- Caches: `hq-shell-<version>` (precache: `/offline`, `hq-pwa.js`, the notification badge; old versions deleted on activate; `hq-pwa.css` comes with app.css under `/build/assets/*`) and `hq-static-v1` (runtime, at most 80 entries: `/build/assets/*`, `/assets/*`, `/icons/*`, `/livewire-*/livewire*.js`).
+- Install: in Chrome and Edge 123+, a static route sends every POST (each Livewire update among them) straight to the network, so the browser doesn't wake the worker for it (`event.addRoutes`; other browsers skip it, and a refusal is ignored); precache, `skipWaiting()`. Activate: delete old caches, `clients.claim()`, enable navigation preload.
 - Navigations: network only (navigation preload when available); on network failure, the cached `/offline`. Pages are never stored.
 - Never handled (left to the browser): non-GET, other origins, `/livewire*` (except the Livewire script), `/pwa/push/*`, `/pwa/open/*`, `/pwa/ping`, `/sw.js`, `/files/*`, `/taskforce*`, `/logout`, `/up`, `/setup/*`, `/login`.
 - `push`: show the notification (`icon` `/icons/icon-192.png`, `badge` the monochrome badge, `tag`, `data: {url, id}`, `timestamp`), set the app badge, post `hq:push` to open windows. A push without data still shows "New notification in HQ".

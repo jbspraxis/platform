@@ -163,7 +163,7 @@ final class ProjectDrafts
         }
         $applied = DB::transaction(function () use ($draft, $runId) {
             $locked = ProjectDraft::whereKey($draft->id)->lockForUpdate()->first();
-            $run = AiRun::find($runId);
+            $run = AiRun::find($runId, AiRun::RESULT);
             if (! $locked || ! $run || $locked->ai_run_id !== $runId || $locked->status === 'created') {
                 return false;
             }

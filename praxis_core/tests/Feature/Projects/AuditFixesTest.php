@@ -56,9 +56,11 @@ class AuditFixesTest extends TestCase
 
         // The portal: the client's own comment, the task shown to them, never the internal one or a deleted milestone
         $portal = Livewire::actingAs($client, 'client')->test(Dashboard::class)->call('switchTab', 'overview');
-        $this->assertSame([$shown], collect($portal->get('activeTasks'))->pluck('id')->all());
         $this->assertSame(['Approved by the client'], collect($portal->get('liveLogs'))->pluck('text')->all());
+        $this->assertSame([$phase], collect($portal->get('phases'))->pluck('id')->all());
         $this->assertNotContains($deleted, collect($portal->get('phases'))->pluck('id')->all());
+        // The task list is the Progress section's (Overview no longer loads it)
+        $this->assertSame([$shown], collect($portal->call('switchTab', 'sprints')->get('activeTasks'))->pluck('id')->all());
         $portal->call('approveTask', $internal);
         $this->assertSame('QA_Review', DB::table('tasks')->where('id', $internal)->value('status'));
         $portal->call('switchTab', 'qa_hub');

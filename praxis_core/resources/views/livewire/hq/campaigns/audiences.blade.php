@@ -6,6 +6,7 @@
     $sources = ['broadcast' => 'Broadcast link', 'outreach' => 'Outreach', 'legacy_link' => 'Old broadcast link', 'backfill' => 'Unsubscribed before 3 Nov 2026', 'hq' => 'Added in HQ'];
 @endphp
 <div class="aud">
+    @assets
     <style>
         /* Campaigns › Audiences (docs/CAMPAIGNS.md 4.2): only what the shared component classes don't cover. Brand tokens only. */
         .aud-tools { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 16px; margin-bottom: 16px; }
@@ -18,6 +19,7 @@
         .aud-tabs .tab span { margin-left: 6px; color: var(--color-muted); font-variant-numeric: tabular-nums; }
         @media (max-width: 600px) { .aud-two { grid-template-columns: 1fr; } .aud .modal-actions { flex-direction: column-reverse; } .aud .modal-actions .btn { width: 100%; } }
     </style>
+    @endassets
 
     <div class="page-header">
         <div>

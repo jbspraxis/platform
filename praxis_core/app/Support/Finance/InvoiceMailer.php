@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
+use function Illuminate\Support\defer;
+
 /**
  * Emails an issued invoice with its PDF to the client's billing contacts (owner, 2 Nov 2026; docs/QA-PORTAL.md D11):
  * the organisation's active portal accounts that see invoices (portal.billing.view: Client Admin, Client Finance) and
@@ -69,5 +71,22 @@ final class InvoiceMailer
         }
 
         return $reached;
+    }
+
+    /**
+     * send(), once the response is out (Laravel's defer(), as App\Services\Site\Deferred), for a caller that shows
+     * nothing about who was reached: the PDF and the mail server don't hold up the page. Finance › Invoices keeps
+     * sending at once, because it says who was emailed. "always": the invoice is saved before this is queued. A
+     * failure is logged; invoices.emailed_at stays empty and HQ can send it again from Finance › Invoices.
+     */
+    public static function sendAfterResponse(string $invoiceId): void
+    {
+        defer(function () use ($invoiceId) {
+            try {
+                self::send($invoiceId);
+            } catch (\Throwable $e) {
+                Log::error('Invoice email not prepared', ['invoice_id' => $invoiceId, 'message' => $e->getMessage()]);
+            }
+        }, always: true);
     }
 }

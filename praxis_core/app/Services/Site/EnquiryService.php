@@ -11,7 +11,6 @@ use App\Support\MailLocale;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -97,7 +96,8 @@ final class EnquiryService
         SiteLimits::check('enquiry', $ip, $limitIds);
 
         $startTiming = array_key_exists((string) $in['start_timing'], self::START_TIMINGS) ? $in['start_timing'] : null;
-        $hasStartColumn = $startTiming !== null && Schema::hasColumn('organizations', 'start_timing');
+        // organizations.start_timing is there everywhere (2026_10_30_400000): no schema query per enquiry
+        $hasStartColumn = $startTiming !== null;
 
         DB::transaction(function () use ($in, $diagnostic, $startTiming, $hasStartColumn) {
 

@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Intelligence;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
@@ -28,48 +29,39 @@ class LiveConsultation extends Component
     // State Management
     public $activeView = 'lobby'; // 'lobby' or 'terminal'
     public $privacyMode = false;
-    
-    // Lobby Data
-    public $requestedAppointments = [];
-    public $scheduledAppointments = [];
-    
+
+    // The lobby's lists, the organisation, its estimate, its notes and the master data are read when the page is drawn
+    // (render), with the columns it shows: the page's state keeps ids only, not rows sent back and forth on every click.
+
     // Terminal Data (Left Pane)
     public $activeOrgId = null;
     public $activeApptId = null;
-    public $leadData = null;
-    public $copqData = null;
-    public $historyData = [];
     public $historySummary = null;
 
-    // Master Data Collections
-    public $dbIndustries = [], $dbArchitectures = [], $dbBottlenecks = [], $dbCurrencies = [];
+    /** The assistant's line before the call still has to be written: the open terminal asks for it (wire:init) */
+    #[Locked]
+    public bool $lineWaiting = false;
 
     // INLINE COPQ FORM STATE
     public $inlineIndustry = '', $inlineTool = '', $inlineBottleneck = '', $inlineCurrency = 'USD';
     public $inlineTurnover = 0, $inlineHeadcount = 1, $inlineMgmtNodes = 1, $inlineAcv = 0;
     public $inlineManualHrs = 5, $inlineHourlyCost = 50, $inlineErrorRate = 3.0;
 
-    public function mount()
-    {
-        $this->loadLobby();
-        
-        $this->dbIndustries = DB::table('mdm_copq_industries')->orderBy('industry_name')->get();
-        $this->dbArchitectures = DB::table('mdm_copq_architectures')->orderBy('display_name')->get();
-        $this->dbBottlenecks = DB::table('mdm_copq_bottlenecks')->orderBy('bottleneck_name')->get();
-        $this->dbCurrencies = DB::table('mdm_exchange_rates')->orderBy('currency_code')->get();
-    }
-
     // ==========================================
     // 1. THE LOBBY (SCHEDULING & APPROVALS)
     // ==========================================
-    public function loadLobby()
+
+    /** Requests to approve (newest first) and scheduled free audits (soonest first): what the lobby prints of each */
+    private function lobby(): array
     {
         $baseQuery = DB::table('appointments')
             ->join('organizations', 'appointments.organization_id', '=', 'organizations.id')
-            ->select('appointments.*', 'organizations.name as company_name', 'organizations.industry');
+            ->select('appointments.id', 'appointments.organization_id', 'appointments.start_time', 'organizations.name as company_name');
 
-        $this->requestedAppointments = (clone $baseQuery)->where('appointments.status', 'Requested')->orderBy('created_at', 'desc')->get();
-        $this->scheduledAppointments = (clone $baseQuery)->where('appointments.status', 'Scheduled')->orderBy('start_time', 'asc')->get();
+        return [
+            'requestedAppointments' => (clone $baseQuery)->where('appointments.status', 'Requested')->orderBy('appointments.created_at', 'desc')->get(),
+            'scheduledAppointments' => (clone $baseQuery)->where('appointments.status', 'Scheduled')->orderBy('appointments.start_time', 'asc')->get(),
+        ];
     }
 
     public function approveMeeting($appointmentId, $meetingLink = '')
@@ -109,7 +101,6 @@ class LiveConsultation extends Component
         ]) === 1;
         if (! $approved) {
             session()->flash('error', 'This request was already approved, declined or closed because its time passed, so nothing changed. The list is up to date now.');
-            $this->loadLobby();
             return;
         }
 
@@ -137,8 +128,6 @@ class LiveConsultation extends Component
         } else {
             session()->flash('success', 'Free audit approved. There is no client email on file, so send the meeting link to the client yourself.');
         }
-
-        $this->loadLobby();
     }
 
     /**
@@ -156,7 +145,6 @@ class LiveConsultation extends Component
         ]) === 1;
         if (! $claimed) {
             session()->flash('error', 'This request was already approved, declined or closed because its time passed, so nothing changed. The list is up to date now.');
-            $this->loadLobby();
             return;
         }
 
@@ -176,7 +164,6 @@ class LiveConsultation extends Component
                 report($e);
             }
             session()->flash('error', __('meetings.approval.google_failed', ['reason' => $e instanceof GoogleUnavailable ? $e->getMessage() : __('integrations.google.errors.failed')]));
-            $this->loadLobby();
             return;
         }
 
@@ -197,8 +184,6 @@ class LiveConsultation extends Component
                 session()->flash('error', __('meetings.approval.done_not_emailed', ['email' => $clientEmail]));
             }
         }
-
-        $this->loadLobby();
     }
 
     /**
@@ -230,7 +215,6 @@ class LiveConsultation extends Component
             ]) === 1;
         if (! $declined) {
             session()->flash('error', 'This request was already approved or declined, so nothing changed. The list is up to date now.');
-            $this->loadLobby();
             return;
         }
 
@@ -270,8 +254,6 @@ class LiveConsultation extends Component
             'ip_address' => request()?->ip(),
             'created_at' => now(),
         ]);
-
-        $this->loadLobby();
     }
 
     /** The person who booked first (website bookings store them in created_by), then the latest report contact, then the primary contact */
@@ -296,18 +278,32 @@ class LiveConsultation extends Component
     // ==========================================
     // 2. START THE FREE AUDIT
     // ==========================================
+    /**
+     * Opens the free audit at once: the line kept from last time (or from earlier today, for the same notes and intel)
+     * shows straight away. When a new one is needed, the terminal asks the assistant for it once it is open
+     * (loadConsultationLine), so nobody waits for the AI to see the page.
+     */
     public function enterTerminal($orgId, $appId)
     {
         $this->activeOrgId = $orgId;
         $this->activeApptId = $appId;
 
-        $this->leadData = DB::table('organizations')->where('id', $orgId)->first();
-        $this->copqData = DB::table('copq_assessments')->where('organization_id', $orgId)->orderBy('created_at', 'desc')->first();
-
-        // Process Historical Interactions AI Summary
-        $this->processHistorySummary($orgId);
+        $prep = $this->consultationPrep($orgId, $this->notes($orgId));
+        $cached = $prep ? Cache::get($prep['key']) : null;
+        $this->lineWaiting = $prep !== null && ! (is_string($cached) && $cached !== '');
+        $this->historySummary = $prep && ! $this->lineWaiting ? $cached : $this->savedSummary($orgId);
 
         $this->activeView = 'terminal';
+    }
+
+    /** wire:init of the open terminal: the assistant's line for today's call, in place of the one kept from last time */
+    public function loadConsultationLine()
+    {
+        if (! $this->lineWaiting || $this->activeView !== 'terminal' || ! $this->activeOrgId) {
+            return;
+        }
+        $this->lineWaiting = false;
+        $this->historySummary = $this->consultationLine($this->activeOrgId, $this->notes($this->activeOrgId));
     }
 
     public function togglePrivacy()
@@ -315,12 +311,16 @@ class LiveConsultation extends Component
         $this->privacyMode = !$this->privacyMode;
     }
 
-    private function processHistorySummary($orgId)
+    /** The organisation's notes, newest first */
+    private function notes($orgId)
     {
-        $notes = DB::table('crm_notes')->where('organization_id', $orgId)->orderBy('created_at', 'desc')->get();
+        return DB::table('crm_notes')->where('organization_id', $orgId)->orderBy('created_at', 'desc')->get(['note_text', 'interaction_type', 'created_at']);
+    }
 
-        $this->historySummary = $this->consultationLine($orgId, $notes);
-        $this->historyData = $this->historySummary ? $notes->take(3) : $notes->take(5);
+    /** The summary the organisation keeps from the last line (shown while there is none for today, or instead of it) */
+    private function savedSummary($orgId): ?string
+    {
+        return DB::table('organizations')->where('id', $orgId)->value('ai_history_summary') ?: null;
     }
 
     /**
@@ -332,16 +332,12 @@ class LiveConsultation extends Component
      */
     private function consultationLine($orgId, $notes): ?string
     {
-        $intel = LeadIntel::canUse(Auth::user()) ? LeadIntel::contextText($orgId) : null;
-        if ($notes->count() <= 2 && $intel === null) {
-            return $this->leadData->ai_history_summary ?: null;
+        $prep = $this->consultationPrep($orgId, $notes);
+        if ($prep === null) {
+            return $this->savedSummary($orgId);
         }
+        ['material' => $material, 'key' => $key] = $prep;
 
-        $material = ($notes->isNotEmpty()
-            ? "NOTES FROM EARLIER CONVERSATIONS (newest first):\n" . $notes->take(25)->map(fn ($n) => '- ' . Str::limit(trim((string) $n->note_text), 600))->implode("\n")
-            : 'No notes from earlier conversations yet.') . ($intel ? "\n\n" . $intel : '');
-
-        $key = 'consultation-prep:' . $orgId . ':' . md5($material);
         $cached = Cache::get($key);
         if (is_string($cached) && $cached !== '') {
             return $cached;
@@ -350,22 +346,37 @@ class LiveConsultation extends Component
         try {
             $run = Ai::now('consultation_prep', ['type' => 'organization', 'id' => $orgId], ['material' => $material]);
         } catch (AiUnavailable) {
-            return $this->leadData->ai_history_summary ?: null;
+            return $this->savedSummary($orgId);
         } catch (\Throwable $e) {
             report($e);
 
-            return $this->leadData->ai_history_summary ?: null;
+            return $this->savedSummary($orgId);
         }
 
         $summary = $run->succeeded() ? trim((string) ($run->output['summary'] ?? '')) : '';
         if ($summary === '') {
-            return $this->leadData->ai_history_summary ?: null;
+            return $this->savedSummary($orgId);
         }
         Cache::put($key, $summary, now()->addHours(12));
         // Kept for the screens that still read it; updated_at is left alone (this is not an edit of the organisation)
         DB::table('organizations')->where('id', $orgId)->update(['ai_history_summary' => $summary, 'updated_at' => DB::raw('updated_at')]);
 
         return $summary;
+    }
+
+    /** What the assistant reads for the line, and the key its answer is kept under; null when there is too little to read */
+    private function consultationPrep($orgId, $notes): ?array
+    {
+        $intel = LeadIntel::canUse(Auth::user()) ? LeadIntel::contextText($orgId) : null;
+        if ($notes->count() <= 2 && $intel === null) {
+            return null;
+        }
+
+        $material = ($notes->isNotEmpty()
+            ? "NOTES FROM EARLIER CONVERSATIONS (newest first):\n" . $notes->take(25)->map(fn ($n) => '- ' . Str::limit(trim((string) $n->note_text), 600))->implode("\n")
+            : 'No notes from earlier conversations yet.') . ($intel ? "\n\n" . $intel : '');
+
+        return ['material' => $material, 'key' => 'consultation-prep:' . $orgId . ':' . md5($material)];
     }
 
     // ==========================================
@@ -412,7 +423,7 @@ class LiveConsultation extends Component
         $archetype = $indData->sector_archetype ?? 'COMMERCIAL';
         $archMandate = $indData->architectural_mandate ?? 'CLOUD-NATIVE MICROSERVICES';
         
-        $companyName = $this->leadData->name;
+        $companyName = (string) DB::table('organizations')->where('id', $this->activeOrgId)->value('name');
         $fallbackTemplate = $indData ? $indData->fallback_diagnostic : "We found signs of avoidable cost in how {COMPANY_NAME} runs today. We recommend a review of the main bottleneck and of the approvals around it.";
         $aiAnalysis = str_replace('{COMPANY_NAME}', $companyName, $fallbackTemplate);
 
@@ -426,7 +437,7 @@ class LiveConsultation extends Component
         
         try {
             $apiKey = config('services.gemini.api_key');
-            $response = Http::timeout(4)->withHeaders(['Content-Type' => 'application/json'])
+            $response = Http::timeout(4)->connectTimeout(3)->withHeaders(['Content-Type' => 'application/json'])
                 ->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", [
                 "contents" => [["role" => "user", "parts" => [["text" => $systemPrompt]]]],
                 "generationConfig" => ["temperature" => 0.2, "maxOutputTokens" => 150]
@@ -476,7 +487,7 @@ class LiveConsultation extends Component
 
         DB::table('copq_assessments')->insert([
             'id' => (string) Str::uuid(), 'report_token' => $token, 'organization_id' => $this->activeOrgId,
-            'executive_name' => $execName, 'company_name' => $this->leadData->name, 'corporate_email' => $execEmail,
+            'executive_name' => $execName, 'company_name' => $companyName, 'corporate_email' => $execEmail,
             'copq_industry' => $industry, 'primary_tool' => $tool, 'bottleneck' => $bottleneck,
             'copq_currency' => $currency, 'copq_turnover' => $turnover, 'headcount' => $headcount,
             'mgmt_nodes' => $mgmtNodes,
@@ -486,8 +497,6 @@ class LiveConsultation extends Component
             'lead_tier' => $tier, 'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        $this->copqData = DB::table('copq_assessments')->where('organization_id', $this->activeOrgId)->orderBy('created_at', 'desc')->first();
-        
         // Update Org Industry to match
         DB::table('organizations')->where('id', $this->activeOrgId)->update(['industry' => $industry]);
         
@@ -550,7 +559,6 @@ class LiveConsultation extends Component
         }
 
         $this->activeView = 'lobby';
-        $this->loadLobby();
     }
 
     // ==========================================
@@ -619,7 +627,7 @@ class LiveConsultation extends Component
             // FIX: Removed the env() wrapper around the hardcoded fallback key. Increased timeout to 15s.
             $apiKey = config('services.gemini.api_key');
             
-            $response = Http::timeout(15)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", [
+            $response = Http::timeout(15)->connectTimeout(3)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", [
                 "contents" => [["role" => "user", "parts" => [["text" => $prompt]]]], 
                 "generationConfig" => ["temperature" => 0.2, "response_mime_type" => "application/json"]
             ]);
@@ -687,7 +695,6 @@ class LiveConsultation extends Component
         $this->dispatch('consultation-closed');
         
         $this->activeView = 'lobby';
-        $this->loadLobby();
         session()->flash('success', 'Free audit closed. A draft proposal is ready in Proposals.');
     }
 
@@ -709,8 +716,26 @@ class LiveConsultation extends Component
 
     public function render()
     {
-        return view('livewire.hq.intelligence.live-consultation', [
-            'googleConnected' => app(GoogleWorkspace::class)->isConnected(),
-        ]);
+        $data = ['googleConnected' => app(GoogleWorkspace::class)->isConnected(), 'leadData' => null, 'copqData' => null];
+        if ($this->activeView !== 'terminal' || ! $this->activeOrgId) {
+            return view('livewire.hq.intelligence.live-consultation', $data + $this->lobby() + ['historyData' => collect()]);
+        }
+
+        $data['leadData'] = DB::table('organizations')->where('id', $this->activeOrgId)->first(['id', 'name', 'industry']);
+        $data['copqData'] = DB::table('copq_assessments')->where('organization_id', $this->activeOrgId)->orderBy('created_at', 'desc')
+            ->first(['report_token', 'copq_currency', 'copq_turnover', 'bottleneck', 'calculated_leakage', 'ai_friction_analysis']);
+        $data['historyData'] = DB::table('crm_notes')->where('organization_id', $this->activeOrgId)->orderBy('created_at', 'desc')
+            ->limit($this->historySummary ? 3 : 5)->get(['interaction_type', 'created_at', 'note_text']);
+        // The estimate form's lists, only while there is no estimate to show
+        if (! $data['copqData']) {
+            $data += [
+                'dbIndustries' => DB::table('mdm_copq_industries')->orderBy('industry_name')->get(['industry_name']),
+                'dbArchitectures' => DB::table('mdm_copq_architectures')->orderBy('display_name')->get(['tech_key', 'display_name']),
+                'dbBottlenecks' => DB::table('mdm_copq_bottlenecks')->orderBy('bottleneck_name')->get(['bottleneck_name']),
+                'dbCurrencies' => DB::table('mdm_exchange_rates')->orderBy('currency_code')->get(['currency_code']),
+            ];
+        }
+
+        return view('livewire.hq.intelligence.live-consultation', $data);
     }
 }

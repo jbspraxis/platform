@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Finance;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\WithPagination;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -16,17 +17,20 @@ use Illuminate\Validation\Rule;
 #[Layout('components.layouts.hq')]
 class InvoiceLedger extends Component
 {
+    use WithPagination;
+
     /** Statuses an invoice can be cancelled from: unpaid ones only */
     private const CANCELLABLE = ['Pending', 'Overdue'];
 
+    /** Invoices shown per page (Paid and Cancelled only grow) */
+    private const PER_PAGE = 50;
+
+    // The invoices, the projects to invoice and the VAT are read when the page renders (never kept in the page)
     public $activeTab = 'Pending'; // Pending, Overdue, Paid, Cancelled
-    public $invoices = [];
-    
+
     // Create Invoice State
     public $showCreateModal = false;
-    public $activeProjects = [];
     public $projectPhases = [];
-    public $exchangeRates = [];
     
     // Form Inputs
     public $new_project_id = '';
@@ -47,10 +51,11 @@ class InvoiceLedger extends Component
     /** At most this many lines on one invoice */
     private const MAX_LINES = 30;
 
+    /** Each project's billing company (Vat::projectEntity), looked up once per request */
+    private array $entities = [];
+
     public function mount()
     {
-        $this->loadMasterData();
-        $this->loadInvoices();
         $this->prefillFromProject();
     }
 
@@ -63,7 +68,7 @@ class InvoiceLedger extends Component
         if (! request()->boolean('create') || ! Auth::user()->can('finance.create')) {
             return;
         }
-        $project = collect($this->activeProjects)->firstWhere('id', (string) request()->query('project'));
+        $project = $this->activeProject((string) request()->query('project'));
         if ($project) {
             $this->new_project_id = $project->id;
             $this->updatedNewProjectId($project->id);
@@ -161,20 +166,32 @@ class InvoiceLedger extends Component
     public function setTab($tab)
     {
         $this->activeTab = $tab;
-        $this->loadInvoices();
+        $this->resetPage();
     }
 
-    public function loadMasterData()
+    /** The projects Create invoice offers: not completed or cancelled, newest first, with their client */
+    private function activeProjects()
     {
-        // Load active projects that have cleared the scoping phase
-        $this->activeProjects = DB::table('projects')
+        return DB::table('projects')
             ->join('organizations', 'projects.organization_id', '=', 'organizations.id')
             ->whereNotIn('projects.status', ['Completed', 'Cancelled'])
             ->select('projects.id', 'projects.title', 'projects.currency', 'organizations.name as client_name')
-            ->orderBy('projects.created_at', 'desc')
-            ->get();
+            ->orderBy('projects.created_at', 'desc');
+    }
 
-        $this->exchangeRates = DB::table('mdm_exchange_rates')->get();
+    private function activeProject(string $projectId): ?object
+    {
+        return $projectId === '' ? null : $this->activeProjects()->where('projects.id', $projectId)->first();
+    }
+
+    /** The project's billing company, once per request (render and the checks ask for it again) */
+    private function entityOf(string $projectId): ?string
+    {
+        if (! array_key_exists($projectId, $this->entities)) {
+            $this->entities[$projectId] = Vat::projectEntity($projectId);
+        }
+
+        return $this->entities[$projectId];
     }
 
     public function updatedNewProjectId($projectId)
@@ -187,7 +204,7 @@ class InvoiceLedger extends Component
         if (!empty($projectId)) {
             $this->projectPhases = $this->offeredPhases((string) $projectId);
 
-            $project = collect($this->activeProjects)->firstWhere('id', $projectId);
+            $project = $this->activeProject((string) $projectId);
             if ($project) {
                 $this->new_currency = $project->currency;
             }
@@ -199,19 +216,21 @@ class InvoiceLedger extends Component
         }
     }
 
-    public function loadInvoices()
+    /** The tab's invoices, soonest due first: only what the list shows */
+    private function invoices()
     {
-        $this->invoices = DB::table('invoices')
+        return DB::table('invoices')
             ->join('projects', 'invoices.project_id', '=', 'projects.id')
             ->join('organizations', 'projects.organization_id', '=', 'organizations.id')
             ->where('invoices.status', $this->activeTab)
             ->select(
-                'invoices.*', 
-                'projects.title as project_title', 
+                'invoices.id', 'invoices.invoice_number', 'invoices.invoice_type', 'invoices.currency', 'invoices.total_amount',
+                'invoices.status', 'invoices.due_date', 'invoices.emailed_at',
+                'projects.title as project_title',
                 'organizations.name as client_name'
             )
             ->orderBy('invoices.due_date', 'asc')
-            ->get();
+            ->paginate(self::PER_PAGE);
     }
 
     public function draftSubsequentInvoice()
@@ -244,7 +263,7 @@ class InvoiceLedger extends Component
 
         // 1. VAT: only when the company issuing it (the project's opportunity's billing company, else Nigeria's) charges
         // VAT today, at 0% for a client abroad (App\Support\Finance\Vat); the invoice records what it applied, and who
-        $vat = Vat::for($org, null, Vat::projectEntity($project->id));
+        $vat = Vat::for($org, null, $this->entityOf((string) $project->id));
         $vatAmount = $vat['applies'] ? round($amountDue * $vat['rate'] / 100, 2) : 0.0;
         $totalAmount = $amountDue + $vatAmount;
 
@@ -257,10 +276,10 @@ class InvoiceLedger extends Component
         }
         $dueDate = now()->addDays($days);
 
-        // Lock Current Exchange Rate
+        // Lock Current Exchange Rate (as it is now in Master data)
         $fxRate = 1.000000;
         if ($this->new_currency !== 'USD') {
-            $rateData = collect($this->exchangeRates)->firstWhere('currency_code', $this->new_currency);
+            $rateData = DB::table('mdm_exchange_rates')->where('currency_code', $this->new_currency)->first(['rate_to_usd']);
             if ($rateData) $fxRate = $rateData->rate_to_usd;
         }
 
@@ -330,7 +349,6 @@ class InvoiceLedger extends Component
 
         $this->showCreateModal = false;
         $this->reset(['new_project_id', 'picked', 'lines']);
-        $this->loadInvoices();
         session()->flash('success', "Invoice {$invNumber} created for " . ($org->name ?? 'the client') . '. ' . $this->emailedLine($reached));
     }
 
@@ -342,11 +360,9 @@ class InvoiceLedger extends Component
         $invoice = DB::table('invoices')->where('id', $invoiceId)->whereNull('deleted_at')->first();
         if (! $invoice || $invoice->status === 'Cancelled') {
             session()->flash('warning', 'Only an invoice that isn’t cancelled can be emailed. Refresh the page and try again.');
-            $this->loadInvoices();
             return;
         }
         $reached = $this->emailToClient($invoiceId);
-        $this->loadInvoices();
         session()->flash($reached ? 'success' : 'warning', "Invoice {$invoice->invoice_number}: " . $this->emailedLine($reached));
     }
 
@@ -379,14 +395,12 @@ class InvoiceLedger extends Component
         $invoice = DB::table('invoices')->where('id', $invoiceId)->first();
         if (! $invoice) {
             session()->flash('warning', "We couldn’t find that invoice. Refresh the page and try again.");
-            $this->loadInvoices();
             return;
         }
         if (! in_array($invoice->status, self::CANCELLABLE, true)) {
             session()->flash('warning', $invoice->status === 'Paid'
                 ? "Invoice {$invoice->invoice_number} is paid, so it can’t be cancelled."
                 : "Invoice {$invoice->invoice_number} is already cancelled.");
-            $this->loadInvoices();
             return;
         }
 
@@ -401,7 +415,6 @@ class InvoiceLedger extends Component
 
         if (! $updated) {
             session()->flash('warning', "Invoice {$invoice->invoice_number} changed while you were working, so it wasn’t cancelled. Check its status and try again.");
-            $this->loadInvoices();
             return;
         }
 
@@ -419,7 +432,6 @@ class InvoiceLedger extends Component
         ]);
         \App\Support\Pwa\ClientNotify::invoice($invoiceId, 'invoice_cancelled');
 
-        $this->loadInvoices();
         session()->flash('success', "Invoice {$invoice->invoice_number} cancelled.");
     }
 
@@ -436,15 +448,19 @@ class InvoiceLedger extends Component
         $expiredInvoices = DB::table('invoices')
             ->where('status', 'Pending')
             ->whereDate('due_date', '<', now()->toDateString())
-            ->get();
+            ->get(['id', 'invoice_number']);
 
         if ($expiredInvoices->isEmpty()) {
             session()->flash('success', 'No unpaid invoices are past their due date. Nothing was changed.');
             return;
         }
 
+        // Finance approvers hear about each invoice marked overdue (looked up once, written in one insert)
+        $admins = Access::staffWith('finance.approve');
+
         $count = 0;
-        DB::transaction(function () use ($expiredInvoices, &$count) {
+        DB::transaction(function () use ($expiredInvoices, &$count, $admins) {
+            $notifications = [];
             foreach ($expiredInvoices as $invoice) {
                 // 1. Mark the invoice overdue (only if it is still unpaid: a payment may have landed meanwhile)
                 $marked = DB::table('invoices')->where('id', $invoice->id)->where('status', 'Pending')->update([
@@ -457,9 +473,6 @@ class InvoiceLedger extends Component
                 $count++;
 
                 // 2. Alert finance approvers
-                $admins = Access::staffWith('finance.approve');
-
-                $notifications = [];
                 foreach($admins as $adminId) {
                     $notifications[] = [
                         'id' => (string) Str::uuid(), 'user_id' => $adminId,
@@ -468,7 +481,6 @@ class InvoiceLedger extends Component
                         'type' => 'System', 'created_at' => now()
                     ];
                 }
-                if(!empty($notifications)) DB::table('notifications')->insert($notifications);
                 \App\Support\Pwa\ClientNotify::invoice($invoice->id, 'invoice_overdue');
 
                 // 3. Audit trail (safe null UUID)
@@ -484,15 +496,17 @@ class InvoiceLedger extends Component
                     'created_at' => now()
                 ]);
             }
+            foreach (array_chunk($notifications, 500) as $rows) {
+                DB::table('notifications')->insert($rows);
+            }
         });
 
-        $this->loadInvoices();
         session()->flash('warning', $count . ($count === 1 ? ' invoice was' : ' invoices were') . " marked overdue. Client Portal access for those projects is on hold until they’re paid.");
     }
     /** Accounts the client may pay this project's invoice into: its currency, held by its billing company (D8) */
     private function matchingAccounts(): \Illuminate\Support\Collection
     {
-        return $this->new_project_id ? ReceivingAccounts::for($this->new_currency, Vat::projectEntity((string) $this->new_project_id)) : collect();
+        return $this->new_project_id ? ReceivingAccounts::for($this->new_currency, $this->entityOf((string) $this->new_project_id)) : collect();
     }
 
     /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
@@ -529,12 +543,20 @@ class InvoiceLedger extends Component
 
     public function render()
     {
-        // What Create invoice adds for the project chosen: VAT, or a line saying why none (App\Support\Finance\Vat)
-        $project = $this->showCreateModal && $this->new_project_id ? DB::table('projects')->where('id', $this->new_project_id)->first(['id', 'organization_id']) : null;
+        // What Create invoice adds for the project chosen: VAT, or a line saying why none (App\Support\Finance\Vat). The
+        // client's country and tax number, all Vat::for() reads of the organisation, come with the project.
+        $project = $this->showCreateModal && $this->new_project_id ? DB::table('projects')
+            ->leftJoin('organizations', 'organizations.id', '=', 'projects.organization_id')
+            ->where('projects.id', $this->new_project_id)
+            ->first(['projects.id', 'organizations.country', 'organizations.tax_identification_number']) : null;
+        $vat = $project ? Vat::for($project, null, $this->entityOf((string) $project->id)) : null;
 
         return view('livewire.hq.finance.invoice-ledger', [
-            'vat' => $vat = $project ? Vat::for((string) $project->organization_id, null, Vat::projectEntity($project->id)) : null,
-            'matchingAccounts' => $project ? $this->matchingAccounts() : collect(),
+            'invoices' => $this->invoices(),
+            'activeProjects' => $this->showCreateModal ? $this->activeProjects()->get() : collect(),
+            'vat' => $vat,
+            // The accounts of the company Vat::for() chose (the same as matchingAccounts(), without looking it up again)
+            'matchingAccounts' => $project ? ReceivingAccounts::heldBy($this->new_currency, $vat['entity_id']) : collect(),
             'billingCompany' => $vat['company'] ?? null,
             'linesTotal' => round(array_sum(array_map(fn ($l) => is_numeric($l['amount'] ?? null) ? round((float) $l['amount'], 2) : 0.0, $this->lines)), 2),
         ]);

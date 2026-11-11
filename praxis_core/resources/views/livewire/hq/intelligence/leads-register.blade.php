@@ -4,6 +4,7 @@
         $tierLabel = fn ($tier) => match ((int) $tier) { 1 => 'Tier 1', 2 => 'Tier 2', default => 'Tier 3' };
     @endphp
 
+    @assets
     <style>
         .lr-row { cursor: pointer; }
         .lr-row:hover td { background: var(--color-mist); }
@@ -40,6 +41,7 @@
             .lr-actions > * > .btn, .lr-actions > .btn { width: 100%; }
         }
     </style>
+    @endassets
 
     <div class="page-header">
         <div>

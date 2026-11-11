@@ -104,8 +104,14 @@ class DocumentRegister extends Component
         $statuses = self::FILTERS[$this->show] ?? null;
         $term = trim($this->search);
 
+        // Only what the list shows: never a letter's body or a signature image (each up to 2 MB, encrypted)
         $documents = LetterDocument::query()
-            ->with('signatures')
+            ->select(['id', 'reference', 'type', 'subtype', 'title', 'addressed_to', 'document_date', 'issued_at', 'status',
+                'revoked_at', 'show_qr', 'replaced_by_id', 'created_at'])
+            ->with([
+                'signatures' => fn ($q) => $q->select(['id', 'document_id', 'signatory_name', 'signatory_title', 'position']),
+                'replacedBy:id,reference',
+            ])
             ->when($statuses, fn ($q) => $q->whereIn('status', $statuses))
             ->when($term !== '', fn ($q) => $q->where(fn ($w) => $w
                 ->where('reference', 'like', '%' . $term . '%')
@@ -118,7 +124,8 @@ class DocumentRegister extends Component
         return view('livewire.hq.letters.register', [
             'documents' => $documents,
             'types' => LetterTypes::TYPES,
-            'nextReference' => Letters::nextReference(LetterTypes::code($this->newType), (int) Letters::today()->format('Y')),
+            // Only the New document dialog shows it, so a search keystroke doesn't look it up
+            'nextReference' => $this->choosing ? Letters::nextReference(LetterTypes::code($this->newType), (int) Letters::today()->format('Y')) : null,
         ])->title('Documents');
     }
 }

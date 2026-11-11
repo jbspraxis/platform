@@ -7,6 +7,7 @@ use App\Support\Projects\Milestones;
 use App\Support\Projects\ProjectHistory;
 use App\Support\Projects\ProjectPlan;
 use App\Support\Projects\ProjectRules;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
@@ -53,6 +54,28 @@ class MilestoneDrawer extends Component
     public string $notice = '';
     public string $noticeTone = 'success';
 
+    // Worked out once per request and kept in private properties, which Livewire never sends to the browser nor keeps
+    // between requests: the access answers (nothing here changes who sees the project) and the milestones (read again
+    // after save() changes one)
+    private ?bool $canView = null;
+    private ?bool $canManage = null;
+    private ?Collection $milestones = null;
+
+    private function canView(): bool
+    {
+        return $this->canView ??= ProjectRules::canView($this->projectId);
+    }
+
+    private function canManage(): bool
+    {
+        return $this->canManage ??= ProjectRules::canManage($this->projectId, $this->canView());
+    }
+
+    private function milestones(): Collection
+    {
+        return $this->milestones ??= ProjectPlan::milestones($this->projectId);
+    }
+
     public function mount(string $projectId): void
     {
         $this->projectId = $projectId;
@@ -65,7 +88,7 @@ class MilestoneDrawer extends Component
     #[On('open-milestone')]
     public function openMilestone(string $id, bool $accept = false): void
     {
-        $phase = ProjectRules::canView($this->projectId) ? Milestones::find($this->projectId, $id) : null;
+        $phase = $this->canView() ? Milestones::find($this->projectId, $id) : null;
         if (! $phase) {
             $this->close();
 
@@ -76,7 +99,7 @@ class MilestoneDrawer extends Component
         $this->link = $phase->id;
         $this->open = true;
         $this->fillFrom($phase);
-        if ($accept && ProjectRules::canManage($this->projectId) && ! in_array($this->column, ProjectPlan::DELIVERED, true)) {
+        if ($accept && $this->canManage() && ! in_array($this->column, ProjectPlan::DELIVERED, true)) {
             $this->column = 'accepted';
             $this->acceptedAt = $this->acceptedAt ?: ProjectPlan::today();
             $this->notice = __('projects.milestone.accept_help');
@@ -87,7 +110,7 @@ class MilestoneDrawer extends Component
     #[On('new-milestone')]
     public function newMilestone(): void
     {
-        abort_unless(ProjectRules::canManage($this->projectId), 403);
+        abort_unless($this->canManage(), 403);
         $this->resetForm();
         $this->phaseId = null;
         $this->link = '';
@@ -112,7 +135,7 @@ class MilestoneDrawer extends Component
 
     private function fillFrom(object $phase): void
     {
-        $milestone = ProjectPlan::milestones($this->projectId)->firstWhere('id', $phase->id);
+        $milestone = $this->milestones()->firstWhere('id', $phase->id);
         $this->fill([
             'number' => (string) $phase->phase_number,
             'title' => ProjectPlan::title($phase),
@@ -130,7 +153,7 @@ class MilestoneDrawer extends Component
 
     private function phase(): object
     {
-        abort_unless(ProjectRules::canManage($this->projectId), 403);
+        abort_unless($this->canManage(), 403);
         $phase = Milestones::find($this->projectId, $this->phaseId);
         abort_unless($phase, 404);
 
@@ -141,14 +164,15 @@ class MilestoneDrawer extends Component
     {
         $this->notice = $message;
         $this->noticeTone = 'success';
-        $this->dispatch('project-changed');
+        // The page and the milestone board draw the milestones again
+        $this->dispatch('project-changed', kind: 'milestone');
     }
 
     public function save(): void
     {
-        abort_unless(ProjectRules::canManage($this->projectId), 403);
+        abort_unless($this->canManage(), 403);
         $phase = $this->phaseId ? $this->phase() : null;
-        $current = $phase ? ProjectPlan::milestones($this->projectId)->firstWhere('id', $phase->id)->column : null;
+        $current = $phase ? $this->milestones()->firstWhere('id', $phase->id)->column : null;
         // Invoiced and Paid follow Finance: the status underneath stays as it was
         $invoiced = in_array($current, ['invoiced', 'paid'], true);
         $this->title = trim($this->title);
@@ -207,6 +231,7 @@ class MilestoneDrawer extends Component
             $this->phaseId = Milestones::create($this->projectId, $data);
             $this->link = $this->phaseId;
         }
+        $this->milestones = null; // read again after the change
         $this->fillFrom(Milestones::find($this->projectId, $this->phaseId));
         $this->changed($phase ? __('projects.drawer.saved') : __('projects.milestone.created'));
     }
@@ -273,7 +298,7 @@ class MilestoneDrawer extends Component
             return;
         }
         $this->close();
-        $this->dispatch('project-changed');
+        $this->dispatch('project-changed', kind: 'milestone');
         session()->flash('success', __('projects.milestone.deleted', ['code' => 'M' . $phase->phase_number]));
         $this->redirectRoute('hq.ops.project', ['project' => $this->projectId, 'tab' => 'milestones'], navigate: true);
     }
@@ -283,7 +308,7 @@ class MilestoneDrawer extends Component
         if (! $this->open) {
             return view('livewire.hq.projects.milestone-drawer', ['milestone' => null]);
         }
-        $milestones = ProjectPlan::milestones($this->projectId);
+        $milestones = $this->milestones();
         $milestone = $this->phaseId ? $milestones->firstWhere('id', $this->phaseId) : null;
         if ($this->phaseId && ! $milestone) {
             $this->close();
@@ -294,8 +319,8 @@ class MilestoneDrawer extends Component
 
         return view('livewire.hq.projects.milestone-drawer', [
             'milestone' => $milestone,
-            'canManage' => ProjectRules::canManage($this->projectId),
-            'canSeeMoney' => ProjectRules::canSeeMoney($this->projectId),
+            'canManage' => $this->canManage(),
+            'canSeeMoney' => ProjectRules::canSeeMoney($this->projectId, $this->canManage()),
             'project' => $project,
             'weightTotal' => ProjectPlan::weightTotal($milestones),
             'others' => $milestones->reject(fn ($m) => $m->id === $this->phaseId || ($milestone && $milestone->waits_on->contains('id', $m->id)))->values(),

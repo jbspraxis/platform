@@ -293,7 +293,10 @@ class SowsTest extends TestCase
         $invoice = DB::table('invoices')->where('id', $sow->deposit_invoice_id)->first();
         $this->assertSame([$project->id, '400.00', '0.00', '400.00', $sow->reference, 'Pending'],
             [$invoice->project_id, $invoice->amount_due, $invoice->vat_amount, $invoice->total_amount, $invoice->po_sow_reference, $invoice->status]);
-        // and emailed with its PDF to the client's billing contacts (docs/QA-PORTAL.md D11)
+        // and emailed with its PDF to the client's billing contacts (docs/QA-PORTAL.md D11), once the signed page has
+        // answered (Laravel's defer(): the PDF and the mail server don't hold up the client's signature)
+        Mail::assertNotSent(\App\Mail\InvoiceMail::class);
+        app(\Illuminate\Support\Defer\DeferredCallbackCollection::class)->invoke();
         Mail::assertSent(\App\Mail\InvoiceMail::class, fn ($m) => $m->hasTo('ngozi@kilo.test') && $m->invoice->id === $invoice->id && str_starts_with((string) $m->pdf, '%PDF'));
         // Won, but the opportunity points at the project only once it is created
         $o->refresh();

@@ -34,6 +34,19 @@ class FollowUps extends Component
 
     public string $stepDue = '';
 
+    /** Later and No next step list this many leads each; Show more adds SHOW_MORE (the other groups are always whole) */
+    #[Locked]
+    public array $shown = ['later' => self::SHOW_MORE, 'none' => self::SHOW_MORE];
+
+    public const SHOW_MORE = 50;
+
+    public function showMore(string $group): void
+    {
+        if (isset($this->shown[$group])) {
+            $this->shown[$group] += self::SHOW_MORE;
+        }
+    }
+
     public function edit(string $orgId): void
     {
         abort_unless(LeadAccess::canEdit(Auth::user()), 403);
@@ -101,7 +114,8 @@ class FollowUps extends Component
         $who = match ($this->owner) { 'mine' => null, 'all' => 'Everyone’s', 'none' => 'Unowned leads’', default => ($owners->firstWhere('id', $this->owner)?->name ?? 'Their') . '’s' };
 
         return view('livewire.hq.leads.follow-ups', [
-            'groups' => LeadNumbers::followUps($this->owner, $me),
+            'groups' => LeadNumbers::followUps($this->owner, $me, $this->shown),
+            'counts' => LeadNumbers::followUpCounts($this->owner, $me),
             'owners' => $owners,
             'title' => $who ? "{$who} follow-ups" : 'My follow-ups',
             'canEdit' => LeadAccess::canEdit($me),

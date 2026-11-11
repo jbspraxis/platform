@@ -48,6 +48,16 @@ const FALLBACK_PAGE = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8
 // ---------------------------------------------------------------------------------------------------------
 
 self.addEventListener('install', (event) => {
+    // Chrome and Edge 123+: every POST (each Livewire update among them) goes straight to the network, so the
+    // browser no longer has to wake this worker only for it to step aside. Other browsers skip this, and a
+    // browser that refuses the rule loses nothing: the fetch handler below lets POSTs through anyway.
+    if (event.addRoutes) {
+        try {
+            event.waitUntil(event.addRoutes([{ condition: { requestMethod: 'POST' }, source: 'network' }]).catch(() => {}));
+        } catch (error) {
+            // Refused: as above
+        }
+    }
     event.waitUntil((async () => {
         try {
             const cache = await caches.open(SHELL_CACHE);

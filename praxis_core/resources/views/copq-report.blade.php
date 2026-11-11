@@ -161,9 +161,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Roboto+Mono:wght@400;500;700;900&display=swap" rel="stylesheet">
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    {{-- The PDF libraries (html2canvas, jsPDF) are fetched on the first Download click (triggerReportDownload), and
+         the icons at the end of the page, so neither holds up the first paint --}}
     <script src="https://cdn.tailwindcss.com"></script>
     
     <script>
@@ -825,6 +824,8 @@
         </div>
     </div>
 
+    {{-- Pinned to the version in package.json: lucide@latest was a redirect, briefly cached, to whatever came out last --}}
+    <script src="https://unpkg.com/lucide@1.64.0/dist/umd/lucide.min.js"></script>
     <script>
         // --- 1. INITIALIZE ICONS ---
         lucide.createIcons();
@@ -833,6 +834,22 @@
         });
 
         // --- 2. SECURE PDF DOWNLOAD ENGINE ---
+        // The libraries are fetched on the first click only (each once; a failed one is tried again next time)
+        const reportPdfLibraries = [
+            'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+        ];
+        function loadPdfLibrary(src) {
+            const loaded = (window.praxisPdfLibraries = window.praxisPdfLibraries || {});
+            return loaded[src] = loaded[src] || new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.onload = resolve;
+                script.onerror = () => { delete loaded[src]; script.remove(); reject(new Error('Could not load ' + src)); };
+                document.head.append(script);
+            });
+        }
         async function triggerReportDownload() {
             const btn = document.getElementById('downloadPdfBtn');
             if (!btn) return;
@@ -848,6 +865,7 @@
             await new Promise(r => setTimeout(r, 100));
 
             try {
+                await Promise.all(reportPdfLibraries.map(loadPdfLibrary));
                 const pages = document.querySelectorAll('.a4-page');
                 const { jsPDF } = window.jspdf;
                 const pdf = new jsPDF('p', 'mm', 'a4');

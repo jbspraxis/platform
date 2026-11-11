@@ -87,8 +87,6 @@ class FinancialDictionary extends Component
         // The route needs mdm.view; adding or changing a code needs mdm.create / mdm.edit
         abort_unless(Auth::user()->can(($this->editMode && $this->recordId) ? 'mdm.edit' : 'mdm.create'), 403);
 
-        sleep(1); // UI/UX micro-delay for the loading spinner
-
         $this->validate([
             'item_code' => 'required|string|max:20',
             'description' => 'required|string|max:255',

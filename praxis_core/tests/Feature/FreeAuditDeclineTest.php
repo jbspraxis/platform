@@ -44,7 +44,7 @@ class FreeAuditDeclineTest extends TestCase
 
         Livewire::test(LiveConsultation::class)
             ->call('declineRequest', $request['appt'], 'Test booking from the website check', true)
-            ->assertSet('requestedAppointments', fn ($list) => collect($list)->where('id', $request['appt'])->isEmpty())
+            ->assertViewHas('requestedAppointments', fn ($list) => collect($list)->where('id', $request['appt'])->isEmpty())
             ->assertDispatched('praxis-toast', $this->toast("Request declined. We emailed {$request['email']} to offer another time."));
 
         $this->assertSame('Cancelled', DB::table('appointments')->where('id', $request['appt'])->value('status'));

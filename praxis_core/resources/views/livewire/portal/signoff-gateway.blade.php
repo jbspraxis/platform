@@ -7,13 +7,11 @@
      Behaviour lives in App\Livewire\Portal\SignoffGateway. --}}
 <div class="gateway signoff-gateway">
 
-    {{-- Caveat sets a typed name as a signature on the canvas --}}
-    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&display=swap" rel="stylesheet">
-
-    {{-- PDF generation --}}
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    {{-- Sent once with the page (in <head>), not again on every round trip. The PDF libraries are fetched only when
+         the client clicks Download (downloadSignoffPdf below), so they no longer hold up the page. --}}
+    @assets
+    {{-- Caveat sets a typed name as a signature on the canvas; loaded without blocking the page --}}
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 
     <style>
         .gateway-main { max-width: 880px; margin: 0 auto; padding: 24px 16px 48px; }
@@ -51,6 +49,7 @@
         .sig-block { border-top: 1px solid var(--color-line-strong); padding-top: 10px; }
         .qr-container { background: #FFFFFF; padding: 4px; display: inline-block; }
     </style>
+    @endassets
 
     <x-portal.gateway-header :kicker="__('gateway.signoff.kicker')" :width="880" />
 
@@ -252,8 +251,8 @@
                     <div class="sig-block">
                         <div style="font-size: 12px; color: var(--color-muted); margin-bottom: 8px;">{{ __('gateway.signoff.pdf_for_client', ['company' => $signoff->signatory_company ?: $signoff->client_name]) }}</div>
                         <div style="height: 72px;">
-                            @if ($signoff->client_signature_b64)
-                                <img src="{{ $signoff->client_signature_b64 }}" alt="" style="max-height: 72px; max-width: 100%;">
+                            @if ($signatureImage)
+                                <img src="{{ $signatureImage }}" alt="" style="max-height: 72px; max-width: 100%;">
                             @endif
                         </div>
                         <div style="font-weight: 600; color: var(--color-ink);">{{ $signoff->signatory_name }}</div>
@@ -283,6 +282,8 @@
                     this.resizeCanvas();
                     window.addEventListener('resize', () => this.resizeCanvas());
                     this.$watch('typedName', value => { if (this.mode === 'type') this.renderTypedSignature(); });
+                    // Caveat no longer blocks the page: make sure it is here, and redraw a typed name in it once it is
+                    if (document.fonts) document.fonts.load('56px "Caveat"').then(() => { if (this.mode === 'type') this.renderTypedSignature(); }).catch(() => {});
                 },
                 resizeCanvas() {
                     const canvas = this.$refs.canvas;
@@ -339,6 +340,23 @@
             failed: @js(__('gateway.common.pdf_failed')),
             filename: @js(__('gateway.signoff.pdf_filename', ['ref' => strtolower(substr($signoff->token ?? 'a', 0, 6))])),
         };
+        // The PDF libraries, fetched on the first click on Download only (each once; a failed one is tried again next time)
+        const signoffPdfLibraries = [
+            'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+        ];
+        function loadPdfLibrary(src) {
+            const loaded = (window.praxisPdfLibraries = window.praxisPdfLibraries || {});
+            return loaded[src] = loaded[src] || new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.onload = resolve;
+                script.onerror = () => { delete loaded[src]; script.remove(); reject(new Error('Could not load ' + src)); };
+                document.head.append(script);
+            });
+        }
         async function downloadSignoffPdf(btn) {
             const target = document.getElementById('pdf-render-zone');
             if (!target || !btn) return;
@@ -346,6 +364,16 @@
             const original = label ? label.textContent : '';
             if (label) label.textContent = signoffText.preparing;
             btn.disabled = true;
+
+            try {
+                // Before the QR code: it needs qrcode.js
+                await Promise.all(signoffPdfLibraries.map(loadPdfLibrary));
+            } catch (e) {
+                alert(signoffText.failed);
+                if (label) label.textContent = original;
+                btn.disabled = false;
+                return;
+            }
 
             const qr = document.getElementById('qrcode-container');
             if (qr && !qr.hasChildNodes() && btn.dataset.verifyUrl && typeof QRCode !== 'undefined') {

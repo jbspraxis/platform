@@ -13,6 +13,8 @@ use App\Support\Mail\Mime\Decoder;
 use App\Support\Mail\Mime\Headers;
 use App\Support\Mail\Sync\MessageWriter;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Reading from the server what HQ doesn't keep (owner decision 8): bodies too large to copy, attachments, and
@@ -27,6 +29,12 @@ final class MailFetch
 {
     /** Largest attachment HQ hands out in one piece (bytes) */
     public const MAX_ATTACHMENT = 30 * 1024 * 1024;
+
+    /** Inline pictures up to this size are read together, one server command per message (inline()) */
+    private const INLINE_BATCH_MAX = 512 * 1024;
+
+    /** How long those pictures are kept for the message's other picture requests (seconds) */
+    private const INLINE_TTL = 300;
 
     public function __construct(private readonly MailServer $server)
     {
@@ -85,12 +93,56 @@ final class MailFetch
         ];
     }
 
-    /** An inline picture by its Content-ID (cid: in the HTML) */
+    /**
+     * An inline picture by its Content-ID (cid: in the HTML). A message's pictures are asked for together (a signature
+     * alone often has several logos, each its own request): the first request reads all of the message's small
+     * inline pictures in one server command, and keeps them for a few minutes (INLINE_TTL, file cache) so the others
+     * don't each sign in to the mail server. Larger ones are read one by one, as before.
+     */
     public function inline(User $user, MailMessage $message, string $contentId): ?array
     {
-        $attachment = $message->attachments()->where('content_id', trim($contentId, '<> '))->first();
+        abort_unless(MailAccess::canMessage($user, $message, 'read'), 403);
+        $cid = trim($contentId, '<> ');
+        $attachment = $message->attachments()->where('content_id', $cid)->first();
+        if (! $attachment) {
+            return null;
+        }
+        if ($attachment->size > self::INLINE_BATCH_MAX) {
+            return $this->attachment($user, $attachment);
+        }
 
-        return $attachment ? $this->attachment($user, $attachment) : null;
+        $store = Cache::store('file');
+        $key = fn (MailAttachment $a) => 'mail-inline:' . $message->id . ':' . sha1(implode('|', [$message->message_id_hash, $message->created_at?->getTimestamp(), $a->section, $a->content_id]));
+        if (is_array($hit = rescue(fn () => $store->get($key($attachment)), null, false))) {
+            return $hit;
+        }
+
+        $read = function () use ($message, $attachment, $store, $key) {
+            if (is_array($hit = $store->get($key($attachment)))) {
+                return $hit; // a sibling request read them while this one waited
+            }
+            $parts = $message->attachments()->whereNotNull('content_id')->where('size', '<=', self::INLINE_BATCH_MAX)->get();
+            $raw = $this->inFolder($message->folder, fn (ImapSession $s) => $s->fetchSections((int) $message->uid, $parts->pluck('section')->all()));
+            $wanted = null;
+            foreach ($parts as $part) {
+                if (! isset($raw[$part->section])) {
+                    continue;
+                }
+                $file = ['filename' => $part->filename, 'mime' => $part->mime, 'content' => Decoder::transfer($raw[$part->section], $part->encoding)];
+                $store->put($key($part), $file, self::INLINE_TTL);
+                if ($part->id === $attachment->id) {
+                    $wanted = $file;
+                }
+            }
+
+            return $wanted;
+        };
+
+        try {
+            return $store->lock('mail-inline-lock:' . $message->id, 30)->block(15, $read) ?? $this->attachment($user, $attachment);
+        } catch (LockTimeoutException) {
+            return $this->attachment($user, $attachment);
+        }
     }
 
     /**

@@ -80,6 +80,7 @@
         .portal-drawer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 24px; border-bottom: 1px solid var(--color-line); }
         .portal-drawer-body { flex: 1; overflow-y: auto; padding: 24px; }
         .portal-drawer-foot { padding: 16px 24px; border-top: 1px solid var(--color-line); }
+        .portal-sign-in-slot > div:empty { min-height: 160px; border-radius: 8px; background: var(--color-mist); }
 
         .portal-fab { position: fixed; right: 24px; bottom: 24px; z-index: 40; box-shadow: var(--shadow-float); }
 
@@ -155,8 +156,8 @@
                     </div>
                 </div>
                 <div class="topbar-actions" style="gap: 16px;">
-                    {{-- The portal's notifications, and the app on this device (docs/PWA.md) --}}
-                    <livewire:client-os.notification-bell />
+                    {{-- The portal's notifications, and the app on this device (docs/PWA.md), in the language worked out above --}}
+                    <livewire:client-os.notification-bell :locale="app()->getLocale()" />
                     @include('livewire.client-os.partials.language-switch')
                     <div class="user-chip">
                         <div>
@@ -427,7 +428,7 @@
                                             · {{ PortalFormat::date($ticket->created_at, 'datetime') }}
                                             · {{ __('portal.qa.priority_value', ['priority' => $label('status.severity', $ticket->severity)]) }}
                                         </span>
-                                        <span class="mt-2 block text-sm text-slate break-words">{{ Str::limit($ticket->description, 100) }}</span>
+                                        <span class="mt-2 block text-sm text-slate break-words">{{ $ticket->excerpt }}</span>
                                         @if ($ticket->task_title)
                                             <span class="mt-2 block text-xs text-deep-teal">{{ __('portal.qa.linked_task', ['task' => $ticket->task_title]) }}</span>
                                         @endif
@@ -1009,7 +1010,11 @@
         </div>
         <div class="portal-drawer-body text-sm text-slate">
             <p class="m-0 mb-6">{{ __('sign_in.settings.intro') }}</p>
-            <livewire:account.sign-in-methods guard="client" />
+            {{-- Lazy: the drawer sits off-screen until it is opened, so the passkeys and PIN load then (one small request),
+                 not on every page load; the grey block keeps their place meanwhile --}}
+            <div class="portal-sign-in-slot">
+                <livewire:account.sign-in-methods guard="client" lazy />
+            </div>
         </div>
     </aside>
 

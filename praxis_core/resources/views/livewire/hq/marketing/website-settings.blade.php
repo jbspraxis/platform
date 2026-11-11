@@ -1,4 +1,5 @@
 <div class="ws">
+    @assets
     <style>
         /* Website settings: only what the shared component classes don’t cover. Brand tokens only. */
         .ws { max-width: 960px; } /* a form reads best narrow; the header's Save button lines up with the cards */
@@ -32,6 +33,7 @@
             .ws-row-4, .ws-row-3, .ws-row-2 { grid-template-columns: minmax(0, 1fr); }
         }
     </style>
+    @endassets
 
     @php
         // Field helpers: aria attributes that tie each field to its message

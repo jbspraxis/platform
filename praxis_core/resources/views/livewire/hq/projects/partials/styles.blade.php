@@ -1,4 +1,6 @@
 {{-- The project page and its drawers (docs/PROJECTS.md): only what the shared component classes don't cover. Brand tokens only. --}}
+{{-- Static, so Livewire sends it once per page (in the head), not again with every update of the page or a drawer --}}
+@assets
 <style>
     .pj { max-width: 1240px; }
     .pj-back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px; font-size: 0.875rem; text-decoration: none; }
@@ -109,3 +111,4 @@
         .pj-actions .btn { flex: 1 1 auto; }
     }
 </style>
+@endassets

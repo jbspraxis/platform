@@ -16,6 +16,15 @@ class MailThread extends Model
 {
     protected $guarded = ['id'];
 
+    /** A conversation that changed changes what the Mail page shows (App\Support\Mail\MailVersion) */
+    protected static function booted(): void
+    {
+        $bump = fn (MailThread $thread) => \App\Support\Mail\MailVersion::bump($thread->account_id);
+        static::created($bump);
+        static::updated($bump);
+        static::deleted($bump);
+    }
+
     protected function casts(): array
     {
         return [

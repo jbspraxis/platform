@@ -266,6 +266,7 @@ return [
         'task_fallback' => 'Task',
         'open_attachment' => 'Open attachment',
         'messages_empty' => 'No messages yet. Ask a question or share a file with the delivery team.',
+        'show_earlier' => 'Show earlier messages',
         'queued' => 'Waiting to send',
         'replying_about' => 'Replying about',
         'cancel_reply' => 'Stop replying about this task',

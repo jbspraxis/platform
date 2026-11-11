@@ -14,6 +14,7 @@ use Anthropic\Core\Exceptions\RateLimitException;
 use Anthropic\Lib\Streaming\MessageAccumulator;
 use Anthropic\RequestOptions;
 use App\Support\Integrations;
+use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Support\Facades\Log;
 use Psr\Http\Client\ClientInterface;
 
@@ -42,12 +43,14 @@ class ClaudeProvider implements AiProvider
             throw new AiUnavailable('not_configured');
         }
 
+        [$timeout, $retries] = $this->limits($request);
         $client = new Client(
             apiKey: $key,
             requestOptions: RequestOptions::with(
-                timeout: (float) config('ai.providers.claude.timeout', 600),
-                maxRetries: (int) config('ai.providers.claude.max_retries', 2),
-                transporter: $this->transporter,
+                timeout: $timeout,
+                maxRetries: $retries,
+                // The SDK leaves the timeout to its HTTP client: while a page waits, one that enforces it
+                transporter: $this->transporter ?? ($request->sync ? new GuzzleClient(['timeout' => $timeout, 'connect_timeout' => 5]) : null),
                 streamingTransporter: $this->transporter,
             ),
             openTelemetry: false,
@@ -78,6 +81,17 @@ class ClaudeProvider implements AiProvider
         }
 
         return $this->result($message, $request->model);
+    }
+
+    /**
+     * [seconds, retries]: a background job may take ten minutes and is retried twice on a busy or lost connection; a
+     * request a page waits for (AiRequest::$sync) gives up after AiRequest::SYNC_TIMEOUT seconds, at once
+     */
+    public function limits(AiRequest $request): array
+    {
+        return $request->sync
+            ? [(float) AiRequest::SYNC_TIMEOUT, 0]
+            : [(float) config('ai.providers.claude.timeout', 600), (int) config('ai.providers.claude.max_retries', 2)];
     }
 
     /** The named arguments of messages->create(): wire names in camelCase, as the SDK takes them */
