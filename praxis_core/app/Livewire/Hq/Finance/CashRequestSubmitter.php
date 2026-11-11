@@ -88,8 +88,6 @@ class CashRequestSubmitter extends Component
     {
         abort_unless(Auth::user()->can('expenses.create'), 403);
 
-        sleep(1);
-
         $final_details = '';
         if ($this->disbursement_method === 'Bank Transfer') {
             $this->validate(['payee_bank' => 'required', 'payee_account_name' => 'required', 'payee_account_number' => 'required'], [], [

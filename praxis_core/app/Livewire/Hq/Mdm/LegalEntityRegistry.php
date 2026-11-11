@@ -86,8 +86,6 @@ class LegalEntityRegistry extends Component
         // The route needs mdm.view; adding or changing an entity needs mdm.create / mdm.edit
         abort_unless(Auth::user()->can(($this->editMode && $this->recordId) ? 'mdm.edit' : 'mdm.create'), 403);
 
-        sleep(1); // UX buffer
-
         // VAT is changed only by people who may edit master data, whoever adds the company
         $existing = ($this->editMode && $this->recordId) ? DB::table('mdm_legal_entities')->where('id', $this->recordId)->first() : null;
         $vatBefore = $this->vatValues($existing);

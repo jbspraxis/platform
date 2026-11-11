@@ -81,9 +81,6 @@ class CashRequestManager extends Component
     {
         abort_unless(Auth::user()->can('expenses.approve'), 403);
 
-        // UX micro-delay
-        sleep(1);
-
         $this->validate([
             'authorizer_signature' => 'required|string'
         ], [
