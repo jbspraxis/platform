@@ -13,12 +13,17 @@ use Illuminate\Support\Facades\Schema;
  *    index, in thread order, where they read every (wide) message row of the folder.
  *  - mail_messages_reply_lookup_index (account_id, in_reply_to): sync files each new message into its conversation by
  *    looking for replies to it, which read the whole mailbox.
+ *  - mail_messages_contacts_index (account_id, is_outbound, from_email, from_name, received_at): the composer's address
+ *    suggestions (a few characters typed in To, Cc or Bcc) list the senders matching them, newest first, from every
+ *    mailbox the person reads; the match is "contains", which no index can seek, but this one holds every column it
+ *    reads, so it scans the index and not the message rows (which carry the bodies).
  */
 return new class extends Migration
 {
     private const INDEXES = [
         'mail_messages_folder_list_index' => ['folder_id', 'thread_id', 'received_at', 'is_seen', 'is_flagged', 'has_attachments'],
         'mail_messages_reply_lookup_index' => ['account_id', 'in_reply_to'],
+        'mail_messages_contacts_index' => ['account_id', 'is_outbound', 'from_email', 'from_name', 'received_at'],
     ];
 
     public function up(): void

@@ -48,13 +48,6 @@ class Inbox extends Component
 {
     public const TZ = 'Africa/Lagos';
 
-    /** mail_messages columns the reader uses: all but body_text and body_html */
-    private const MESSAGE_COLUMNS = ['id', 'account_id', 'folder_id', 'thread_id', 'uid', 'message_id', 'message_id_hash',
-        'in_reply_to', 'references', 'subject', 'from_name', 'from_email', 'to', 'cc', 'bcc', 'reply_to', 'to_text',
-        'sent_at', 'received_at', 'size', 'is_seen', 'is_flagged', 'is_answered', 'is_draft', 'has_attachments',
-        'is_outbound', 'snippet', 'body_state', 'parts', 'list_unsubscribe', 'seen_by', 'seen_at', 'sent_by',
-        'created_at', 'updated_at'];
-
     /** How long the reader keeps a message as it shows it (sanitised HTML in its frame document), in seconds */
     private const VIEW_TTL = 21600;
 
@@ -286,7 +279,7 @@ class Inbox extends Component
             $action === 'read' => $actions->markRead($user, $scope, true),
             $action === 'unread' => $actions->markRead($user, $latest, false),
             $action === 'flag' => $actions->flag($user, $latest, true),
-            $action === 'unflag' => $actions->flag($user, $thread->messages()->where('is_flagged', true)->get(), false),
+            $action === 'unflag' => $actions->flag($user, $thread->messages()->withoutBodies()->where('is_flagged', true)->get(), false),
             $action === 'delete' => $actions->deleteForever($user, $scope),
             str_starts_with($action, 'move:') => $actions->move($user, $scope,
                 MailFolder::where('account_id', $this->box)->where('selectable', true)->findOrFail((int) substr($action, 5))),
@@ -332,7 +325,7 @@ class Inbox extends Component
             return;
         }
         $folder = MailFolder::where('account_id', $this->box)->find($undo['folder']);
-        $messages = MailMessage::whereIn('id', $undo['ids'])->where('account_id', $this->box)->get();
+        $messages = MailMessage::withoutBodies()->whereIn('id', $undo['ids'])->where('account_id', $this->box)->get();
         if (! $folder || $messages->isEmpty()) {
             $this->notice('That can no longer be undone.', 'error');
 
@@ -532,6 +525,8 @@ class Inbox extends Component
         $account = $this->account;
         $folder = $this->currentFolder;
         $list = ['rows' => collect(), 'total' => 0, 'page' => 1];
+        // The stamps before reading anything: a change landing during this render then shows at the next poll
+        $this->drawnAt = $this->stamps();
 
         if ($account && $folder) {
             $folder->setRelation('account', $account);
@@ -545,7 +540,6 @@ class Inbox extends Component
         if ($this->thread && ! $thread) {
             $this->thread = null;
         }
-        $this->drawnAt = $this->stamps();
 
         return view('livewire.hq.mail.inbox', [
             'user' => $user,
@@ -689,8 +683,7 @@ class Inbox extends Component
         // Every column but the bodies (up to 1 MB each): those are read for the open messages only (readerMessages)
         $this->messagesMemoKey = $key;
 
-        return $this->messagesMemo = MailMessage::with(['attachments', 'folder:id,role,name,path'])
-            ->select(array_map(fn ($c) => 'mail_messages.' . $c, self::MESSAGE_COLUMNS))
+        return $this->messagesMemo = MailMessage::with(['attachments', 'folder:id,role,name,path'])->withoutBodies()
             ->where('thread_id', $this->thread)->where('account_id', $this->box)
             ->orderBy('received_at')->orderBy('id')->get()
             ->groupBy(fn (MailMessage $m) => $m->message_id_hash ?? 'row:' . $m->id)
@@ -712,7 +705,7 @@ class Inbox extends Component
     /** What toolbar actions work on: the conversation's messages in this folder (in search, outside Sent and Drafts) */
     private function scopeMessages(MailThread $thread): Collection
     {
-        $all = MailMessage::with('account')->where('thread_id', $thread->id)->where('account_id', $this->box)->get();
+        $all = MailMessage::with('account')->withoutBodies()->where('thread_id', $thread->id)->where('account_id', $this->box)->get();
         $folder = $this->currentFolder;
         $roles = $this->folders->pluck('role', 'id');
         $scope = $this->search === '' && $folder
@@ -895,8 +888,11 @@ class Inbox extends Component
         if (! $folder) {
             return null;
         }
+        // Kept ten minutes in the file cache (a message can be megabytes: not the database cache), with what the reader
+        // makes of it below, so the minute's refresh and each click don't read and sanitise it again
+        $store = Cache::store('file');
         try {
-            $item = Cache::remember('mail-read-live:' . $this->user()->id . ':' . $folder->id . ':' . $this->liveUid, 600,
+            $item = $store->remember('mail-read-live:' . $this->user()->id . ':' . $folder->id . ':' . $folder->uidvalidity . ':' . $this->liveUid, 600,
                 fn () => MailFetch::make()->message($this->user(), $folder, $this->liveUid));
         } catch (ImapException) {
             return ['error' => true, 'uid' => $this->liveUid];
@@ -922,7 +918,9 @@ class Inbox extends Component
             'attachments' => $sections->filter(fn ($a) => ! $a['is_inline'] || ! $a['content_id'])
                 ->map(fn ($a) => $a + ['url' => $link($a)])->values()->all(),
             'remote' => $remote,
-            'body' => self::present((string) ($item['text'] ?? ''), $item['html'] ?? null, $remote, $cid),
+            'body' => $store->remember('mail-read-live-view:' . sha1(implode('|', [$this->user()->id, $folder->id, $folder->uidvalidity, $this->liveUid,
+                (int) $remote, self::viewVersion(), request()->getSchemeAndHttpHost()])), 600,
+                fn () => self::present((string) ($item['text'] ?? ''), $item['html'] ?? null, $remote, $cid)),
             'folder' => $folder->label(),
         ];
     }

@@ -109,7 +109,7 @@ final class MailActions
      */
     private function markReadLater(User $user, array $ids): void
     {
-        $targets = MailMessage::with('account')->whereIn('id', $ids)->where('is_seen', false)->get();
+        $targets = MailMessage::with('account')->withoutBodies()->whereIn('id', $ids)->where('is_seen', false)->get();
         if ($targets->isEmpty()) {
             return;
         }
@@ -307,10 +307,10 @@ final class MailActions
     private function resolve(iterable|MailThread $messages): Collection
     {
         if ($messages instanceof MailThread) {
-            return $messages->messages()->with('account')->get();
+            return $messages->messages()->with('account')->withoutBodies()->get();
         }
         $ids = collect($messages)->map(fn ($m) => $m instanceof MailMessage ? $m->id : (int) $m)->all();
-        $rows = MailMessage::with('account')->whereIn('id', $ids)->get();
+        $rows = MailMessage::with('account')->withoutBodies()->whereIn('id', $ids)->get();
         abort_if($rows->pluck('account_id')->unique()->count() > 1, 422, 'One mailbox at a time.');
 
         return $rows;
