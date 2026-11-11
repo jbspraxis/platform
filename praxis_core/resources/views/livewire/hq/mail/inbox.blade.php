@@ -83,7 +83,10 @@
         .mr-empty { padding: 32px 16px; text-align: center; color: var(--color-muted); font-size: 0.875rem; }
         .mr-empty strong { display: block; color: var(--color-ink); margin-bottom: 4px; }
 
-        .mr-reader { display: flex; flex-direction: column; background: var(--color-paper); container-type: inline-size; }
+        .mr-reader { display: flex; flex-direction: column; background: var(--color-paper); container-type: inline-size; position: relative; }
+        .mr-opening { position: sticky; top: 0; z-index: 2; height: 2px; margin-bottom: -2px; background: linear-gradient(90deg, transparent, var(--color-teal), transparent); background-size: 40% 100%; background-repeat: no-repeat; animation: mr-opening 1s linear infinite; }
+        @keyframes mr-opening { from { background-position: -40% 0; } to { background-position: 140% 0; } }
+        @media (prefers-reduced-motion: reduce) { .mr-opening { animation: none; background: var(--color-teal); opacity: 0.6; } }
         .mr-toolbar { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 2px; flex-wrap: wrap; padding: 6px 12px; border-bottom: 1px solid var(--color-line); background: var(--color-paper); }
         .mr-toolbar .mr-sep { width: 1px; height: 20px; background: var(--color-line); margin: 0 6px; }
         .mr-toolbar .mr-grow { flex: 1; }
@@ -257,6 +260,8 @@
             @include('livewire.hq.mail.read.list')
 
             <section class="mr-reader" aria-label="Reader" @if ($hasReader) x-init="$nextTick(() => { if (window.innerWidth <= 820) $el.scrollIntoView({ block: 'start' }) })" @endif>
+                {{-- Opening a conversation that takes more than a moment: a thin bar along the top, nothing for quick ones --}}
+                <div class="mr-opening" wire:loading.delay wire:target="openThread,openLive" role="progressbar" aria-label="Opening the conversation"></div>
                 @if ($liveMessage)
                     @include('livewire.hq.mail.read.live', ['item' => $liveMessage])
                 @elseif ($openThread)

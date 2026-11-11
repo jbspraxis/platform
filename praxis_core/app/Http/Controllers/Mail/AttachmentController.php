@@ -43,7 +43,8 @@ class AttachmentController extends Controller
         }
         abort_unless($file && $this->isPicture($file['mime']), 404);
 
-        return $this->respond($file, true, 'private, max-age=3600');
+        // What a message id and Content-ID point to never changes: the browser keeps it for a week without asking again
+        return $this->respond($file, true, 'private, max-age=604800, immutable');
     }
 
     /** An attachment (or cid: picture) of an older message read live from the server */

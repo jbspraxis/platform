@@ -170,6 +170,32 @@ class ReadOpenSpeedTest extends TestCase
             ->assertViewHas('assignees', fn ($a) => $a->isEmpty());
     }
 
+    public function test_a_messages_inline_pictures_come_from_one_server_session(): void
+    {
+        [$account, , $reader] = $this->shared();
+        $this->server->deliver(self::BOX, 'INBOX', FakeMailServer::message(subject: 'Signature',
+            html: '<p>Regards <img src="cid:logo@x"> <img src="cid:in@x"> <img src="cid:x@x"></p>', text: 'Regards', attachments: [
+                ['name' => 'logo.png', 'mime' => 'image/png', 'content' => "\x89PNG-logo", 'inline' => true, 'cid' => 'logo@x'],
+                ['name' => 'in.png', 'mime' => 'image/png', 'content' => "\x89PNG-linkedin", 'inline' => true, 'cid' => 'in@x'],
+                ['name' => 'x.png', 'mime' => 'image/png', 'content' => "\x89PNG-x", 'inline' => true, 'cid' => 'x@x'],
+            ]));
+        MailSync::make()->account($account);
+        $message = MailMessage::firstOrFail();
+        $base = 'https://' . \App\Support\Hosts::hq() . '/mail/read/inline/' . $message->id . '/';
+
+        $before = $this->server->sessions;
+        foreach (['logo@x' => "\x89PNG-logo", 'in@x' => "\x89PNG-linkedin", 'x@x' => "\x89PNG-x"] as $cid => $bytes) {
+            $picture = $this->actingAs($reader)->get($base . $cid)->assertOk();
+            $this->assertSame($bytes, $picture->getContent());
+            $this->assertStringContainsString('immutable', (string) $picture->headers->get('Cache-Control'));
+        }
+        $this->assertSame(1, $this->server->sessions - $before, 'One sign-in for all three pictures');
+
+        // The kept pictures are only for people who can read the mailbox
+        $outsider = $this->staff('out', ['sales']);
+        $this->actingAs($outsider)->get($base . 'logo@x')->assertForbidden();
+    }
+
     /** @return list<int> UIDs of a conversation of $n unread messages in the shared Inbox */
     private function conversation(int $n): array
     {

@@ -92,7 +92,9 @@
                     $folderTags = $searching ? collect(explode(',', (string) $t->row_folders))->map(fn ($id) => $folderNames[(int) $id] ?? null)->filter()->unique()->take(2) : collect();
                 @endphp
                 <li wire:key="t-{{ $t->id }}">
+                    {{-- The row shows as open and read at once, before the server answers (the answer then confirms it) --}}
                     <button type="button" class="mr-row {{ $unread ? 'is-unread' : '' }} {{ $active ? 'is-active' : '' }}" wire:click="openThread({{ $t->id }})"
+                            @click="$el.closest('.mr-rows').querySelectorAll('.mr-row.is-active').forEach((r) => { r.classList.remove('is-active'); r.setAttribute('aria-current', 'false') }); $el.classList.add('is-active'); $el.classList.remove('is-unread'); $el.setAttribute('aria-current', 'true')"
                             data-thread-row="{{ $t->id }}" aria-current="{{ $active ? 'true' : 'false' }}">
                         <span class="mr-row-from">{{ $toLine ? 'To: ' : '' }}{{ $names }}@if ($t->message_count > 1)<span class="mr-count">{{ $t->message_count }}</span>@endif</span>
                         <span class="mr-row-date" title="{{ $t->row_last_at ? \Illuminate\Support\Carbon::parse($t->row_last_at)->timezone(\App\Livewire\Hq\Mail\Inbox::TZ)->format('j M Y, H:i') : '' }}">{{ $t->row_last_at ? \App\Livewire\Hq\Mail\Inbox::when(\Illuminate\Support\Carbon::parse($t->row_last_at)) : '' }}</span>
