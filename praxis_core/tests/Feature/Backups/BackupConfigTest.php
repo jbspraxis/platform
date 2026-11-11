@@ -50,7 +50,7 @@ class BackupConfigTest extends TestCase
             'praxis' => ['praxis_core/storage/app/private', 'praxis_core/storage/app/public', 'praxis_site/storage/app'],
             'lpc' => ['public_html/bureau.lpc.cm/uploads', 'public_html/lpc.cm/uploads'],
             'nfelia' => ['public_html/nfelia.com/uploads', 'public_html/nfelia.com/storage', 'public_html/nfelia.lpc.cm/uploads', 'public_html/nfelia.lpc.cm/storage'],
-            'hodlc' => ['public_html/hodlc.lpc.cm/uploads'],
+            'hodlc' => ['public_html/hodlekki/uploads', 'public_html/hodlekki/assets/uploads'],
             'smartls' => ['public_html/uploads', 'public_html/administration/uploads', 'public_html/administration/upload',
                 'public_html/administration/storage', 'public_html/assets/uploads', 'uploads'],
         ], array_map(fn ($s) => $s['files'], Sites::all()));
