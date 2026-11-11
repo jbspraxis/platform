@@ -3,7 +3,8 @@
      the logo, what the page is, and the English | Français switch. The switch calls switchLanguage() on the
      page's Livewire component (App\Livewire\Portal\Concerns\WithGatewayLanguage), which reloads the page. --}}
 @php $current = app()->getLocale() === 'fr' ? 'fr' : 'en'; @endphp
-@once
+{{-- Sent once per page (@assets): @once starts again on every Livewire update, which re-sent it each time --}}
+@assets
 <style>
     .gateway-header { background: var(--color-paper); border-bottom: 1px solid var(--color-line); }
     .gateway-header-inner { max-width: 1040px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -18,7 +19,7 @@
     @media (max-width: 480px) { .gateway-kicker { display: none; } .gateway-logo { height: 24px; } }
     @media print { .gateway-header { display: none !important; } }
 </style>
-@endonce
+@endassets
 <header class="gateway-header">
     <div class="gateway-header-inner" style="max-width: {{ (int) $width }}px;">
         <div class="gateway-brand">
