@@ -4,6 +4,7 @@
         $groupNames = ['clients' => 'clients', 'leads' => 'leads', 'subscribers' => 'subscribers'];
         $kindNames = ['client' => 'Clients', 'lead' => 'Leads', 'kaizen' => 'Kaizen writers', 'subscriber' => 'Subscribers'];
     @endphp
+    @assets
     <style>
         .sgb { max-width: 640px; }
         .sgb-form { display: flex; flex-direction: column; gap: 16px; }
@@ -21,6 +22,7 @@
         .sgb-count strong { font-size: 1.25rem; color: var(--color-ink); font-variant-numeric: tabular-nums; }
         @media (max-width: 600px) { .sgb-filters { grid-template-columns: 1fr; } .sgb .modal-actions { flex-direction: column-reverse; } .sgb .modal-actions .btn { width: 100%; } }
     </style>
+    @endassets
     <div class="modal-backdrop" wire:click.self="closeSegment" @keydown.escape.window="$wire.closeSegment()">
         <div class="modal sgb" role="dialog" aria-modal="true" aria-labelledby="sgb-title">
             <h2 class="modal-title" id="sgb-title">{{ $segmentEditing ? 'Edit segment' : 'New segment' }}</h2>
@@ -34,9 +36,9 @@
                 <fieldset class="field">
                     <legend class="label mb-2">Who</legend>
                     <div class="sgb-who">
-                        <label><input type="checkbox" class="checkbox" value="clients" wire:model.live="segmentWho"> Clients’ contacts</label>
-                        <label><input type="checkbox" class="checkbox" value="leads" wire:model.live="segmentWho"> Leads’ contacts</label>
-                        <label><input type="checkbox" class="checkbox" value="subscribers" wire:model.live="segmentWho"> Subscribers and Kaizen writers</label>
+                        <label><input type="checkbox" class="checkbox" value="clients" wire:model.live.debounce.400ms="segmentWho"> Clients’ contacts</label>
+                        <label><input type="checkbox" class="checkbox" value="leads" wire:model.live.debounce.400ms="segmentWho"> Leads’ contacts</label>
+                        <label><input type="checkbox" class="checkbox" value="subscribers" wire:model.live.debounce.400ms="segmentWho"> Subscribers and Kaizen writers</label>
                     </div>
                     @error('segmentWho') <span class="field-error">{{ $message }}</span> @enderror
                 </fieldset>
@@ -56,7 +58,7 @@
                                     <button type="button" class="select sgb-trigger" @click="open = ! open" aria-expanded="false" :aria-expanded="open.toString()" aria-labelledby="sgb-l-{{ $key }} sgb-v-{{ $key }}"><span id="sgb-v-{{ $key }}">{{ $shown }}</span></button>
                                     <div class="sgb-options" role="group" aria-labelledby="sgb-l-{{ $key }}" x-show="open" x-cloak>
                                         @forelse ($definition['options'] as $value => $label)
-                                            <label wire:key="o-{{ $key }}-{{ md5($value) }}"><input type="checkbox" class="checkbox" value="{{ $value }}" wire:model.live="segmentFilters.{{ $key }}"> {{ $label }}</label>
+                                            <label wire:key="o-{{ $key }}-{{ md5($value) }}"><input type="checkbox" class="checkbox" value="{{ $value }}" wire:model.live.debounce.400ms="segmentFilters.{{ $key }}"> {{ $label }}</label>
                                         @empty
                                             <p class="help m-0 p-2">Nothing to choose from yet.</p>
                                         @endforelse

@@ -38,6 +38,9 @@ final class Sorting
 
     public const PER_RUN = 20;
 
+    /** Sorting jobs waiting or running at most: a burst of replies is sorted a few at a time, never hours deep */
+    public const IN_FLIGHT = 5;
+
     /** Not now, when they named no day: a reminder this many months later */
     public const REMIND_MONTHS = 3;
 
@@ -48,9 +51,13 @@ final class Sorting
         foreach (AiRun::whereIn('id', $waiting)->whereIn('status', ['done', 'failed'])->get() as $run) {
             self::file($run);
         }
+        $room = self::IN_FLIGHT - AiRun::where('purpose', self::PURPOSE)->whereIn('status', ['queued', 'running'])->count();
+        if ($room <= 0) {
+            return 0;
+        }
         $started = 0;
         $replies = OutreachReply::where('kind', 'reply')->whereNull('label')->whereNull('ai_label')->whereNull('ai_run_id')->whereNull('ai_error')
-            ->orderBy('id')->limit(self::PER_RUN)->get();
+            ->orderBy('id')->limit(min(self::PER_RUN, $room))->get();
         foreach ($replies as $reply) {
             $started += self::start($reply) ? 1 : 0;
         }

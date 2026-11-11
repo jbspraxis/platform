@@ -18,6 +18,7 @@
     ];
 @endphp
 <div class="orx">
+    @assets
     <style>
         /* Outreach sending limits (docs/CAMPAIGNS.md section 10): only what the shared component classes don't cover. Brand tokens only. */
         .orx-back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 0.875rem; color: var(--color-deep-teal); text-decoration: none; }
@@ -28,6 +29,7 @@
         .orx-table td small { display: block; color: var(--color-muted); font-size: 0.8125rem; }
         @media (max-width: 767px) { .orx-hide-sm { display: none; } }
     </style>
+    @endassets
 
     <a href="{{ route('hq.campaigns.outreach') }}" class="orx-back" wire:navigate><i data-lucide="arrow-left"></i> Outreach</a>
     <div class="page-header">

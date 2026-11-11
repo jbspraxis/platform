@@ -42,10 +42,11 @@
     $status = $campaign->status;
     $canRest = $handApproved >= Outreach::HAND_APPROVALS;
 @endphp
-<div class="orc" @if ($busy) wire:poll.4s @endif>
+<div class="orc" @if ($busy) wire:poll.4s="tick" @endif>
     @assets
         <script src="{{ route('hq.campaigns.outreach.script', ['v' => filemtime(resource_path('campaigns/editor.js'))]) }}"></script>
     @endassets
+    @assets
     <style>
         /* An outreach campaign (docs/CAMPAIGNS.md section 10): only what the shared component classes don't cover. Brand tokens only. */
         .orc-back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 0.875rem; color: var(--color-deep-teal); text-decoration: none; }
@@ -110,6 +111,7 @@
             .orc-modal-actions .orc-left { margin-right: 0; flex-basis: 100%; }
         }
     </style>
+    @endassets
 
     <a href="{{ route('hq.campaigns.outreach') }}" class="orc-back" wire:navigate><i data-lucide="arrow-left"></i> Outreach</a>
     <div class="page-header">

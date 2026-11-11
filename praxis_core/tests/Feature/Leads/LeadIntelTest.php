@@ -374,13 +374,20 @@ class LeadIntelTest extends TestCase
         $ai = FakeAi::install()->respond('lead_intel_read', self::REPORT)->respond('consultation_prep', ['summary' => 'Paul decides: open with staff turnover.']);
         $this->addReport($lead, $sales);
 
-        Livewire::test(LiveConsultation::class)->call('enterTerminal', $lead->id, (string) Str::uuid())->assertSet('historySummary', 'Paul decides: open with staff turnover.');
+        // The free audit opens without waiting for the AI; the open terminal then asks for the line (wire:init)
+        $page = Livewire::test(LiveConsultation::class)->call('enterTerminal', $lead->id, (string) Str::uuid())->assertSet('lineWaiting', true)
+            ->assertSeeHtml('wire:init="loadConsultationLine"');
+        $this->assertSame([], $ai->requestsFor('consultation_prep'));
+        $page->call('loadConsultationLine')->assertSet('historySummary', 'Paul decides: open with staff turnover.')->assertSet('lineWaiting', false)
+            ->assertSee('Paul decides: open with staff turnover.')->assertDontSeeHtml('wire:init="loadConsultationLine"');
         $ai->assertRan('consultation_prep', fn ($r) => str_contains($r->prompt, 'CONFIDENTIAL INTEL') && str_contains($r->prompt, 'Staff turnover'));
         $this->assertSame('Paul decides: open with staff turnover.', DB::table('organizations')->where('id', $lead->id)->value('ai_history_summary'));
 
-        // The same notes and intel again cost nothing; someone who cannot edit leads gets a line without the intel
+        // The same notes and intel again cost nothing, and the line shows at once; someone who cannot edit leads gets a
+        // line without the intel
         $before = count($ai->requestsFor('consultation_prep'));
-        Livewire::test(LiveConsultation::class)->call('enterTerminal', $lead->id, (string) Str::uuid());
+        Livewire::test(LiveConsultation::class)->call('enterTerminal', $lead->id, (string) Str::uuid())
+            ->assertSet('lineWaiting', false)->assertSet('historySummary', 'Paul decides: open with staff turnover.');
         $this->assertSame($before, count($ai->requestsFor('consultation_prep')));
 
         DB::table('organizations')->where('id', $lead->id)->update(['ai_history_summary' => null]);
@@ -388,7 +395,7 @@ class LeadIntelTest extends TestCase
             $this->insertRow('crm_notes', ['id' => (string) Str::uuid(), 'organization_id' => $lead->id, 'author_id' => $sales->id, 'note_text' => $note, 'interaction_type' => 'Call']);
         }
         $this->actingAs($this->viewer());
-        Livewire::test(LiveConsultation::class)->call('enterTerminal', $lead->id, (string) Str::uuid());
+        Livewire::test(LiveConsultation::class)->call('enterTerminal', $lead->id, (string) Str::uuid())->call('loadConsultationLine');
         $last = collect($ai->requestsFor('consultation_prep'))->last();
         $this->assertStringContainsString('They count stock on paper.', $last->prompt);
         $this->assertStringNotContainsString('CONFIDENTIAL INTEL', $last->prompt);

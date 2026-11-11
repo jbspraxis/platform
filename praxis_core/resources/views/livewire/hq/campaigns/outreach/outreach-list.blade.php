@@ -3,6 +3,7 @@
     $n = fn (int $v) => number_format($v);
 @endphp
 <div class="orl">
+    @assets
     <style>
         /* Outreach list (docs/CAMPAIGNS.md section 10): only what the shared component classes don't cover. Brand tokens only. */
         .orl-day { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; margin-bottom: 24px; }
@@ -24,6 +25,7 @@
             .orl-hide-sm { display: none; }
         }
     </style>
+    @endassets
 
     <div class="page-header">
         <div>

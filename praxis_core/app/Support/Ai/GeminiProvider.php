@@ -26,7 +26,9 @@ class GeminiProvider implements AiProvider
         $model = str_starts_with($request->model, 'gemini') ? $request->model : (string) config('ai.providers.gemini.model');
 
         try {
-            $response = Http::timeout((int) config('ai.providers.gemini.timeout', 120))->connectTimeout(5)->withHeaders([
+            // A page waiting for the answer (AiRequest::$sync) waits AiRequest::SYNC_TIMEOUT seconds at most
+            $timeout = $request->sync ? AiRequest::SYNC_TIMEOUT : (int) config('ai.providers.gemini.timeout', 120);
+            $response = Http::timeout($timeout)->connectTimeout(5)->withHeaders([
                 'x-goog-api-key' => config('services.gemini.api_key'),
             ])->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", [
                 'system_instruction' => ['parts' => array_map(fn ($b) => ['text' => $b], array_values($request->system))],

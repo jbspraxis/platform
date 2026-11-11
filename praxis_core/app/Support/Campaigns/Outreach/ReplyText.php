@@ -28,7 +28,8 @@ final class ReplyText
 
     /**
      * The copy of the reply this person may read, the one in the campaign sender's mailbox first; null when they
-     * can read none (another person's own mailbox).
+     * can read none (another person's own mailbox). Without its bodies (up to 1 MB each, on every render of the
+     * dialog): present() reads them for the one copy it shows.
      */
     public static function copyFor(?User $user, OutreachReply $reply): ?MailMessage
     {
@@ -39,7 +40,7 @@ final class ReplyText
         if (! $ids) {
             return null;
         }
-        $q = MailMessage::query()->whereIn('account_id', $ids);
+        $q = MailMessage::query()->withoutBodies()->whereIn('account_id', $ids);
         str_starts_with($reply->message_key, 'id:')
             ? $q->whereKey((int) substr($reply->message_key, 3))
             : $q->where(fn ($q) => $q->where('message_id_hash', $reply->message_key)->orWhere('id', $reply->mail_message_id));
@@ -59,7 +60,7 @@ final class ReplyText
         try {
             // Mail's reader keeps a body read from the server for ten minutes under the same key
             $body = $message->body_state === 'cached'
-                ? ['text' => (string) $message->body_text, 'html' => $message->body_html]
+                ? self::storedBody($message)
                 : Cache::remember('mail-read-body:' . $message->id, 600, fn () => MailFetch::make()->body($user, $message));
         } catch (ImapException) {
             return ['kind' => 'error'];
@@ -67,6 +68,15 @@ final class ReplyText
 
         // Pictures stay hidden and cid: pictures are left out: the full message is one click away in Mail
         return Inbox::present((string) ($body['text'] ?? ''), $body['html'] ?? null, false, fn () => null);
+    }
+
+    /** HQ's copy of the body: from the model when it was loaded with it, else read now (copyFor() leaves it out) */
+    private static function storedBody(MailMessage $message): array
+    {
+        $row = array_key_exists('body_text', $message->getAttributes()) ? $message
+            : MailMessage::whereKey($message->id)->first(['id', 'body_text', 'body_html']);
+
+        return ['text' => (string) $row?->body_text, 'html' => $row?->body_html];
     }
 
     /**
