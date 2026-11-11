@@ -36,10 +36,45 @@ class SystemHealth extends Component
     #[Locked]
     public ?string $flash = null;
 
+    /**
+     * The worst check, for the pill at the top. Worked out whenever the checks run (opening the page or the Health
+     * tab, and after a change to the errors), so ticking, searching and opening errors don't run all twelve again.
+     */
+    #[Locked]
+    public string $overall = 'unknown';
+
+    /** This request's checks and backups table, once run (not kept between requests) */
+    private ?array $checks = null;
+
+    private ?array $backupTable = null;
+
+    public function mount(): void
+    {
+        $this->runChecks();
+    }
+
+    /**
+     * Every check, once per request. On the Health tab the Server backups table and the backups check read the same
+     * rows, so they are read once for both.
+     */
+    private function runChecks(): array
+    {
+        if ($this->checks === null) {
+            $this->backupTable = $this->tab === 'health' ? $this->backups() : null;
+            $this->checks = HealthChecks::all($this->backupTable['sites'] ?? null);
+            $this->overall = HealthChecks::worst($this->checks);
+        }
+
+        return $this->checks;
+    }
+
     public function setTab(string $tab): void
     {
         $this->tab = in_array($tab, ['health', 'errors'], true) ? $tab : 'health';
         $this->openGroupId = null;
+        if ($this->tab === 'health') {
+            $this->runChecks();
+        }
     }
 
     public function setFilter(string $filter): void
@@ -66,6 +101,7 @@ class SystemHealth extends Component
         }
         DB::table('monitor_error_groups')->where('id', $id)->update(['status' => $status, 'updated_at' => now()]);
         $this->flash = 'Status changed to ' . $status . '.';
+        $this->runChecks();
     }
 
     public function bulkStatus(string $status): void
@@ -77,6 +113,7 @@ class SystemHealth extends Component
         DB::table('monitor_error_groups')->whereIn('id', $ids)->update(['status' => $status, 'updated_at' => now()]);
         $this->flash = count($ids) . ' error type(s) marked ' . $status . '.';
         $this->selected = [];
+        $this->runChecks();
     }
 
     public function addNote(): void
@@ -103,6 +140,7 @@ class SystemHealth extends Component
     {
         $n = LogScanner::scanAll();
         $this->flash = $n ? "{$n} new log entr" . ($n === 1 ? 'y' : 'ies') . ' recorded.' : 'No new log entries.';
+        $this->runChecks();
     }
 
     /** The ticked errors (or, if none are ticked, the open ones) as one Markdown file for an AI. */
@@ -144,21 +182,10 @@ class SystemHealth extends Component
 
     public function render()
     {
-        $checks = HealthChecks::all();
+        $health = $this->tab === 'health';
+        $checks = $health ? $this->runChecks() : [];
 
-        $query = DB::table('monitor_error_groups');
-        match ($this->statusFilter) {
-            'open' => $query->whereIn('status', ['new', 'investigating']),
-            'fixed' => $query->where('status', 'fixed'),
-            'ignored' => $query->where('status', 'ignored'),
-            default => null,
-        };
-        if (trim($this->search) !== '') {
-            $term = '%' . trim($this->search) . '%';
-            $query->where(fn ($q) => $q->where('message', 'like', $term)->orWhere('file', 'like', $term)->orWhere('exception_class', 'like', $term));
-        }
-        $groups = $query->orderByDesc('last_seen_at')->limit(100)->get();
-
+        $groups = $health ? collect() : $this->groups();
         $counts = DB::table('monitor_error_groups')->selectRaw('status, count(*) as n')->groupBy('status')->pluck('n', 'status');
 
         $open = null;
@@ -178,13 +205,30 @@ class SystemHealth extends Component
 
         return view('livewire.hq.system.system-health', [
             'checks' => $checks,
-            'overall' => HealthChecks::worst($checks),
+            'overall' => $this->overall,
             'groups' => $groups,
             'counts' => $counts,
             'open' => $open,
-            'heartbeat' => ErrorMonitor::state('heartbeat'),
-            'backups' => $this->tab === 'health' ? $this->backups() : null,
+            'heartbeat' => $health ? ErrorMonitor::state('heartbeat') : null,
+            'backups' => $health ? $this->backupTable : null,
             'alertEmail' => config('services.monitor.alert_email'),
         ]);
+    }
+
+    /** The Errors tab's list: the filter and the search, latest first */
+    private function groups()
+    {
+        $query = DB::table('monitor_error_groups');
+        match ($this->statusFilter) {
+            'open' => $query->whereIn('status', ['new', 'investigating']),
+            'fixed' => $query->where('status', 'fixed'),
+            'ignored' => $query->where('status', 'ignored'),
+            default => null,
+        };
+        if (trim($this->search) !== '') {
+            $term = '%' . trim($this->search) . '%';
+            $query->where(fn ($q) => $q->where('message', 'like', $term)->orWhere('file', 'like', $term)->orWhere('exception_class', 'like', $term));
+        }
+        return $query->orderByDesc('last_seen_at')->limit(100)->get();
     }
 }

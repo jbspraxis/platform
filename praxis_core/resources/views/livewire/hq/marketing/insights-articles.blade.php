@@ -21,6 +21,7 @@
     </div>
 
     <div class="kz">
+        @assets
         <style>
             /* Insights articles: only what the shared component classes don't cover. Brand tokens only. */
             .kz-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; margin-bottom: 16px; }
@@ -56,6 +57,7 @@
                 .kz-reader-foot { padding: 12px 16px; }
             }
         </style>
+        @endassets
 
         @if($waiting > 0 && $kaizenStatusFilter !== 'Pending Moderation')
             <div class="kz-waiting" role="status">

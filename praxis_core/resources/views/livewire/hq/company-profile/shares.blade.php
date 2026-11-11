@@ -6,6 +6,7 @@
     $day = fn ($at) => $at ? \Carbon\Carbon::parse($at)->timezone('Africa/Lagos')->format('j M Y, H:i') : '—';
 @endphp
 <div class="shares">
+    @assets
     <style>
         /* Only what the shared component classes don't cover. Brand tokens only. */
         .share-made { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
@@ -21,6 +22,7 @@
         .share-two { display: flex; flex-wrap: wrap; gap: 0 16px; }
         .share-two .field { flex: 1 1 240px; min-width: 0; }
     </style>
+    @endassets
 
     <div class="page-header">
         <div>

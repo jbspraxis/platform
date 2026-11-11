@@ -32,10 +32,12 @@ class RoleManagement extends Component
 {
     // --- DATAGRID & UI STATE ---
     public $activeTab = 'CREATE'; // Tabs: CREATE, INTERNAL, CLIENTS
-    public $users = [];
-    public $staffRoles = [];
-    public $clientRoles = [];
-    public $organizations = [];
+
+    /**
+     * The open list's accounts, read when the page draws (ledger()). Kept for that request only, never in the page:
+     * the lists and the form's choices are drawn from the database each time, so a click sends back ids, not rows.
+     */
+    private ?\Illuminate\Support\Collection $ledgerRows = null;
 
     #[Locked]
     public $jbsOrgId = null;
@@ -74,9 +76,7 @@ class RoleManagement extends Component
     {
         abort_unless(Auth::user()?->can('access.view'), 403);
         $this->resolveJbsPraxisId();
-        $this->loadDropdownData();
         $this->activeTab = Auth::user()->can('access.create') ? 'CREATE' : 'INTERNAL';
-        $this->loadLedger();
     }
 
     /**
@@ -89,13 +89,6 @@ class RoleManagement extends Component
             ->value('id');
     }
 
-    public function loadDropdownData()
-    {
-        $this->staffRoles = DB::table('roles')->where('audience', 'staff')->whereNull('deleted_at')->orderByDesc('is_protected')->orderBy('id')->get();
-        $this->clientRoles = DB::table('roles')->where('audience', 'client')->whereNull('deleted_at')->orderBy('id')->get();
-        $this->organizations = DB::table('organizations')->orderBy('name', 'asc')->get();
-    }
-
     public function setTab($tab)
     {
         if (!in_array($tab, ['CREATE', 'INTERNAL', 'CLIENTS'], true)) return;
@@ -106,7 +99,6 @@ class RoleManagement extends Component
         if ($this->editMode) {
             $this->resetForm();
         }
-        $this->loadLedger();
     }
 
     /** A staff account belongs to JBS Praxis; any other organisation means a client account. */
@@ -115,15 +107,21 @@ class RoleManagement extends Component
         return $this->organization_id !== '' && $this->organization_id !== $this->jbsOrgId;
     }
 
-    public function loadLedger()
+    /** The accounts on the open list (none on the form), read once per request */
+    private function ledger(): \Illuminate\Support\Collection
     {
         if ($this->activeTab === 'CREATE') {
-            return;
+            return collect();
         }
 
+        return $this->ledgerRows ??= $this->readLedger();
+    }
+
+    private function readLedger(): \Illuminate\Support\Collection
+    {
         if ($this->activeTab === 'CLIENTS') {
             // Portal accounts only; website leads live in the CRM
-            $this->users = DB::table('client_users as u')
+            return DB::table('client_users as u')
                 ->leftJoin('organizations as org', 'u.organization_id', '=', 'org.id')
                 ->leftJoin('roles as r', 'u.role_id', '=', 'r.id')
                 ->whereIn('u.lifecycle_stage', ['Onboarding', 'Active'])
@@ -135,11 +133,10 @@ class RoleManagement extends Component
                 )
                 ->orderBy('u.created_at', 'desc')
                 ->get();
-            return;
         }
 
         // Staff; the Editorial author is a system account, not a person
-        $this->users = DB::table('users as u')
+        return DB::table('users as u')
             ->leftJoin('organizations as org', 'u.organization_id', '=', 'org.id')
             ->where('u.lifecycle_stage', '!=', 'System')
             ->select(
@@ -272,8 +269,6 @@ class RoleManagement extends Component
 
             Access::flush();
             $this->showSuccessModal = true;
-            $this->loadDropdownData(); // Refresh orgs in case a new one was added
-            $this->loadLedger();
 
         } catch (Exception $e) {
             report($e);
@@ -449,7 +444,6 @@ class RoleManagement extends Component
 
             $this->successMessage = "Invitation sent again to {$user->first_name} at {$user->email}. The earlier link no longer works.";
             $this->showSuccessModal = true;
-            $this->loadLedger();
         }
     }
 
@@ -522,7 +516,6 @@ class RoleManagement extends Component
         Access::flush();
         $this->successMessage = "{$user->first_name} {$user->last_name} is now the primary contact. The previous one keeps the Administrator role.";
         $this->showSuccessModal = true;
-        $this->loadLedger();
     }
 
     /**
@@ -575,7 +568,6 @@ class RoleManagement extends Component
         Access::flush();
         $this->successMessage = "{$name} no longer has access to {$org}'s Client Portal. Their invitation and sign-in links no longer work.";
         $this->showSuccessModal = true;
-        $this->loadLedger();
     }
 
     public function toggleUserStatus($id, $currentStatus)
@@ -606,7 +598,6 @@ class RoleManagement extends Component
             'updated_at' => now()
         ]);
         Access::flush();
-        $this->loadLedger();
     }
 
     public function resetForm()
@@ -622,7 +613,7 @@ class RoleManagement extends Component
     public function openClient(string $orgId): void
     {
         $this->openClientId = $this->activeTab === 'CLIENTS'
-            && collect($this->users)->contains(fn ($u) => (string) data_get($u, 'org_id') === $orgId) ? $orgId : null;
+            && $this->ledger()->contains(fn ($u) => (string) data_get($u, 'org_id') === $orgId) ? $orgId : null;
     }
 
     public function closeClient(): void
@@ -634,9 +625,9 @@ class RoleManagement extends Component
      * The Client Portal list, one row per client: its accounts, its Client Admin (primary contact), how many are
      * invited or suspended, and when anyone last signed in. Sorted by client name.
      */
-    public function clientRows(): \Illuminate\Support\Collection
+    private function clientRows(): \Illuminate\Support\Collection
     {
-        return collect($this->users)->groupBy(fn ($u) => (string) data_get($u, 'org_id'))->map(function ($people, $orgId) {
+        return $this->ledger()->groupBy(fn ($u) => (string) data_get($u, 'org_id'))->map(function ($people, $orgId) {
             $primary = $people->first(fn ($u) => ! empty(data_get($u, 'is_primary_client')));
             $last = $people->map(fn ($u) => data_get($u, 'last_login_at'))->filter()->max();
 
@@ -664,8 +655,16 @@ class RoleManagement extends Component
     public function render()
     {
         $clients = $this->activeTab === 'CLIENTS' ? $this->clientRows() : collect();
+        $form = $this->activeTab === 'CREATE';
 
         return view('livewire.hq.system.role-management', [
+            'users' => $this->ledger(),
+            // The form's choices, only while it is open, and only what it shows: organisations hold every CRM lead too
+            'staffRoles' => $form ? DB::table('roles')->where('audience', 'staff')->whereNull('deleted_at')
+                ->orderByDesc('is_protected')->orderBy('id')->get(['id', 'name', 'is_protected']) : collect(),
+            'clientRoles' => $form ? DB::table('roles')->where('audience', 'client')->whereNull('deleted_at')
+                ->orderBy('id')->get(['id', 'name', 'slug']) : collect(),
+            'organizations' => $form ? DB::table('organizations')->orderBy('name', 'asc')->get(['id', 'name']) : collect(),
             'canCreate' => Auth::user()->can('access.create'),
             'canEdit' => Auth::user()->can('access.edit'),
             'clients' => $clients,

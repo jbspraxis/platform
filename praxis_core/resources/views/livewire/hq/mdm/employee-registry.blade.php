@@ -1,4 +1,5 @@
 <div>
+    @assets
     <style>
         /* Three-step progress for the staff record form */
         .steps { display: flex; gap: 8px; margin: 0 0 24px; padding: 0; list-style: none; counter-reset: step; }
@@ -8,6 +9,7 @@
         .steps li.is-current::before { background: var(--color-deep-teal); }
         .steps li.is-done::before { background: var(--color-teal); }
     </style>
+    @endassets
 
     @php
         $regionLabels = ['GLOBAL' => 'Global', 'CM' => 'Cameroon', 'NG' => 'Nigeria', 'KE' => 'Kenya'];

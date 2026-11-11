@@ -1,4 +1,5 @@
 <div class="cpp">
+    @assets
     <style>
         /* HQ › Company profile › Preview (docs/COMPANY_PROFILE.md section 6). Plain on purpose: this proves the
            content, not the design. PR 2's renderer is what the reader sees. */
@@ -20,6 +21,7 @@
         .cpp-dl dd { font-size: 0.9375rem; line-height: 1.5rem; color: var(--color-ink); margin: 0 0 6px; }
         .cpp-note { font-size: 0.8125rem; line-height: 1.25rem; color: var(--color-muted); }
     </style>
+    @endassets
 
     <div class="page-header">
         <div>

@@ -1,4 +1,5 @@
 <div class="cpv">
+    @assets
     <style>
         /* HQ › Company profile › Versions (docs/COMPANY_PROFILE.md section 6) */
         .cpv-row { border-top: 1px solid var(--color-line); padding: 14px 0; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 20px; }
@@ -15,6 +16,7 @@
         .cpv-was { color: var(--color-muted); text-decoration: line-through; overflow-wrap: anywhere; }
         .cpv-now { color: var(--color-ink); overflow-wrap: anywhere; }
     </style>
+    @endassets
 
     <div class="page-header">
         <div>

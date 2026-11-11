@@ -79,6 +79,9 @@ class DocumentPage extends Component
     #[Locked]
     public int $previewVersion = 0;
 
+    /** The document as this request read it, so an action and the render after it share one read (not kept between requests) */
+    private ?LetterDocument $record = null;
+
     public function mount(string $document): void
     {
         $this->documentId = $document;
@@ -103,7 +106,14 @@ class DocumentPage extends Component
 
     private function document(): LetterDocument
     {
-        return LetterDocument::with('signatures', 'replacedBy', 'replaces')->findOrFail($this->documentId);
+        return $this->record ??= LetterDocument::with(['signatures', 'replacedBy:id,reference', 'replaces:id,reference'])
+            ->findOrFail($this->documentId);
+    }
+
+    /** After Letters or Agreements changed the document (a signature, its status), the page reads it again */
+    private function reread(): void
+    {
+        $this->record = null;
     }
 
     /** Every field of the type is present, and a "people" field always has at least one empty row */
@@ -289,7 +299,7 @@ class DocumentPage extends Component
         $this->authorize('letters.sign');
         $user = Auth::user();
 
-        if (! Signatures::forUser($user)) {
+        if (! Signatures::nameOf($user)) {
             $this->flash = null;
             $this->addError('signature', 'Save your own signature first, on My signature.');
 
@@ -302,6 +312,7 @@ class DocumentPage extends Component
         }
 
         Letters::sign($this->document(), $user);
+        $this->reread();
         $this->previewVersion++;
         $this->flash = 'Signed.';
     }
@@ -310,6 +321,7 @@ class DocumentPage extends Component
     {
         $this->authorize('letters.sign');
         Letters::unsign($this->document(), Auth::user());
+        $this->reread();
         $this->previewVersion++;
         $this->flash = 'Your signature is off this document.';
     }
@@ -372,6 +384,8 @@ class DocumentPage extends Component
             $this->addError('signing', $e->getMessage());
 
             return;
+        } finally {
+            $this->reread();
         }
 
         $this->previewVersion++;
@@ -391,6 +405,8 @@ class DocumentPage extends Component
             $this->addError('signing', $e->getMessage());
 
             return;
+        } finally {
+            $this->reread();
         }
 
         $this->flash = 'The signing link has been taken back. Nobody can sign with it now.';
@@ -416,6 +432,7 @@ class DocumentPage extends Component
 
         Letters::issue($record, Auth::user());
         Letters::markReplaced($record->fresh());
+        $this->reread();
         $this->previewVersion++;
         $this->flash = 'Issued as ' . $record->reference . '. The PDF and its fingerprint are kept as they are from now on.';
     }
@@ -431,6 +448,7 @@ class DocumentPage extends Component
         }
 
         Letters::revoke($this->document(), $reason, Auth::user());
+        $this->reread();
         $this->revoking = false;
         $this->revokeReason = '';
         $this->flash = 'Revoked. Anyone who checks it now sees that it no longer stands.';
@@ -446,6 +464,8 @@ class DocumentPage extends Component
             $this->addError('filing', $e->getMessage());
 
             return;
+        } finally {
+            $this->reread();
         }
         $this->flash = 'Filed in Company documents, under Master data.';
     }
@@ -480,7 +500,8 @@ class DocumentPage extends Component
             'common' => LetterTypes::common(),
             'freeBody' => LetterTypes::isFreeBody($record->type),
             'kind' => LetterTypes::label($record->type, $record->subtype),
-            'mySignature' => Signatures::forUser($user),
+            // Only the name and title, for "Sign as …": the stored image is read when the signature is applied
+            'mySignature' => Signatures::nameOf($user),
             'signedByMe' => $record->signatures->firstWhere('user_id', $user->id),
             'canEdit' => $record->isDraft() && $user->can('letters.create'),
             'hasSignedFile' => $record->signed_file_path !== null,

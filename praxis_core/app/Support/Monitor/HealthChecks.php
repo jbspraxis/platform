@@ -15,12 +15,13 @@ use Illuminate\Support\Str;
  */
 class HealthChecks
 {
-    public static function all(): array
+    /** @param  ?array  $backupSites  Backups\Status::sites() when the caller has read it already (System health's table) */
+    public static function all(?array $backupSites = null): array
     {
         $checks = [];
         foreach (['scheduler', 'errors', 'email', 'ai', 'integrations', 'backups', 'queue', 'logs', 'leads', 'rates', 'config', 'push'] as $key) {
             try {
-                $checks[] = ['key' => $key] + self::$key();
+                $checks[] = ['key' => $key] + ($key === 'backups' ? self::backups($backupSites) : self::$key());
             } catch (\Throwable $e) {
                 $checks[] = ['key' => $key, 'label' => ucfirst($key), 'state' => 'unknown', 'detail' => 'This check could not run: ' . mb_substr($e->getMessage(), 0, 160), 'fix' => null];
             }
@@ -118,9 +119,9 @@ class HealthChecks
     }
 
     /** Server backups (docs/BACKUPS.md): every site's last database and files backup, and the weekly restore test */
-    private static function backups(): array
+    private static function backups(?array $sites = null): array
     {
-        return \App\Support\Backups\Status::check();
+        return \App\Support\Backups\Status::check($sites);
     }
 
     private static function queue(): array

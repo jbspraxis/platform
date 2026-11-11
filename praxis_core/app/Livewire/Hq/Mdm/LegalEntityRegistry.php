@@ -53,29 +53,35 @@ class LegalEntityRegistry extends Component
     }
 
     /**
-     * Loads the entities with active headcount and monthly pay per country.
+     * Loads the entities with active headcount and monthly pay per country: one aggregate per country and one count
+     * of documents per company for all of them, not two queries per entity.
      */
     public function loadEntities()
     {
         $rawEntities = DB::table('mdm_legal_entities')->orderBy('region_code', 'asc')->get();
 
-        $this->entities = $rawEntities->map(function ($entity) {
-            // Aggregating Human Capital Metrics for this specific region
-            $hrMetrics = DB::table('mdm_employees')
-                ->where('tax_region', $entity->region_code)
-                ->where('is_active', 1)
-                ->selectRaw('
-                    COUNT(id) as active_headcount, 
-                    SUM(base_salary + allowance_housing + allowance_transport + allowance_utility) as monthly_liability,
-                    MAX(currency) as local_currency
-                ')
-                ->first();
+        // Aggregating Human Capital Metrics per region
+        $hr = DB::table('mdm_employees')
+            ->whereIn('tax_region', $rawEntities->pluck('region_code')->unique()->values())
+            ->where('is_active', 1)
+            ->groupBy('tax_region')
+            ->selectRaw('
+                tax_region,
+                COUNT(id) as active_headcount,
+                SUM(base_salary + allowance_housing + allowance_transport + allowance_utility) as monthly_liability,
+                MAX(currency) as local_currency
+            ')
+            ->get()->keyBy('tax_region');
+        // Master data › Company documents filed under each company (archived ones aside)
+        $documents = DB::table('company_documents')->whereIn('legal_entity_id', $rawEntities->pluck('id'))->whereNull('archived_at')
+            ->groupBy('legal_entity_id')->selectRaw('legal_entity_id, COUNT(*) as n')->pluck('n', 'legal_entity_id');
 
+        $this->entities = $rawEntities->map(function ($entity) use ($hr, $documents) {
+            $hrMetrics = $hr->get($entity->region_code);
             $entity->active_headcount = $hrMetrics->active_headcount ?? 0;
             $entity->monthly_liability = $hrMetrics->monthly_liability ?? 0.00;
             $entity->local_currency = $hrMetrics->local_currency ?? 'USD';
-            // Master data › Company documents filed under this company (archived ones aside)
-            $entity->documents_count = DB::table('company_documents')->where('legal_entity_id', $entity->id)->whereNull('archived_at')->count();
+            $entity->documents_count = (int) ($documents[$entity->id] ?? 0);
 
             return $entity;
         })->toArray();

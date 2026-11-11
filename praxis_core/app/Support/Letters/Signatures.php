@@ -24,6 +24,12 @@ final class Signatures
         return LetterSignature::where('user_id', $user->id)->first();
     }
 
+    /** The name and title a person signs with, without reading their image: enough to offer "Sign as …" */
+    public static function nameOf(User $user): ?LetterSignature
+    {
+        return LetterSignature::where('user_id', $user->id)->first(['id', 'user_id', 'signatory_name', 'signatory_title']);
+    }
+
     /**
      * Save (or replace) this person's signature.
      *

@@ -204,20 +204,30 @@ class RolesPermissions extends Component
         return array_filter(Access::catalogue(), fn ($p) => $p['audience'] === $this->audience);
     }
 
-    private function memberCount($role): int
+    /**
+     * How many accounts hold each role of this audience, counted for all of them at once: role id => count. A client
+     * organisation's primary account is always Client Admin, so that role also counts every primary account.
+     *
+     * @param  \Illuminate\Support\Collection<int, Role>  $roles  this audience's roles
+     * @return array<int, int>
+     */
+    private function memberCounts($roles): array
     {
-        if ($role->audience === 'staff') {
+        if ($this->audience === 'staff') {
             return DB::table('staff_roles')->join('users', 'users.id', '=', 'staff_roles.user_id')
-                ->where('staff_roles.role_id', $role->id)->count();
+                ->groupBy('staff_roles.role_id')->selectRaw('staff_roles.role_id, COUNT(*) AS n')->pluck('n', 'role_id')
+                ->map(fn ($n) => (int) $n)->all();
         }
 
-        return DB::table('client_users')->whereNull('deleted_at')
-            ->where(function ($q) use ($role) {
-                $q->where('role_id', $role->id);
-                if ($role->slug === config('access.client_admin_role')) {
-                    $q->orWhere('is_primary_client', 1);
-                }
-            })->count();
+        $counts = DB::table('client_users')->whereNull('deleted_at')->whereNotNull('role_id')
+            ->groupBy('role_id')->selectRaw('role_id, COUNT(*) AS n')->pluck('n', 'role_id')->map(fn ($n) => (int) $n)->all();
+        $admin = $roles->firstWhere('slug', config('access.client_admin_role'))?->id;
+        if ($admin !== null) {
+            $counts[$admin] = DB::table('client_users')->whereNull('deleted_at')
+                ->where(fn ($q) => $q->where('role_id', $admin)->orWhere('is_primary_client', 1))->count();
+        }
+
+        return $counts;
     }
 
     /** Field names in validation messages: the labels people see, not the property names (docs/BRAND.md sections 5 and 12) */
@@ -231,12 +241,14 @@ class RolesPermissions extends Component
 
     public function render()
     {
-        $roles = Role::where('audience', $this->audience)->orderByDesc('is_protected')->orderBy('id')->get()
-            ->map(function ($role) {
-                $role->member_count = $this->memberCount($role);
-                $role->permission_count = $role->is_protected ? count($this->catalogue()) : $role->permissions()->count();
-                return $role;
-            });
+        $roles = Role::where('audience', $this->audience)->withCount('permissions')->orderByDesc('is_protected')->orderBy('id')->get();
+        $memberCounts = $this->memberCounts($roles);
+        $everything = count($this->catalogue());
+        $roles = $roles->map(function ($role) use ($memberCounts, $everything) {
+            $role->member_count = $memberCounts[$role->id] ?? 0;
+            $role->permission_count = $role->is_protected ? $everything : (int) $role->permissions_count;
+            return $role;
+        });
 
         $current = $this->roleId ? $roles->firstWhere('id', $this->roleId) : null;
 

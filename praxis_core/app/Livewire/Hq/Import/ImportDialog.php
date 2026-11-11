@@ -54,6 +54,12 @@ class ImportDialog extends Component
     #[Locked]
     public bool $done = false;
 
+    /**
+     * The preview (or the result) as this request read or made it, so an action and the render after it share one
+     * read of the kept file. Not kept between requests: each one reads it again.
+     */
+    private ?Analysis $analysis = null;
+
     public function mount(string $schema): void
     {
         $this->schema = $schema;
@@ -63,6 +69,11 @@ class ImportDialog extends Component
     private function definition(): ImportSchema
     {
         return Imports::schema($this->schema);
+    }
+
+    private function analysis(): ?Analysis
+    {
+        return $this->analysis ??= Importer::recall($this->token, Auth::user());
     }
 
     public function show(): void
@@ -75,6 +86,7 @@ class ImportDialog extends Component
     public function close(): void
     {
         Importer::forget($this->token, Auth::user());
+        $this->analysis = null;
         if ($this->done) {
             $this->dispatch('import-finished', schema: $this->schema);
         }
@@ -86,6 +98,7 @@ class ImportDialog extends Component
     public function startOver(): void
     {
         Importer::forget($this->token, Auth::user());
+        $this->analysis = null;
         if ($this->done) {
             $this->dispatch('import-finished', schema: $this->schema);
         }
@@ -131,6 +144,7 @@ class ImportDialog extends Component
             return;
         }
         Importer::remember($token, $user, $analysis);
+        $this->analysis = $analysis;
         $this->token = $token;
         $this->fileName = $name;
         $this->options = Importer::defaults($schema, $user, $name);
@@ -175,6 +189,7 @@ class ImportDialog extends Component
             return;
         }
         Importer::remember($this->token, $user, $analysis);
+        $this->analysis = $analysis;
         $this->done = true;
         $this->filter = 'fix';
     }
@@ -185,7 +200,7 @@ class ImportDialog extends Component
         $schema = $this->definition();
         $user = Auth::user();
         abort_unless($schema->canImport($user), 403);
-        $analysis = Importer::recall($this->token, $user);
+        $analysis = $this->analysis();
         if (! $analysis || ! $analysis->toFix()) {
             return null;
         }
@@ -201,7 +216,7 @@ class ImportDialog extends Component
     {
         $schema = $this->definition();
         $user = Auth::user();
-        $analysis = $this->open ? Importer::recall($this->token, $user) : null;
+        $analysis = $this->open ? $this->analysis() : null;
         if ($this->open && $this->token && ! $analysis) {
             // the kept file is gone (more than a day old): start again
             $this->reset(['token', 'fileName', 'options', 'done']);

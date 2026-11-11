@@ -1,4 +1,5 @@
 <div class="cp">
+    @assets
     <style>
         /* HQ › Company profile (docs/COMPANY_PROFILE.md) */
         .cp-top { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 24px; }
@@ -40,6 +41,7 @@
             .cp-nav button { white-space: nowrap; }
         }
     </style>
+    @endassets
 
     <div class="page-header cp-top">
         <div>

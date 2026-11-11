@@ -21,6 +21,7 @@
         $tabs = ['campaigns' => 'Campaigns', 'assets' => 'Accounts and logins', 'social' => 'Social reach'];
     @endphp
 
+    @assets
     <style>
         .mk-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(12, 20, 43, 0.4); }
         .mk-panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 41; width: 100%; max-width: 600px; display: flex; flex-direction: column; background: var(--color-paper); border-left: 1px solid var(--color-line); box-shadow: var(--shadow-float); }
@@ -31,6 +32,7 @@
         .mk-facts dt { font-size: 0.8125rem; color: var(--color-muted); }
         .mk-facts dd { margin: 2px 0 0; color: var(--color-ink); word-break: break-word; }
     </style>
+    @endassets
 
     <div class="page-header">
         <div>

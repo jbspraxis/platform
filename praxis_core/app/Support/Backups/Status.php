@@ -91,8 +91,8 @@ final class Status
         return $out;
     }
 
-    /** The "Server backups" check of HQ › System health */
-    public static function check(): array
+    /** The "Server backups" check of HQ › System health; $sites is sites() when the caller has read it already */
+    public static function check(?array $sites = null): array
     {
         $label = 'Server backups (Drive)';
         if (! app(Backups::class)->setUp()) {
@@ -108,7 +108,7 @@ final class Status
                 'fix' => 'HQ › Settings and access › Integrations → Reconnect Google, and allow Drive.'];
         }
 
-        $sites = self::sites();
+        $sites ??= self::sites();
         $state = HealthChecks::worst(array_map(fn ($s) => ['state' => $s['state']], $sites));
         $good = count(array_filter($sites, fn ($s) => $s['state'] === 'ok'));
         $problems = array_values(array_filter($sites, fn ($s) => $s['state'] !== 'ok'));
