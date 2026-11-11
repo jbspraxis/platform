@@ -17,6 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         
+        // 0. GZIP for files PHP serves (Livewire's script); pages and updates are compressed on RequestHandled
+        $middleware->prepend(\App\Http\Middleware\CompressResponses::class);
+
         // 1. CANONICAL SEO ENFORCER
         $middleware->append(\App\Http\Middleware\EnforceCanonicalUrl::class);
 

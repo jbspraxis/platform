@@ -4,6 +4,11 @@ use Illuminate\Support\Facades\Schedule;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 
+// HQ Mail (docs/MAIL.md): copy new mail from every connected mailbox. First and in the background: a run takes up to
+// 50 s, and in the foreground every command below waited for it each minute (scheduled sends, the AI queue, pushes),
+// while new mail waited for the commands above it
+Schedule::command('mail:sync')->everyMinute()->withoutOverlapping(10)->runInBackground();
+
 // The 6-Hour Shift Marketing Telemetry Cron Job
 Schedule::command('marketing:sync-telemetry')->everySixHours();
 
@@ -57,8 +62,7 @@ Schedule::command('backups:files')->sundays()->at('03:00')->timezone('Africa/Lag
     ->appendOutputTo(storage_path('logs/backups.log'));
 Schedule::command('backups:check')->hourlyAt(17)->withoutOverlapping(10);
 
-// HQ Mail (docs/MAIL.md): copy new mail from every connected mailbox, send what is due, tidy up
-Schedule::command('mail:sync')->everyMinute()->withoutOverlapping(10);
+// HQ Mail (docs/MAIL.md): send what is due, tidy up (mail:sync is at the top of this file)
 Schedule::command('mail:send-due')->everyMinute()->withoutOverlapping(5);
 Schedule::command('mail:prune')->dailyAt('03:40');
 
@@ -66,8 +70,9 @@ Schedule::command('mail:prune')->dailyAt('03:40');
 // pass; a long document keeps its worker until it is done (no overlap). Only the 'ai' queue: anything else in the jobs
 // table is left alone. Each job is tried once (RunAiJob). Runs left behind by a worker that stopped fail after 30
 // minutes, so screens stop waiting.
+// In the background like mail:sync, so the commands after it don't wait for its minute
 Schedule::command('queue:work ' . config('ai.queue.connection') . ' --queue=' . config('ai.queue.name') . ' --stop-when-empty --max-time=50 --tries=2')
-    ->everyMinute()->withoutOverlapping(30);
+    ->everyMinute()->withoutOverlapping(30)->runInBackground();
 Schedule::call(fn () => \App\Support\Ai\Ai::expireStuck())->name('ai:expire-stuck')->everyTenMinutes()->withoutOverlapping(5);
 
 // Meetings (docs/OPPORTUNITIES.md 6.1): ended meetings become held; transcripts are collected from Google from 20

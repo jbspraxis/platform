@@ -97,20 +97,20 @@ final class MailAccess
 
     public static function canThread(?User $user, MailThread $thread, string $ability): bool
     {
-        $account = $thread->relationLoaded('account') ? $thread->account : self::account($thread->account_id);
+        $account = $thread->relationLoaded('account') ? $thread->account : self::mailbox($thread->account_id);
 
         return $account !== null && self::can($user, $account, $ability);
     }
 
     public static function canMessage(?User $user, MailMessage $message, string $ability): bool
     {
-        $account = $message->relationLoaded('account') ? $message->account : self::account($message->account_id);
+        $account = $message->relationLoaded('account') ? $message->account : self::mailbox($message->account_id);
 
         return $account !== null && self::can($user, $account, $ability);
     }
 
-    /** A mailbox by id, read once per request for the checks above (flush() forgets it) */
-    private static function account(?string $id): ?MailAccount
+    /** A mailbox by id, read once per request for access checks (flush() forgets it) */
+    public static function mailbox(?string $id): ?MailAccount
     {
         if (! $id) {
             return null;
@@ -130,6 +130,11 @@ final class MailAccess
         if (! self::canUse($user)) {
             return collect();
         }
+        // The Mail page, the rail's unread count and Ask about your mail all ask in one request: read once
+        $key = 'accounts:' . $user->id . ':' . $ability;
+        if (isset(self::$cache[$key])) {
+            return self::$cache[$key];
+        }
 
         $query = MailAccount::query()->where(function ($q) use ($user) {
             $q->where(fn ($p) => $p->where('kind', 'personal')->where('owner_user_id', $user->id));
@@ -141,7 +146,7 @@ final class MailAccess
             }
         });
 
-        return $query->get()
+        return self::$cache[$key] = $query->get()
             ->each(fn (MailAccount $a) => $a->setAttribute('access_level', self::level($user, $a)))
             ->filter(fn (MailAccount $a) => self::can($user, $a, $ability))
             ->sortBy(fn (MailAccount $a) => ($a->isShared() ? '1' : '0') . $a->email)

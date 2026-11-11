@@ -64,6 +64,13 @@ class AppServiceProvider extends ServiceProvider
             'company_document_version' => \App\Models\CompanyDocumentVersion::class,
         ]);
 
+        // Gzip for text answers (App\Http\Middleware\CompressResponses): registered once every provider has booted, so it
+        // runs after Livewire's own RequestHandled listener, which writes @assets and its scripts into the page
+        $this->app->booted(fn () => \Illuminate\Support\Facades\Event::listen(
+            \Illuminate\Foundation\Http\Events\RequestHandled::class,
+            [\App\Http\Middleware\CompressResponses::class, 'handled'],
+        ));
+
         // Uploads wait in Livewire's temporary folder before a screen keeps them: up to 20 MB (Company documents takes
         // scans that large; Livewire's own default is 12 MB). Each screen still checks its own limit and file types.
         config(['livewire.temporary_file_upload.rules' => ['required', 'file', 'max:'.\App\Support\CompanyDocuments\Documents::MAX_KB]]);

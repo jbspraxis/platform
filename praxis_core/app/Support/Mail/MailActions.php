@@ -321,7 +321,10 @@ final class MailActions
         if ($messages->isEmpty()) {
             return;
         }
-        MailAccess::authorize($user, $messages->first()->account, $ability);
+        $first = $messages->first();
+        $account = $first->relationLoaded('account') ? $first->account : MailAccess::mailbox($first->account_id);
+        abort_unless($account, 403);
+        MailAccess::authorize($user, $account, $ability);
     }
 
     private function refresh(array $threadIds, array $folders): void

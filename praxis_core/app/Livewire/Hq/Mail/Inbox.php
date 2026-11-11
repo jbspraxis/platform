@@ -113,6 +113,12 @@ class Inbox extends Component
     #[Locked]
     public int $quietPolls = 0;
 
+    /** Bodies read for this render's open messages whose view wasn't kept (id => [body_text, body_html]) */
+    private array $bodyRows = [];
+
+    /** Kept views found for this render's open messages (view key => view) */
+    private array $keptViews = [];
+
     /** The open conversation's messages for this request (threadMessages), with the key they were read for */
     private ?Collection $messagesMemo = null;
 
@@ -528,6 +534,7 @@ class Inbox extends Component
         $list = ['rows' => collect(), 'total' => 0, 'page' => 1];
 
         if ($account && $folder) {
+            $folder->setRelation('account', $account);
             $list = $this->search !== ''
                 ? ThreadList::search($user, $account, $this->search, $folder, $this->filter, $this->page)
                 : ThreadList::folder($user, $folder, $this->filter, $this->page);
@@ -733,6 +740,20 @@ class Inbox extends Component
         $trusted = ImageTrust::trusted($user, $messages->pluck('from_email')->all());
         $current = $this->currentFolder?->id;
 
+        // The stored bodies of the open messages whose view isn't kept, in one read (body() would read them one by one)
+        $remoteOf = fn (MailMessage $m) => in_array((string) $m->id, $this->images, true) || in_array(strtolower((string) $m->from_email), $trusted, true);
+        $this->keptViews = [];
+        $open = $messages->filter(fn (MailMessage $m) => in_array($m->id, $this->expanded, true));
+        foreach ($open as $m) {
+            $key = $this->viewKey($m, $remoteOf($m));
+            if (is_array($view = rescue(fn () => Cache::store('file')->get($key), null, false))) {
+                $this->keptViews[$key] = $view;
+            }
+        }
+        $missing = $open->filter(fn (MailMessage $m) => $m->body_state === 'cached' && ! isset($this->keptViews[$this->viewKey($m, $remoteOf($m))]));
+        $this->bodyRows = $missing->isEmpty() ? [] : MailMessage::whereIn('id', $missing->pluck('id'))->get(['id', 'body_text', 'body_html'])
+            ->mapWithKeys(fn (MailMessage $m) => [$m->id => ['body_text' => $m->body_text, 'body_html' => $m->body_html]])->all();
+
         return $messages->map(function (MailMessage $m) use ($people, $trusted, $current, $senderOf) {
             $open = in_array($m->id, $this->expanded, true);
             $remote = in_array((string) $m->id, $this->images, true) || in_array(strtolower((string) $m->from_email), $trusted, true);
@@ -769,11 +790,10 @@ class Inbox extends Component
      */
     private function body(MailMessage $m, bool $remote): array
     {
-        $key = 'mail-read-view:' . sha1(implode('|', [$m->id, $m->message_id_hash, $m->created_at?->getTimestamp(), (int) $remote,
-            $m->body_state, self::viewVersion(), request()->getSchemeAndHttpHost()]));
+        $key = $this->viewKey($m, $remote);
         $store = Cache::store('file');
         try {
-            $cached = $store->get($key);
+            $cached = $this->keptViews[$key] ?? $store->get($key);
         } catch (\Throwable) {
             $cached = null;
         }
@@ -783,7 +803,7 @@ class Inbox extends Component
 
         try {
             $body = $m->body_state === 'cached'
-                ? (MailMessage::whereKey($m->id)->first(['id', 'body_text', 'body_html'])?->only(['body_text', 'body_html']) ?? [])
+                ? ($this->bodyRows[$m->id] ?? MailMessage::whereKey($m->id)->first(['id', 'body_text', 'body_html'])?->only(['body_text', 'body_html']) ?? [])
                 : Cache::remember('mail-read-body:' . $m->id, 600, fn () => MailFetch::make()->body($this->user(), $m));
         } catch (ImapException) {
             return ['kind' => 'error'];
@@ -803,6 +823,12 @@ class Inbox extends Component
         }
 
         return $view;
+    }
+
+    private function viewKey(MailMessage $m, bool $remote): string
+    {
+        return 'mail-read-view:' . sha1(implode('|', [$m->id, $m->message_id_hash, $m->created_at?->getTimestamp(), (int) $remote,
+            $m->body_state, self::viewVersion(), request()->getSchemeAndHttpHost()]));
     }
 
     /** Changes when the code that turns a body into what the reader shows changes (a release), so kept views follow it */
