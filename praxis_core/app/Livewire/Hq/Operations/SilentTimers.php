@@ -26,12 +26,8 @@ class SilentTimers extends Component
     // View State
     public $activeTab = 'live_burn'; // live_burn, anomalies, ledger, corrections
     public $ledgerGroupBy = 'engineer'; // engineer or project
-    
-    // Data Arrays
-    public $liveBurnData = [];
-    public $anomaliesData = [];
-    public $ledgerData = [];
-    public $correctionRequests = [];
+
+    // The tab's rows are read when the page draws (render), for the open tab only, and never kept in the page's state
 
     // Manual time entry state (timesheets.approve + payroll.approve, see $canInject)
     public $godModeUserId;
@@ -49,50 +45,45 @@ class SilentTimers extends Component
         if (! $this->canSeeAll) {
             $this->activeTab = 'ledger';
         }
-
-        $this->loadAllData();
-    }
-
-    public function loadAllData()
-    {
-        if ($this->canSeeAll) {
-            $this->loadLiveBurn();
-            $this->loadAnomalies();
-        }
-        if ($this->canManage) {
-            $this->loadCorrectionRequests();
-        }
-        $this->loadLedger();
     }
 
     // --- 1. LIVE BURN TELEMETRY ---
-    private function loadLiveBurn()
+    private function loadLiveBurn(): array
     {
         // FIX: Bridged through project_phases to reach projects
-        $this->liveBurnData = DB::table('task_time_logs')
+        $logs = DB::table('task_time_logs')
             ->join('users', 'task_time_logs.user_id', '=', 'users.id')
             ->join('tasks', 'task_time_logs.task_id', '=', 'tasks.id')
             ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
             ->join('projects', 'project_phases.project_id', '=', 'projects.id')
             ->whereNull('task_time_logs.end_time')
             ->select(
-                'task_time_logs.id', 'task_time_logs.start_time', 'task_time_logs.is_rework',
+                'task_time_logs.id', 'task_time_logs.user_id', 'task_time_logs.start_time', 'task_time_logs.is_rework',
                 'users.first_name', 'users.last_name',
                 'tasks.title as task_title', 'projects.title as project_title'
-            )->get()->map(function($log) {
-                $elapsedMinutes = Carbon::parse($log->start_time)->diffInMinutes(now());
-                $rate = DB::table('compensation_history')->where('user_id', $log->id ?? Auth::id())->orderBy('effective_from', 'desc')->value('hourly_rate') ?? 50.00;
-                
-                $log->live_duration = intdiv($elapsedMinutes, 60) . 'h ' . ($elapsedMinutes % 60) . 'm';
-                $log->live_cost = $this->canSeeMoney ? ($elapsedMinutes / 60) * $rate : null;
-                return (array) $log;
-            })->toArray();
+            )->get();
+
+        // Each person's hourly rate (their latest compensation row; US$50 an hour when unset), read once for everyone
+        // running a timer: the rate their time is costed at when the timer stops (App\Support\Projects\Tasks)
+        $rates = $this->canSeeMoney && $logs->isNotEmpty()
+            ? DB::table('compensation_history')->whereIn('user_id', $logs->pluck('user_id')->unique()->values())
+                ->orderBy('effective_from', 'desc')->get(['user_id', 'hourly_rate'])->unique('user_id')->pluck('hourly_rate', 'user_id')
+            : collect();
+
+        return $logs->map(function ($log) use ($rates) {
+            $elapsedMinutes = Carbon::parse($log->start_time)->diffInMinutes(now());
+            $rate = $rates->get($log->user_id) ?? 50.00;
+
+            $log->live_duration = intdiv($elapsedMinutes, 60) . 'h ' . ($elapsedMinutes % 60) . 'm';
+            $log->live_cost = $this->canSeeMoney ? ($elapsedMinutes / 60) * $rate : null;
+            return (array) $log;
+        })->toArray();
     }
 
     // --- 2. ANOMALY DETECTOR ---
-    private function loadAnomalies()
+    private function loadAnomalies(): array
     {
-        $this->anomaliesData = DB::table('tasks')
+        return DB::table('tasks')
             ->join('users', 'tasks.assigned_to', '=', 'users.id')
             ->whereNotNull('tasks.assigned_to')
             ->where(function($query) {
@@ -104,12 +95,13 @@ class SilentTimers extends Component
                               ->where('task_time_logs.duration_minutes', '>', 240);
                       });
             })
-            ->select('tasks.*', 'users.first_name', 'users.last_name')
+            // Only what the table shows (not each task's description)
+            ->select('tasks.title', 'tasks.estimated_hours', 'tasks.story_points', 'tasks.actual_hours_logged', 'users.first_name', 'users.last_name')
             ->get()->toArray();
     }
 
     // --- 3. THE MASTER LEDGER ---
-    private function loadLedger()
+    private function loadLedger(): array
     {
         // FIX: Bridged through project_phases to reach projects
         $query = DB::table('task_time_logs')
@@ -119,7 +111,8 @@ class SilentTimers extends Component
             ->join('projects', 'project_phases.project_id', '=', 'projects.id')
             ->whereNotNull('task_time_logs.end_time')
             ->select(
-                'task_time_logs.*', 
+                'task_time_logs.start_time', 'task_time_logs.end_time', 'task_time_logs.duration_minutes', 'task_time_logs.cost_calculated',
+                'task_time_logs.is_rework', 'task_time_logs.is_system_terminated',
                 'users.first_name', 'users.last_name',
                 'tasks.title as task_title', 'projects.title as project_title'
             )
@@ -138,23 +131,24 @@ class SilentTimers extends Component
         }
 
         if ($this->ledgerGroupBy === 'engineer') {
-            $this->ledgerData = $rawLogs->groupBy(function($item) {
+            return $rawLogs->groupBy(function($item) {
                 return $item->first_name . ' ' . $item->last_name;
             })->toArray();
-        } else {
-            $this->ledgerData = $rawLogs->groupBy('project_title')->toArray();
         }
+
+        return $rawLogs->groupBy('project_title')->toArray();
     }
 
     // --- 4. TIME CORRECTION QUEUE ---
-    private function loadCorrectionRequests()
+    private function loadCorrectionRequests(): array
     {
-        $this->correctionRequests = DB::table('time_correction_requests')
+        return DB::table('time_correction_requests')
             ->join('users', 'time_correction_requests.user_id', '=', 'users.id')
             ->join('tasks', 'time_correction_requests.task_id', '=', 'tasks.id')
             ->where('time_correction_requests.status', 'Pending')
             ->select(
-                'time_correction_requests.*',
+                'time_correction_requests.id', 'time_correction_requests.requested_start_time', 'time_correction_requests.requested_end_time',
+                'time_correction_requests.reason_for_correction',
                 'users.first_name', 'users.last_name',
                 'tasks.title as task_title'
             )->get()->toArray();
@@ -225,7 +219,6 @@ class SilentTimers extends Component
             ]);
         });
 
-        $this->loadAllData();
         session()->flash('success', 'Correction approved. The time is added to the task.');
     }
 
@@ -238,7 +231,6 @@ class SilentTimers extends Component
             'reviewed_by' => Auth::id(),
             'reviewed_at' => now()
         ]);
-        $this->loadAllData();
         session()->flash('success', 'Correction rejected. The requested time is not added.');
     }
 
@@ -299,16 +291,24 @@ class SilentTimers extends Component
         });
 
         $this->godModeUserId = ''; $this->godModeTaskId = ''; $this->godModeStartTime = ''; $this->godModeEndTime = '';
-        
-        $this->loadAllData();
+
         session()->flash('success', 'Time added. The entry is approved and shows in the time log.');
     }
 
     public function render()
     {
-        $allUsers = $this->canInject ? DB::table('users')->where('status', 'Active')->select('id', 'first_name', 'last_name', 'email')->get() : [];
-        $allTasks = $this->canInject ? DB::table('tasks')->whereIn('status', ['To-Do', 'In-Progress', 'QA_Review'])->get() : [];
+        // Only the open tab's rows, with the same rights the view checks before it shows a tab
+        $tab = $this->activeTab;
+        $liveBurnData = $tab === 'live_burn' && $this->canSeeAll ? $this->loadLiveBurn() : [];
+        $anomaliesData = $tab === 'anomalies' && $this->canSeeAll ? $this->loadAnomalies() : [];
+        $ledgerData = $tab === 'ledger' ? $this->loadLedger() : [];
+        $correctionRequests = $tab === 'corrections' && $this->canManage ? $this->loadCorrectionRequests() : [];
 
-        return view('livewire.hq.operations.silent-timers', compact('allUsers', 'allTasks'));
+        // The manual time entry's lists, on its tab only, with only the columns they show
+        $manualEntry = $tab === 'corrections' && $this->canInject;
+        $allUsers = $manualEntry ? DB::table('users')->where('status', 'Active')->select('id', 'first_name', 'last_name')->get() : [];
+        $allTasks = $manualEntry ? DB::table('tasks')->whereIn('status', ['To-Do', 'In-Progress', 'QA_Review'])->get(['id', 'title']) : [];
+
+        return view('livewire.hq.operations.silent-timers', compact('liveBurnData', 'anomaliesData', 'ledgerData', 'correctionRequests', 'allUsers', 'allTasks'));
     }
 }

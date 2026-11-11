@@ -172,6 +172,12 @@
         </div>
 
         <div class="flex flex-1 flex-col gap-3 overflow-y-auto px-6 py-4" id="chat-scroller">
+            {{-- The latest messages show first; older ones a page at a time --}}
+            @if($hasEarlierMessages)
+                <button type="button" wire:click="showEarlierMessages" wire:loading.attr="disabled" wire:target="showEarlierMessages" class="btn btn-ghost btn-sm self-center">
+                    <i data-lucide="arrow-up"></i> Show earlier messages
+                </button>
+            @endif
             @forelse($messages as $msg)
                 <div class="max-w-[85%] rounded-lg px-4 py-3 text-small {{ $msg->sender_type === 'staff' ? 'self-end bg-teal-tint text-ink' : 'self-start border border-line bg-mist text-ink' }}">
                     <div class="mb-1 flex justify-between gap-4 text-caption text-muted">

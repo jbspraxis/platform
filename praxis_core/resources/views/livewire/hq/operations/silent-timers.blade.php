@@ -1,4 +1,5 @@
-<div wire:poll.60s="loadAllData">
+{{-- Each tab reads its own rows only (render); only "Running now" refreshes itself --}}
+<div>
     @php $cols = $canSeeMoney ? 6 : 5; @endphp
 
     <div class="page-header">
@@ -6,7 +7,9 @@
             <h1 class="page-title">Time tracking</h1>
             <p class="page-subtitle">{{ $canSeeAll ? 'Timers running now, time that needs a second look, the time log and correction requests.' : 'Your finished timers. A timer runs while one of your tasks is In progress.' }}</p>
         </div>
-        <p class="help">Updates every 60 seconds.</p>
+        @if($activeTab === 'live_burn' && $canSeeAll)
+            <p class="help">Updates every 60 seconds.</p>
+        @endif
     </div>
 
 
@@ -25,6 +28,8 @@
 
     <!-- Tab 1: running now -->
     @if($activeTab === 'live_burn' && $canSeeAll)
+        {{-- Every 60 seconds while this tab is open (Livewire stops it when the tab changes) --}}
+        <div wire:poll.60s hidden></div>
         <div class="card p-0">
             <div class="table-wrap">
                 <table class="table">

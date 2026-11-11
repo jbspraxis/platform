@@ -122,71 +122,67 @@
         </div>
     </section>
 
-    @assets
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    @endassets
-
     @script
     <script>
-        document.addEventListener('livewire:navigated', function () {
+        // Runs once each time the page opens (first load or wire:navigate), so nothing is left listening afterwards.
+        // Chart.js is our own build (resources/js/charts.js), fetched by this page only, after the page has shown.
+        const chartData = { labels: @js($chartLabels), revenue: @js($chartRevenue), burn: @js($chartBurn) };
+
+        import(@js(\Illuminate\Support\Facades\Vite::asset('resources/js/charts.js'))).then(({ default: Chart }) => {
             const ctx = document.getElementById('telemetryChart');
-            if (!ctx) return;
+            // Gone if the person left the page before Chart.js arrived
+            if (!ctx || !ctx.isConnected) return;
 
-            // Wait for Chart.js to finish downloading before drawing
-            const waitForChart = setInterval(() => {
-                if (typeof Chart !== 'undefined') {
-                    clearInterval(waitForChart);
+            // Prevent "Canvas is already in use" errors when navigating back and forth
+            if (window.telemetryChartInstance) {
+                window.telemetryChartInstance.destroy();
+            }
 
-                    // Prevent "Canvas is already in use" errors when navigating back and forth
-                    if (window.telemetryChartInstance) {
-                        window.telemetryChartInstance.destroy();
-                    }
+            // Brand chart colours (docs/BRAND.md section 7): Petrol and Teal, labelled; Muted text; Line grid
+            Chart.defaults.color = '#5E6679';
+            Chart.defaults.font.family = "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', 'Segoe UI', Arial, sans-serif";
 
-                    // Brand chart colours (docs/BRAND.md section 7): Petrol and Teal, labelled; Muted text; Line grid
-                    Chart.defaults.color = '#5E6679';
-                    Chart.defaults.font.family = "'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', 'Segoe UI', Arial, sans-serif";
+            // Revenue is one series per currency: amounts in different currencies are never added together
+            const symbols = { NGN: '₦', USD: '$', XAF: 'FCFA', XOF: 'FCFA' };
+            const revenueColours = ['#044B6A', '#0C142B', '#08707C'];
+            const revenueSets = Object.entries(chartData.revenue || {}).map(([currency, data], i) => ({
+                label: 'Revenue received (' + (symbols[currency] || currency || 'no currency') + ')',
+                data: data,
+                backgroundColor: revenueColours[i % revenueColours.length],
+                borderRadius: 2
+            }));
 
-                    // Revenue is one series per currency: amounts in different currencies are never added together
-                    const symbols = { NGN: '₦', USD: '$', XAF: 'FCFA', XOF: 'FCFA' };
-                    const revenueColours = ['#044B6A', '#0C142B', '#08707C'];
-                    const revenueSets = Object.entries($wire.chartRevenue || {}).map(([currency, data], i) => ({
-                        label: 'Revenue received (' + (symbols[currency] || currency || 'no currency') + ')',
-                        data: data,
-                        backgroundColor: revenueColours[i % revenueColours.length],
-                        borderRadius: 2
-                    }));
-
-                    window.telemetryChartInstance = new Chart(ctx.getContext('2d'), {
-                        type: 'bar',
-                        data: {
-                            labels: $wire.chartLabels,
-                            datasets: [
-                                ...revenueSets,
-                                {
-                                    label: 'Staff time cost ($)',
-                                    data: $wire.chartBurn,
-                                    backgroundColor: '#0C8B9B',
-                                    borderRadius: 2
-                                }
-                            ]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: { legend: { position: 'top', align: 'end' } },
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    grid: { color: '#D8DEE6' },
-                                    // Amounts of 1,000 or more read as 'k'; the currency is named in each series
-                                    ticks: { callback: function(value) { return Math.abs(value) >= 1000 ? (value / 1000).toLocaleString('en-GB') + 'k' : value.toLocaleString('en-GB'); } }
-                                },
-                                x: { grid: { display: false } }
-                            }
+            window.telemetryChartInstance = new Chart(ctx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [
+                        ...revenueSets,
+                        {
+                            label: 'Staff time cost ($)',
+                            data: chartData.burn,
+                            backgroundColor: '#0C8B9B',
+                            borderRadius: 2
                         }
-                    });
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top', align: 'end' } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#D8DEE6' },
+                            // Amounts of 1,000 or more read as 'k'; the currency is named in each series
+                            ticks: { callback: function(value) { return Math.abs(value) >= 1000 ? (value / 1000).toLocaleString('en-GB') + 'k' : value.toLocaleString('en-GB'); } }
+                        },
+                        x: { grid: { display: false } }
+                    }
                 }
-            }, 50);
+            });
+        }).catch(() => {
+            // Chart.js couldn't be fetched (offline): the figures above still show, only the chart stays empty
         });
     </script>
     @endscript

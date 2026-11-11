@@ -367,10 +367,39 @@ final class Planner
     /** Files a finished job that the listener missed (the page calls it on load and while it polls) */
     public static function sync(MilestonePlan $plan): void
     {
-        $run = $plan->ai_run_id ? AiRun::find($plan->ai_run_id) : null;
-        if ($plan->status === 'drafting' && $run?->isFinished()) {
+        if ($plan->status !== 'drafting' || ! $plan->ai_run_id) {
+            return;
+        }
+        // Only the run's status until it has finished: its input (the scope and the adopted plan) and output are large
+        $run = AiRun::query()->select(['id', 'status'])->find($plan->ai_run_id);
+        if ($run?->isFinished() && ($run = AiRun::find($plan->ai_run_id))) {
             self::fileAiOutput($run);
         }
+    }
+
+    /**
+     * What the planner page shows of a plan being drafted (its pass, its run's status and progress), as one string; null
+     * when the project has no plan drafting, or when its run has finished (the page draws then, and sync() files it).
+     * The page polls this while the AI works and draws itself again only when it changes, from the plan and run
+     * columns alone (not their scope, input or output). Same plan as current().
+     */
+    public static function draftingState(string $projectId): ?string
+    {
+        $plan = MilestonePlan::where('project_id', $projectId)->whereIn('status', ['drafting', 'ready', 'failed'])->latest()
+            ->first(['id', 'status', 'pass', 'ai_run_id', 'transcript_meeting_id', 'transcript_reason']);
+        if (! $plan || $plan->status !== 'drafting') {
+            return null;
+        }
+        $run = $plan->ai_run_id ? AiRun::query()->select(['id', 'status', 'progress'])->find($plan->ai_run_id) : null;
+
+        return $run?->isFinished() ? null : self::stateOf($plan, $run);
+    }
+
+    /** draftingState's string for a plan and its run already in hand */
+    public static function stateOf(MilestonePlan $plan, ?AiRun $run): string
+    {
+        return implode('|', [$plan->id, $plan->status, $plan->pass, $plan->ai_run_id, $plan->transcript_meeting_id, sha1((string) $plan->transcript_reason),
+            $run?->status, (int) $run?->progress]);
     }
 
     /**

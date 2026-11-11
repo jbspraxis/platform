@@ -156,17 +156,19 @@
         </div>
     </section>
 
-    @assets
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    @endassets
-
     @script
     <script>
         const initialTrends = @json($trends);
+        // Chart.js is our own build (resources/js/charts.js), fetched by the pages that draw a chart only, after the page has shown
+        const chartReady = import(@js(\Illuminate\Support\Facades\Vite::asset('resources/js/charts.js'))).then((module) => module.default);
 
         function initFinancialChart(liveTrends = null) {
+            chartReady.then((Chart) => drawFinancialChart(Chart, liveTrends)).catch(() => {});
+        }
+
+        function drawFinancialChart(Chart, liveTrends) {
             const ctx = document.getElementById('financialTrendChart');
-            if (!ctx || typeof Chart === 'undefined') return;
+            if (!ctx || !ctx.isConnected) return;
 
             // Destroy the existing chart so they don’t overlap
             if (window.financialChart) {

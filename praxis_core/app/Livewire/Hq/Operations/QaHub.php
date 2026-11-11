@@ -4,6 +4,7 @@ namespace App\Livewire\Hq\Operations;
 
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
@@ -30,8 +31,7 @@ class QaHub extends Component
     // One project's tickets (?project=<id>, from its project page); the visibility rule still applies
     #[\Livewire\Attributes\Url(as: 'project', except: '')]
     public string $filterProject = '';
-    #[Locked]
-    public $tickets = [];
+    // The list itself is read when the page draws (tickets()), never kept in the page's state
 
     // Offcanvas Modal State: loaded on the server only (the browser must not swap in another ticket)
     #[Locked]
@@ -52,7 +52,6 @@ class QaHub extends Component
     {
         $this->canWork = Auth::user()->can('qa.edit');
         $this->canResolve = Auth::user()->can('qa.approve');
-        $this->loadFirehose();
 
         // NEW: Auto-open ticket if teleporting from the Sprint Board
         if (request()->has('ticket')) {
@@ -65,18 +64,22 @@ class QaHub extends Component
      * The tickets this person may see: QA approvers, managers and auditors see every ticket; everyone else
      * the tickets on projects they can see (the sprint board rule, App\Support\ProjectAccess) and those they reported.
      */
-    private function ticketQuery()
+    private function ticketQuery(bool $forList = false)
     {
+        // The list shows a few columns of each ticket (not its description); an opened ticket shows all of them
+        $columns = $forList
+            ? ['qa_tickets.id', 'qa_tickets.title', 'qa_tickets.severity', 'qa_tickets.status', 'qa_tickets.task_id', 'qa_tickets.submitted_by_type', 'qa_tickets.created_at']
+            : ['qa_tickets.*'];
         $query = DB::table('qa_tickets')
             ->join('projects', 'qa_tickets.project_id', '=', 'projects.id')
             ->join('organizations', 'projects.organization_id', '=', 'organizations.id')
             ->leftJoin('tasks', 'qa_tickets.task_id', '=', 'tasks.id')
-            ->select(
-                'qa_tickets.*',
+            ->select([
+                ...$columns,
                 'projects.title as project_title',
                 'organizations.name as client_name',
-                'tasks.title as task_title'
-            )
+                'tasks.title as task_title',
+            ])
             ->orderByRaw("FIELD(qa_tickets.severity, 'Critical', 'Medium', 'Low')") // Prioritize Critical
             ->orderBy('qa_tickets.created_at', 'desc');
         People::joinAuthor($query, 'qa_tickets.submitted_by', 'qa_tickets.submitted_by_type', 'submitter', ['email' => 'submitter_email']);
@@ -117,9 +120,11 @@ class QaHub extends Component
         return $ticket ? $this->withSla($ticket) : null;
     }
 
-    public function loadFirehose()
+    /** The listed tickets for the filters, read once per request (render) */
+    #[Computed]
+    public function tickets(): array
     {
-        $query = $this->ticketQuery();
+        $query = $this->ticketQuery(forList: true);
 
         if ($this->filterStatus !== 'All') {
             if ($this->filterStatus === 'Open') {
@@ -132,18 +137,12 @@ class QaHub extends Component
             $query->where('qa_tickets.project_id', $this->filterProject);
         }
 
-        $this->tickets = $query->get()->map(fn ($ticket) => $this->withSla($ticket))->toArray();
-    }
-
-    public function updatedFilterStatus()
-    {
-        $this->loadFirehose();
+        return $query->get()->map(fn ($ticket) => $this->withSla($ticket))->toArray();
     }
 
     public function showEveryProject(): void
     {
         $this->filterProject = '';
-        $this->loadFirehose();
     }
 
     // --- 2. OFFCANVAS TICKET TRIAGE ---
@@ -187,7 +186,7 @@ class QaHub extends Component
             DB::table('qa_tickets')->where('id', $ticketId)->update(['status' => 'Investigating', 'updated_at' => now()]);
             // The client who reported it hears that someone is on it (docs/PWA.md)
             \App\Support\Pwa\ClientNotify::ticket($ticketId, 'ticket_investigating');
-            $this->loadFirehose();
+            unset($this->tickets); // the list shows the new status
             $this->selectedTicket['status'] = 'Investigating';
         }
         
@@ -350,13 +349,13 @@ class QaHub extends Component
 
         // Close offcanvas and refresh grid
         $this->dispatch('close-offcanvas');
-        $this->loadFirehose();
+        unset($this->tickets); // the list shows the new status
         $this->selectedTicket = null;
         session()->flash('success', 'Issue resolved. The person who reported it now sees it as resolved.');
     }
 
     public function render()
     {
-        return view('livewire.hq.operations.qa-hub');
+        return view('livewire.hq.operations.qa-hub', ['tickets' => $this->tickets]);
     }
 }

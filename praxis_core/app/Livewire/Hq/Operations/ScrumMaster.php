@@ -55,6 +55,10 @@ class ScrumMaster extends Component
     #[Locked]
     public string $warning = '';
 
+    /** While the AI drafts: what the page last showed of it (Planner::draftingState), so a poll that finds nothing new draws nothing */
+    #[Locked]
+    public string $draftingState = '';
+
     public function mount($id): void
     {
         $this->projectId = (string) $id;
@@ -119,8 +123,16 @@ class ScrumMaster extends Component
         }
     }
 
-    /** wire:poll while the AI works: render() files what it finished */
-    public function check(): void {}
+    /**
+     * wire:poll while the AI works: render() files what it finished. While the plan is still drafting and its pass and
+     * progress haven't moved, the page is not drawn again (a few small reads instead of the whole plan).
+     */
+    public function check(): void
+    {
+        if ($this->draftingState !== '' && Planner::draftingState($this->projectId) === $this->draftingState) {
+            $this->skipRender();
+        }
+    }
 
     /** Saves the ticked suggestions; the others are set aside */
     public function save(): void
@@ -198,11 +210,13 @@ class ScrumMaster extends Component
         $plan = Planner::current($this->projectId);
         if ($plan) {
             Planner::sync($plan);
-            $plan->refresh()->load(['aiRun', 'transcriptMeeting']);
+            // The run's status, progress and error only (not its input and output)
+            $plan->refresh()->load(['aiRun' => fn ($q) => $q->select(['id', 'status', 'progress', 'error']), 'transcriptMeeting']);
             if ($plan->status === 'saved') {
                 $plan = null;
             }
         }
+        $this->draftingState = $plan?->status === 'drafting' ? Planner::stateOf($plan, $plan->aiRun) : '';
         // A new review (or one changed elsewhere) starts with nothing ticked
         if ($plan && $plan->status === 'ready' && ($this->planId !== $plan->id || $this->revision !== $plan->revision)) {
             $this->planId = $plan->id;

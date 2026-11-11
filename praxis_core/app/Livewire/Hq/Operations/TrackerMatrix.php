@@ -51,7 +51,12 @@ class TrackerMatrix extends Component
 
     // Communication State
     public $chatMessage = '';
-    public $mediaUpload; 
+    public $mediaUpload;
+
+    // How many of the latest messages the conversation shows; "Show earlier messages" adds another page
+    public const MESSAGES_PAGE = 200;
+    #[Locked]
+    public int $messageLimit = self::MESSAGES_PAGE;
 
     // ==========================================================================
     // INITIALIZATION & SECURITY PERIMETER
@@ -277,18 +282,20 @@ class TrackerMatrix extends Component
     
     private function recalculateProgress()
     {
-        $totalTasks = TrackerTask::whereHas('milestone', function($q) {
-            $q->where('tracker_id', $this->trackerId);
-        })->count();
+        // The tracker's tasks and how many are done, in one query
+        $counts = DB::table('tracker_tasks')
+            ->join('tracker_milestones', 'tracker_milestones.id', '=', 'tracker_tasks.milestone_id')
+            ->where('tracker_milestones.tracker_id', $this->trackerId)
+            ->selectRaw("COUNT(*) as total, COALESCE(SUM(CASE WHEN tracker_tasks.status = 'done' THEN 1 ELSE 0 END), 0) as done")
+            ->first();
+        $totalTasks = (int) $counts->total;
 
         if ($totalTasks === 0) {
             Tracker::where('id', $this->trackerId)->update(['progress_percentage' => 0]);
             return;
         }
 
-        $completedTasks = TrackerTask::whereHas('milestone', function($q) {
-            $q->where('tracker_id', $this->trackerId);
-        })->where('status', 'done')->count();
+        $completedTasks = (int) $counts->done;
 
         $percentage = ($completedTasks / $totalTasks) * 100;
 
@@ -326,7 +333,13 @@ class TrackerMatrix extends Component
         $this->reset(['chatMessage', 'mediaUpload']);
         
         // Trigger Alpine.js to auto-scroll to the newest message natively
-        $this->dispatch('message-transmitted'); 
+        $this->dispatch('message-transmitted');
+    }
+
+    /** "Show earlier messages": the conversation shows another page of older messages */
+    public function showEarlierMessages(): void
+    {
+        $this->messageLimit += self::MESSAGES_PAGE;
     }
 
     // ==========================================================================
@@ -353,20 +366,25 @@ class TrackerMatrix extends Component
             'milestones.tasks.assignee'
         ])->findOrFail($this->trackerId);
         
-        $messages = TrackerMessage::with(['sender', 'task'])
+        // The latest messages only (one more than shown, to know whether earlier ones exist), oldest first on screen
+        $latest = TrackerMessage::with(['sender', 'task'])
             ->where('tracker_id', $this->trackerId)
-            ->orderBy('created_at', 'asc')
+            ->orderBy('created_at', 'desc')->orderBy('id', 'desc')
+            ->limit($this->messageLimit + 1)
             ->get();
-            
-        // Filter out archived/deleted users to prevent ghost assignments
+        $hasEarlierMessages = $latest->count() > $this->messageLimit;
+        $messages = $latest->take($this->messageLimit)->reverse()->values();
+
+        // Filter out archived/deleted users to prevent ghost assignments; only what the pickers show
         $consultants = TrackerUser::where('is_active', true)
             ->orderBy('name', 'asc')
-            ->get();
+            ->get(['id', 'name', 'role']);
 
         return view('livewire.hq.operations.tracker-matrix', [
             'activeTracker' => $activeTracker,
             'milestones' => $activeTracker->milestones,
             'messages' => $messages,
+            'hasEarlierMessages' => $hasEarlierMessages,
             'consultants' => $consultants
         ]);
     }
