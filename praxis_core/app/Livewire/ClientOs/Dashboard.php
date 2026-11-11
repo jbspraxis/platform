@@ -31,6 +31,9 @@ class Dashboard extends Component
     // Everything that identifies this client (organisation, projects, tickets,
     // invoices, lockout) is #[Locked]: set on the server only. Actions that take
     // an id from the browser check it belongs to this organisation.
+    // Public properties travel to the browser and back on every click, so they hold
+    // only the fields the page shows or the actions use (never signatures, codes,
+    // IP addresses or internal notes), and only the open section's rows.
 
     // View State
     #[Locked]
@@ -144,6 +147,17 @@ class Dashboard extends Component
         'financials' => 'billing.view', 'vault' => 'documents.view', 'team' => 'team.view',
     ];
 
+    // The rows each section shows. Leaving a section empties its rows (loadTab), so the page's state never carries
+    // every section at once; the section reloads them when it is opened again
+    private const TAB_DATA = [
+        'overview' => ['phases', 'liveLogs'],
+        'sprints' => ['activeTasks'],
+        'qa_hub' => ['activeTasks', 'qaTickets', 'selectedTicket', 'ticketComments', 'ticketAttachments'],
+        'financials' => ['invoices', 'remittanceAccounts'],
+        'vault' => ['vaultSows', 'vaultSignoffs', 'vaultContracts', 'vaultProposals', 'vaultMeetings'],
+        'team' => ['teamMembers', 'clientRoles'],
+    ];
+
     // Sections about a project; before the first one exists (until the SOW is signed) they say so
     public const PROJECT_TABS = ['overview', 'sprints', 'qa_hub', 'financials'];
 
@@ -176,7 +190,8 @@ class Dashboard extends Component
             abort(403, __('portal.errors.not_client'));
         }
 
-        $this->organization = DB::table('organizations')->where('id', $this->user->organization_id)->first();
+        // The three fields the portal uses; the rest of the row (internal CRM notes) stays on the server
+        $this->organization = DB::table('organizations')->where('id', $this->user->organization_id)->first(['id', 'name', 'preferred_language']);
         if (!$this->organization) {
             Auth::guard('client')->logout();
             abort(404, __('portal.errors.no_organisation'));
@@ -197,8 +212,9 @@ class Dashboard extends Component
             $this->activeTab = $askedTab;
         }
 
-        // Project Routing
-        $projectQuery = DB::table('projects')->where('organization_id', $this->organization->id)->orderBy('created_at', 'desc');
+        // Project Routing (the columns the page and the actions read: the project picker, the overview, the lockout)
+        $projectQuery = DB::table('projects')->where('organization_id', $this->organization->id)->orderBy('created_at', 'desc')
+            ->select('id', 'title', 'status', 'total_budget', 'currency', 'lead_user_id', 'created_by');
         if ($this->user->restricted_project_id) {
             $projectQuery->where('id', $this->user->restricted_project_id);
         }
@@ -210,8 +226,7 @@ class Dashboard extends Component
             if (in_array($this->activeTab, self::PROJECT_TABS, true)) {
                 $this->activeTab = collect(['vault', 'team'])->first(fn ($tab) => $this->can[self::TAB_PERMISSIONS[$tab]] ?? false) ?? $this->activeTab;
             }
-            if ($this->activeTab === 'vault') $this->loadVault();
-            if ($this->activeTab === 'team') $this->loadTeamCommand();
+            $this->loadTab();
 
             return;
         }
@@ -272,12 +287,29 @@ class Dashboard extends Component
             $this->activeTab = collect(['financials', 'vault', 'team'])->first(fn ($tab) => $this->allowed(self::TAB_PERMISSIONS[$tab])) ?? $this->activeTab;
         }
 
-        // Initialize default tab data
-        if ($this->activeTab === 'overview' || $this->activeTab === 'sprints') $this->loadProjectTelemetry();
-        if ($this->activeTab === 'qa_hub') $this->loadQaHub();
-        if ($this->activeTab === 'financials') $this->loadFinancials();
-        if ($this->activeTab === 'vault') $this->loadVault();
-        if ($this->activeTab === 'team') $this->loadTeamCommand();
+        // Initialize default tab data (nothing kept from the project shown before)
+        $this->loadTab(true);
+    }
+
+    /**
+     * Load the open section's rows. The other sections' rows are emptied first (every section's, after a change of
+     * project), so the page's state carries one section at a time and doesn't grow as the client moves around.
+     */
+    private function loadTab(bool $everything = false): void
+    {
+        $keep = $everything ? [] : (self::TAB_DATA[$this->activeTab] ?? []);
+        $stale = array_values(array_unique(array_diff(array_merge(...array_values(self::TAB_DATA)), $keep)));
+        if ($stale) $this->reset($stale); // never an empty list: reset() with none resets every property
+
+        match ($this->activeTab) {
+            'overview' => $this->loadOverview(),
+            'sprints' => $this->loadSprints(),
+            'qa_hub' => $this->loadQaHub(),
+            'financials' => $this->loadFinancials(),
+            'vault' => $this->loadVault(),
+            'team' => $this->loadTeamCommand(),
+            default => null,
+        };
     }
 
     public function enforceFinancialLockout()
@@ -310,18 +342,20 @@ class Dashboard extends Component
 
     // --- TAB LOADERS ---
 
-    public function loadProjectTelemetry()
+    // Overview: the lead, the milestones and the client's own activity (the task list is the Progress section's)
+    public function loadOverview()
     {
         if (!$this->activeProject || !$this->allowed('projects.view')) return;
 
         // The project's lead (projects created before leads existed: whoever created it)
-        $architect = DB::table('users')->where('id', $this->activeProject->lead_user_id ?? $this->activeProject->created_by)->first();
+        $architect = DB::table('users')->where('id', $this->activeProject->lead_user_id ?? $this->activeProject->created_by)->first(['first_name', 'last_name']);
         $this->leadArchitect = $architect ? trim($architect->first_name . ' ' . mb_substr((string) $architect->last_name, 0, 1) . '.') : __('portal.overview.lead_fallback');
-        
-        $this->phases = DB::table('project_phases')->where('project_id', $this->activeProject->id)->whereNull('deleted_at')->orderBy('phase_number', 'asc')->get()
-            ->map(fn ($phase) => (array) $phase)->toArray();
-        // The same figure as HQ's project page: each milestone's weight × its share of done tasks (docs/PROJECTS.md, decision 3)
-        $this->overallProgress = (int) round(ProjectPlan::progress(ProjectPlan::milestones($this->activeProject->id)));
+
+        // The milestones, read once for both: their steps (the four fields shown) and the same figure as HQ's project
+        // page, each milestone's weight × its share of done tasks (docs/PROJECTS.md, decision 3)
+        $milestones = ProjectPlan::milestones($this->activeProject->id);
+        $this->phases = $milestones->map(fn ($m) => ['id' => $m->id, 'phase_number' => $m->phase_number, 'title' => $m->title, 'status' => $m->status])->all();
+        $this->overallProgress = (int) round(ProjectPlan::progress($milestones));
 
         // The client's own approvals only: staff comments on a task stay inside HQ (docs/PROJECTS.md)
         $logs = $this->clientTasks()->join('task_comments', 'task_comments.task_id', '=', 'tasks.id')->where('task_comments.author_type', 'client')->whereNull('task_comments.deleted_at')
@@ -329,56 +363,79 @@ class Dashboard extends Component
         $this->liveLogs = People::joinAuthor($logs, 'task_comments.user_id', 'task_comments.author_type')->get()->map(function($log) {
             return ['time' => PortalFormat::date($log->created_at, 'datetime'), 'author' => trim(mb_substr((string) $log->first_name, 0, 1) . '. ' . $log->last_name), 'text' => $log->comment_text];
         })->toArray();
+    }
 
-        $this->activeTasks = $this->clientTasks()->select('tasks.*', 'project_phases.title as phase_title')->orderBy('project_phases.phase_number')->orderByRaw("FIELD(tasks.status, 'QA_Review', 'In-Progress', 'To-Do', 'Done')")->orderBy('tasks.updated_at', 'desc')->get()->toArray();
+    // Progress: the client's tasks, milestone by milestone (what the list shows, not the tasks' descriptions)
+    public function loadSprints()
+    {
+        if (!$this->activeProject || !$this->allowed('projects.view')) return;
+
+        $this->activeTasks = $this->clientTasks()->select('tasks.id', 'tasks.title', 'tasks.status', 'project_phases.title as phase_title')->orderBy('project_phases.phase_number')->orderByRaw("FIELD(tasks.status, 'QA_Review', 'In-Progress', 'To-Do', 'Done')")->orderBy('tasks.updated_at', 'desc')->get()->toArray();
     }
 
     public function loadQaHub()
     {
         if (!$this->activeProject || !$this->allowed('qa.view')) return;
         $this->activeTasks = $this->clientTasks()->select('tasks.id', 'tasks.title', 'tasks.status')->get()->toArray();
-        // A ticket on an internal task keeps its own title; the task's is not shown
+        // A ticket on an internal task keeps its own title; the task's is not shown. The list shows the start of the
+        // description (excerpt); the whole text is read when the ticket is opened
         $this->qaTickets = DB::table('qa_tickets')->leftJoin('tasks', fn ($j) => $j->on('qa_tickets.task_id', '=', 'tasks.id')->where('tasks.is_client_visible', 1))
-            ->where('qa_tickets.project_id', $this->activeProject->id)->whereNull('qa_tickets.deleted_at')->select('qa_tickets.*', 'tasks.title as task_title')->orderBy('qa_tickets.created_at', 'desc')->get()->toArray();
+            ->where('qa_tickets.project_id', $this->activeProject->id)->whereNull('qa_tickets.deleted_at')
+            ->select('qa_tickets.id', 'qa_tickets.task_id', 'qa_tickets.title', 'qa_tickets.status', 'qa_tickets.severity', 'qa_tickets.created_at', 'qa_tickets.description', 'tasks.title as task_title')
+            ->orderBy('qa_tickets.created_at', 'desc')->get()
+            ->map(function ($ticket) {
+                $ticket->excerpt = Str::limit((string) $ticket->description, 100);
+                unset($ticket->description);
+                return $ticket;
+            })->toArray();
     }
 
     public function loadFinancials()
     {
         if (!$this->activeProject || !$this->allowed('billing.view')) return;
-        $this->invoices = DB::table('invoices')->where('project_id', $this->activeProject->id)->orderBy('created_at', 'desc')->get()->map(function($invoice) {
-            $invoice->has_pending_pop = DB::table('transactions')->where('invoice_id', $invoice->id)->where('status', 'Pending Verification')->exists();
+        $invoices = DB::table('invoices')->where('project_id', $this->activeProject->id)->orderBy('created_at', 'desc')
+            ->get(['id', 'invoice_number', 'issued_at', 'due_date', 'status', 'total_amount', 'currency']);
+        // The invoices with a proof of payment waiting for HQ's check, in one query (not one per invoice)
+        $pending = $invoices->isEmpty() ? collect() : DB::table('transactions')->whereIn('invoice_id', $invoices->pluck('id'))
+            ->where('status', 'Pending Verification')->distinct()->pluck('invoice_id')->flip();
+        $this->invoices = $invoices->map(function($invoice) use ($pending) {
+            $invoice->has_pending_pop = $pending->has($invoice->id);
             return $invoice;
         })->toArray();
-        // Only the accounts in the currency of the invoices held by the company that bills them (D8)
-        $this->remittanceAccounts = \App\Support\Finance\ReceivingAccounts::forProject($this->activeProject)->toArray();
+        // Only the accounts in the currency of the invoices held by the company that bills them (D8), with the fields shown
+        $this->remittanceAccounts = \App\Support\Finance\ReceivingAccounts::forProject($this->activeProject)
+            ->map(fn ($account) => (object) \Illuminate\Support\Arr::only((array) $account, ['type', 'currency', 'provider_name', 'account_name', 'account_reference', 'routing_code']))
+            ->toArray();
     }
 
     public function loadVault()
     {
         if (!$this->allowed('documents.view')) return;
 
+        // Older proposals and handovers: the fields the list and its links use (never the signatures, codes or IP addresses)
         $this->vaultSows = DB::table('proposals')
             ->where('organization_id', $this->organization->id)
             ->whereIn('status', ['Authorized', 'Converted'])
             ->orderBy('created_at', 'desc')
-            ->get()->toArray();
+            ->get(['title', 'proposal_ref', 'updated_at', 'token_hash'])->toArray();
 
         $this->vaultSignoffs = DB::table('project_signoffs')
             ->join('projects', 'project_signoffs.project_id', '=', 'projects.id')
             ->where('projects.organization_id', $this->organization->id)
             ->whereIn('project_signoffs.status', ['Signed', 'Frozen'])
-            ->select('project_signoffs.*', 'projects.title as project_title')
+            ->select('project_signoffs.token', 'project_signoffs.client_signature_hash', 'projects.title as project_title')
             ->orderBy('project_signoffs.created_at', 'desc')
             ->get()->toArray();
 
         // Sent through the opportunity pipeline: the version they have now (older ones are superseded). A member limited
         // to one project sees that project's SOW only. Links are made now, so they outlive the email's (docs/QA-PORTAL.md)
+        // Each query reads only the columns the list uses: a version's sections and signature images stay in the database
         $opportunityIds = DB::table('opportunities')->where('organization_id', $this->organization->id)->whereNull('deleted_at')->pluck('id');
         $restricted = $this->user->restricted_project_id;
         $this->vaultContracts = StatementOfWork::whereIn('opportunity_id', $opportunityIds)
             ->whereIn('status', [StatementOfWork::SENT, StatementOfWork::CHANGES_REQUESTED, StatementOfWork::SIGNED])
             ->when($restricted, fn ($q) => $q->where('project_id', $restricted))
-            ->orderByDesc('created_at')->get()
+            ->orderByDesc('created_at')->get(['id', 'title', 'reference', 'version', 'status', 'signed_at', 'changes_requested_at', 'sent_at', 'proposal_id'])
             ->map(function (StatementOfWork $sow) {
                 $paper = Sows::isImported($sow);
                 $online = ! $paper && $sow->sent_at;
@@ -391,7 +448,7 @@ class Dashboard extends Component
             })->all();
         $this->vaultProposals = $restricted ? [] : Proposal::whereIn('opportunity_id', $opportunityIds)
             ->whereIn('status', [Proposal::SENT, Proposal::CHANGES_REQUESTED, Proposal::CLIENT_APPROVED])->whereNotNull('sent_at')
-            ->orderByDesc('created_at')->get()
+            ->orderByDesc('created_at')->get(['id', 'title', 'proposal_ref', 'version', 'status', 'client_approved_at', 'sent_at'])
             ->map(fn (Proposal $proposal) => ['id' => $proposal->id, 'title' => $proposal->title, 'reference' => $proposal->proposal_ref, 'version' => $proposal->version,
                 'state' => match ($proposal->status) { Proposal::CLIENT_APPROVED => 'approved', Proposal::CHANGES_REQUESTED => 'changes_requested', default => 'sent' },
                 'date' => PortalFormat::date($proposal->client_approved_at ?? $proposal->sent_at),
@@ -402,7 +459,7 @@ class Dashboard extends Component
         $this->vaultMeetings = \App\Models\Opportunity::whereIn('id', $opportunityIds)->where('stage', '!=', 'lost')
             ->whereHas('meetings', fn ($q) => $q->where('kind', 'client'))
             ->when($restricted, fn ($q) => $q->where('project_id', $restricted))
-            ->orderByDesc('created_at')->get()
+            ->orderByDesc('created_at')->get(['id', 'title'])
             ->map(fn ($o) => ['id' => $o->id, 'title' => $o->title, 'link' => PortalLinks::fromPortal('portal.meetings', $o->id, $this->user->id)])->all();
     }
 
@@ -438,12 +495,8 @@ class Dashboard extends Component
         }
         $this->activeTab = $tab;
         
-        // Dynamically load the required data for the tab
-        if ($tab === 'overview' || $tab === 'sprints') $this->loadProjectTelemetry();
-        if ($tab === 'qa_hub') $this->loadQaHub();
-        if ($tab === 'financials') $this->loadFinancials();
-        if ($tab === 'vault') $this->loadVault();
-        if ($tab === 'team') $this->loadTeamCommand();
+        // Dynamically load the required data for the tab (and drop the rows of the one left)
+        $this->loadTab();
     }
 
     // --- FORM SUBMISSIONS ---
@@ -521,7 +574,7 @@ class Dashboard extends Component
             'comment_text' => __('portal.tasks.approved_comment', [], 'en'), 'created_at' => now()
         ]);
 
-        $this->loadProjectTelemetry();
+        $this->loadSprints(); // the Approve button is on Progress
         session()->flash('global_success', __('portal.tasks.approved'));
     }
 
@@ -546,23 +599,26 @@ class Dashboard extends Component
     public function openTicket($ticketId)
     {
         abort_unless($this->allowed('qa.view'), 403);
-        $this->selectedTicket = collect($this->qaTickets)->firstWhere('id', $ticketId);
+        // One of the issues listed (the active project's); the list keeps an excerpt, so the ticket is read again whole
+        $this->selectedTicket = $this->activeProject && collect($this->qaTickets)->contains('id', $ticketId)
+            ? DB::table('qa_tickets')->where('id', $ticketId)->where('project_id', $this->activeProject->id)->whereNull('deleted_at')
+                ->first(['id', 'task_id', 'title', 'description', 'status', 'severity'])
+            : null;
         if (!$this->selectedTicket) return;
 
-        // Fetch non-internal comments only
+        // Fetch non-internal comments only (the fields the conversation shows, with the author's name)
         $comments = DB::table('qa_comments')
             ->where('qa_comments.ticket_id', $ticketId)
             ->where('qa_comments.is_internal_only', 0)
-            ->select('qa_comments.*')
+            ->select('qa_comments.user_id', 'qa_comments.comment_text', 'qa_comments.created_at')
             ->orderBy('qa_comments.created_at', 'asc');
         $this->ticketComments = People::joinAuthor($comments, 'qa_comments.user_id', 'qa_comments.author_type')->get()->toArray();
 
-        // NEW: Fetch Evidence/Attachments
-        $attachments = DB::table('qa_attachments')
-            ->where('qa_attachments.ticket_id', $ticketId)
-            ->select('qa_attachments.*')
-            ->orderBy('qa_attachments.created_at', 'desc');
-        $this->ticketAttachments = People::joinAuthor($attachments, 'qa_attachments.uploaded_by', 'qa_attachments.uploader_type', 'uploader')->get()->toArray();
+        // NEW: Fetch Evidence/Attachments (a name and a link each)
+        $this->ticketAttachments = DB::table('qa_attachments')
+            ->where('ticket_id', $ticketId)
+            ->orderBy('created_at', 'desc')
+            ->get(['file_name', 'file_path'])->toArray();
 
         $this->dispatch('open-qa');
     }
@@ -662,8 +718,7 @@ class Dashboard extends Component
         }
 
         $this->dispatch('close-qa');
-        $this->loadQaHub();
-        $this->loadProjectTelemetry(); // Refreshes the Sprints tab in the background
+        $this->loadQaHub(); // Progress shows the task as done when it is opened (each section reloads its rows)
         session()->flash('global_success', __('portal.qa.task_approved_from_issue'));
     }
     
