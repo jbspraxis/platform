@@ -70,7 +70,7 @@ final class InvoicePdf
         $organisation = $project ? DB::table('organizations')->where('id', $project->organization_id)->first() : null;
         // The company recorded on the invoice, even if it has been deactivated since; none recorded: Nigeria's
         $issuer = $invoice->billing_entity_id ? DB::table('mdm_legal_entities')->where('id', $invoice->billing_entity_id)->first() : Vat::issuer(null);
-        $vat = Vat::recorded($invoice->vat_applied ?? null, $invoice->vat_rate ?? null, $issuer?->id, $organisation);
+        $vat = Vat::recorded($invoice->vat_applied ?? null, $invoice->vat_rate ?? null, $issuer?->id, $organisation, $issuer);
         $lines = DB::table('invoice_lines')->where('invoice_id', $invoice->id)->orderBy('id')->get();
         if ($lines->isEmpty()) {
             $lines = collect([(object) ['description' => (string) $invoice->invoice_type, 'quantity' => 1, 'unit_price' => $invoice->amount_due, 'total_price' => $invoice->amount_due]]);

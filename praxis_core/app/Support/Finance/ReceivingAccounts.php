@@ -14,7 +14,15 @@ class ReceivingAccounts
 {
     public static function for(?string $currency, ?string $entityId): Collection
     {
-        $company = Vat::issuer($entityId)?->id;
+        return self::heldBy($currency, Vat::issuer($entityId)?->id);
+    }
+
+    /**
+     * The same, for a company already chosen by Vat::issuer() (Vat::for()'s entity_id), so a screen that has the VAT
+     * answer doesn't look the company up again
+     */
+    public static function heldBy(?string $currency, ?string $company): Collection
+    {
         if (! $currency || ! $company) {
             return collect();
         }

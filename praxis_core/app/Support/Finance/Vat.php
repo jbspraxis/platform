@@ -74,12 +74,13 @@ final class Vat
     /**
      * What an issued document recorded, in the shape of for(): applied at its rate by its company (null: Nigeria's,
      * or issued before the switch existed). A VAT-charging company never has a 0% rate of its own (Tax compliance
-     * refuses it), so applied at 0% is a zero-rated export.
+     * refuses it), so applied at 0% is a zero-rated export. $entity: that company's row, when the caller has read it
+     * already (not looked up again).
      */
-    public static function recorded(mixed $applied, mixed $rate, ?string $entityId, object|string|null $organisation = null): array
+    public static function recorded(mixed $applied, mixed $rate, ?string $entityId, object|string|null $organisation = null, ?object $entity = null): array
     {
         $applies = self::applied($applied, $rate);
-        $entity = $entityId ? DB::table('mdm_legal_entities')->where('id', $entityId)->first() : null;
+        $entity = $entityId ? ($entity && (string) $entity->id === $entityId ? $entity : DB::table('mdm_legal_entities')->where('id', $entityId)->first()) : null;
 
         return [
             'applies' => $applies,

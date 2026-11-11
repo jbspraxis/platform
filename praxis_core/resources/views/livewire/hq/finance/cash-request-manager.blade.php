@@ -1,8 +1,10 @@
 <div>
+    @assets
     <style>
         .signature-pad { display: block; width: 100%; height: 150px; border: 1px dashed var(--color-line-strong); border-radius: var(--radius-control); background: var(--color-paper); cursor: crosshair; touch-action: none; }
         .signature-pad.expanded { height: 400px; }
     </style>
+    @endassets
 
     @php
         $statusLabels = ['Pending Auth' => 'Awaiting approval', 'Authorized' => 'Approved', 'Rejected' => 'Rejected', 'Cleared' => 'Closed'];
@@ -99,6 +101,9 @@
                 </tbody>
             </table>
         </div>
+        @if($activeTab === 'history' && $requests->hasPages())
+            <div class="p-4">{{ $requests->links() }}</div>
+        @endif
     </div>
 
     @if($showAuthModal && $selectedRequest)
@@ -254,12 +259,13 @@
                 if (this.isDrawing) {
                     this.isDrawing = false;
                     this.ctx.closePath();
-                    this.$wire.set('authorizer_signature', this.activeCanvas.toDataURL('image/png'));
+                    // Kept until Approve request sends it (false: no round trip per stroke)
+                    this.$wire.set('authorizer_signature', this.activeCanvas.toDataURL('image/png'), false);
                 }
             },
             clearCanvas() {
                 this.ctx.clearRect(0, 0, this.activeCanvas.width, this.activeCanvas.height);
-                this.$wire.set('authorizer_signature', null);
+                this.$wire.set('authorizer_signature', null, false);
             },
             syncToSmallCanvas() {
                 const smallCtx = this.$refs.canvas.getContext('2d');

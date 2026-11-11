@@ -17,10 +17,8 @@ class CashRequestSubmitter extends Component
 
     public $activeTab = 'request'; // 'request' or 'ledger'
 
-    public $projects = [];
-    public $dictionaryItems = [];
-    public $myRequests = [];
-    
+    // The form's choices and the person's requests are read when the page renders (never kept in the page)
+
     // Core Form State
     public $project_id = '';
     public $financial_dictionary_id = '';
@@ -45,36 +43,34 @@ class CashRequestSubmitter extends Component
     public $generatedReference = '';
     public $receipt_file; 
 
-    public function mount()
-    {
-        $this->loadMasterData();
-        $this->loadMyRequests();
-    }
-
     public function setTab($tab)
     {
         $this->activeTab = $tab;
-        if ($tab === 'ledger') $this->loadMyRequests();
     }
 
-    public function loadMasterData()
+    /** New request: the active projects and expense items to choose from */
+    private function masterData(): array
     {
         try {
-            $this->projects = DB::table('projects')->where('status', 'Active')->select('id', 'title', 'currency')->get();
-            $this->dictionaryItems = DB::table('mdm_financial_dictionary')->where('is_active', 1)->orderBy('category')->get();
+            return [
+                DB::table('projects')->where('status', 'Active')->select('id', 'title')->get(),
+                DB::table('mdm_financial_dictionary')->where('is_active', 1)->orderBy('category')->select('id', 'item_code', 'description')->get(),
+            ];
         } catch (\Exception $e) {
-            $this->projects = collect([]);
-            $this->dictionaryItems = collect([]);
+            return [collect([]), collect([])];
         }
     }
 
-    public function loadMyRequests()
+    /** My requests: what the list shows, without the signature image (a base64 PNG of 5-30 KB) */
+    private function myRequests()
     {
         $userId = Auth::id() ?? '3f0bd9fe-1ab7-11f1-ab8b-44a84221081c';
-        $this->myRequests = DB::table('cash_requests')
+
+        return DB::table('cash_requests')
             ->join('mdm_financial_dictionary', 'cash_requests.financial_dictionary_id', '=', 'mdm_financial_dictionary.id')
             ->where('cash_requests.requester_id', $userId)
-            ->select('cash_requests.*', 'mdm_financial_dictionary.item_code', 'mdm_financial_dictionary.category')
+            ->select('cash_requests.id', 'cash_requests.reference', 'cash_requests.created_at', 'cash_requests.purpose', 'cash_requests.currency',
+                'cash_requests.amount_requested', 'cash_requests.status', 'cash_requests.receipt_url', 'mdm_financial_dictionary.category')
             ->orderBy('cash_requests.created_at', 'desc')
             ->get();
     }
@@ -154,14 +150,10 @@ class CashRequestSubmitter extends Component
             'user_id' => $userId, 'action' => 'SUBMITTED_CASH_REQUEST', 'target_table' => 'cash_requests', 'ip_address' => $ipAddress, 'created_at' => now()
         ]);
 
-        $adminIds = Access::staffWith('expenses.approve');
-        foreach ($adminIds as $adminId) {
-            DB::table('notifications')->insert([
-                'id' => Str::uuid()->toString(), 'user_id' => $adminId, 'type' => 'Financial', 'title' => 'Cash request to approve',
-                'message' => "Cash request {$this->generatedReference} needs approval. Review it in Cash request approvals.", 'link_url' => route('hq.finance.manager'), 'is_read' => 0, 'created_at' => now(),
-            ]);
-        }
+        // Every approver hears about it (one insert for all of them)
+        $this->notifyApprovers('Cash request to approve', "Cash request {$this->generatedReference} needs approval. Review it in Cash request approvals.");
 
+        $this->requester_signature = null; // stored with the request; no need to carry it in the page any more
         $this->showSuccessModal = true;
     }
 
@@ -185,17 +177,22 @@ class CashRequestSubmitter extends Component
         ]);
 
         // Notify Admins that Receipt is ready for Audit Clearance
-        $adminIds = Access::staffWith('expenses.approve');
-        foreach ($adminIds as $adminId) {
-            DB::table('notifications')->insert([
-                'id' => Str::uuid()->toString(), 'user_id' => $adminId, 'type' => 'Financial', 'title' => 'Receipt uploaded',
-                'message' => "A receipt was uploaded for cash request {$req->reference}. Check it and close the request in Cash request approvals.", 'link_url' => route('hq.finance.manager'), 'is_read' => 0, 'created_at' => now(),
-            ]);
-        }
+        $this->notifyApprovers('Receipt uploaded', "A receipt was uploaded for cash request {$req->reference}. Check it and close the request in Cash request approvals.");
 
         $this->receipt_file = null;
-        $this->loadMyRequests();
         session()->flash('message-'.$requestId, 'Receipt uploaded. Finance will check it and close the request.');
+    }
+
+    /** One notification per approver, written in a single insert */
+    private function notifyApprovers(string $title, string $message): void
+    {
+        $rows = array_map(fn ($adminId) => [
+            'id' => Str::uuid()->toString(), 'user_id' => $adminId, 'type' => 'Financial', 'title' => $title,
+            'message' => $message, 'link_url' => route('hq.finance.manager'), 'is_read' => 0, 'created_at' => now(),
+        ], array_values(Access::staffWith('expenses.approve')));
+        if ($rows) {
+            DB::table('notifications')->insert($rows);
+        }
     }
 
     public function closeSuccessModal()
@@ -206,6 +203,13 @@ class CashRequestSubmitter extends Component
 
     public function render()
     {
-        return view('livewire.hq.finance.cash-request-submitter');
+        // Only what the open tab shows
+        [$projects, $dictionaryItems] = $this->activeTab === 'request' ? $this->masterData() : [collect(), collect()];
+
+        return view('livewire.hq.finance.cash-request-submitter', [
+            'projects' => $projects,
+            'dictionaryItems' => $dictionaryItems,
+            'myRequests' => $this->activeTab === 'ledger' ? $this->myRequests() : collect(),
+        ]);
     }
 }

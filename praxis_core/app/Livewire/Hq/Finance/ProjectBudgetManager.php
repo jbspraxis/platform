@@ -4,7 +4,6 @@ namespace App\Livewire\Hq\Finance;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
-use Livewire\Attributes\Locked;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -12,23 +11,8 @@ use Illuminate\Support\Str;
 #[Layout('components.layouts.hq')]
 class ProjectBudgetManager extends Component
 {
-    // Loaded on the server only; the browser must not change them
-    #[Locked]
-    public $allProjects = [];
+    // The project chosen; its budget lines and totals are read when the page renders (never kept in the page)
     public $activeProjectId = '';
-    #[Locked]
-    public $activeProject = null;
-
-    #[Locked]
-    public $budgetLines = [];
-    #[Locked]
-    public $metrics = [
-        'total_budget' => 0,
-        'total_allocated' => 0,
-        'total_spent' => 0,
-        'total_accrued' => 0, 
-        'remaining_pool' => 0
-    ];
 
     // Sweep / Reallocate State
     public $showSweepModal = false;
@@ -38,48 +22,59 @@ class ProjectBudgetManager extends Component
 
     public function mount()
     {
-        $this->allProjects = DB::table('projects')->orderBy('created_at', 'desc')->get()->toArray();
-        if (!empty($this->allProjects)) {
-            $this->switchProject($this->allProjects[0]->id);
+        $first = DB::table('projects')->orderBy('created_at', 'desc')->value('id');
+        if ($first) {
+            $this->switchProject($first);
         }
     }
 
     public function switchProject($projectId)
     {
         $this->activeProjectId = $projectId;
-        $this->activeProject = collect($this->allProjects)->firstWhere('id', $projectId);
-        $this->loadBudgetData();
     }
 
-    public function loadBudgetData()
+    /** The projects to choose from, newest first: only what the picker and the totals use */
+    private function allProjects()
     {
-        if (!$this->activeProject) return;
+        return DB::table('projects')->orderBy('created_at', 'desc')->get(['id', 'title', 'currency', 'total_budget']);
+    }
 
+    /** The project chosen, as it is now in the database */
+    private function activeProject(): ?object
+    {
+        return $this->activeProjectId ? DB::table('projects')->where('id', (string) $this->activeProjectId)->first(['id', 'title', 'currency', 'total_budget']) : null;
+    }
+
+    /** The project's budget lines (as arrays) and its totals */
+    private function budgetData(object $activeProject): array
+    {
         // Fetch budget lines and join MDM dictionary for categorization
         $rawBudgets = DB::table('project_budgets')
             ->leftJoin('mdm_financial_dictionary', 'project_budgets.dict_id', '=', 'mdm_financial_dictionary.id')
-            ->where('project_budgets.project_id', $this->activeProject->id)
+            ->where('project_budgets.project_id', $activeProject->id)
             ->select(
-                'project_budgets.*', 
+                'project_budgets.id', 'project_budgets.dict_id', 'project_budgets.description',
+                'project_budgets.total_allocated', 'project_budgets.total_spent',
                 'mdm_financial_dictionary.item_code', 
                 'mdm_financial_dictionary.category'
             )
             ->get();
 
+        // ACCRUAL LOGIC: pending/authorized cash requests locked against each line, summed per expense item in one query
+        $accruedByItem = DB::table('cash_requests')
+            ->where('project_id', $activeProject->id)
+            ->whereIn('status', ['Pending Auth', 'Authorized'])
+            ->groupBy('financial_dictionary_id')
+            ->selectRaw('financial_dictionary_id, SUM(amount_requested) as accrued')
+            ->pluck('accrued', 'financial_dictionary_id');
+
         $totalAllocated = 0;
         $totalSpent = 0;
         $totalAccrued = 0;
 
-        $this->budgetLines = $rawBudgets->map(function($line) use (&$totalAllocated, &$totalSpent, &$totalAccrued) {
-            
-            // ACCRUAL LOGIC: Calculate pending/authorized cash requests locked against this line
-            $accrued = DB::table('cash_requests')
-                ->where('project_id', $this->activeProject->id)
-                ->where('financial_dictionary_id', $line->dict_id)
-                ->whereIn('status', ['Pending Auth', 'Authorized'])
-                ->sum('amount_requested');
+        $budgetLines = $rawBudgets->map(function($line) use (&$totalAllocated, &$totalSpent, &$totalAccrued, $accruedByItem) {
 
-            $line->accrued_amount = (float) $accrued;
+            $line->accrued_amount = (float) ($line->dict_id === null ? 0 : ($accruedByItem[$line->dict_id] ?? 0));
             
             // Available Balance = Allocated - (Already Spent + Currently Requested)
             $line->available_balance = (float) $line->total_allocated - ((float) $line->total_spent + $line->accrued_amount);
@@ -91,13 +86,13 @@ class ProjectBudgetManager extends Component
             return (array) $line;
         })->toArray();
 
-        $this->metrics = [
-            'total_budget' => (float) $this->activeProject->total_budget,
+        return [$budgetLines, [
+            'total_budget' => (float) $activeProject->total_budget,
             'total_allocated' => $totalAllocated,
             'total_spent' => $totalSpent,
             'total_accrued' => $totalAccrued,
-            'remaining_pool' => (float) $this->activeProject->total_budget - $totalAllocated 
-        ];
+            'remaining_pool' => (float) $activeProject->total_budget - $totalAllocated 
+        ]];
     }
 
     public function openSweepModal()
@@ -122,19 +117,21 @@ class ProjectBudgetManager extends Component
             'sweepAmount' => 'amount',
         ]);
 
+        $activeProject = $this->activeProject();
+
         try {
-            DB::transaction(function () {
+            DB::transaction(function () use ($activeProject) {
                 $fromLine = DB::table('project_budgets')->where('id', $this->sweepFromId)->first();
                 $toLine = DB::table('project_budgets')->where('id', $this->sweepToId)->first();
 
                 // 1. Both lines must belong to the selected project
-                if ($fromLine->project_id !== $this->activeProject->id || $toLine->project_id !== $this->activeProject->id) {
+                if (! $activeProject || $fromLine->project_id !== $activeProject->id || $toLine->project_id !== $activeProject->id) {
                     throw new \DomainException("Both budget lines must belong to the selected project. Refresh the page and try again.");
                 }
 
                 // 2. Only money that is neither spent nor held by open cash requests can move
                 $accrued = DB::table('cash_requests')
-                    ->where('project_id', $this->activeProject->id)
+                    ->where('project_id', $activeProject->id)
                     ->where('financial_dictionary_id', $fromLine->dict_id)
                     ->whereIn('status', ['Pending Auth', 'Authorized'])
                     ->sum('amount_requested');
@@ -155,7 +152,7 @@ class ProjectBudgetManager extends Component
                     // Assuming id is auto-increment or UUID, ensure it’s handled. If UUID: 'id' => str()->uuid(),
                     'user_id' => Auth::check() ? Auth::id() : null, // Use null instead of 'SYSTEM' to respect UUID FKs
                     'action' => 'BUDGET_SWEEP_EXECUTED',
-                    'description' => "Moved {$this->activeProject->currency} {$sweepAmountFloat} of budget from {$fromLine->description} to {$toLine->description} on project {$this->activeProject->title}",
+                    'description' => "Moved {$activeProject->currency} {$sweepAmountFloat} of budget from {$fromLine->description} to {$toLine->description} on project {$activeProject->title}",
                     'target_table' => 'project_budgets',
                     'ip_address' => request()->ip(),
                     'created_at' => now()
@@ -163,7 +160,6 @@ class ProjectBudgetManager extends Component
             });
 
             $this->showSweepModal = false;
-            $this->loadBudgetData();
             session()->flash('success', 'Budget moved. The line totals below are updated.');
 
         } catch (\DomainException $e) {
@@ -176,6 +172,16 @@ class ProjectBudgetManager extends Component
 
     public function render()
     {
-        return view('livewire.hq.finance.project-budget-manager');
+        $activeProject = $this->activeProject();
+        [$budgetLines, $metrics] = $activeProject
+            ? $this->budgetData($activeProject)
+            : [[], ['total_budget' => 0, 'total_allocated' => 0, 'total_spent' => 0, 'total_accrued' => 0, 'remaining_pool' => 0]];
+
+        return view('livewire.hq.finance.project-budget-manager', [
+            'allProjects' => $this->allProjects(),
+            'activeProject' => $activeProject,
+            'budgetLines' => $budgetLines,
+            'metrics' => $metrics,
+        ]);
     }
 }

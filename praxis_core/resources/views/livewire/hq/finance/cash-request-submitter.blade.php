@@ -1,7 +1,9 @@
 <div>
+    @assets
     <style>
         .signature-pad { display: block; width: 100%; height: 150px; border: 1px dashed var(--color-line-strong); border-radius: var(--radius-control); background: var(--color-paper); cursor: crosshair; touch-action: none; }
     </style>
+    @endassets
 
     @php
         $statusLabels = ['Pending Auth' => 'Awaiting approval', 'Authorized' => 'Approved', 'Rejected' => 'Rejected', 'Cleared' => 'Closed'];
@@ -171,8 +173,9 @@
                 getCoordinates(e) { const rect = this.activeCanvas.getBoundingClientRect(); const clientX = e.touches ? e.touches[0].clientX : e.clientX; const clientY = e.touches ? e.touches[0].clientY : e.clientY; return { x: clientX - rect.left, y: clientY - rect.top }; },
                 startDrawing(e) { this.isDrawing = true; const { x, y } = this.getCoordinates(e); this.ctx.beginPath(); this.ctx.moveTo(x, y); },
                 draw(e) { if (!this.isDrawing) return; const { x, y } = this.getCoordinates(e); this.ctx.lineTo(x, y); this.ctx.stroke(); },
-                stopDrawing() { if (this.isDrawing) { this.isDrawing = false; this.ctx.closePath(); this.$wire.set('requester_signature', this.activeCanvas.toDataURL('image/png')); } },
-                clearCanvas() { this.ctx.clearRect(0, 0, this.activeCanvas.width, this.activeCanvas.height); this.$wire.set('requester_signature', null); },
+                // Kept until Send request sends it (false: no round trip per stroke)
+                stopDrawing() { if (this.isDrawing) { this.isDrawing = false; this.ctx.closePath(); this.$wire.set('requester_signature', this.activeCanvas.toDataURL('image/png'), false); } },
+                clearCanvas() { this.ctx.clearRect(0, 0, this.activeCanvas.width, this.activeCanvas.height); this.$wire.set('requester_signature', null, false); },
             }))
         </script>
         @endscript

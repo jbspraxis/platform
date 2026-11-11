@@ -4,6 +4,8 @@ namespace App\Livewire\Hq\Finance;
 
 use Livewire\Component;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
+use Livewire\WithPagination;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -11,10 +13,19 @@ use Illuminate\Support\Str;
 #[Layout('components.layouts.hq')]
 class GeneralLedgerManager extends Component
 {
-    public $entries = [];
+    use WithPagination;
+
+    /** Journal entries shown per page */
+    private const PER_PAGE = 50;
+
+    // The filters as typed; the entries are read when the page renders, for the filters last applied with Show entries
     public $startDate;
     public $endDate;
     public $regionFilter = 'ALL';
+
+    /** The filters last applied: ['from', 'to', 'region'] */
+    #[Locked]
+    public array $shown = [];
 
     // Reversal State
     public $showReversalModal = false;
@@ -28,33 +39,52 @@ class GeneralLedgerManager extends Component
         $this->loadLedger();
     }
 
+    /** Show entries: the filters as typed become the ones the list follows */
     public function loadLedger()
     {
+        $this->shown = ['from' => $this->startDate, 'to' => $this->endDate, 'region' => $this->regionFilter];
+        $this->resetPage();
+    }
+
+    /** One page of the period's entries, newest first, each with its lines */
+    private function entries()
+    {
         $query = DB::table('journal_entries')
-            ->whereBetween('entry_date', [$this->startDate, $this->endDate])
+            ->whereBetween('entry_date', [$this->shown['from'] ?? null, $this->shown['to'] ?? null])
+            ->select('id', 'reference_number', 'entry_date', 'description', 'source_module', 'region_code', 'is_reversal', 'reverses_entry_id')
             ->orderBy('created_at', 'desc');
 
-        if ($this->regionFilter !== 'ALL') {
-            $query->where('region_code', $this->regionFilter);
+        if (($this->shown['region'] ?? 'ALL') !== 'ALL') {
+            $query->where('region_code', $this->shown['region']);
         }
 
-        $rawEntries = $query->get();
+        $entries = $query->paginate(self::PER_PAGE);
 
-        // Attach lines to entries with strict IFRS Sorting (Debits strictly above Credits)
-        $this->entries = $rawEntries->map(function ($entry) {
-            $entry->lines = DB::table('journal_lines')
-                ->join('chart_of_accounts', 'journal_lines.account_id', '=', 'chart_of_accounts.id')
-                ->where('journal_lines.journal_entry_id', $entry->id)
-                ->select(
-                    'journal_lines.*', 
-                    'chart_of_accounts.account_code', 
-                    'chart_of_accounts.account_name'
-                )
-                // IFRS Rule: Debits (values > 0) sort to the top, Credits sort to the bottom
-                ->orderBy('journal_lines.debit_amount', 'desc') 
-                ->get();
-            return $entry;
-        })->toArray();
+        $ids = $entries->getCollection()->pluck('id')->all();
+        if ($ids === []) {
+            return $entries;
+        }
+
+        // Every line of the page's entries in one query, with strict IFRS Sorting (Debits strictly above Credits)
+        $lines = DB::table('journal_lines')
+            ->join('chart_of_accounts', 'journal_lines.account_id', '=', 'chart_of_accounts.id')
+            ->whereIn('journal_lines.journal_entry_id', $ids)
+            ->select(
+                'journal_lines.journal_entry_id', 'journal_lines.memo', 'journal_lines.debit_amount', 'journal_lines.credit_amount',
+                'chart_of_accounts.account_code', 
+                'chart_of_accounts.account_name'
+            )
+            // IFRS Rule: Debits (values > 0) sort to the top, Credits sort to the bottom
+            ->orderBy('journal_lines.debit_amount', 'desc')
+            ->orderBy('journal_lines.id')
+            ->get()
+            ->groupBy('journal_entry_id');
+
+        foreach ($entries as $entry) {
+            $entry->lines = $lines->get($entry->id, collect());
+        }
+
+        return $entries;
     }
 
     public function filterLedger()
@@ -368,6 +398,6 @@ class GeneralLedgerManager extends Component
 
     public function render()
     {
-        return view('livewire.hq.finance.general-ledger-manager');
+        return view('livewire.hq.finance.general-ledger-manager', ['entries' => $this->entries()]);
     }
 }
