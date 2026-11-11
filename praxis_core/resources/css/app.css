@@ -3,6 +3,8 @@
 @import 'tailwindcss';
 @import '@fontsource-variable/newsreader/opsz.css';
 @import '@fontsource-variable/plus-jakarta-sans/wght.css';
+/* HQ and the Client Portal as apps (docs/PWA.md); ahead of the rules below, as when it was its own stylesheet */
+@import '../pwa/hq-pwa.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';

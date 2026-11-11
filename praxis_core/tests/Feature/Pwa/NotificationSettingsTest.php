@@ -388,7 +388,8 @@ class NotificationSettingsTest extends TestCase
         ], $config['routes']);
         $this->assertSame(['install' => 14, 'notify' => 14], $config['snoozeDays']);
 
-        $response->assertSee('<link rel="stylesheet" href="' . Pwa::asset('hq-pwa.css') . '">', false);
+        // The app's styles come with app.css: no second stylesheet holds up the page
+        $response->assertDontSee('hq-pwa.css', false);
         $response->assertSee('<script src="' . Pwa::asset('hq-pwa.js') . '" defer></script>', false);
         // The bell's app actions and the settings panel are on every HQ page
         $response->assertSee('data-hq-pwa="bell-actions"', false);

@@ -13,6 +13,7 @@
     <button type="button" class="btn btn-secondary" wire:click="show"><i data-lucide="upload"></i> {{ $definition->title() }}</button>
 
     @if ($open)
+        {{-- Static styles: sent once, the first time the dialog opens, not again on every round trip --}}
         @assets
         <style>
             .im { max-width: 560px; }

@@ -26,9 +26,10 @@ Route::prefix('documents')->middleware('can:letters.view')->group(function () {
     Route::get('/{document}', \App\Livewire\Hq\Letters\DocumentPage::class)->whereUuid('document')->name('hq.letters.document');
     Route::get('/{document}/pdf', [LetterheadController::class, 'documentPdf'])->whereUuid('document')->name('hq.letters.pdf');
 
-    // The screens' script (the signature pad and the rich-text body); plain script, no build step
+    // The screens' script (the signature pad and the rich-text body); plain script, no build step. The views
+    // add ?v=<file time>, so a changed file has a new address and each one can be kept for a year
     Route::get('/editor.js', fn () => response()->file(resource_path('letters/documents.js'), [
         'Content-Type' => 'application/javascript; charset=utf-8',
-        'Cache-Control' => 'private, max-age=86400',
+        'Cache-Control' => 'private, max-age=31536000, immutable',
     ]))->name('hq.letters.script');
 });

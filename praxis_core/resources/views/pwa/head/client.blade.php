@@ -46,5 +46,4 @@
 <script id="hq-pwa-config" type="application/json">{!! json_encode($pwaConfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES) !!}</script>
 {{-- Chrome can offer the install before hq-pwa.js runs: keep the offer for the card and the bell menu --}}
 <script>window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.hqPwaInstallPrompt = e; });</script>
-<link rel="stylesheet" href="{{ \App\Support\Pwa\Pwa::asset('hq-pwa.css') }}">
 <script src="{{ \App\Support\Pwa\Pwa::asset('hq-pwa.js') }}" defer></script>

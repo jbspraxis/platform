@@ -13,7 +13,9 @@
 @endphp
 <div class="mc">
     @assets
-        <script src="{{ route('hq.mail.compose.script', ['v' => filemtime(resource_path('mail/compose.js'))]) }}"></script>
+        {{-- defer: on a full load it runs once the page is read, still before Livewire starts Alpine (on DOMContentLoaded),
+             so it no longer holds up the first paint. Added later (wire:navigate, an update), Livewire waits for it as before. --}}
+        <script src="{{ route('hq.mail.compose.script', ['v' => filemtime(resource_path('mail/compose.js'))]) }}" defer></script>
     @endassets
     @assets
     <style>

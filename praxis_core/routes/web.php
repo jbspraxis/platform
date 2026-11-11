@@ -292,10 +292,11 @@ Route::domain(Hosts::portal())->group(function () use ($notOwnRoute, $legacy) {
             ->middleware('signed:relative')->name('portal.agreement');
         Route::get('/agreements/{token}/pdf', [\App\Http\Controllers\LetterheadController::class, 'agreementPdf'])->where('token', '[A-Za-z0-9]{24,64}')
             ->name('portal.agreement.pdf');
-        // The signature pad, the same script HQ's Documents screens load; no build step
+        // The signature pad, the same script HQ's Documents screens load; no build step. Versioned by ?v=<file time>
+        // in the page, so each address is kept for a year
         Route::get('/agreements-signature.js', fn () => response()->file(resource_path('letters/documents.js'), [
             'Content-Type' => 'application/javascript; charset=utf-8',
-            'Cache-Control' => 'public, max-age=86400',
+            'Cache-Control' => 'public, max-age=31536000, immutable',
         ]))->name('portal.agreement.script');
 
         // One version of an opportunity's statement of work: read it, sign it with the one-time code or ask for changes; and its PDF (PR 5)

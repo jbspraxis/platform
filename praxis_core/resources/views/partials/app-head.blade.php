@@ -18,6 +18,18 @@
 <script>window.lucide = window.lucide || { createIcons: function () {} };</script>
 {{-- Passkeys on HQ and the Client Portal (docs/SIGN_IN.md) --}}
 @include('partials.passkey-script')
+{{-- The UI font (Plus Jakarta Sans, Latin letters) downloads alongside app.css, not after it. The same file app.css
+     imports: keep this path in step with it (FrontendAssetsTest checks). Not the serif or the other alphabets: few pages need them. --}}
+@php
+    try {
+        $uiFont = \Illuminate\Support\Facades\Vite::asset('node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2');
+    } catch (\Throwable $e) {
+        $uiFont = null; // not in this build: the page opens as before, only without the head start
+    }
+@endphp
+@if ($uiFont)
+<link rel="preload" as="font" type="font/woff2" crossorigin href="{{ $uiFont }}">
+@endif
 @vite(['resources/css/app.css', 'resources/js/app.js'])
 @livewireStyles
 @stack('styles')
