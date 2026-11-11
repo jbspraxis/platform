@@ -49,7 +49,7 @@ class ErrorMonitor
                 'url' => $request ? self::cleanUrl($request->fullUrl()) : 'artisan ' . implode(' ', array_slice($_SERVER['argv'] ?? [], 1, 3)),
                 'method' => $request?->method(),
                 'user_id' => Auth::id(),
-                'component' => $request ? self::livewireComponent($request) : null,
+                'component' => $request ? self::livewireComponent($request, $e) : null,
             ]);
         } catch (Throwable $ignored) {
             // The database may be the thing that is down; the log file still has the error
@@ -339,13 +339,39 @@ class ErrorMonitor
         return ($parts['path'] ?? '/');
     }
 
-    private static function livewireComponent($request): ?string
+    /**
+     * The Livewire component the error belongs to. One request can carry several components (a tab click and the
+     * bell's push refresh in the same moment), so not simply the first: the one the failing method was called on
+     * ("Public method [setTab] not found"), else the first asked to run a method rather than receive an event.
+     */
+    private static function livewireComponent($request, ?Throwable $e = null): ?string
     {
-        if (!str_contains($request->path(), 'livewire')) {
+        if (!str_contains($request->path(), 'livewire') || !is_array($components = $request->input('components'))) {
             return null;
         }
-        $snapshot = $request->input('components.0.snapshot');
-        $data = is_string($snapshot) ? json_decode($snapshot, true) : null;
-        return $data['memo']['name'] ?? null;
+
+        $named = [];
+        foreach ($components as $component) {
+            $snapshot = is_array($component) ? ($component['snapshot'] ?? null) : null;
+            $name = is_string($snapshot) ? (json_decode($snapshot, true)['memo']['name'] ?? null) : null;
+            if (is_string($name)) {
+                $calls = is_array($component['calls'] ?? null) ? $component['calls'] : [];
+                $named[] = [$name, array_column(array_filter($calls, 'is_array'), 'method')];
+            }
+        }
+
+        $failed = $e && preg_match('/method \[([^\]]+)\]/', $e->getMessage(), $m) ? $m[1] : null;
+        foreach ($named as [$name, $methods]) {
+            if ($failed !== null && in_array($failed, $methods, true)) {
+                return $name;
+            }
+        }
+        foreach ($named as [$name, $methods]) {
+            if (array_diff($methods, ['__dispatch'])) {
+                return $name;
+            }
+        }
+
+        return $named[0][0] ?? null;
     }
 }
