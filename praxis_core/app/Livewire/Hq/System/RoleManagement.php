@@ -42,6 +42,9 @@ class RoleManagement extends Component
     public $showSuccessModal = false;
     public $successMessage = '';
 
+    /** Client Portal accounts lists one row per client; this is the client whose people are open in the dialog */
+    public ?string $openClientId = null;
+
     // --- EDIT STATE ---
     public $editMode = false;
     #[Locked]
@@ -98,6 +101,7 @@ class RoleManagement extends Component
         if (!in_array($tab, ['CREATE', 'INTERNAL', 'CLIENTS'], true)) return;
         if ($tab === 'CREATE' && !Auth::user()->can('access.create')) return;
         $this->activeTab = $tab;
+        $this->openClientId = null;
         // A half-filled new account survives a look at the lists; an edit doesn't follow you out
         if ($this->editMode) {
             $this->resetForm();
@@ -125,7 +129,7 @@ class RoleManagement extends Component
                 ->whereIn('u.lifecycle_stage', ['Onboarding', 'Active'])
                 ->whereNull('u.deleted_at')
                 ->select(
-                    'u.id', 'u.first_name', 'u.last_name', 'u.email', 'u.lifecycle_stage', 'u.status', 'u.is_primary_client',
+                    'u.id', 'u.first_name', 'u.last_name', 'u.email', 'u.lifecycle_stage', 'u.status', 'u.is_primary_client', 'u.last_login_at',
                     'org.name as org_name', 'org.id as org_id',
                     DB::raw("CASE WHEN u.is_primary_client = 1 THEN 'Client Admin (primary)' ELSE COALESCE(r.name, 'No role') END as role_name")
                 )
@@ -561,6 +565,41 @@ class RoleManagement extends Component
         ]);
     }
 
+    /** Opens the dialog with every Client Portal account of one client (only a client on the list) */
+    public function openClient(string $orgId): void
+    {
+        $this->openClientId = $this->activeTab === 'CLIENTS'
+            && collect($this->users)->contains(fn ($u) => (string) data_get($u, 'org_id') === $orgId) ? $orgId : null;
+    }
+
+    public function closeClient(): void
+    {
+        $this->openClientId = null;
+    }
+
+    /**
+     * The Client Portal list, one row per client: its accounts, its Client Admin (primary contact), how many are
+     * invited or suspended, and when anyone last signed in. Sorted by client name.
+     */
+    public function clientRows(): \Illuminate\Support\Collection
+    {
+        return collect($this->users)->groupBy(fn ($u) => (string) data_get($u, 'org_id'))->map(function ($people, $orgId) {
+            $primary = $people->first(fn ($u) => ! empty(data_get($u, 'is_primary_client')));
+            $last = $people->map(fn ($u) => data_get($u, 'last_login_at'))->filter()->max();
+
+            return (object) [
+                'id' => (string) $orgId,
+                'name' => data_get($people->first(), 'org_name') ?: 'No organisation',
+                'people' => $people->values(),
+                'count' => $people->count(),
+                'invited' => $people->filter(fn ($u) => data_get($u, 'lifecycle_stage') === 'Onboarding')->count(),
+                'suspended' => $people->filter(fn ($u) => data_get($u, 'lifecycle_stage') !== 'Onboarding' && data_get($u, 'status') !== 'Active')->count(),
+                'primary' => $primary,
+                'last_login_at' => $last,
+            ];
+        })->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values();
+    }
+
     public function closeSuccessModal()
     {
         $this->showSuccessModal = false;
@@ -571,9 +610,13 @@ class RoleManagement extends Component
 
     public function render()
     {
+        $clients = $this->activeTab === 'CLIENTS' ? $this->clientRows() : collect();
+
         return view('livewire.hq.system.role-management', [
             'canCreate' => Auth::user()->can('access.create'),
             'canEdit' => Auth::user()->can('access.edit'),
+            'clients' => $clients,
+            'openClient' => $this->openClientId === null ? null : $clients->firstWhere('id', $this->openClientId),
         ]);
     }
 }

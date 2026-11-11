@@ -57,8 +57,10 @@ class HqQaFixesTest extends TestCase
         $this->insertRow('client_users', ['id' => $second, 'organization_id' => $org, 'first_name' => 'Adaeze', 'last_name' => 'Client', 'email' => 'adaeze@client.test',
             'is_primary_client' => 0, 'role_id' => $member, 'status' => 'Active', 'lifecycle_stage' => 'Onboarding']);
 
-        Livewire::test(RoleManagement::class)->call('setTab', 'CLIENTS')->assertSee('Make primary contact')
-            ->call('makePrimary', $second)->assertSet('showSuccessModal', true);
+        // The list shows the client; its people (and their actions) are in its dialog
+        Livewire::test(RoleManagement::class)->call('setTab', 'CLIENTS')->assertDontSee('Make primary contact')
+            ->call('openClient', $org)->assertSee('Make primary contact')
+            ->call('makePrimary', $second)->assertSet('showSuccessModal', true)->assertSet('openClientId', $org);
 
         $this->assertEquals([$first => 0, $second => 1], DB::table('client_users')->where('organization_id', $org)->pluck('is_primary_client', 'id')->map(fn ($v) => (int) $v)->all());
         $this->assertSame(\App\Support\Access::clientAdminRoleId(), (int) DB::table('client_users')->where('id', $second)->value('role_id'));

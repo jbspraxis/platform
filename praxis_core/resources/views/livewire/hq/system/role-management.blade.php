@@ -181,6 +181,129 @@
             </form>
         </div>
 
+    @elseif($activeTab === 'CLIENTS')
+        @php
+            $signedIn = fn ($at) => $at ? \Illuminate\Support\Carbon::parse($at)->setTimezone('Africa/Lagos')->format('j M Y, H:i') : 'Never';
+        @endphp
+        {{-- One row per client; its people open in a dialog --}}
+        <div class="card" style="padding: 0; overflow: hidden;">
+            <div class="card-header" style="padding: 16px 20px 0;">
+                <h2 class="card-title">Client Portal accounts</h2>
+                <span class="help" style="font-variant-numeric: tabular-nums;">{{ $clients->count() }} {{ $clients->count() == 1 ? 'client' : 'clients' }}, {{ count($users) }} {{ count($users) == 1 ? 'account' : 'accounts' }}</span>
+            </div>
+
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th style="min-width: 220px;">Client</th>
+                            <th style="min-width: 140px;">Accounts</th>
+                            <th style="min-width: 220px;">Client Admin</th>
+                            <th style="min-width: 150px;">Last sign-in</th>
+                            <th><span class="sr-only">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($clients as $client)
+                            <tr wire:key="client-{{ $client->id }}">
+                                <td class="text-ink" style="font-weight: 600;">{{ $client->name }}</td>
+                                <td>
+                                    <div class="text-ink" style="font-variant-numeric: tabular-nums;">{{ $client->count }} {{ $client->count == 1 ? 'account' : 'accounts' }}</div>
+                                    @if($client->invited || $client->suspended)
+                                        <div class="help" style="margin-top: 2px;">{{ collect([$client->invited ? $client->invited . ' invited' : null, $client->suspended ? $client->suspended . ' suspended' : null])->filter()->implode(', ') }}</div>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if($client->primary)
+                                        <div class="text-ink">{{ $client->primary->first_name }} {{ $client->primary->last_name }}</div>
+                                        <div class="help" style="margin-top: 2px;">{{ $client->primary->email }}</div>
+                                    @else
+                                        <span class="help">No Client Admin yet</span>
+                                    @endif
+                                </td>
+                                <td class="text-ink" style="font-variant-numeric: tabular-nums;">{{ $signedIn($client->last_login_at) }}</td>
+                                <td style="white-space: nowrap; text-align: right;">
+                                    <button type="button" wire:click="openClient('{{ $client->id }}')" class="btn btn-secondary btn-sm"
+                                            aria-label="View the accounts of {{ $client->name }}">View accounts</button>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5">
+                                    <div class="empty-state">
+                                        <strong>No Client Portal accounts yet</strong>
+                                        @if($canCreate)
+                                            Clients appear here once you send one of their people an invitation from Add an account.
+                                        @else
+                                            Clients appear here once someone with permission to invite people adds them.
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        @if($openClient && ! $showSuccessModal)
+            <div class="modal-backdrop" wire:click.self="closeClient" x-data x-on:keydown.escape.window="$wire.closeClient()">
+                <div class="modal" role="dialog" aria-modal="true" aria-labelledby="client-accounts-title" style="max-width: 960px;"
+                     x-init="$nextTick(() => $refs.close.focus())">
+                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;">
+                        <div style="min-width: 0;">
+                            <h2 id="client-accounts-title" class="modal-title">{{ $openClient->name }}</h2>
+                            <p class="help" style="margin: 0;">{{ $openClient->count }} Client Portal {{ $openClient->count == 1 ? 'account' : 'accounts' }}</p>
+                        </div>
+                        <button type="button" x-ref="close" wire:click="closeClient" class="btn btn-ghost btn-sm">Close</button>
+                    </div>
+
+                    <div class="table-wrap" style="margin-top: 16px;">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th style="min-width: 220px;">Name and email</th>
+                                    <th style="min-width: 150px;">Role</th>
+                                    <th>Status</th>
+                                    <th style="min-width: 130px;">Last sign-in</th>
+                                    <th><span class="sr-only">Actions</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($openClient->people as $user)
+                                    <tr wire:key="client-account-{{ $user->id }}">
+                                        <td>
+                                            <div class="flex items-center gap-3">
+                                                <x-hq.avatar :user="$user" :size="32" />
+                                                <div style="min-width: 0;">
+                                                    <div class="text-ink" style="font-weight: 600;">{{ $user->first_name }} {{ $user->last_name }}</div>
+                                                    <div class="help" style="margin-top: 2px;">{{ $user->email }}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="text-ink">{{ $user->role_name ? $roleLabel($user->role_name) : 'No role' }}</td>
+                                        <td>
+                                            @if($user->lifecycle_stage === 'Onboarding')
+                                                <span class="pill pill-warning">Invited</span>
+                                            @elseif($user->status === 'Active')
+                                                <span class="pill pill-success">Active</span>
+                                            @else
+                                                <span class="pill pill-danger">Suspended</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-ink" style="font-variant-numeric: tabular-nums;">{{ $signedIn($user->last_login_at ?? null) }}</td>
+                                        <td style="white-space: nowrap; text-align: right;">
+                                            @include('livewire.hq.system.partials.account-actions')
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        @endif
+
     @else
         <div class="card" style="padding: 0; overflow: hidden;">
 
@@ -235,31 +358,7 @@
                                 </td>
 
                                 <td style="white-space: nowrap; text-align: right;">
-                                @if($canEdit)
-                                    @if($user->lifecycle_stage === 'Onboarding')
-                                        <button type="button" wire:click="resendInvitation('{{ $user->id }}')" class="btn btn-ghost btn-sm">Resend invitation</button>
-                                    @elseif($user->status === 'Active')
-                                        <button type="button" wire:click="sendPasswordReset('{{ $user->id }}')"
-                                                wire:confirm="Email {{ $user->first_name }} {{ $user->last_name }} a link to choose a new password? It goes to {{ $user->email }} and works for {{ \App\Support\SignIn\PasswordResets::MINUTES }} minutes."
-                                                class="btn btn-ghost btn-sm">Send reset link</button>
-                                    @endif
-
-                                    <button type="button" wire:click="editUser('{{ $user->id }}')" class="btn btn-ghost btn-sm">Edit</button>
-
-                                    @if($activeTab === 'CLIENTS' && empty($user->is_primary_client) && $user->status === 'Active')
-                                        <button type="button" wire:click="makePrimary('{{ $user->id }}')"
-                                                wire:confirm="Make {{ $user->first_name }} {{ $user->last_name }} the primary contact of {{ $user->org_name }}? They become its Client Admin; the current primary contact keeps the Administrator role."
-                                                class="btn btn-ghost btn-sm">Make primary contact</button>
-                                    @endif
-
-                                    @if($user->status === 'Active')
-                                        <button type="button" wire:click="toggleUserStatus('{{ $user->id }}', '{{ $user->status }}')"
-                                                wire:confirm="Suspend access for {{ $user->first_name }} {{ $user->last_name }}? They will be signed out and can’t sign in until you restore access."
-                                                class="btn btn-ghost btn-sm" style="color: var(--color-danger);">Suspend access</button>
-                                    @else
-                                        <button type="button" wire:click="toggleUserStatus('{{ $user->id }}', '{{ $user->status }}')" class="btn btn-ghost btn-sm">Restore access</button>
-                                    @endif
-                                @endif
+                                    @include('livewire.hq.system.partials.account-actions')
                                 </td>
 
                             </tr>
