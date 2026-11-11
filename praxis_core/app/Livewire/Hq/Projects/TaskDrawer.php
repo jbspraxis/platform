@@ -9,6 +9,7 @@ use App\Support\Projects\ProjectHistory;
 use App\Support\Projects\ProjectPlan;
 use App\Support\Projects\ProjectRules;
 use App\Support\Projects\Tasks;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -70,6 +71,16 @@ class TaskDrawer extends Component
     public string $notice = '';
     public string $noticeTone = 'success';
 
+    /** The pickers' people (the project's team when it was last worked out), so a keystroke doesn't work it out again */
+    #[Locked]
+    public array $teamIds = [];
+
+    // Worked out once per request and kept in private properties, which Livewire never sends to the browser nor keeps
+    // between requests: the access answers (forgotten after a change to who is on the task) and the team
+    private ?bool $canView = null;
+    private ?bool $canManage = null;
+    private ?Collection $team = null;
+
     public function mount(string $projectId): void
     {
         $this->projectId = $projectId;
@@ -78,10 +89,40 @@ class TaskDrawer extends Component
         }
     }
 
+    private function canView(): bool
+    {
+        return $this->canView ??= ProjectRules::canView($this->projectId);
+    }
+
+    private function canManage(): bool
+    {
+        return $this->canManage ??= ProjectRules::canManage($this->projectId, $this->canView());
+    }
+
+    private function canWork(object $task): bool
+    {
+        return ProjectRules::canWorkOn($task, $this->projectId, $this->canManage(), $this->canView());
+    }
+
+    /** Someone joined or left the task (or its lead changed): the next check looks again */
+    private function forgetAccess(): void
+    {
+        $this->canView = $this->canManage = null;
+    }
+
+    /** ProjectRules::team, and its ids for the pickers' next keystrokes */
+    private function team(): Collection
+    {
+        $this->team ??= ProjectRules::team($this->projectId);
+        $this->teamIds = $this->team->pluck('id')->all();
+
+        return $this->team;
+    }
+
     #[On('open-task')]
     public function openTask(string $id): void
     {
-        $task = ProjectRules::canView($this->projectId) ? Tasks::find($this->projectId, $id) : null;
+        $task = $this->canView() ? Tasks::find($this->projectId, $id) : null;
         if (! $task) {
             $this->close();
 
@@ -92,17 +133,22 @@ class TaskDrawer extends Component
         $this->link = $task->id;
         $this->open = true;
         $this->fillFrom($task);
+        // The pickers are for the project's lead and managers only
+        if ($this->canManage()) {
+            $this->team();
+        }
     }
 
     #[On('new-task')]
     public function newTask(?string $phase = null): void
     {
-        abort_unless(ProjectRules::canManage($this->projectId), 403);
+        abort_unless($this->canManage(), 403);
         $this->resetForm();
         $this->taskId = null;
         $this->link = '';
         $this->open = true;
         $this->phaseId = Milestones::find($this->projectId, $phase)?->id ?? '';
+        $this->team();
     }
 
     // The pickers (managers): the lead is never also sharing or watching
@@ -157,19 +203,22 @@ class TaskDrawer extends Component
 
     private function authorizePicking(): void
     {
-        abort_unless($this->open && ProjectRules::canManage($this->projectId), 403);
+        abort_unless($this->open && $this->canManage(), 403);
     }
 
+    /** Checked against the team as it is now, whatever the pickers listed */
     private function onTeam(string $userId): bool
     {
-        return ProjectRules::team($this->projectId)->contains('id', $userId);
+        return $this->team()->contains('id', $userId);
     }
 
     /** Options and choices for the three pickers: the project's team, narrowed by what is typed */
     private function pickers(): array
     {
-        $team = ProjectRules::team($this->projectId)->pluck('id')->all();
-        $people = User::whereIn('id', $team)->get(['id', 'first_name', 'last_name', 'avatar_path', 'job_title'])->keyBy('id');
+        if (! $this->teamIds) {
+            $this->team();
+        }
+        $people = User::whereIn('id', $this->teamIds)->get(['id', 'first_name', 'last_name', 'avatar_path', 'job_title'])->keyBy('id');
         $item = fn (User $u) => ['id' => $u->id, 'label' => trim($u->first_name . ' ' . $u->last_name), 'meta' => $u->job_title, 'user' => $u];
         $match = fn (string $term, array $exclude) => $people->reject(fn ($u) => in_array($u->id, $exclude, true))
             ->filter(fn ($u) => trim($term) === '' || Str::contains(Str::lower($u->first_name . ' ' . $u->last_name), Str::lower(trim($term))))
@@ -192,6 +241,7 @@ class TaskDrawer extends Component
         $this->open = false;
         $this->taskId = null;
         $this->link = '';
+        $this->teamIds = [];
         $this->resetForm();
     }
 
@@ -223,27 +273,31 @@ class TaskDrawer extends Component
     /** The open task, checked again: it may have moved or access may have ended while the drawer was open */
     private function task(): object
     {
-        abort_unless(ProjectRules::canView($this->projectId), 403, __('projects.errors.no_access'));
+        abort_unless($this->canView(), 403, __('projects.errors.no_access'));
         $task = Tasks::find($this->projectId, $this->taskId);
         abort_unless($task, 404);
 
         return $task;
     }
 
-    private function changed(string $message, string $tone = 'success'): void
+    /**
+     * $kind tells the page and the milestone board what changed, so they draw again only where it shows: 'task' (its
+     * status, dates, people or waits) or 'activity' (steps, comments, watching, a proposal: only the Overview's history)
+     */
+    private function changed(string $message, string $tone = 'success', string $kind = 'task'): void
     {
         $this->notice = $message;
         $this->noticeTone = $tone;
-        $this->dispatch('project-changed');
+        $this->dispatch('project-changed', kind: $kind);
     }
 
     public function save(): void
     {
-        abort_unless(ProjectRules::canManage($this->projectId), 403);
+        abort_unless($this->canManage(), 403);
         $task = $this->taskId ? $this->task() : null;
         $this->title = trim($this->title);
         // The team (active staff), plus whoever is on the task already: someone who has left doesn't block a save
-        $team = ProjectRules::team($this->projectId)->pluck('id')->all();
+        $team = $this->team()->pluck('id')->all();
         $already = $task ? Tasks::people($task->id) : ['sharing' => [], 'watcher' => []];
         $this->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -283,7 +337,10 @@ class TaskDrawer extends Component
             $this->taskId = Tasks::create($this->projectId, $data);
             $this->link = $this->taskId;
         }
+        // The lead may have changed, then the people: each task() looks at access again, as before
+        $this->forgetAccess();
         Tasks::setPeople($this->task(), $this->sharing, $this->watchers);
+        $this->forgetAccess();
         $this->fillFrom($this->task());
         $this->changed($task ? __('projects.drawer.saved') : __('projects.task.created'));
     }
@@ -291,9 +348,10 @@ class TaskDrawer extends Component
     public function assignToMe(): void
     {
         $task = $this->task();
-        abort_unless(Auth::user()->can('projects.edit') || ProjectRules::canManage($this->projectId), 403);
-        $anyone = ProjectRules::canManage($this->projectId) || Auth::user()->can('projects.approve');
+        abort_unless(Auth::user()->can('projects.edit') || $this->canManage(), 403);
+        $anyone = $this->canManage() || Auth::user()->can('projects.approve');
         if (Tasks::assignToMe($task, $anyone)) {
+            $this->forgetAccess();
             $this->fillFrom($this->task());
             $this->changed(__('projects.task.assigned_to_you'));
         } else {
@@ -311,7 +369,7 @@ class TaskDrawer extends Component
 
             return;
         }
-        if (! ProjectRules::canMove($task, $this->projectId)) {
+        if (! ProjectRules::canMove($task, $this->projectId, $this->canWork($task), $this->canView())) {
             $this->status = $task->status;
             $this->notice = __('projects.task.move_own');
             $this->noticeTone = 'error';
@@ -326,8 +384,9 @@ class TaskDrawer extends Component
     public function watch(bool $on): void
     {
         Tasks::watch($this->task(), $on);
+        $this->forgetAccess();
         $this->watchers = Tasks::people($this->taskId)['watcher'];
-        $this->changed($on ? __('projects.task.watching') : __('projects.task.not_watching'));
+        $this->changed($on ? __('projects.task.watching') : __('projects.task.not_watching'), kind: 'activity');
     }
 
     public function addStep(): void
@@ -341,19 +400,19 @@ class TaskDrawer extends Component
             return;
         }
         $this->newStep = '';
-        $this->changed(__('projects.task.step_added'));
+        $this->changed(__('projects.task.step_added'), kind: 'activity');
     }
 
     public function toggleStep(int $stepId): void
     {
         Tasks::toggleStep($this->authoriseWork(), $stepId);
-        $this->dispatch('project-changed');
+        $this->dispatch('project-changed', kind: 'activity');
     }
 
     public function removeStep(int $stepId): void
     {
         Tasks::removeStep($this->authoriseWork(), $stepId);
-        $this->changed(__('projects.task.step_removed'));
+        $this->changed(__('projects.task.step_removed'), kind: 'activity');
     }
 
     public function addWait(): void
@@ -404,7 +463,7 @@ class TaskDrawer extends Component
         }
         Tasks::comment($this->projectId, $task, $this->comment, $path);
         $this->reset('comment', 'attachment');
-        $this->changed(__('projects.task.commented'));
+        $this->changed(__('projects.task.commented'), kind: 'activity');
     }
 
     /** A team member's proposal for the project lead; the lead (or a manager) simply sets the date */
@@ -413,12 +472,13 @@ class TaskDrawer extends Component
         $task = $this->authoriseWork();
         $this->validate(['proposedDate' => ['required', 'date_format:Y-m-d']], ['proposedDate.*' => __('projects.errors.date')]);
         Tasks::proposeDueDate($this->projectId, $task, $this->proposedDate);
-        $this->changed(__('projects.task.proposed'));
+        // Only the drawer shows a proposal; the due date itself changes when the lead accepts it
+        $this->changed(__('projects.task.proposed'), kind: 'activity');
     }
 
     public function decideProposal(bool $accept): void
     {
-        abort_unless(ProjectRules::canManage($this->projectId), 403);
+        abort_unless($this->canManage(), 403);
         Tasks::decideProposal($this->task(), $accept);
         $this->fillFrom($this->task());
         $this->changed($accept ? __('projects.task.proposal_accepted') : __('projects.task.proposal_declined'));
@@ -428,7 +488,7 @@ class TaskDrawer extends Component
     private function authoriseWork(): object
     {
         $task = $this->task();
-        abort_unless(ProjectRules::canWorkOn($task, $this->projectId), 403, __('projects.task.work_own'));
+        abort_unless($this->canWork($task), 403, __('projects.task.work_own'));
         $this->resetErrorBag();
 
         return $task;
@@ -445,15 +505,20 @@ class TaskDrawer extends Component
 
             return view('livewire.hq.projects.task-drawer', ['task' => null]);
         }
-        $canManage = ProjectRules::canManage($this->projectId);
-        $milestones = ProjectPlan::milestones($this->projectId);
-        $names = DB::table('users')->get(['id', 'first_name', 'last_name'])->mapWithKeys(fn ($u) => [$u->id => trim($u->first_name . ' ' . $u->last_name)]);
+        $canManage = $this->canManage();
+        // The milestone menu and the drawer's heading need each milestone's code and name only (not its progress or invoice)
+        $milestones = DB::table('project_phases')->where('project_id', $this->projectId)->whereNull('deleted_at')
+            ->orderBy('phase_number')->orderBy('created_at')->get(['id', 'phase_number', 'title'])
+            ->each(function ($m) {
+                $m->code = ProjectPlan::code($m);
+                $m->name = ProjectPlan::title($m);
+            });
 
         $data = [
             'task' => $task,
             'canManage' => $canManage,
             'milestones' => $milestones,
-            'names' => $names,
+            'names' => collect(),
         ] + ($canManage ? $this->pickers() : []);
         if (! $task) {
             return view('livewire.hq.projects.task-drawer', $data);
@@ -464,19 +529,28 @@ class TaskDrawer extends Component
         $holding = DB::table('task_dependencies')->join('tasks', 'tasks.id', '=', 'task_dependencies.task_id')
             ->where('task_dependencies.depends_on_task_id', $task->id)->whereNull('tasks.deleted_at')->orderBy('tasks.title')->get(['tasks.id', 'tasks.title', 'tasks.status']);
         $people = Tasks::people($task->id);
+        $steps = DB::table('task_steps')->where('task_id', $task->id)->orderBy('position')->get();
+        // Names for the people this drawer shows (its lead, who shares and watches it, who proposed a date, who ticked
+        // a step), whoever they are, as before; not every account
+        $nameIds = collect([$task->assigned_to, $task->proposed_due_by, ...$people['sharing'], ...$people['watcher']])
+            ->merge($steps->pluck('done_by'))->filter()->unique()->values();
+        $data['names'] = $nameIds->isEmpty() ? collect() : DB::table('users')->whereIn('id', $nameIds)->get(['id', 'first_name', 'last_name'])
+            ->mapWithKeys(fn ($u) => [$u->id => trim($u->first_name . ' ' . $u->last_name)]);
+        $canWork = $this->canWork($task);
 
         return view('livewire.hq.projects.task-drawer', $data + [
-            'canWork' => ProjectRules::canWorkOn($task, $this->projectId),
-            'canMove' => ProjectRules::canMove($task, $this->projectId),
+            'canWork' => $canWork,
+            'canMove' => ProjectRules::canMove($task, $this->projectId, $canWork, $this->canView()),
             // "Assign to me": an unassigned task for anyone with projects.edit, anyone's for a manager (the board's rule)
             'canCheckout' => (! $task->assigned_to && Auth::user()->can('projects.edit')) || ($canManage && $task->assigned_to !== Auth::id()),
             'myRole' => $task->assigned_to === Auth::id() ? 'lead' : (in_array(Auth::id(), $people['sharing'], true) ? 'sharing' : (in_array(Auth::id(), $people['watcher'], true) ? 'watcher' : null)),
             'people' => $people,
             'milestone' => $milestones->firstWhere('id', $task->phase_id),
-            'steps' => DB::table('task_steps')->where('task_id', $task->id)->orderBy('position')->get(),
+            'steps' => $steps,
             'waits' => $waits,
             'holding' => $holding,
-            'candidates' => DB::table('tasks')->join('project_phases', 'project_phases.id', '=', 'tasks.phase_id')
+            // The "waits on" menu: only for someone who may add one
+            'candidates' => ! $canWork ? collect() : DB::table('tasks')->join('project_phases', 'project_phases.id', '=', 'tasks.phase_id')
                 ->where('project_phases.project_id', $this->projectId)->whereNull('tasks.deleted_at')->whereNull('project_phases.deleted_at')
                 ->where('tasks.id', '!=', $task->id)->whereNotIn('tasks.id', $waits->pluck('id'))
                 ->orderBy('project_phases.phase_number')->orderBy('tasks.title')->get(['tasks.id', 'tasks.title', 'project_phases.phase_number']),

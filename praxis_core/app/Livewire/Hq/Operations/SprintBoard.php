@@ -24,8 +24,6 @@ class SprintBoard extends Component
     // Set in mount after the access check; the browser must not switch the board to another project
     #[Locked]
     public $projectId;
-    #[Locked]
-    public $project;
 
     // Task statuses a card can be dropped into (database values)
     private const COLUMNS = ['To-Do', 'In-Progress', 'QA_Review', 'Failed', 'Done'];
@@ -52,21 +50,26 @@ class SprintBoard extends Component
     // Telemetry State
     public $teamCapacity = []; // Tracks burnout risk
 
+    // Worked out once per request and kept in private properties, which Livewire never sends to the browser nor keeps
+    // between requests: nothing the board changes can end this person's own access within the request
+    private ?bool $maySee = null;
+    private ?bool $canView = null;
+    private ?bool $canManage = null;
+    private ?\Illuminate\Support\Collection $team = null;
+
     /** $milestone: the one to open on (a kanban card's link); else the one running now (ProjectPlan::boardDefault) */
     public function mount($id, ?string $milestone = null)
     {
         $this->canMoveOwn = Auth::user()->can('projects.edit');
         $this->canMoveAny = Auth::user()->can('projects.approve');
-        $project = DB::table('projects')->where('id', $id)->first();
-        if (!$project) abort(404);
+        if (! DB::table('projects')->where('id', $id)->exists()) abort(404);
 
         // Same rule as the milestone boards list: managers and auditors see every board,
         // everyone else only the boards of projects they lead or have a task on
-        abort_unless(self::maySeeBoard($id), 403, __('projects.errors.no_access'));
+        abort_unless($this->maySee = self::maySeeBoard($id), 403, __('projects.errors.no_access'));
 
         $this->projectId = $id;
-        $this->project = $project;
-        $this->canAssign = \App\Support\Projects\ProjectRules::canManage($id);
+        $this->canAssign = $this->canManage();
 
         $this->loadMilestones();
         $this->activeMilestoneId = $milestone;
@@ -91,7 +94,22 @@ class SprintBoard extends Component
     /** Checked again on every change: access can end while the board is open (a task reassigned, a role changed) */
     private function authoriseBoard(): void
     {
-        abort_unless(self::maySeeBoard($this->projectId), 403, __('projects.errors.no_access'));
+        abort_unless($this->maySee ??= self::maySeeBoard($this->projectId), 403, __('projects.errors.no_access'));
+    }
+
+    private function canView(): bool
+    {
+        return $this->canView ??= \App\Support\Projects\ProjectRules::canView($this->projectId, $this->maySee);
+    }
+
+    private function canManage(): bool
+    {
+        return $this->canManage ??= \App\Support\Projects\ProjectRules::canManage($this->projectId, $this->canView());
+    }
+
+    private function team(): \Illuminate\Support\Collection
+    {
+        return $this->team ??= \App\Support\Projects\ProjectRules::team($this->projectId);
     }
 
     /** A task on this board’s project, or null (task ids come from the browser) */
@@ -105,12 +123,23 @@ class SprintBoard extends Component
             ->first();
     }
 
-    /** A drawer on the project page changed a milestone or a task: the menu and the cards follow */
+    /**
+     * A drawer on the project page changed a milestone or a task: the cards follow, and the menu too when a milestone
+     * changed ('milestone'). A step, a comment, watching, a due-date proposal ('activity') or a change report not yet
+     * decided ('report') shows nothing here.
+     */
     #[\Livewire\Attributes\On('project-changed')]
-    public function refreshFromProject(): void
+    public function refreshFromProject(string $kind = 'task'): void
     {
         $this->authoriseBoard();
-        $this->loadMilestones();
+        if (in_array($kind, ['activity', 'report'], true)) {
+            $this->skipRender();
+
+            return;
+        }
+        if ($kind === 'milestone') {
+            $this->loadMilestones();
+        }
         $this->updatedActiveMilestoneId($this->activeMilestoneId);
     }
 
@@ -139,6 +168,7 @@ class SprintBoard extends Component
         $this->authoriseBoard();
         if (!$this->activeMilestoneId) return;
 
+        // Only what a card and the capacity line read (not the description): the cards stay in the board's state
         $rawTasks = DB::table('tasks')
             ->leftJoin('users', 'tasks.assigned_to', '=', 'users.id')
             ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
@@ -146,9 +176,9 @@ class SprintBoard extends Component
             ->where('tasks.phase_id', $this->activeMilestoneId)
             ->whereNull('tasks.deleted_at')
             ->select(
-                'tasks.*', 
-                'users.first_name', 'users.last_name', 
-                'project_phases.title as phase_title'
+                'tasks.id', 'tasks.title', 'tasks.status', 'tasks.due_date', 'tasks.assigned_to',
+                'tasks.estimated_hours', 'tasks.story_points', 'tasks.qa_sla_expires_at',
+                'users.first_name', 'users.last_name'
             )
             ->orderBy('tasks.created_at', 'desc')
             ->get();
@@ -209,7 +239,7 @@ class SprintBoard extends Component
         $ids = collect($this->tasks)->flatten(1)->pluck('id')->all();
         $waits = \App\Support\Projects\ProjectPlan::openWaits($ids);
         $sharing = $ids ? DB::table('task_people')->whereIn('task_id', $ids)->where('role', 'sharing')->groupBy('task_id')->selectRaw('task_id, COUNT(*) AS n')->pluck('n', 'task_id') : collect();
-        $mayMove = \App\Support\Projects\ProjectRules::mover($this->projectId);
+        $mayMove = \App\Support\Projects\ProjectRules::mover($this->projectId, $this->canManage(), $this->canView());
         foreach ($this->tasks as $column => $cards) {
             foreach ($cards as $i => $card) {
                 $this->tasks[$column][$i] += [
@@ -245,7 +275,7 @@ class SprintBoard extends Component
     public function assignTo($taskId, $userId)
     {
         $this->authoriseBoard();
-        $manager = \App\Support\Projects\ProjectRules::canManage($this->projectId);
+        $manager = $this->canManage();
         abort_unless($manager || Auth::user()->can('projects.edit'), 403);
 
         $task = $this->boardTask($taskId);
@@ -258,7 +288,7 @@ class SprintBoard extends Component
             \App\Support\Projects\Tasks::assignToMe($task, false);
         } else {
             abort_unless($manager, 403);
-            if (\App\Support\Projects\ProjectRules::team($this->projectId)->contains('id', (string) $userId)) {
+            if ($this->team()->contains('id', (string) $userId)) {
                 // The drawer's save: the audit log, the new lead stops sharing or watching it, and their bell
                 \App\Support\Projects\Tasks::update($this->projectId, $task, ['assigned_to' => (string) $userId]);
             }
@@ -277,7 +307,8 @@ class SprintBoard extends Component
 
         // Security gate: the lead or someone sharing the task (projects.edit), the project's lead or a manager, or
         // projects.approve for anyone's (App\Support\Projects\ProjectRules)
-        if (! \App\Support\Projects\ProjectRules::canMove($task, $this->projectId)) {
+        $canWork = \App\Support\Projects\ProjectRules::canWorkOn($task, $this->projectId, $this->canManage(), $this->canView());
+        if (! \App\Support\Projects\ProjectRules::canMove($task, $this->projectId, $canWork, $this->canView())) {
             session()->flash('error', __('projects.task.move_own'));
             return;
         }
@@ -305,10 +336,13 @@ class SprintBoard extends Component
 
     public function render()
     {
+        // The card picker opens from an unassigned card only
+        $unassigned = collect($this->tasks)->flatten(1)->contains(fn ($task) => empty($task['assigned_to']));
+
         return view('livewire.hq.operations.sprint-board', [
             'handover' => $this->handover(),
             // The card picker's people (managers only; everyone else's menu holds just "Me")
-            'team' => $this->canAssign ? \App\Support\Projects\ProjectRules::team($this->projectId) : collect(),
+            'team' => $this->canAssign && $unassigned ? $this->team() : collect(),
         ]);
     }
 }

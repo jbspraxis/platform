@@ -54,6 +54,29 @@ class ChangeReportDrawer extends Component
     public string $notice = '';
     public string $noticeTone = 'success';
 
+    // Worked out once per request and kept in private properties, which Livewire never sends to the browser nor keeps
+    // between requests (nothing here changes who sees the project)
+    private ?bool $canView = null;
+    private ?bool $canManage = null;
+
+    private function canView(): bool
+    {
+        return $this->canView ??= ProjectRules::canView($this->projectId);
+    }
+
+    private function canManage(): bool
+    {
+        return $this->canManage ??= ProjectRules::canManage($this->projectId, $this->canView());
+    }
+
+    /** $kind: 'report' while it is a draft or sent; an approval adds a milestone and tasks, so the board follows too */
+    private function changed(string $message, string $kind = 'report'): void
+    {
+        $this->notice = $message;
+        $this->noticeTone = 'success';
+        $this->dispatch('project-changed', kind: $kind);
+    }
+
     public function mount(string $projectId): void
     {
         $this->projectId = $projectId;
@@ -65,7 +88,7 @@ class ChangeReportDrawer extends Component
     #[On('open-report')]
     public function openReport(string $id): void
     {
-        $report = ProjectRules::canView($this->projectId) ? ChangeReports::find($this->projectId, $id) : null;
+        $report = $this->canView() ? ChangeReports::find($this->projectId, $id) : null;
         if (! $report) {
             $this->close();
 
@@ -81,7 +104,7 @@ class ChangeReportDrawer extends Component
     #[On('new-report')]
     public function newReport(): void
     {
-        abort_unless(ProjectRules::canManage($this->projectId), 403);
+        abort_unless($this->canManage(), 403);
         $this->resetForm();
         $this->reportId = null;
         $this->link = '';
@@ -122,7 +145,7 @@ class ChangeReportDrawer extends Component
     /** An open report (draft or sent) this person may change */
     private function report(): object
     {
-        abort_unless(ProjectRules::canManage($this->projectId), 403);
+        abort_unless($this->canManage(), 403);
         $report = ChangeReports::find($this->projectId, $this->reportId);
         abort_unless($report, 404);
         abort_unless(ChangeReports::isOpen($report), 403, __('projects.cr.locked'));
@@ -147,7 +170,7 @@ class ChangeReportDrawer extends Component
 
     public function save(): void
     {
-        abort_unless(ProjectRules::canManage($this->projectId), 403);
+        abort_unless($this->canManage(), 403);
         $report = $this->reportId ? $this->report() : null;
         $this->title = trim($this->title);
         $this->validate([
@@ -188,18 +211,14 @@ class ChangeReportDrawer extends Component
             $this->link = $this->reportId;
         }
         $this->fillFrom(ChangeReports::find($this->projectId, $this->reportId));
-        $this->notice = $report ? __('projects.drawer.saved') : __('projects.cr.created');
-        $this->noticeTone = 'success';
-        $this->dispatch('project-changed');
+        $this->changed($report ? __('projects.drawer.saved') : __('projects.cr.created'));
     }
 
     public function markSent(): void
     {
         $report = $this->report();
         ChangeReports::markSent($report);
-        $this->notice = __('projects.cr.sent');
-        $this->noticeTone = 'success';
-        $this->dispatch('project-changed');
+        $this->changed(__('projects.cr.sent'));
     }
 
     /** First step: check the decision, then show what it will do and ask to confirm */
@@ -242,9 +261,8 @@ class ChangeReportDrawer extends Component
         $report = $this->report();
         ChangeReports::decide($report, $this->decision === 'approved', $this->decidedOn, $this->decidedBy, $this->decidedByTitle);
         $this->confirming = false;
-        $this->notice = $this->decision === 'approved' ? __('projects.cr.approved') : __('projects.cr.declined');
-        $this->noticeTone = 'success';
-        $this->dispatch('project-changed');
+        $approved = $this->decision === 'approved';
+        $this->changed($approved ? __('projects.cr.approved') : __('projects.cr.declined'), $approved ? 'milestone' : 'report');
     }
 
     public function render()
@@ -260,8 +278,8 @@ class ChangeReportDrawer extends Component
 
         return view('livewire.hq.projects.change-report-drawer', [
             'report' => $report,
-            'canManage' => $this->open && ProjectRules::canManage($this->projectId),
-            'canSeeMoney' => $this->open && ProjectRules::canSeeMoney($this->projectId),
+            'canManage' => $this->open && $this->canManage(),
+            'canSeeMoney' => $this->open && ProjectRules::canSeeMoney($this->projectId, $this->canManage()),
             'project' => $project,
             'preview' => $report && ChangeReports::isOpen($report) ? ChangeReports::preview($report) : null,
             'phase' => $report && $report->phase_id ? DB::table('project_phases')->where('id', $report->phase_id)->whereNull('deleted_at')->first(['id', 'phase_number', 'title', 'weight_percentage']) : null,

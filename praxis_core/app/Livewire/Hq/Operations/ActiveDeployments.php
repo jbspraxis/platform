@@ -27,23 +27,17 @@ class ActiveDeployments extends Component
 
     public $activeTab = 'matrix'; // 'matrix' or 'ledger'
 
-    // View State
-    public $matrixProjects = [];
-    public $ledgerProjects = [];
-    public $availableAssignees = [];
-    public $availableOrganizations = [];
-    
+    // The projects, the KPIs and the menus are worked out in render(), not kept here, so every poll and click
+    // sends only the filters and the form back and forth
+
     // Filters
     public $searchQuery = '';
     public $filterStatus = '';
     public $filterHealth = '';
     public $filterAssignee = '';
 
-    // KPIs (For Matrix Tab)
-    public $kpiActiveDeployments = 0;
-    public $kpiSprintVelocity = 0;
-    public $kpiCapitalAtRisk = []; // per currency: ['NGN' => 537.5, 'USD' => 322.5]
-    public $kpiBleedingProjects = 0;
+    // The Create project panel is open: its list of clients is loaded only then
+    public bool $creating = false;
 
     // Configuration
     private $firmHourlyRate = 150.00;
@@ -67,65 +61,58 @@ class ActiveDeployments extends Component
         $this->canSeeMoney = $user->can('finance.view');
         $this->canLock = $user->can('finance.approve');
         $this->canExport = $user->can('projects.export');
-
-        $this->loadAssignees();
-        $this->loadOrganizations();
-        $this->loadData();
-    }
-
-    public function updated($property)
-    {
-        if (in_array($property, ['searchQuery', 'filterStatus', 'filterHealth', 'filterAssignee'])) {
-            $this->loadData();
-        }
     }
 
     public function switchTab($tab)
     {
         $this->activeTab = $tab;
-        $this->loadData();
     }
 
-    private function loadAssignees()
+    /** The 30-second poll: render() reads the projects again */
+    public function loadData(): void
     {
-        if ($this->canSeeAll) {
-            $this->availableAssignees = DB::table('users')
-                ->where('status', 'Active')
-                ->whereIn('id', function($query) {
-                    $query->select('assigned_to')->from('tasks')->whereNotNull('assigned_to');
-                })
-                ->select('id', 'first_name', 'last_name')
-                ->get()
-                ->toArray();
+    }
+
+    /** The Assigned to filter (managers, Active projects tab): active people with a task */
+    private function assignees(): array
+    {
+        if (! $this->canSeeAll || $this->activeTab !== 'matrix') {
+            return [];
         }
+
+        return DB::table('users')
+            ->where('status', 'Active')
+            ->whereIn('id', function($query) {
+                $query->select('assigned_to')->from('tasks')->whereNotNull('assigned_to');
+            })
+            ->select('id', 'first_name', 'last_name')
+            ->get()
+            ->toArray();
     }
 
-    private function loadOrganizations()
+    /** The Create project panel's client menu, only while the panel is open */
+    private function organizations(): array
     {
-        // For the Project Creation dropdown
-        $this->availableOrganizations = DB::table('organizations')
+        if (! $this->canCreate || ! $this->creating) {
+            return [];
+        }
+
+        return DB::table('organizations')
             ->orderBy('name', 'asc')
             ->select('id', 'name')
             ->get()
             ->toArray();
     }
 
-    public function loadData()
+    /** The Active projects tab: each project's progress and money, and the KPIs above them */
+    private function matrixData(): array
     {
-        if ($this->activeTab === 'matrix') {
-            $this->loadMatrixData();
-        } else {
-            $this->loadLedgerData();
-        }
-    }
-
-    private function loadMatrixData()
-    {
-        // 1. Fetch Active & Locked Projects for Live Telemetry
+        // 1. Fetch Active & Locked Projects for Live Telemetry (only the columns the cards and the export use)
         $query = DB::table('projects')
             ->join('organizations', 'projects.organization_id', '=', 'organizations.id')
             ->whereIn('projects.status', ['Active', 'Locked'])
-            ->select('projects.*', 'organizations.name as client_name')
+            ->select('projects.id', 'projects.title', 'projects.status', 'projects.is_financially_locked', 'projects.total_budget', 'projects.currency',
+                'organizations.name as client_name')
             ->orderBy('projects.created_at', 'desc');
 
         // Apply Text Search
@@ -155,25 +142,37 @@ class ActiveDeployments extends Component
         $processedProjects = [];
         $bleedingCount = 0;
 
+        // Milestones, hours and unpaid invoices for every listed project at once: a few queries, not a few per project
+        $projectIds = $rawProjects->pluck('id')->all();
+        $plans = \App\Support\Projects\ProjectPlan::milestonesFor($projectIds);
+        // Hours on every task of the project, deleted ones included, as before
+        $hoursByProject = $projectIds ? DB::table('tasks')
+            ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
+            ->whereIn('project_phases.project_id', $projectIds)
+            ->groupBy('project_phases.project_id')
+            ->selectRaw('project_phases.project_id, SUM(tasks.actual_hours_logged) AS hours')
+            ->pluck('hours', 'project_id') : collect();
+        // Pending and overdue invoices, every currency added together, as before
+        $unpaidByProject = $projectIds ? DB::table('invoices')
+            ->whereIn('project_id', $projectIds)
+            ->whereIn('status', ['Pending', 'Overdue'])
+            ->groupBy('project_id')
+            ->selectRaw('project_id, SUM(total_amount) AS unpaid')
+            ->pluck('unpaid', 'project_id') : collect();
+
         foreach ($rawProjects as $project) {
             // Progress is the milestones' weights × their done tasks (docs/PROJECTS.md, decision 3), as on the project page
-            $milestones = \App\Support\Projects\ProjectPlan::milestones($project->id);
+            $milestones = $plans->get($project->id) ?? collect();
             $totalPoints = $milestones->sum('tasks_total');
             $completedPoints = $milestones->sum('tasks_done');
             $progressPercent = (int) round(\App\Support\Projects\ProjectPlan::progress($milestones));
-            $totalHours = DB::table('tasks')
-                ->join('project_phases', 'tasks.phase_id', '=', 'project_phases.id')
-                ->where('project_phases.project_id', $project->id)
-                ->sum('tasks.actual_hours_logged');
+            $totalHours = $hoursByProject[$project->id] ?? 0;
 
             $spentAmount = $totalHours * $this->firmHourlyRate;
             $burnPercent = $project->total_budget > 0 ? round(($spentAmount / $project->total_budget) * 100) : 0;
             $isBleeding = false;
 
-            $unpaidInvoices = DB::table('invoices')
-                ->where('project_id', $project->id)
-                ->whereIn('status', ['Pending', 'Overdue'])
-                ->sum('total_amount');
+            $unpaidInvoices = $unpaidByProject[$project->id] ?? 0;
 
             if ($this->canSeeMoney) {
                 if ($burnPercent > ($progressPercent + 15)) {
@@ -205,32 +204,32 @@ class ActiveDeployments extends Component
             ];
         }
 
-        $this->matrixProjects = $processedProjects;
-
-        // Global KPIs
-        $this->kpiActiveDeployments = DB::table('projects')->whereIn('status', ['Active', 'Locked'])->count();
-        $this->kpiBleedingProjects = $bleedingCount;
-
-        // Tasks done in the last 7 days (story points are no longer shown, docs/PROJECTS.md decision 3)
-        $this->kpiSprintVelocity = DB::table('tasks')
-            ->where('status', 'Done')
-            ->where('updated_at', '>=', now()->subDays(7))
-            ->count();
-
-        if ($this->canSeeMoney) {
-            $this->kpiCapitalAtRisk = HqMoney::sumByCurrency(DB::table('invoices')
+        return [
+            'matrixProjects' => $processedProjects,
+            // Global KPIs
+            'kpiActiveDeployments' => DB::table('projects')->whereIn('status', ['Active', 'Locked'])->count(),
+            'kpiBleedingProjects' => $bleedingCount,
+            // Tasks done in the last 7 days (story points are no longer shown, docs/PROJECTS.md decision 3)
+            'kpiSprintVelocity' => DB::table('tasks')
+                ->where('status', 'Done')
+                ->where('updated_at', '>=', now()->subDays(7))
+                ->count(),
+            // Per currency: ['NGN' => 537.5, 'USD' => 322.5]
+            'kpiCapitalAtRisk' => $this->canSeeMoney ? HqMoney::sumByCurrency(DB::table('invoices')
                 ->join('projects', 'invoices.project_id', '=', 'projects.id')
                 ->whereIn('projects.status', ['Active', 'Locked'])
-                ->whereIn('invoices.status', ['Pending', 'Overdue']), 'invoices.total_amount', 'invoices.currency');
-        }
+                ->whereIn('invoices.status', ['Pending', 'Overdue']), 'invoices.total_amount', 'invoices.currency') : [],
+        ];
     }
 
-    private function loadLedgerData()
+    /** The Full list tab */
+    private function ledgerData(): array
     {
-        // Master List of ALL projects
+        // Master List of ALL projects (only the columns the table and the export use)
         $query = DB::table('projects')
             ->join('organizations', 'projects.organization_id', '=', 'organizations.id')
-            ->select('projects.*', 'organizations.name as client_name')
+            ->select('projects.id', 'projects.title', 'projects.status', 'projects.is_financially_locked', 'projects.total_budget', 'projects.currency',
+                'projects.start_date', 'projects.target_end_date', 'organizations.name as client_name')
             ->orderByRaw("FIELD(projects.status, 'Active', 'Scoping', 'Locked', 'Completed', 'Cancelled')")
             ->orderBy('projects.created_at', 'desc');
 
@@ -250,12 +249,14 @@ class ActiveDeployments extends Component
             $query->whereIn('projects.id', \App\Support\ProjectAccess::assignedProjectIds());
         }
 
-        $this->ledgerProjects = json_decode(json_encode($query->get()), true);
+        $projects = json_decode(json_encode($query->get()), true);
 
         // Budgets stay on the server without finance.view
         if (! $this->canSeeMoney) {
-            $this->ledgerProjects = array_map(fn ($p) => array_merge($p, ['total_budget' => null]), $this->ledgerProjects);
+            $projects = array_map(fn ($p) => array_merge($p, ['total_budget' => null]), $projects);
         }
+
+        return $projects;
     }
 
     // --- NEW PROJECT CREATION ---
@@ -304,7 +305,6 @@ class ActiveDeployments extends Component
             $this->activeTab = 'matrix';
         }
 
-        $this->loadData();
         session()->flash('success', 'Project created.');
     }
 
@@ -340,7 +340,6 @@ class ActiveDeployments extends Component
             ]);
         });
 
-        $this->loadData();
         session()->flash('success', $newLockStatus ? 'Project put on hold. It stays on hold until someone releases the hold.' : 'Hold released. The project is active again.');
     }
 
@@ -352,7 +351,8 @@ class ActiveDeployments extends Component
             return;
         }
 
-        $data = $this->activeTab === 'matrix' ? $this->matrixProjects : $this->ledgerProjects;
+        // What the tab shows now, with the same search and filters
+        $data = $this->activeTab === 'matrix' ? $this->matrixData()['matrixProjects'] : $this->ledgerData();
 
         if (empty($data)) {
             session()->flash('error', 'There are no projects to export. Clear the search or filters and try again.');
@@ -360,6 +360,8 @@ class ActiveDeployments extends Component
         }
 
         $filename = 'projects_' . ($this->activeTab === 'matrix' ? 'active' : 'all') . '_' . now()->format('Y_m_d_His') . '.csv';
+        // The page is unchanged: only the file goes back, not the projects worked out again
+        $this->skipRender();
 
         return response()->streamDownload(function () use ($data) {
             $file = fopen('php://output', 'w');
@@ -392,6 +394,13 @@ class ActiveDeployments extends Component
 
     public function render()
     {
-        return view('livewire.hq.operations.active-deployments');
+        $data = $this->activeTab === 'matrix'
+            ? $this->matrixData() + ['ledgerProjects' => []]
+            : ['ledgerProjects' => $this->ledgerData(), 'matrixProjects' => [], 'kpiActiveDeployments' => 0, 'kpiSprintVelocity' => 0, 'kpiCapitalAtRisk' => [], 'kpiBleedingProjects' => 0];
+
+        return view('livewire.hq.operations.active-deployments', $data + [
+            'availableAssignees' => $this->assignees(),
+            'availableOrganizations' => $this->organizations(),
+        ]);
     }
 }

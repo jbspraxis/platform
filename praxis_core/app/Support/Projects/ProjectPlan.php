@@ -79,19 +79,28 @@ final class ProjectPlan
      */
     public static function milestones(string $projectId): Collection
     {
-        $phases = DB::table('project_phases')->where('project_id', $projectId)->whereNull('deleted_at')
+        return self::milestonesFor([$projectId])->first();
+    }
+
+    /**
+     * milestones() for several projects at once (All projects), keyed by the project ids given, each in order and
+     * empty for a project with none. The same six queries at most, however many projects there are.
+     */
+    public static function milestonesFor(array $projectIds): Collection
+    {
+        $phases = DB::table('project_phases')->whereIn('project_id', $projectIds)->whereNull('deleted_at')
             ->orderBy('phase_number')->orderBy('created_at')->get();
         $ids = $phases->pluck('id');
 
-        $counts = DB::table('tasks')->whereIn('phase_id', $ids)->whereNull('deleted_at')->groupBy('phase_id')
+        $counts = $ids->isEmpty() ? collect() : DB::table('tasks')->whereIn('phase_id', $ids)->whereNull('deleted_at')->groupBy('phase_id')
             ->selectRaw("phase_id, COUNT(*) AS total, SUM(CASE WHEN status = 'Done' THEN 1 ELSE 0 END) AS done")
             ->get()->keyBy('phase_id');
         // Each milestone's latest live invoice, whether it bills that milestone alone or on one of its lines
         $invoices = \App\Support\Finance\MilestoneInvoices::latest($ids);
-        $links = DB::table('phase_dependencies')->whereIn('phase_id', $ids)->get()->groupBy('phase_id');
+        $links = $ids->isEmpty() ? collect() : DB::table('phase_dependencies')->whereIn('phase_id', $ids)->get()->groupBy('phase_id');
         $today = self::today();
 
-        $milestones = $phases->map(function ($phase) use ($counts, $invoices, $today) {
+        $all = $phases->map(function ($phase) use ($counts, $invoices, $today) {
             $c = $counts->get($phase->id);
             $phase->code = self::code($phase);
             $phase->name = self::title($phase);
@@ -105,15 +114,22 @@ final class ProjectPlan
             $phase->overdue = $phase->due_date && $phase->due_date < $today && ! in_array($phase->column, self::DELIVERED, true);
 
             return $phase;
-        })->keyBy('id');
+        });
 
-        foreach ($milestones as $phase) {
-            $phase->waits_on = collect($links->get($phase->id, []))->map(fn ($link) => $milestones->get($link->depends_on_phase_id))->filter()
-                ->map(fn ($other) => (object) ['id' => $other->id, 'code' => $other->code, 'name' => $other->name, 'done' => in_array($other->column, self::DELIVERED, true)])
-                ->values();
-        }
+        // Ids compared as MySQL compares them (case aside), so an id typed in another case still finds its project
+        $byProject = $all->groupBy(fn ($phase) => strtolower((string) $phase->project_id));
 
-        return $milestones->values();
+        return collect($projectIds)->mapWithKeys(function ($projectId) use ($byProject, $links) {
+            $milestones = $byProject->get(strtolower((string) $projectId), collect())->keyBy('id');
+            // "Waits on" names milestones of the same project only
+            foreach ($milestones as $phase) {
+                $phase->waits_on = collect($links->get($phase->id, []))->map(fn ($link) => $milestones->get($link->depends_on_phase_id))->filter()
+                    ->map(fn ($other) => (object) ['id' => $other->id, 'code' => $other->code, 'name' => $other->name, 'done' => in_array($other->column, self::DELIVERED, true)])
+                    ->values();
+            }
+
+            return [$projectId => $milestones->values()];
+        });
     }
 
     /** The sum of each milestone's weight × its progress, as a percentage */
