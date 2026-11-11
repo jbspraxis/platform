@@ -168,12 +168,26 @@ class HealthChecks
     {
         $last = collect(['appointments', 'crm_notes', 'copq_assessments'])
             ->map(fn ($t) => DB::table($t)->max('created_at'))->filter()->max();
-        if (!$last) {
+
+        return self::enquiriesFrom($last, config('site_api.live_since'));
+    }
+
+    /**
+     * The enquiries check from the last enquiry and the day the site went live, so it can be tested. With no
+     * enquiry recorded yet (a new site, or test enquiries cleared away, as on 11 Nov 2026), the same 14- and 30-day
+     * limits count from the day the site went live instead: an empty history is a fault only once it has lasted that long.
+     */
+    public static function enquiriesFrom($last, $liveSince): array
+    {
+        $from = $last ?: $liveSince;
+        if (!$from) {
             return ['label' => 'Website enquiries', 'state' => 'warn', 'detail' => 'No enquiry has ever been recorded.', 'fix' => null];
         }
-        $days = (int) Carbon::parse($last)->diffInDays(now(), true);
+        $days = (int) Carbon::parse($from)->diffInDays(now(), true);
         return ['label' => 'Website enquiries', 'state' => $days > 30 ? 'bad' : ($days > 14 ? 'warn' : 'ok'),
-            'detail' => 'Last enquiry (booking, contact form or cost report) ' . self::ago($last) . '.',
+            'detail' => $last
+                ? 'Last enquiry (booking, contact form or cost report) ' . self::ago($last) . '.'
+                : 'No enquiry yet (booking, contact form or cost report); the site went live ' . self::ago($liveSince) . '.',
             'fix' => $days > 14 ? 'Test the contact and booking forms yourself, and check the site is getting visitors.' : null];
     }
 
@@ -213,8 +227,29 @@ class HealthChecks
             'hit_rate' => isset($stats['opcache_hit_rate']) ? (float) $stats['opcache_hit_rate'] : null,
             'free_mb' => isset($opcache['memory_usage']['free_memory']) ? (int) round($opcache['memory_usage']['free_memory'] / 1048576) : null,
             'cached_files' => isset($stats['num_cached_scripts']) ? (int) $stats['num_cached_scripts'] : null,
+            'hits' => isset($stats['hits']) ? (int) $stats['hits'] : null,
+            'misses' => isset($stats['misses']) ? (int) $stats['misses'] : null,
+            'restarts' => (int) ($stats['oom_restarts'] ?? 0) + (int) ($stats['hash_restarts'] ?? 0),
             'laravel_caches' => app()->configurationIsCached() && app()->routesAreCached() && app()->eventsAreCached(),
         ]);
+    }
+
+    /**
+     * The share of code loads OPcache served from memory, leaving out each file's first load. A cache PHP has just
+     * started misses every file once, and LiteSpeed restarts PHP after it has been idle (11 Nov 2026: the cache was
+     * 2½ minutes old, 744 files, 744 misses, 101 of 128 MB free), so OPcache's own hit rate stays low for a while after
+     * every restart with nothing wrong. Misses beyond one per cached file are code compiled again: that is the problem.
+     * Null until there are enough loads to judge; then OPcache's own rate when the counters are not known.
+     */
+    public static function warmHitRate(array $facts): ?float
+    {
+        if (! isset($facts['hits'], $facts['misses'], $facts['cached_files'])) {
+            return isset($facts['hit_rate']) ? round((float) $facts['hit_rate'], 1) : null;
+        }
+        $again = max(0, $facts['misses'] - $facts['cached_files']);
+        $loads = $facts['hits'] + $again;
+
+        return $loads >= 200 ? round(100 * $facts['hits'] / $loads, 1) : null;
     }
 
     /**
@@ -225,6 +260,7 @@ class HealthChecks
     public static function speedFrom(array $facts): array
     {
         $problems = $fixes = [];
+        $rate = self::warmHitRate($facts);
         if (empty($facts['early_finish'])) {
             $problems[] = "PHP runs as {$facts['sapi']}, which can't answer a page before slow work is done, so opening a mail waits for the mail server";
             $fixes[] = 'cPanel → MultiPHP Manager: switch hq.jbspraxis.com and portal.jbspraxis.com to PHP-FPM.';
@@ -232,8 +268,10 @@ class HealthChecks
         if (empty($facts['opcache'])) {
             $problems[] = 'OPcache is off, so every page compiles HQ\'s code again';
             $fixes[] = 'Ask the host to switch OPcache on (opcache.enable=1, memory_consumption=256, max_accelerated_files=32531).';
-        } elseif (! empty($facts['opcache_full']) || (isset($facts['hit_rate']) && $facts['hit_rate'] < 95)) {
-            $problems[] = 'OPcache is full or misses often' . (isset($facts['hit_rate']) ? ' (' . round($facts['hit_rate'], 1) . '% from memory)' : '');
+        } elseif (! empty($facts['opcache_full']) || ! empty($facts['restarts']) || ($rate !== null && $rate < 95)) {
+            $problems[] = 'OPcache is full or misses often'
+                . ($rate !== null ? " ({$rate}% from memory)" : '')
+                . (! empty($facts['restarts']) ? ', and it has had to start again for lack of room' : '');
             $fixes[] = 'Ask the host for more OPcache memory (memory_consumption=256, max_accelerated_files=32531).';
         }
         if (empty($facts['laravel_caches'])) {
@@ -242,7 +280,8 @@ class HealthChecks
         }
 
         $ok = 'PHP (' . $facts['sapi'] . ') answers before slow work is done; OPcache serves '
-            . (isset($facts['hit_rate']) ? round($facts['hit_rate'], 1) . '% of code from memory' : 'code from memory')
+            . ($rate !== null ? $rate . '% of code from memory' : 'code from memory')
+            . (isset($facts['hits'], $facts['misses']) ? ' after each file\'s first load' : '')
             . (isset($facts['cached_files']) ? ' (' . number_format($facts['cached_files']) . ' files' . (isset($facts['free_mb']) ? ', ' . $facts['free_mb'] . ' MB free' : '') . ')' : '')
             . "; Laravel's caches are built.";
 
