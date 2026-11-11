@@ -27,6 +27,12 @@ final class LeadNumbers
     /** Proposal versions that no longer count for an opportunity's value */
     private const SET_ASIDE = ['Superseded', 'Rejected', 'Expired'];
 
+    /** An open lead with no next step: nothing to do, or no date for it (as NextStep stores them: trimmed, null when empty) */
+    private const NO_STEP = "(organizations.next_step IS NULL OR TRIM(organizations.next_step) = '' OR organizations.next_step_due IS NULL)";
+
+    /** The value of leads with no open opportunity */
+    private const NO_VALUE = ['totals' => [], 'open' => 0, 'priced' => 0];
+
     /** The period's start (UTC; null for all time), counted from the start of the day, week, month… in Lagos */
     public static function since(string $period): ?Carbon
     {
@@ -73,70 +79,110 @@ final class LeadNumbers
      */
     public static function summary(string $owner, string $period, User $me): array
     {
-        $since = self::since($period);
-        $added = fn () => self::leads($owner, $me)->when($since, fn ($q, $s) => $q->where('organizations.created_at', '>=', $s));
-
-        $status = $added()->groupBy('organizations.lead_status')->selectRaw('organizations.lead_status as s, COUNT(*) as n')->pluck('n', 's')->map(fn ($n) => (int) $n);
-        $cohort = $added()->where(fn ($q) => $q->whereNull('organizations.client_via')->orWhere('organizations.client_via', '!=', 'existing'));
-        $leads = (clone $cohort)->count();
-        $clients = (clone $cohort)->where('organizations.lead_status', 'client')->count();
+        $rows = self::counted(self::leads($owner, $me), $period, 'organizations.lead_status');
+        $status = $rows->mapWithKeys(fn ($r) => [$r->grp => (int) $r->added]);
 
         return [
             'new' => [
-                'week' => self::leads($owner, $me)->where('organizations.created_at', '>=', self::since('week'))->count(),
-                'month' => self::leads($owner, $me)->where('organizations.created_at', '>=', self::since('month'))->count(),
+                'week' => (int) $rows->sum('new_week'),
+                'month' => (int) $rows->sum('new_month'),
                 'period' => array_sum($status->all()),
             ],
             'status' => collect(LeadStatus::LABELS)->map(fn ($label, $key) => $status[$key] ?? 0)->all(),
-            'conversion' => ['clients' => $clients, 'leads' => $leads, 'rate' => $leads ? round($clients * 100 / $leads, 1) : null],
-            'value' => self::openValue(self::leads($owner, $me)),
-            'overdue' => self::open($owner, $me)->where('organizations.next_step_due', '<', self::today())->count(),
-            'noStep' => self::open($owner, $me)->where(fn ($q) => $q->whereNull('organizations.next_step')->orWhere('organizations.next_step', ''))->count(),
+            'conversion' => self::conversion((int) $rows->sum('clients'), (int) $rows->sum('cohort')),
+            'value' => self::openValue(self::leads($owner, $me))[''] ?? self::NO_VALUE,
+            'overdue' => (int) $rows->sum('overdue'),
+            'noStep' => (int) $rows->sum('no_step'),
         ];
     }
 
     /**
      * The per-owner view: one row per person who owns leads (and one for leads nobody owns), with the same figures
-     * as the strip: new in the period, open, overdue, no next step, conversion, open opportunity value.
+     * as the strip: new in the period, open, overdue, no next step, conversion, open opportunity value. Counted in one
+     * query grouped by owner, and the opportunities' value in one more.
      */
     public static function byOwner(string $period, User $me): Collection
     {
-        $owners = self::leads('all', $me)->leftJoin('users', 'users.id', '=', 'organizations.assigned_to')
-            ->groupBy('organizations.assigned_to', 'users.first_name', 'users.last_name', 'users.avatar_path')
-            ->orderBy('users.first_name')
-            ->get(['organizations.assigned_to as id', 'users.first_name', 'users.last_name', 'users.avatar_path']);
+        $rows = self::counted(self::leads('all', $me)->leftJoin('users', 'users.id', '=', 'organizations.assigned_to')
+            ->groupBy('users.first_name', 'users.last_name', 'users.avatar_path')
+            ->addSelect('users.first_name', 'users.last_name', 'users.avatar_path'), $period, 'organizations.assigned_to');
+        $values = self::openValue(self::leads('all', $me), 'organizations.assigned_to');
 
-        return $owners->map(function ($o) use ($period, $me) {
-            $scope = $o->id ?? 'none';
-            $s = self::summary($scope, $period, $me);
+        return $rows->map(function ($o) use ($values) {
+            $id = $o->grp;
 
             return (object) [
-                'id' => $o->id, 'scope' => $scope, 'name' => $o->id ? trim($o->first_name . ' ' . $o->last_name) : 'No owner',
+                'id' => $id, 'scope' => $id ?? 'none', 'name' => $id ? trim($o->first_name . ' ' . $o->last_name) : 'No owner',
                 'first_name' => $o->first_name, 'last_name' => $o->last_name, 'avatar_path' => $o->avatar_path,
-                'new' => $s['new']['period'], 'open' => self::open($scope, $me)->count(), 'overdue' => $s['overdue'], 'noStep' => $s['noStep'],
-                'conversion' => $s['conversion'], 'value' => $s['value'],
+                'new' => (int) $o->added, 'open' => (int) $o->open_leads, 'overdue' => (int) $o->overdue, 'noStep' => (int) $o->no_step,
+                'conversion' => self::conversion((int) $o->clients, (int) $o->cohort), 'value' => $values[(string) $id] ?? self::NO_VALUE,
             ];
         })->sortBy(fn ($o) => [$o->id === null ? 1 : 0, $o->name])->values();
     }
 
     /**
+     * The strip's figures for these leads in one query, a row per $group (lead_status or the owner): added in the
+     * period, the cohort (added in the period, not a client from before the revamp) and the clients among it, new this
+     * week and this month, open, overdue and with no next step. Each figure keeps its definition from summary().
+     */
+    private static function counted(Builder $leads, string $period, string $group): Collection
+    {
+        $since = self::since($period);
+        $open = 'organizations.lead_status IN (' . implode(', ', array_fill(0, count(LeadStatus::OPEN), '?')) . ')';
+        $added = $since ? 'organizations.created_at >= ?' : '1 = 1';
+        $cohort = "{$added} AND (organizations.client_via IS NULL OR organizations.client_via != 'existing')";
+        $sum = fn (string $when) => "SUM(CASE WHEN {$when} THEN 1 ELSE 0 END)";
+        $at = $since ? [$since] : [];
+
+        return $leads->groupBy($group)->addSelect(DB::raw("{$group} as grp"))
+            ->selectRaw($sum($added) . ' as added', $at)
+            ->selectRaw($sum($cohort) . ' as cohort', $at)
+            ->selectRaw($sum("{$cohort} AND organizations.lead_status = 'client'") . ' as clients', $at)
+            ->selectRaw($sum('organizations.created_at >= ?') . ' as new_week', [self::since('week')])
+            ->selectRaw($sum('organizations.created_at >= ?') . ' as new_month', [self::since('month')])
+            ->selectRaw($sum($open) . ' as open_leads', LeadStatus::OPEN)
+            ->selectRaw($sum("{$open} AND organizations.next_step_due < ?") . ' as overdue', [...LeadStatus::OPEN, self::today()])
+            ->selectRaw($sum("{$open} AND (organizations.next_step IS NULL OR organizations.next_step = '')") . ' as no_step', LeadStatus::OPEN)
+            ->get();
+    }
+
+    /** Of the leads added in the period (not clients from before the revamp), those that are clients now */
+    private static function conversion(int $clients, int $leads): array
+    {
+        return ['clients' => $clients, 'leads' => $leads, 'rate' => $leads ? round($clients * 100 / $leads, 1) : null];
+    }
+
+    /**
      * My follow-ups: the open leads in the scope, by when their next step is due (Lagos):
      *   overdue (oldest first), today, week (the next 7 days), later, none (no next step: flagged)
+     * Overdue, today and week are always whole; later and none stop at $limits[group] leads when given (followUpCounts()
+     * says how many each has). The main contact is read for the leads listed only.
      */
-    public static function followUps(string $owner, User $me): array
+    public static function followUps(string $owner, User $me, array $limits = []): array
     {
-        $today = self::today();
-        $week = Carbon::now(NextStep::TZ)->addDays(7)->format('Y-m-d');
-        $rows = self::open($owner, $me)->leftJoin('users as owner', 'owner.id', '=', 'organizations.assigned_to')
+        [$today, $week] = [self::today(), Carbon::now(NextStep::TZ)->addDays(7)->format('Y-m-d')];
+        $rows = fn (string $where, array $bindings, ?int $limit) => self::open($owner, $me)->whereRaw($where, $bindings)
+            ->leftJoin('users as owner', 'owner.id', '=', 'organizations.assigned_to')
             ->orderByRaw('organizations.next_step_due IS NULL, organizations.next_step_due')->orderBy('organizations.created_at')
+            ->when($limit !== null, fn ($q) => $q->limit($limit))
             ->get(['organizations.id', 'organizations.name', 'organizations.lead_status', 'organizations.next_step', 'organizations.next_step_due', 'organizations.industry',
                 'organizations.country', 'organizations.phone', 'organizations.email', 'organizations.last_activity_at', 'organizations.created_at', 'organizations.assigned_to',
                 'owner.first_name as owner_first', 'owner.last_name as owner_last', 'owner.avatar_path as owner_avatar']);
 
-        $contacts = DB::table('client_users')->whereIn('organization_id', $rows->pluck('id'))->whereNull('deleted_at')
+        $soon = $rows('NOT ' . self::NO_STEP . ' AND organizations.next_step_due <= ?', [$week], null);
+        $groups = [
+            'overdue' => $soon->filter(fn ($r) => $r->next_step_due < $today)->values(),
+            'today' => $soon->filter(fn ($r) => $r->next_step_due === $today)->values(),
+            'week' => $soon->filter(fn ($r) => $r->next_step_due > $today)->values(),
+            'later' => $rows('NOT ' . self::NO_STEP . ' AND organizations.next_step_due > ?', [$week], $limits['later'] ?? null),
+            'none' => $rows(self::NO_STEP, [], $limits['none'] ?? null),
+        ];
+
+        $all = collect($groups)->flatten(1);
+        $contacts = DB::table('client_users')->whereIn('organization_id', $all->pluck('id'))->whereNull('deleted_at')
             ->orderByDesc('is_main_contact')->orderBy('created_at')->get(['organization_id', 'first_name', 'last_name', 'email', 'phone', 'job_title'])
             ->groupBy('organization_id')->map->first();
-        $rows->each(function ($r) use ($contacts) {
+        $all->each(function ($r) use ($contacts) {
             $c = $contacts[$r->id] ?? null;
             $r->contact_name = $c ? trim($c->first_name . ' ' . $c->last_name) : null;
             $r->contact_title = $c->job_title ?? null;
@@ -144,15 +190,24 @@ final class LeadNumbers
             $r->contact_email = $c->email ?? $r->email;
         });
 
-        $none = fn ($r) => trim((string) $r->next_step) === '' || ! $r->next_step_due;
+        return $groups;
+    }
 
-        return [
-            'overdue' => $rows->filter(fn ($r) => ! $none($r) && $r->next_step_due < $today)->values(),
-            'today' => $rows->filter(fn ($r) => ! $none($r) && $r->next_step_due === $today)->values(),
-            'week' => $rows->filter(fn ($r) => ! $none($r) && $r->next_step_due > $today && $r->next_step_due <= $week)->values(),
-            'later' => $rows->filter(fn ($r) => ! $none($r) && $r->next_step_due > $week)->values(),
-            'none' => $rows->filter($none)->values(),
-        ];
+    /** How many open leads in the scope each group of My follow-ups has, in one query */
+    public static function followUpCounts(string $owner, User $me): array
+    {
+        [$today, $week] = [self::today(), Carbon::now(NextStep::TZ)->addDays(7)->format('Y-m-d')];
+        $dated = 'NOT ' . self::NO_STEP . ' AND organizations.next_step_due';
+        $sum = fn (string $when) => "SUM(CASE WHEN {$when} THEN 1 ELSE 0 END)";
+        $row = self::open($owner, $me)
+            ->selectRaw($sum("{$dated} < ?") . ' as n_overdue', [$today])
+            ->selectRaw($sum("{$dated} = ?") . ' as n_today', [$today])
+            ->selectRaw($sum("{$dated} > ? AND organizations.next_step_due <= ?") . ' as n_week', [$today, $week])
+            ->selectRaw($sum("{$dated} > ?") . ' as n_later', [$week])
+            ->selectRaw($sum(self::NO_STEP) . ' as n_none')
+            ->first();
+
+        return collect(['overdue', 'today', 'week', 'later', 'none'])->mapWithKeys(fn ($k) => [$k => (int) ($row->{'n_' . $k} ?? 0)])->all();
     }
 
     /** Open leads (LeadStatus::OPEN) in the scope */
@@ -167,20 +222,26 @@ final class LeadNumbers
         return Carbon::now(NextStep::TZ)->format('Y-m-d');
     }
 
-    /** The open opportunities of these leads and what their current proposals are worth, before VAT, by currency */
-    private static function openValue(Builder $leads): array
+    /**
+     * The open opportunities of these leads and what their current proposals are worth, before VAT, by currency:
+     * ['' => figures] for all of them, or per value of $by (the organisation's owner) when it is given
+     */
+    private static function openValue(Builder $leads, ?string $by = null): array
     {
-        $open = DB::table('opportunities')->whereNull('deleted_at')->whereNotIn('stage', \App\Models\Opportunity::CLOSED)
-            ->whereIn('organization_id', $leads->select('organizations.id'))->pluck('id');
+        $open = DB::table('opportunities')->join('organizations', 'organizations.id', '=', 'opportunities.organization_id')
+            ->whereNull('opportunities.deleted_at')->whereNotIn('opportunities.stage', \App\Models\Opportunity::CLOSED)
+            ->whereIn('opportunities.organization_id', $leads->select('organizations.id'))
+            ->get(['opportunities.id', DB::raw(($by ?? "''") . ' as grp')])->pluck('grp', 'id');
         // each opportunity's current proposal: its latest version not set aside
-        $current = $open->isEmpty() ? collect() : DB::table('proposals')->whereIn('opportunity_id', $open)->whereNull('deleted_at')
+        $current = $open->isEmpty() ? collect() : DB::table('proposals')->whereIn('opportunity_id', $open->keys())->whereNull('deleted_at')
             ->whereNotIn('status', self::SET_ASIDE)->orderByDesc('version')->orderByDesc('created_at')
             ->get(['opportunity_id', 'currency', 'subtotal'])->unique('opportunity_id');
+        $priced = $current->groupBy(fn ($p) => (string) $open[$p->opportunity_id]);
 
-        return [
-            'totals' => $current->groupBy('currency')->map(fn ($rows) => (float) $rows->sum('subtotal'))->sortDesc()->all(),
-            'open' => $open->count(),
-            'priced' => $current->count(),
-        ];
+        return $open->groupBy(fn ($grp) => (string) $grp, true)->map(fn ($ids, $grp) => [
+            'totals' => ($priced[$grp] ?? collect())->groupBy('currency')->map(fn ($rows) => (float) $rows->sum('subtotal'))->sortDesc()->all(),
+            'open' => $ids->count(),
+            'priced' => ($priced[$grp] ?? collect())->count(),
+        ])->all();
     }
 }

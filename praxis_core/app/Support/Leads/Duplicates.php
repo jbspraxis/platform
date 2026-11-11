@@ -48,9 +48,10 @@ final class Duplicates
         // Email
         $emails = collect($emails)->map(fn ($e) => mb_strtolower(trim((string) $e)))->filter(fn ($e) => str_contains($e, '@'))->unique()->values();
         if ($emails->isNotEmpty()) {
-            $add($base()->whereIn(DB::raw('LOWER(organizations.email)'), $emails)->pluck('organizations.id'), 'email');
+            // The columns' collation ignores case: compared as they are, client_users.email's index is used
+            $add($base()->whereIn('organizations.email', $emails)->pluck('organizations.id'), 'email');
             $add($base()->join('client_users', 'client_users.organization_id', '=', 'organizations.id')->whereNull('client_users.deleted_at')
-                ->whereIn(DB::raw('LOWER(client_users.email)'), $emails)->pluck('organizations.id'), 'email');
+                ->whereIn('client_users.email', $emails)->pluck('organizations.id'), 'email');
         }
 
         // Phone: digits only, compared on the last 9

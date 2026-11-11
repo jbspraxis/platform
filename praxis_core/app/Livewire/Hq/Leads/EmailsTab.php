@@ -53,6 +53,10 @@ class EmailsTab extends Component
         $c = ClientUser::where('organization_id', $this->leadId)->whereNotNull('email')->where('email', '!=', '')->find($contactId);
         abort_unless($c, 404);
         $name = str_replace(['"', '<', '>', ',', ';'], '', trim($c->first_name . ' ' . $c->last_name));
+        // Nothing on the tab changes unless a notice goes: the list isn't read again just to open the composer
+        if ($this->notice === null) {
+            $this->skipRender();
+        }
         $this->notice = null;
         // From the browser, as the Mail page does: a named `to:` argument of dispatch() would be read as a target component
         $this->js('Livewire.dispatch("mail-compose", ' . Js::from(['mode' => 'new', 'to' => $name !== '' ? "\"{$name}\" <{$c->email}>" : $c->email]) . ')');

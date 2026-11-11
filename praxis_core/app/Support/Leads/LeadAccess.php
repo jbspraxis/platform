@@ -2,8 +2,10 @@
 
 namespace App\Support\Leads;
 
+use App\Models\Opportunity;
 use App\Models\Organization;
 use App\Models\User;
+use App\Support\Opportunities\OpportunityAccess;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -36,6 +38,31 @@ final class LeadAccess
     public static function find(?string $id): ?Organization
     {
         return $id ? Organization::query()->whereKey($id)->whereIn('status', self::STATUSES)->whereNull('deleted_at')->first() : null;
+    }
+
+    /**
+     * Which of a lead's opportunities this person may open (OpportunityAccess::canView: the permission, or being on its
+     * team), by opportunity id. The lead's tabs list many at once: the team is read in one query, not once per row.
+     *
+     * @param  iterable<Opportunity|null>  $opportunities
+     * @return array<string, bool>
+     */
+    public static function opportunitiesVisible(?User $user, iterable $opportunities): array
+    {
+        $list = collect($opportunities)->filter()->unique('id');
+        if ($list->isEmpty()) {
+            return [];
+        }
+        // The permission alone (no opportunity given: no team asked)
+        if (OpportunityAccess::canView($user)) {
+            return $list->mapWithKeys(fn (Opportunity $o) => [$o->id => true])->all();
+        }
+        // Team members as OpportunityAccess::isMember counts them: active accounts only
+        $member = $user !== null && $user->status === 'Active'
+            ? DB::table('opportunity_members')->where('user_id', $user->id)->whereIn('opportunity_id', $list->pluck('id')->all())->pluck('opportunity_id')->flip()->all()
+            : [];
+
+        return $list->mapWithKeys(fn (Opportunity $o) => [$o->id => OpportunityAccess::isLead($user, $o) || isset($member[$o->id])])->all();
     }
 
     /** One line in system_audit_logs about the lead (target organizations), by whoever is signed in */

@@ -1,5 +1,6 @@
 {{-- A lead's Opportunities tab (App\Livewire\Hq\Leads\OpportunitiesTab, docs/LEADS.md section 9). HQ is English. --}}
 <div class="lo">
+    @assets
     <style>
         .lo-sum { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 0 0 16px; font-size: 0.875rem; color: var(--color-slate); }
         .lo-sum strong { color: var(--color-ink); font-variant-numeric: tabular-nums; }
@@ -19,6 +20,7 @@
             .ld-card-head .btn { flex: 1 1 100%; justify-content: center; }
         }
     </style>
+    @endassets
     @php
         $tz = 'Africa/Lagos';
         $day = fn ($at) => $at ? \Illuminate\Support\Carbon::parse($at)->setTimezone($tz)->format('j M Y') : '—';

@@ -13,6 +13,7 @@ use App\Support\Leads\Sources;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
@@ -62,6 +63,13 @@ class LeadsRegister extends Component
 
     /** Rows shown; "Show more" adds 100 */
     public int $limit = 100;
+
+    /** Goes up when this page changes leads (Assign to me, an import), so the strip is counted again (see side()) */
+    #[Locked]
+    public int $changes = 0;
+
+    /** The filters from the address are checked once a request */
+    private bool $sanitised = false;
 
     public const STEPS = ['overdue' => 'Overdue', 'today' => 'Due today', 'week' => 'Due in the next 7 days', 'none' => 'No next step'];
 
@@ -116,6 +124,10 @@ class LeadsRegister extends Component
     /** Filters from the address that aren't one of the choices fall back to their defaults */
     private function sanitise(): void
     {
+        if ($this->sanitised) {
+            return;
+        }
+        $this->sanitised = true;
         if (! in_array($this->owner, ['mine', 'all', 'none'], true) && ! LeadOwner::activeStaff($this->owner) && ! DB::table('organizations')->where('assigned_to', $this->owner)->exists()) {
             $this->owner = 'mine';
         }
@@ -160,6 +172,7 @@ class LeadsRegister extends Component
         // Only a lead nobody owns yet ("Assign to me" is offered only for those): an owned lead can't be taken over
         if ($lead) {
             LeadOwner::claim($lead, Auth::user());
+            $this->changes++;
         }
     }
 
@@ -314,6 +327,7 @@ class LeadsRegister extends Component
     public function imported(): void
     {
         $this->limit = 100;
+        $this->changes++;
     }
 
     /** The owner filter's people: whoever owns a lead (Mine, Everyone and No owner come first) */
@@ -326,12 +340,40 @@ class LeadsRegister extends Component
             ->get(['users.id', DB::raw("TRIM(CONCAT(users.first_name, ' ', users.last_name)) as name")]);
     }
 
+    /**
+     * The strip, the owner and country choices and the follow-ups badge. They don't follow the search or the other
+     * filters, so they are read once for this owner, period and view and kept a minute while the page is open (each
+     * visit has its own copy; Assign to me and an import count again). Kept as plain arrays.
+     */
+    private function side(): array
+    {
+        $me = Auth::user();
+        $key = 'leads-list:' . $this->getId() . ':' . $this->changes . ':' . $me->id . ':' . md5($this->owner . '|' . $this->period . '|' . (int) $this->byOwner);
+        $side = Cache::remember($key, 60, fn () => [
+            'owners' => $this->owners()->map(fn ($o) => (array) $o)->all(),
+            'countries' => DB::table('organizations')->whereIn('status', LeadAccess::STATUSES)->whereNull('deleted_at')->whereNotNull('country')->where('country', '!=', '')
+                ->distinct()->orderBy('country')->pluck('country')->all(),
+            'numbers' => LeadNumbers::summary($this->owner, $this->period, $me),
+            'perOwner' => $this->byOwner ? LeadNumbers::byOwner($this->period, $me)->map(fn ($o) => (array) $o)->all() : [],
+            'myOverdue' => LeadNumbers::open('mine', $me)->where('organizations.next_step_due', '<', LeadNumbers::today())->count(),
+        ]);
+
+        return [
+            'owners' => collect($side['owners'])->map(fn ($o) => (object) $o),
+            'countries' => collect($side['countries']),
+            'numbers' => $side['numbers'],
+            'perOwner' => collect($side['perOwner'])->map(fn ($o) => (object) $o),
+            'myOverdue' => $side['myOverdue'],
+        ];
+    }
+
     public function render()
     {
         $me = Auth::user();
         $query = $this->query();
         $total = (clone $query)->count();
-        $owners = $this->owners();
+        $side = $this->side();
+        $owners = $side['owners'];
         $scope = $this->owner;
 
         return view('livewire.hq.intelligence.leads-register', [
@@ -341,12 +383,11 @@ class LeadsRegister extends Component
             'canImport' => (new LeadImportSchema())->canImport($me),
             'owners' => $owners,
             'ownerName' => match ($scope) { 'mine' => 'you', 'all' => 'everyone', 'none' => 'no one', default => $owners->firstWhere('id', $scope)?->name ?? 'this person' },
-            'countries' => DB::table('organizations')->whereIn('status', LeadAccess::STATUSES)->whereNull('deleted_at')->whereNotNull('country')->where('country', '!=', '')
-                ->distinct()->orderBy('country')->pluck('country'),
-            'numbers' => LeadNumbers::summary($scope, $this->period, $me),
-            'perOwner' => $this->byOwner ? LeadNumbers::byOwner($this->period, $me) : collect(),
+            'countries' => $side['countries'],
+            'numbers' => $side['numbers'],
+            'perOwner' => $side['perOwner'],
             'filtered' => $this->status !== '' || $this->step !== '' || $this->source !== '' || $this->country !== '' || trim($this->search) !== '',
-            'myOverdue' => LeadNumbers::open('mine', $me)->where('organizations.next_step_due', '<', LeadNumbers::today())->count(),
+            'myOverdue' => $side['myOverdue'],
         ]);
     }
 }

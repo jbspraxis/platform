@@ -8,6 +8,7 @@
     $briefRunning = $brief && ! $brief->isFinished();
 @endphp
 <div class="in" @if ($busy) wire:poll.4s @endif>
+    @assets
     <style>
         .in-head { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-start; justify-content: space-between; }
         .in-head p { margin: 4px 0 0; max-width: 62ch; color: var(--color-slate); font-size: 0.875rem; }
@@ -52,6 +53,7 @@
             .in-actions .btn { flex: 1 1 100%; }
         }
     </style>
+    @endassets
 
     @if ($notice)
         <div class="alert alert-success mb-6" role="status" wire:key="in-notice"><i data-lucide="circle-check"></i><span>{{ $notice }}</span></div>

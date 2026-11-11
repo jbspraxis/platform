@@ -43,7 +43,7 @@ class OpportunitiesTab extends Component
             ->orderByDesc('version')->orderByDesc('created_at')->get(['id', 'opportunity_id', 'proposal_ref', 'status', 'total_value', 'currency', 'version', 'approved_at'])
             ->unique('opportunity_id')->keyBy('opportunity_id') : collect();
         $meetings = $ids ? Meeting::whereIn('opportunity_id', $ids)->where('status', '!=', 'cancelled')->get(['id', 'opportunity_id', 'kind', 'status', 'starts_at', 'title'])->groupBy('opportunity_id') : collect();
-        $visible = $opportunities->mapWithKeys(fn ($o) => [$o->id => OpportunityAccess::canView($user, $o)]);
+        $visible = collect(LeadAccess::opportunitiesVisible($user, $opportunities));
 
         // The value of open opportunities' proposals, per currency, among those this person may open
         $openValue = $opportunities->reject(fn ($o) => in_array($o->stage, Opportunity::CLOSED, true))

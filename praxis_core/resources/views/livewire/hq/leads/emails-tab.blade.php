@@ -1,5 +1,6 @@
 {{-- A lead's Emails tab (App\Livewire\Hq\Leads\EmailsTab, docs/LEADS.md section 9). HQ is English. --}}
 <div class="le">
+    @assets
     <style>
         .le-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 16px; margin-bottom: 16px; }
         .le-head p { margin: 0; max-width: 560px; }
@@ -23,6 +24,7 @@
             .le-write .btn { flex: 1 1 100%; justify-content: center; }
         }
     </style>
+    @endassets
     @php
         $tz = 'Africa/Lagos';
         $when = fn ($at) => $at->copy()->setTimezone($tz)->format($at->copy()->setTimezone($tz)->isSameYear(now($tz)) ? 'D j M, H:i' : 'j M Y, H:i');
