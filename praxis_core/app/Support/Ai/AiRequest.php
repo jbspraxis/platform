@@ -22,8 +22,11 @@ final class AiRequest
     /** An image is resized to fit the model's limit first; the budget counts the largest it can be */
     public const TOKENS_PER_IMAGE = 5000;
 
-    /** Seconds a request made while a page waits may take, connecting included */
-    public const SYNC_TIMEOUT = 25;
+    /**
+     * Seconds a request made while a page waits may take, connecting included: room for the longest sync draft (a
+     * letter, up to 3,000 tokens) and still inside the web server's usual 60 s proxy limit
+     */
+    public const SYNC_TIMEOUT = 50;
 
     /**
      * @param  list<string>  $system
