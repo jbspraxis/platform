@@ -1,4 +1,4 @@
-<div class="mtg" @if ($pending) wire:poll.4s @endif>
+<div class="mtg" @if ($pending) wire:poll.4s="check" @endif>
     @include('livewire.hq.opportunities.partials.meetings-styles')
     @php
         $locale = app()->getLocale();

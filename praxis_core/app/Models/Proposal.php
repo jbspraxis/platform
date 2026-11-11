@@ -68,14 +68,16 @@ class Proposal extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
+    /** The job drafting it: where it stands, without its input or output (AiRun::LIGHT; Proposals::sync reads the output) */
     public function aiRun(): BelongsTo
     {
-        return $this->belongsTo(AiRun::class);
+        return $this->belongsTo(AiRun::class)->select(AiRun::LIGHT);
     }
 
+    /** The job writing "what changed", likewise light */
     public function changesRun(): BelongsTo
     {
-        return $this->belongsTo(AiRun::class, 'changes_run_id');
+        return $this->belongsTo(AiRun::class, 'changes_run_id')->select(AiRun::LIGHT);
     }
 
     /** Proposal v2: the client reviews and approves it in the portal; the SOW (PR 5) is what gets signed */

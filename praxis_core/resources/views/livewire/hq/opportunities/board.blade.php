@@ -1,4 +1,5 @@
 <div class="opb">
+    @assets
     <style>
         /* Opportunities board: only what the shared component classes don't cover. Brand tokens only. */
         .opb-tools { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; margin-bottom: 20px; }
@@ -42,6 +43,7 @@
             .opb .modal-actions .btn, .opb-neworg-actions .btn { width: 100%; }
         }
     </style>
+    @endassets
 
     @php
         $tone = fn (string $stage) => match ($stage) { 'won' => 'pill-success', 'lost' => 'pill-danger', 'on_hold' => 'pill-warning', default => 'pill-info' };

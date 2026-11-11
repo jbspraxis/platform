@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Hq\Opportunities;
 
+use App\Models\AiRun;
 use App\Models\Opportunity;
 use App\Models\StatementOfWork;
 use App\Support\Ai\AiUnavailable;
@@ -67,6 +68,13 @@ class SowTab extends Component
     #[Locked]
     public string $notice = '';
 
+    /** Where the AI's work stood when the tab was last drawn: the poll draws it again only once that moves on (check()) */
+    #[Locked]
+    public string $polled = '';
+
+    /** The opportunity, read once per request (Livewire makes a new component object for each one); render() adds its organisation and lead */
+    private ?Opportunity $opp = null;
+
     public function mount(string $opportunityId): void
     {
         $opportunity = Opportunity::findOrFail($opportunityId);
@@ -82,7 +90,7 @@ class SowTab extends Component
 
     private function opportunity(): Opportunity
     {
-        return Opportunity::with(['organization', 'lead'])->findOrFail($this->opportunityId);
+        return $this->opp ??= Opportunity::findOrFail($this->opportunityId);
     }
 
     private function current(): ?StatementOfWork
@@ -396,8 +404,25 @@ class SowTab extends Component
         $this->dispatch('sow-changed');
     }
 
-    /** wire:poll while the AI works: render() applies what it finished */
-    public function check(): void {}
+    /**
+     * wire:poll while the AI works: two small queries, and the tab is drawn again (render() applies what the AI
+     * finished) only when the version or its run moved on: a new status, more progress, the draft filed
+     */
+    public function check(): void
+    {
+        $versions = StatementOfWork::where('opportunity_id', $this->opportunityId)->orderByDesc('version')->get(['id', 'status', 'ai_run_id', 'updated_at']);
+        $sow = $versions->firstWhere('id', $this->versionId) ?? $versions->first();
+        $run = $sow?->ai_run_id ? AiRun::whereKey($sow->ai_run_id)->first(['id', 'status', 'progress']) : null;
+        if ($sow && self::stamp($sow, $run) === $this->polled) {
+            $this->skipRender();
+        }
+    }
+
+    /** The version on screen and its run, as one short string (the same from check() and from render()) */
+    private static function stamp(StatementOfWork $sow, ?AiRun $run): string
+    {
+        return md5(json_encode([$sow->id, $sow->status, $sow->getRawOriginal('updated_at'), $sow->ai_run_id, $run ? [$run->id, $run->status, (int) $run->progress] : null]));
+    }
 
     private function persist(): void
     {
@@ -431,7 +456,7 @@ class SowTab extends Component
 
     public function render()
     {
-        $opportunity = $this->opportunity();
+        $opportunity = $this->opportunity()->loadMissing(['organization', 'lead']);
         $user = Auth::user();
         $versions = Sows::versions($opportunity);
         $sow = $versions->firstWhere('id', $this->versionId) ?? $versions->first();
@@ -442,6 +467,7 @@ class SowTab extends Component
                 $sow = Sows::versions($opportunity)->firstWhere('id', $sow->id);
             }
             $sow->load(['aiRun', 'approver', 'previousVersion', 'proposal']);
+            $sow->setRelation('opportunity', $opportunity); // Sows::vat reads its organisation and billing company: not read again
             if ($sow->aiRun && ! $sow->aiRun->isFinished()) {
                 $this->loaded = '';
             } elseif ($sow->isEditable() && $this->loaded !== $sow->id) {
@@ -461,6 +487,7 @@ class SowTab extends Component
         }
 
         $drafting = $sow?->aiRun && ! $sow->aiRun->isFinished();
+        $this->polled = $drafting ? self::stamp($sow, $sow->aiRun) : '';
         $latest = $versions->first();
         $canEdit = Sows::canEdit($user, $opportunity);
         $proposal = Sows::approvedProposal($opportunity) ?? $sow?->proposal;

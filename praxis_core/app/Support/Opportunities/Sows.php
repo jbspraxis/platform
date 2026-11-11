@@ -113,10 +113,10 @@ final class Sows
         return Proposals::clientApproved($opportunity->id);
     }
 
-    /** The opportunity's SOW versions, latest first */
+    /** The opportunity's SOW versions, latest first, without the drawn signatures (refresh() or a fresh read has them) */
     public static function versions(Opportunity $opportunity): Collection
     {
-        return StatementOfWork::where('opportunity_id', $opportunity->id)->orderByDesc('version')->get();
+        return StatementOfWork::where('opportunity_id', $opportunity->id)->orderByDesc('version')->get(StatementOfWork::WITHOUT_SIGNATURES);
     }
 
     public static function signed(string $opportunityId): ?StatementOfWork
@@ -196,7 +196,7 @@ final class Sows
         }
         $applied = DB::transaction(function () use ($sow, $runId) {
             $locked = StatementOfWork::whereKey($sow->id)->lockForUpdate()->first();
-            $run = AiRun::find($runId);
+            $run = AiRun::find($runId, AiRun::RESULT);
             if (! $locked || ! $run || $locked->ai_run_id !== $runId) {
                 return false;
             }

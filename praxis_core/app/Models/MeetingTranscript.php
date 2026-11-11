@@ -16,6 +16,10 @@ class MeetingTranscript extends Model
 {
     use HasUuids, SoftDeletes;
 
+    /** Every column but the text and its lines (up to 500,000 characters each): what a list of meetings needs */
+    public const WITHOUT_TEXT = ['id', 'meeting_id', 'source', 'google_doc_id', 'language', 'notes', 'minutes', 'minutes_sent_at', 'minutes_unsent',
+        'collected_at', 'created_by', 'updated_by', 'deleted_by', 'created_at', 'updated_at', 'deleted_at'];
+
     protected $fillable = [
         'meeting_id', 'source', 'google_doc_id', 'language', 'text', 'entries', 'notes', 'minutes', 'minutes_sent_at', 'minutes_unsent', 'collected_at',
         'created_by', 'updated_by', 'deleted_by',

@@ -123,7 +123,7 @@ final class Questionnaires
     {
         $changed = [];
         if ($questionnaire->status === 'drafting' && $questionnaire->ai_run_id) {
-            $run = AiRun::find($questionnaire->ai_run_id);
+            $run = AiRun::find($questionnaire->ai_run_id, AiRun::RESULT);
             if ($run?->succeeded()) {
                 $changed = self::applyDraft($questionnaire, $run);
             }
@@ -458,7 +458,7 @@ final class Questionnaires
     {
         return DB::transaction(function () use ($questionId, $runId) {
             $question = QuestionnaireQuestion::whereKey($questionId)->lockForUpdate()->first();
-            $run = AiRun::find($runId);
+            $run = AiRun::find($runId, AiRun::RESULT);
             if (! $question || ! $run || $question->ai_run_id !== $runId) {
                 return false;
             }

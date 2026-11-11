@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Hq\Opportunities;
 
+use App\Models\AiRun;
 use App\Models\Opportunity;
 use App\Models\ProjectDraft;
+use App\Models\StatementOfWork;
 use App\Support\Ai\AiUnavailable;
 use App\Support\Opportunities\OpportunityAccess;
 use App\Support\Opportunities\ProjectDrafts;
@@ -43,6 +45,13 @@ class ProjectDraftTab extends Component
     #[Locked]
     public string $notice = '';
 
+    /** Where the AI's work stood when the tab was last drawn: the poll draws it again only once that moves on (check()) */
+    #[Locked]
+    public string $polled = '';
+
+    /** The opportunity, read once per request (Livewire makes a new component object for each one); render() adds its organisation and lead */
+    private ?Opportunity $opp = null;
+
     public function mount(string $opportunityId): void
     {
         $opportunity = Opportunity::findOrFail($opportunityId);
@@ -57,7 +66,7 @@ class ProjectDraftTab extends Component
 
     private function opportunity(): Opportunity
     {
-        return Opportunity::with(['organization', 'lead'])->findOrFail($this->opportunityId);
+        return $this->opp ??= Opportunity::findOrFail($this->opportunityId);
     }
 
     private function draft(): ?ProjectDraft
@@ -221,8 +230,24 @@ class ProjectDraftTab extends Component
         $this->redirectRoute('hq.ops.project', ['project' => $draft->fresh()->created_project_id, 'tab' => 'milestones'], navigate: true);
     }
 
-    /** wire:poll while the AI works */
-    public function check(): void {}
+    /**
+     * wire:poll while the AI works: two small queries, and the tab is drawn again (render() applies what the AI
+     * finished) only when the draft or its run moved on
+     */
+    public function check(): void
+    {
+        $draft = ProjectDraft::where('opportunity_id', $this->opportunityId)->latest()->first(['id', 'status', 'revision', 'ai_run_id']);
+        $run = $draft?->ai_run_id ? AiRun::whereKey($draft->ai_run_id)->first(['id', 'status', 'progress']) : null;
+        if ($draft && self::stamp($draft, $run) === $this->polled) {
+            $this->skipRender();
+        }
+    }
+
+    /** The draft and its run, as one short string (the same from check() and from render()) */
+    private static function stamp(ProjectDraft $draft, ?AiRun $run): string
+    {
+        return md5(json_encode([$draft->id, $draft->status, (int) $draft->revision, $draft->ai_run_id, $run ? [$run->id, $run->status, (int) $run->progress] : null]));
+    }
 
     /** Saves the editor's payload as of the revision it was loaded at; a draft changed since is reloaded instead */
     private function persist(ProjectDraft $draft): bool
@@ -242,13 +267,14 @@ class ProjectDraftTab extends Component
 
     public function render()
     {
-        $opportunity = $this->opportunity();
+        $opportunity = $this->opportunity()->loadMissing(['organization', 'lead']);
         $draft = $this->draft();
         if ($draft) {
             if (ProjectDrafts::sync($draft)) {
                 $this->loaded = '';
             }
-            $draft->load(['aiRun', 'sow']);
+            // The SOW for its reference and project; not its drawn signatures
+            $draft->load(['aiRun', 'sow' => fn ($q) => $q->select(StatementOfWork::WITHOUT_SIGNATURES)]);
             if ($draft->status === 'drafting' || ($draft->aiRun && ! $draft->aiRun->isFinished())) {
                 $this->loaded = '';
                 $this->payload = (array) $draft->payload;
@@ -262,6 +288,7 @@ class ProjectDraftTab extends Component
         $leadId = $draft ? ProjectDrafts::leadId($draft) : null;
         $canEdit = $draft && ProjectDrafts::canEdit(Auth::user(), $opportunity) && $draft->status === 'ready';
         $drafting = $draft && ($draft->status === 'drafting' || ($draft->aiRun && ! $draft->aiRun->isFinished()));
+        $this->polled = $drafting ? self::stamp($draft, $draft->aiRun) : '';
 
         return view('livewire.hq.opportunities.project-draft-tab', [
             'o' => $opportunity,
