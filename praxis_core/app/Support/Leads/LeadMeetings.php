@@ -66,8 +66,7 @@ final class LeadMeetings
     }
 
     /** A transcript's columns but its text and lines (up to 500,000 characters each): what a list of meetings needs */
-    public const TRANSCRIPT_LIST = ['id', 'meeting_id', 'source', 'google_doc_id', 'language', 'notes', 'minutes', 'minutes_sent_at', 'minutes_unsent',
-        'collected_at', 'created_by', 'updated_by', 'deleted_by', 'created_at', 'updated_at', 'deleted_at'];
+    public const TRANSCRIPT_LIST = MeetingTranscript::WITHOUT_TEXT;
 
     /**
      * The lead's meetings, by start: its own (no opportunity) and the client meetings of its opportunities, which are
