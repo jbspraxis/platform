@@ -23,4 +23,11 @@
     @else
         <button type="button" wire:click="toggleUserStatus('{{ $user->id }}', '{{ $user->status }}')" class="btn btn-ghost btn-sm">Restore access</button>
     @endif
+
+    {{-- Client accounts only; the primary contact stays until someone else is made primary --}}
+    @if($activeTab === 'CLIENTS' && empty($user->is_primary_client))
+        <button type="button" wire:click="removeClientAccount('{{ $user->id }}')"
+                wire:confirm="Remove {{ $user->first_name }} {{ $user->last_name }} from {{ $user->org_name }}’s Client Portal? They are signed out at once, their invitation and sign-in links stop working, and they leave this list. What they did stays in the history. You can’t undo this here."
+                class="btn btn-ghost btn-sm" style="color: var(--color-danger);">Remove account</button>
+    @endif
 @endif

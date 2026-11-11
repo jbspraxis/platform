@@ -47,4 +47,38 @@ class ClientPortalAccountsTest extends TestCase
         $screen->call('openClient', $alpha)->assertSee('Restore access')->call('closeClient')->assertSet('openClientId', null);
         $screen->call('openClient', $alpha)->call('setTab', 'INTERNAL')->assertSet('openClientId', null);
     }
+
+    public function test_a_client_account_can_be_removed_but_not_the_primary_contact_or_a_staff_account(): void
+    {
+        $owner = $this->staff('owner', ['owner']);
+        $this->actingAs($owner);
+        $member = DB::table('roles')->where('audience', 'client')->where('slug', 'client-member')->value('id');
+        $org = (string) Str::uuid();
+        $this->insertRow('organizations', ['id' => $org, 'name' => 'Gamma Client Ltd', 'status' => 'Active Client']);
+        $primary = (string) Str::uuid();
+        $leaving = (string) Str::uuid();
+        $this->insertRow('client_users', ['id' => $primary, 'organization_id' => $org, 'first_name' => 'Bode', 'last_name' => 'Client', 'email' => 'bode@gamma.test',
+            'is_primary_client' => 1, 'role_id' => \App\Support\Access::clientAdminRoleId(), 'status' => 'Active', 'lifecycle_stage' => 'Active']);
+        $this->insertRow('client_users', ['id' => $leaving, 'organization_id' => $org, 'first_name' => 'Cynthia', 'last_name' => 'Client', 'email' => 'cynthia@gamma.test',
+            'is_primary_client' => 0, 'role_id' => $member, 'status' => 'Active', 'lifecycle_stage' => 'Onboarding', 'invitation_token' => 'tok-123']);
+        $this->insertRow('passkeys', ['owner_id' => $leaving, 'guard' => 'client', 'credential_id' => 'cred-1', 'public_key' => 'pk', 'algorithm' => -7, 'name' => 'Phone', 'created_at' => now(), 'updated_at' => now()]);
+
+        $screen = Livewire::test(RoleManagement::class)->call('setTab', 'CLIENTS')->call('openClient', $org)
+            ->assertSee('Remove account')
+            ->call('removeClientAccount', $leaving)->assertSet('showSuccessModal', true)
+            ->assertDontSee('cynthia@gamma.test');
+
+        $row = DB::table('client_users')->where('id', $leaving)->first();
+        $this->assertNotNull($row->deleted_at);
+        $this->assertSame('Suspended', $row->status);
+        $this->assertNull($row->invitation_token);
+        $this->assertSame(0, DB::table('passkeys')->where('owner_id', $leaving)->count());
+        $this->assertDatabaseHas('system_audit_logs', ['action' => 'CLIENT_ACCOUNT_REMOVED', 'target_id' => $leaving, 'user_id' => $owner->id]);
+        $this->assertDatabaseHas('lead_timeline', ['organization_id' => $org, 'type' => 'contact_removed']);
+
+        // The primary contact and staff accounts stay
+        $screen->call('removeClientAccount', $primary)->call('removeClientAccount', $owner->id);
+        $this->assertNull(DB::table('client_users')->where('id', $primary)->value('deleted_at'));
+        $this->assertSame('Active', DB::table('users')->where('id', $owner->id)->value('status'));
+    }
 }
