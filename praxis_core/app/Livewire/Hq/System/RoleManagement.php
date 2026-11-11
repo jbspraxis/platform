@@ -525,6 +525,59 @@ class RoleManagement extends Component
         $this->loadLedger();
     }
 
+    /**
+     * Takes a person off a client's Client Portal (owner, 11 Nov 2026). They are signed out at once (remember token
+     * changed; the client guard no longer finds a removed account), their invitation link, passkeys, PINs, reset links
+     * and push subscriptions stop working, and they leave every list. The row is soft-deleted, so the comments,
+     * approvals and meetings they took part in keep their name. The primary contact can't be removed: make someone
+     * else the primary contact first.
+     */
+    public function removeClientAccount($id): void
+    {
+        abort_unless(Auth::user()->can('access.edit'), 403);
+
+        [$user, $isClient] = $this->findAccount($id);
+        if (! $user || ! $isClient || $user->is_primary_client) {
+            return;
+        }
+        $org = DB::table('organizations')->where('id', $user->organization_id)->value('name') ?? 'their organisation';
+        $name = trim("{$user->first_name} {$user->last_name}");
+
+        DB::transaction(function () use ($user, $name) {
+            DB::table('client_users')->where('id', $user->id)->update([
+                'status' => 'Suspended',
+                'invitation_token' => null,
+                'remember_token' => Str::random(60),
+                'is_main_contact' => 0,
+                'deleted_at' => now(),
+                'updated_at' => now(),
+            ]);
+            foreach (['passkeys', 'sign_in_pins', 'password_reset_links'] as $table) {
+                if (\Illuminate\Support\Facades\Schema::hasTable($table)) {
+                    DB::table($table)->where('owner_id', $user->id)->where('guard', 'client')->delete();
+                }
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('push_subscriptions', 'client_user_id')) {
+                DB::table('push_subscriptions')->where('client_user_id', $user->id)->delete();
+            }
+            DB::table('system_audit_logs')->insert([
+                'user_id' => Auth::id(), 'action' => 'CLIENT_ACCOUNT_REMOVED',
+                'description' => "Removed {$name} from their organisation's Client Portal.",
+                'target_table' => 'client_users', 'target_id' => $user->id,
+                'old_values' => json_encode(['status' => $user->status, 'lifecycle_stage' => $user->lifecycle_stage]),
+                'new_values' => json_encode(['removed' => true]),
+                'ip_address' => request()?->ip(), 'created_at' => now(),
+            ]);
+            \App\Support\Leads\LeadTimeline::record($user->organization_id, 'contact_removed', "Client Portal account removed: {$name}.",
+                ['actor' => Auth::user(), 'payload' => ['client_user_id' => $user->id]]);
+        });
+
+        Access::flush();
+        $this->successMessage = "{$name} no longer has access to {$org}'s Client Portal. Their invitation and sign-in links no longer work.";
+        $this->showSuccessModal = true;
+        $this->loadLedger();
+    }
+
     public function toggleUserStatus($id, $currentStatus)
     {
         abort_unless(Auth::user()->can('access.edit'), 403);
