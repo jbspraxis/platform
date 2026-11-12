@@ -5,6 +5,8 @@
 @import '@fontsource-variable/plus-jakarta-sans/wght.css';
 /* HQ and the Client Portal as apps (docs/PWA.md); ahead of the rules below, as when it was its own stylesheet */
 @import '../pwa/hq-pwa.css';
+/* HQ on phones: the top bar, the bottom bar, More and the sheets (docs/HQ_PHONE.md); after hq-pwa.css, whose safe areas it uses */
+@import './hq-phone.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
@@ -168,10 +170,6 @@
     .rail-group { margin: 10px 0 2px; padding: 0 8px; font-size: 0.75rem; line-height: 1rem; font-weight: 600; color: var(--color-fg-on-dark-muted); opacity: 0.8; }
     .rail-foot { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--color-border-on-dark); }
     .rail :focus-visible { outline-color: var(--color-accent-on-dark); } /* focus on Ink is Bright Teal (section 7) */
-    /* Menu button: shown only on narrow screens, where the rail folds into its header (see the media query below) */
-    .rail-menu-btn { display: none; align-items: center; justify-content: center; width: 44px; height: 44px; margin-right: -6px; padding: 0; border: 1px solid var(--color-border-on-dark); border-radius: var(--radius-control); background: transparent; color: var(--color-fg-on-dark); cursor: pointer; }
-    .rail-menu-btn svg { width: 20px; height: 20px; }
-    .rail-menu-btn:hover { background: rgba(255, 255, 255, 0.06); }
     .main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
     .topbar { height: 64px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 32px; background: var(--color-paper); border-bottom: 1px solid var(--color-line); }
     .topbar-title { font-size: 0.875rem; line-height: 1.25rem; color: var(--color-muted); }
@@ -204,6 +202,14 @@
     .stat-label { font-size: 0.8125rem; line-height: 1.125rem; color: var(--color-muted); }
     .stat-value { margin-top: 4px; font-size: 1.5rem; line-height: 2rem; font-weight: 600; color: var(--color-ink); font-variant-numeric: tabular-nums; }
     .callout { background: var(--color-teal-tint); border-radius: var(--radius-card); padding: 16px 20px; color: var(--color-ink); }
+    /* The (i) beside a title or a line (components/hq/info.blade.php): support text, closed until hovered or tapped */
+    .hq-info { position: relative; display: inline-flex; vertical-align: middle; }
+    .hq-info-btn { display: inline-grid; place-items: center; width: 28px; height: 28px; margin: -4px 0; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--color-muted); cursor: pointer; }
+    .hq-info-btn:hover, .hq-info.is-open .hq-info-btn { color: var(--color-deep-teal); background: var(--color-teal-tint); }
+    .hq-info-btn svg { width: 16px; height: 16px; }
+    .hq-info-tip { display: none; position: absolute; z-index: 20; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); width: max-content; max-width: min(280px, calc(100vw - 32px)); padding: 10px 12px; border: 1px solid var(--color-line); border-radius: var(--radius-card); background: var(--color-paper); box-shadow: var(--shadow-float); color: var(--color-slate); font-size: 0.8125rem; line-height: 1.25rem; font-weight: 400; text-align: left; white-space: normal; }
+    .hq-info.is-open .hq-info-tip { display: block; }
+    @media (hover: hover) { .hq-info:hover .hq-info-tip, .hq-info:focus-within .hq-info-tip { display: block; } }
 
     /* ---- Actions ---- */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 16px; border-radius: var(--radius-control); border: 1px solid transparent; font-family: var(--font-sans); font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; text-decoration: none; white-space: nowrap; cursor: pointer; transition: background var(--motion-instant), border-color var(--motion-instant), color var(--motion-instant); }
@@ -321,19 +327,13 @@
 }
 
 @media (max-width: 900px) {
-    /* Phones and tablets: the rail folds into its 64px header with a menu button (.rail.is-open shows the
-       links). In HQ (.rail-hq) the menu opens as a full-height Ink panel with every second-level link. */
+    /* Phones and tablets: the rail folds into its 64px header (.rail.is-open shows the links; the Client Portal).
+       HQ has a top bar and a bottom bar here instead (hq-phone.css, docs/HQ_PHONE.md). */
     .app-shell { flex-direction: column; height: auto; min-height: 100vh; overflow: visible; }
     .rail { width: 100%; }
     .rail-head { justify-content: space-between; gap: 12px; padding: 0 16px; }
-    .rail-menu-btn { display: inline-flex; }
     .rail:not(.is-open) .rail-nav, .rail:not(.is-open) .rail-foot { display: none; }
     .rail-nav { padding: 12px 16px 24px; }
-    .rail-hq.is-open { position: fixed; inset: 0; z-index: 60; overflow: hidden; }
-    .rail-hq.is-open .rail-nav { overscroll-behavior: contain; }
-    .rail-hq .rail-link, .rail-hq .rail-sub a { min-height: 44px; } /* touch targets (section 9) */
-    .rail-hq .rail-sub a { display: flex; align-items: center; }
-    body.rail-menu-open { overflow: hidden; }
     .main { overflow: visible; }
     .workspace { padding: 20px 16px; overflow: visible; }
     .topbar { padding: 0 16px; }

@@ -22,7 +22,13 @@ class MyProfileTest extends TestCase
 
         $this->assertStringContainsString('id="hq-user-menu"', $html);
         $this->assertStringContainsString(route('hq.profile'), $html);
-        $this->assertSame(1, substr_count($html, route('hq.logout')), 'Sign out only inside the menu');
+        // Sign out only inside the avatar's menu: the dropdown on computers, More on phones (the avatar opens it there;
+        // docs/HQ_PHONE.md), never on its own in the top bar
+        $this->assertSame(2, substr_count($html, route('hq.logout')), 'Sign out only inside the menus');
+        $menu = substr($html, strpos($html, 'id="hq-user-menu"'));
+        $this->assertStringContainsString(route('hq.logout'), substr($menu, 0, strpos($menu, '</header>')));
+        $more = substr($html, strpos($html, 'id="hq-more"'));
+        $this->assertStringContainsString(route('hq.logout'), $more);
         $this->assertMatchesRegularExpression('/btn btn-danger"[^>]*>\s*<i data-lucide="log-out"><\/i> Sign out/', $html);
     }
 

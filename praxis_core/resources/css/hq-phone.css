@@ -1,0 +1,332 @@
+/* HQ on phones and tablets in portrait (docs/HQ_PHONE.md, owner 12 Nov 2026): a light top bar with the mark, the
+   page's title and the avatar; a strip with the pages of the module in view; the bottom bar (Home, Mail, Leads,
+   Projects, More); More as a launcher sheet; the bell as a sheet; pull to refresh in the installed app.
+   Light only: HQ has no dark theme. Computers and tablets in landscape keep the rail (app.css section 14).
+   Part of the compiled stylesheet (resources/css/app.css imports it after hq-pwa.css). Unlayered, and the rules
+   that change app.css or hq-pwa.css start with "html .hq-shell" so they win whatever the order.
+   Only the HQ layout has .hq-shell and .hq-body: the Client Portal is untouched. */
+
+:root {
+    --hq-bar-h: 60px;        /* the bottom bar, above the home indicator */
+    --hq-top-h: 56px;        /* the top bar, below the status bar */
+}
+
+/* Computers: none of the phone pieces */
+.hq-mark,
+.hq-bar-title,
+.hq-subnav,
+.hq-phone,
+.hq-pull,
+.hq-avatar-count,
+.hq-sheet-grab { display: none; }
+.hq-avatar-wrap { position: relative; display: inline-flex; }
+
+@media (max-width: 900px) {
+    /* ---- The frame: the window scrolls; the top bar sticks, the bottom bar is fixed ---- */
+    html .hq-shell { display: block; height: auto; min-height: 100dvh; overflow: visible; }
+    html .hq-shell .rail { display: none; }
+    html .hq-shell .main { display: block; overflow: visible; }
+    html .hq-shell .workspace {
+        overflow: visible;
+        padding: 16px calc(16px + var(--hqp-safe-right)) calc(var(--hq-bar-h) + var(--hqp-safe-bottom) + 24px) calc(16px + var(--hqp-safe-left));
+    }
+
+    /* ---- Top bar: the mark, the title, the avatar. Above the bottom bar (so the bell's sheet inside it covers
+       the bar), under page backdrops and drawers (40 and up) ---- */
+    html .hq-shell .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 35;
+        height: calc(var(--hq-top-h) + var(--hqp-safe-top));
+        padding: var(--hqp-safe-top) calc(12px + var(--hqp-safe-right)) 0 calc(12px + var(--hqp-safe-left));
+        justify-content: flex-start;
+        gap: 8px;
+        background: var(--color-paper);
+        border-bottom: 1px solid var(--color-line);
+    }
+    html .hq-shell .topbar-title { display: none; }
+    html .hq-shell .topbar-actions { margin-left: auto; gap: 0; }
+    html .hq-shell [data-hq-bell-button] { display: none; }
+    .hq-mark { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; border-radius: var(--radius-control); }
+    .hq-mark img { display: block; width: auto; height: 22px; }
+    .hq-bar-title {
+        display: block;
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        color: var(--color-ink);
+        font-size: 1rem;
+        line-height: 1.5rem;
+        font-weight: 600;
+        opacity: 0;
+        transform: translateY(4px);
+        transition: opacity var(--motion-quick) var(--ease-settle), transform var(--motion-quick) var(--ease-settle);
+    }
+    .topbar.is-titled .hq-bar-title { opacity: 1; transform: none; }
+    html .hq-shell .hq-user-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; margin: 0; padding: 4px; }
+    .hq-avatar-count {
+        display: block;
+        position: absolute;
+        top: -8px;
+        right: -12px;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        border: 2px solid var(--color-paper);
+        border-radius: 999px;
+        box-sizing: content-box;
+        background: var(--color-danger);
+        color: #fff;
+        font-size: 0.6875rem;
+        line-height: 18px;
+        font-weight: 700;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* ---- The module's pages: chips that scroll sideways, under the top bar ---- */
+    .hq-subnav {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        padding: 12px calc(16px + var(--hqp-safe-right)) 0 calc(16px + var(--hqp-safe-left));
+    }
+    .hq-subnav::-webkit-scrollbar { display: none; }
+    .hq-subnav a {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        min-height: 36px;
+        padding: 0 14px;
+        border: 1px solid var(--color-line);
+        border-radius: 999px;
+        background: var(--color-paper);
+        color: var(--color-slate);
+        font-size: 0.8125rem;
+        line-height: 1.125rem;
+        font-weight: 500;
+        white-space: nowrap;
+        text-decoration: none;
+    }
+    .hq-subnav a[aria-current="page"] { border-color: var(--color-deep-teal); background: var(--color-teal-tint); color: var(--color-petrol); font-weight: 600; }
+    .hq-subnav a:focus-visible { outline-offset: -2px; }
+
+    /* ---- Bottom bar: five places, an icon and one word each ---- */
+    .hq-phone { display: block; }
+    .hq-bottombar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 30;
+        display: flex;
+        padding: 4px calc(4px + var(--hqp-safe-right)) var(--hqp-safe-bottom) calc(4px + var(--hqp-safe-left));
+        background: var(--color-paper);
+        border-top: 1px solid var(--color-line);
+    }
+    .hq-tab {
+        flex: 1 1 0;
+        min-width: 0;
+        min-height: 56px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        padding: 4px 2px;
+        border: 0;
+        border-radius: var(--radius-card);
+        background: none;
+        color: var(--color-muted);
+        font-family: var(--font-sans);
+        font-size: 0.6875rem;
+        line-height: 1rem;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .hq-tab:focus-visible { outline-offset: -2px; }
+    .hq-tab-icon {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 52px;
+        height: 30px;
+        border-radius: 999px;
+        transition: background var(--motion-instant);
+    }
+    .hq-tab-icon svg { width: 22px; height: 22px; }
+    .hq-tab-label { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .hq-tab[aria-current="page"], .hq-tab[aria-expanded="true"], .hq-tab.is-here { color: var(--color-petrol); }
+    .hq-tab[aria-current="page"] .hq-tab-icon, .hq-tab[aria-expanded="true"] .hq-tab-icon, .hq-tab.is-here .hq-tab-icon { background: var(--color-teal-tint); }
+
+    /* A count on an icon (bar, tiles, More's bell): teal for unread mail and things waiting, red for notifications */
+    .hq-count {
+        position: absolute;
+        top: -4px;
+        right: 4px;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        border: 2px solid var(--color-paper);
+        border-radius: 999px;
+        box-sizing: content-box;
+        background: var(--color-deep-teal);
+        color: #fff;
+        font-size: 0.6875rem;
+        line-height: 18px;
+        font-weight: 700;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+    }
+    .hq-count.is-alert { background: var(--color-danger); }
+
+    /* ---- Sheets from the bottom: More, and the bell's panel ---- */
+    .hq-sheet-dim { position: fixed; inset: 0; z-index: 58; background: rgba(12, 20, 43, 0.45); }
+    .hq-sheet {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 59;
+        display: flex;
+        flex-direction: column;
+        max-height: 90dvh;
+        padding: 0 var(--hqp-safe-right) var(--hqp-safe-bottom) var(--hqp-safe-left);
+        background: var(--color-paper);
+        border-radius: 16px 16px 0 0;
+        box-shadow: var(--shadow-float);
+        color: var(--color-slate);
+        animation: hq-sheet-in var(--motion-standard) var(--ease-enter);
+    }
+    .hq-sheet-grab { display: flex; justify-content: center; flex: none; padding: 8px 0 6px; touch-action: none; cursor: grab; }
+    .hq-sheet-handle { display: block; width: 36px; height: 4px; border-radius: 2px; background: var(--color-line-strong); }
+    .hq-sheet-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 16px 16px; }
+    .hq-sheet.is-dragging, .hq-menu-panel.is-dragging { animation: none; transition: none; }
+
+    .hq-more-person { display: flex; align-items: center; gap: 8px; padding: 4px 0 12px; border-bottom: 1px solid var(--color-line); }
+    .hq-more-me { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 44px; border-radius: var(--radius-card); text-decoration: none; color: inherit; }
+    .hq-more-me .avatar { width: 44px; height: 44px; font-size: 0.9375rem; }
+    .hq-more-me strong { display: block; color: var(--color-ink); font-size: 0.9375rem; line-height: 1.375rem; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .hq-more-me span span { display: block; color: var(--color-muted); font-size: 0.8125rem; line-height: 1.125rem; }
+    .hq-more-me > span { min-width: 0; }
+    .hq-icon-btn {
+        position: relative;
+        flex: none;
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        border: 0;
+        border-radius: 999px;
+        background: var(--color-mist);
+        color: var(--color-ink);
+        cursor: pointer;
+    }
+    .hq-icon-btn svg { width: 20px; height: 20px; }
+    .hq-icon-btn .hq-count { top: -2px; right: -4px; }
+    .hq-more-app:empty { display: none; }
+    .hq-more-app { margin: 8px -16px 0; }
+    .hq-group-title { margin: 20px 0 10px; color: var(--color-muted); font-size: 0.8125rem; line-height: 1.125rem; font-weight: 600; }
+    .hq-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 6px; }
+    .hq-tile {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        min-height: 44px;
+        padding: 2px;
+        border-radius: var(--radius-card);
+        color: var(--color-ink);
+        font-size: 0.75rem;
+        line-height: 1rem;
+        font-weight: 500;
+        text-align: center;
+        text-decoration: none;
+        overflow-wrap: anywhere;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .hq-tile-icon { position: relative; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: var(--color-teal-tint); color: var(--color-petrol); }
+    .hq-tile-icon svg { width: 22px; height: 22px; }
+    .hq-tile .hq-count { top: -6px; right: -8px; }
+    .hq-tile[aria-current="page"] .hq-tile-icon { background: var(--color-deep-teal); color: #fff; }
+    .hq-more-foot { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--color-line); }
+    .hq-more-foot .btn { width: 100%; justify-content: center; min-height: 44px; }
+
+    /* The bell's panel (and the account menu, should it open): a sheet like More */
+    html .hq-shell .hq-menu-panel {
+        position: fixed;
+        top: auto;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: auto;
+        max-height: 85dvh;
+        display: flex;
+        flex-direction: column;
+        padding: 0 var(--hqp-safe-right) var(--hqp-safe-bottom) var(--hqp-safe-left);
+        border: 0;
+        border-radius: 16px 16px 0 0;
+        animation: hq-sheet-in var(--motion-standard) var(--ease-enter);
+    }
+    html .hq-shell .hq-menu-panel .hq-sheet-grab { display: flex; }
+    html .hq-shell .hq-menu-scroll { flex: 1 1 auto; min-height: 0; max-height: none !important; overscroll-behavior: contain; }
+    html .hq-shell .hq-menu-dim { display: block; position: fixed; inset: 0; z-index: 59; background: rgba(12, 20, 43, 0.45); }
+
+    /* ---- Pull to refresh (installed app): a disc that follows the finger under the top bar ---- */
+    .hq-pull {
+        display: grid;
+        place-items: center;
+        position: fixed;
+        z-index: 34;
+        top: calc(var(--hq-top-h) + var(--hqp-safe-top) + 8px);
+        left: 50%;
+        width: 40px;
+        height: 40px;
+        margin-left: -20px;
+        border-radius: 50%;
+        background: var(--color-paper);
+        box-shadow: var(--shadow-float);
+        color: var(--color-muted);
+        opacity: 0;
+        transform: translateY(-48px);
+        pointer-events: none;
+    }
+    .hq-pull svg { width: 20px; height: 20px; transition: transform var(--motion-quick); }
+    .hq-pull.is-ready { color: var(--color-deep-teal); }
+    .hq-pull.is-ready svg { transform: rotate(180deg); }
+    .hq-pull.is-busy { color: var(--color-deep-teal); }
+    .hq-pull.is-busy svg { animation: hq-spin 800ms linear infinite; }
+    .hq-pull.is-back { transition: transform var(--motion-quick) var(--ease-exit), opacity var(--motion-quick) var(--ease-exit); }
+
+    /* ---- Things that float at the foot of the screen wait above the bottom bar ---- */
+    html body.hq-body .toast-host { bottom: calc(var(--hq-bar-h) + var(--hqp-safe-bottom) + 12px); }
+    html body.hq-body .hqp-cards { bottom: calc(var(--hq-bar-h) + var(--hqp-safe-bottom) + 12px); }
+    html body.hq-body .hqp-toasts { bottom: calc(var(--hq-bar-h) + var(--hqp-safe-bottom) + 12px + var(--hqp-lift, 0px)); }
+    html body.hq-body .hq-lift { bottom: calc(var(--hq-bar-h) + var(--hqp-safe-bottom) + 16px); }
+    html body.hq-body .mc-toast { bottom: calc(var(--hq-bar-h) + var(--hqp-safe-bottom) + 12px); } /* Mail's "Sending · Undo" */
+
+    /* Mail's three panes (tablets in portrait): their height leaves room for the strip and the bottom bar */
+    html .hq-shell .mr { --mr-pane-h: calc(100dvh - 320px - var(--hqp-safe-top) - var(--hqp-safe-bottom)); }
+    html .hq-shell .mr.has-flash { --mr-pane-h: calc(100dvh - 378px - var(--hqp-safe-top) - var(--hqp-safe-bottom)); }
+}
+
+/* Phones, where Mail shows one pane and the page scrolls: its reader's toolbar sticks under the top bar */
+@media (max-width: 820px) {
+    html .hq-shell .mr-toolbar { top: calc(var(--hq-top-h) + var(--hqp-safe-top)); }
+}
+
+@keyframes hq-sheet-in { from { transform: translateY(32px); opacity: 0.6; } }
+@keyframes hq-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .hq-sheet, html .hq-shell .hq-menu-panel { animation: none; }
+    .hq-bar-title { transform: none; }
+    .hq-pull.is-busy svg { animation-duration: 2400ms; }
+}

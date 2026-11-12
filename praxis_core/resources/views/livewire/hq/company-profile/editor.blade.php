@@ -35,6 +35,18 @@
         .cp-empty { font-size: 0.875rem; line-height: 1.375rem; color: var(--color-muted); margin: 0; }
         .cp-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; }
         .cp-foot .input { max-width: 26rem; }
+        .cp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+        .cp-narrow { display: none; }
+        .cp-locked { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; width: 100%; }
+        @media (max-width: 640px) {
+            /* Phones: the language on its own line, then Download, Deck and Preview side by side */
+            .cp-tools { width: 100%; }
+            .cp-lang { flex: 1 1 100%; }
+            .cp-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+            .cp-actions .btn { min-height: 44px; padding: 8px 6px; border-color: var(--color-line-strong); background: var(--color-paper); }
+            .cp-wide { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+            .cp-narrow { display: inline; }
+        }
         @media (max-width: 860px) {
             .cp-body { grid-template-columns: minmax(0, 1fr); }
             .cp-nav { position: static; grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; gap: 4px; padding-bottom: 4px; }
@@ -46,7 +58,10 @@
     <div class="page-header cp-top">
         <div>
             <h1 class="page-title">Company profile</h1>
-            <p class="page-subtitle">The firm's own profile, written once in English and French. Only a draft can be edited; what has been published never changes.</p>
+            <p class="page-subtitle">
+                The firm's profile, in English and French.
+                <x-hq.info label="About versions">Only a draft can be edited. A published version never changes: start a new version to make changes.</x-hq.info>
+            </p>
             @if ($version)
                 <div class="cp-state">
                     <span class="cp-pill" data-status="{{ $version->status }}">{{ $version->label() }} · {{ $version->statusLabel() }}</span>
@@ -57,8 +72,8 @@
                 </div>
             @endif
         </div>
-        <div class="cp-item-tools">
-            <label class="field">
+        <div class="cp-item-tools cp-tools">
+            <label class="field cp-lang">
                 <span class="field-label">Language</span>
                 <select class="input" wire:model.live="lang">
                     <option value="both">Side by side</option>
@@ -67,15 +82,18 @@
                 </select>
             </label>
             @if ($version)
-                <a class="btn btn-quiet" href="{{ route('company-profile.download', ['locale' => $lang === 'fr' ? 'fr' : 'en', 'version' => $version->number]) }}">
-                    <i data-lucide="download"></i> Download
-                </a>
-                <a class="btn btn-quiet" href="{{ route('company-profile.deck', ['locale' => $lang === 'fr' ? 'fr' : 'en', 'version' => $version->number]) }}">
-                    <i data-lucide="presentation"></i> Download deck
-                </a>
-                <a class="btn btn-quiet" href="{{ route('hq.company-profile.preview', $version) }}" wire:navigate>
-                    <i data-lucide="eye"></i> Preview
-                </a>
+                {{-- One row of three buttons on a phone ("Download deck" reads "Deck" there) --}}
+                <div class="cp-actions">
+                    <a class="btn btn-quiet" href="{{ route('company-profile.download', ['locale' => $lang === 'fr' ? 'fr' : 'en', 'version' => $version->number]) }}">
+                        <i data-lucide="download"></i> Download
+                    </a>
+                    <a class="btn btn-quiet" href="{{ route('company-profile.deck', ['locale' => $lang === 'fr' ? 'fr' : 'en', 'version' => $version->number]) }}">
+                        <i data-lucide="presentation"></i> <span class="cp-wide">Download deck</span><span class="cp-narrow" aria-hidden="true">Deck</span>
+                    </a>
+                    <a class="btn btn-quiet" href="{{ route('hq.company-profile.preview', $version) }}" wire:navigate>
+                        <i data-lucide="eye"></i> Preview
+                    </a>
+                </div>
             @endif
         </div>
     </div>
@@ -98,8 +116,10 @@
                 @if (! $canEdit)
                     You are reading {{ $version->label() }}. Editing it needs Company profile: Edit.
                 @else
-                    {{ $version->label() }} is {{ strtolower($version->statusLabel()) }}, so it cannot be changed. Start a new version to make changes.
-                    <button type="button" class="btn btn-sm btn-quiet" wire:click="startDraft">Start a new version</button>
+                    <span class="cp-locked">
+                        <span>{{ $version->label() }} is {{ strtolower($version->statusLabel()) }} and locked.</span>
+                        <button type="button" class="btn btn-sm btn-secondary" wire:click="startDraft">Start new version</button>
+                    </span>
                 @endif
             </div>
         @endunless
