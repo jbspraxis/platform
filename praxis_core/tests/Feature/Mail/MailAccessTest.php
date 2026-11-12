@@ -3,6 +3,7 @@
 namespace Tests\Feature\Mail;
 
 use App\Support\Mail\MailAccess;
+use App\Support\Mail\MailSettings;
 use Tests\TestCase;
 
 /** Who may use Mail and what each level allows (docs/MAIL.md, "Access"; owner decisions 1–3). */
@@ -16,10 +17,18 @@ class MailAccessTest extends TestCase
         $this->setUpMail();
     }
 
-    public function test_mail_is_owner_only_until_opened_to_everyone(): void
+    public function test_mail_is_open_to_everyone_and_an_owner_can_limit_it_to_owner_accounts(): void
     {
         $owner = $this->staff('own', ['owner']);
         $engineer = $this->staff('eng', ['engineer']);
+
+        // Opened to everyone with the Mail permission (2026_11_12_100000_open_mail_to_everyone, owner 12 Nov 2026)
+        $this->assertSame('everyone', MailSettings::get('open_to'));
+        $this->assertTrue(MailAccess::canUse($engineer));
+
+        // Limited again on Mailboxes: only Owner accounts
+        MailSettings::set('open_to', 'owner');
+        MailAccess::flush();
 
         $this->assertTrue(MailAccess::canUse($owner));
         $this->assertFalse(MailAccess::canUse($engineer));

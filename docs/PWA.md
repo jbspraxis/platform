@@ -10,7 +10,7 @@ Agreed with the owner on 30 October 2026. **Only HQ** (`hq.jbspraxis.com`) becom
 | 2 | What sends a push | **Everything that lands in the HQ bell, plus system alerts** (new errors and urgent failing checks from System Health, to staff who can open System health). Each person can mute groups. |
 | 3 | Lock screen | **Title and message** (the phone's own settings can still hide previews). |
 | 4 | Offline | **A branded offline screen** that reconnects by itself. No client or finance data is stored on devices: pages are never cached. |
-| 5 | Install invitation | **After sign-in, a small card.** "Not now" hides it for 14 days; "Install the app" stays in the bell menu. |
+| 5 | Install invitation | **After sign-in, a small card.** "Not now" hides it for 14 days; "Install the app" stays in the bell menu (and, on phones since 12 Nov 2026, in More: `docs/HQ_PHONE.md`). |
 | 6 | Notification permission | **Phones: on the first launch of the installed app** (on iPhone push only works there). **Computers: a card after sign-in.** The browser's own prompt only appears after "Turn on". The bell dropdown also has a "Turn on notifications" button. |
 
 ## What the owner sees
@@ -164,7 +164,8 @@ App\Models\PushSubscription  (user_id, endpoint, endpoint_hash, public_key, auth
 | `html.hq-launching` class, then `hq:launch-done` on `document` | launch splash → hq-pwa.js | the splash is on screen; cards wait until it is gone |
 | `{type: 'hq:push', id, category, badge}` | service worker → page (`postMessage`) | a push arrived |
 | Livewire `hq-push-received` | hq-pwa.js → NotificationBell | reload the bell |
-| browser `hq-unread` with `detail.count` | NotificationBell (`$this->dispatch('hq-unread', count: n)`) → hq-pwa.js | set the app icon badge |
+| browser `hq-unread` with `detail.count` | NotificationBell (`$this->dispatch('hq-unread', count: n)`) → hq-pwa.js, the avatar and More's bell (`docs/HQ_PHONE.md`) | set the app icon badge and the phone's counts |
+| browser `hq-open-bell`, `hq-open-more` | More's bell → NotificationBell; the avatar on a phone → More (`docs/HQ_PHONE.md`) | open the bell's panel as a sheet; open More |
 | `{type: 'hq:navigate', url}` | service worker → page | a notification was clicked: `Livewire.navigate(url)` (or `location.assign`) |
 | browser `open-notification-settings` | bell menu → NotificationSettings | open the settings panel |
 | browser `hq-pwa-state` with `detail` = `{installable, standalone, platform, permission, subscribed, pushSupported}` | hq-pwa.js → anything that shows app state | state changed |

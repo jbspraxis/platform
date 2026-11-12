@@ -684,7 +684,7 @@ A 4px base with an 8-point rhythm. The allowed steps:
 4, 8, 12, 16, 24, 32, 48, 64, 96 and 128px
 
 - Within components: 4 to 16. Between related elements: 16 to 24. Between sections: 64 to 128 on the website, 32 to 48 in HQ and the Client Portal.
-- HQ and the Client Portal: a 240px navigation rail (Ink) and a fluid workspace on Mist.
+- HQ and the Client Portal: a 240px navigation rail (Ink) and a fluid workspace on Mist. HQ on phones and tablets in portrait (900px and below): a white top bar (the mark, the page title, the avatar) and a white bottom bar of five places, with More as a launcher sheet (`docs/HQ_PHONE.md`, 12 Nov 2026).
 
 ### Responsive grid
 
@@ -1078,6 +1078,7 @@ Designed emails from HQ › Campaigns › Broadcasts (docs/CAMPAIGNS.md) to peop
 ### JBS Praxis HQ and the Client Portal
 
 - Light workspace on Mist with Paper cards; a 240px Ink navigation rail with the reversed horizontal lockup at the top, white text and a Bright Teal indicator for the current page.
+- HQ on phones (`docs/HQ_PHONE.md`): light only. A Paper top bar with the colour monogram, the page title and the avatar; a Paper bottom bar (Home, Mail, Leads, Projects, More) whose current place has a Teal Tint pill and Petrol icon; More's module tiles are Petrol icons on Teal Tint squares.
 - Plus Jakarta Sans throughout, Newsreader only for the page’s main headline number where a page has one (for example, cash position on the finance overview).
 - Data first: tables with tabular figures, Line Strong control borders, functional colours for status.
 - The vocabulary in section 5 replaces every on-screen term; route names and database columns stay as they are.

@@ -168,7 +168,8 @@ class MailboxesScreenTest extends TestCase
 
         MailSettings::flush();
         $this->assertSame('everyone', MailSettings::get('open_to'));
-        $this->assertSame(1, DB::table('system_audit_logs')->where('action', 'MAIL_OPENED_TO_EVERYONE')->count());
+        // The owner's own line (the 12 Nov 2026 migration wrote one of its own, with no person)
+        $this->assertSame(1, DB::table('system_audit_logs')->where('action', 'MAIL_OPENED_TO_EVERYONE')->where('user_id', $owner->id)->count());
     }
 
     public function test_pages_render_on_the_hq_host(): void

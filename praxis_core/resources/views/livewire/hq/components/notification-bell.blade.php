@@ -8,10 +8,11 @@
         default => \Illuminate\Support\Str::of($type)->replace('_', ' ')->lower()->ucfirst()->toString(),
     };
 @endphp
-{{-- On phones the panel opens full width under the top bar (hq-menu-panel, styled in components/layouts/hq.blade.php) --}}
-<div x-data="{ open: false, top: 64 }" class="relative flex items-center" @keydown.escape.window="open = false">
+{{-- A dropdown under the bell on computers. On phones the top bar has no bell: More's bell opens this panel as a sheet
+     from the bottom (browser event hq-open-bell; resources/css/hq-phone.css, docs/HQ_PHONE.md) --}}
+<div x-data="{ open: false }" class="relative flex items-center" @keydown.escape.window="open = false" @hq-open-bell.window="open = true">
     <button type="button" class="btn btn-ghost relative" style="padding: 8px;" data-hq-bell-button
-            @click="open = !open; if (open) top = Math.max(0, Math.round(($el.closest('.topbar') || $el).getBoundingClientRect().bottom))"
+            @click="open = !open"
             :aria-expanded="open.toString()" aria-haspopup="true" title="Notifications"
             aria-label="Notifications{{ $unreadCount > 0 ? ', ' . $unreadCount . ' unread' : '' }}">
         <i data-lucide="bell" style="width: 20px; height: 20px; color: var(--color-slate);"></i>
@@ -20,10 +21,11 @@
         @endif
     </button>
 
-    <div class="hq-menu-dim" x-show="open" x-transition.opacity @click="open = false" :style="'--hq-menu-top:' + top + 'px'" style="display: none;"></div>
+    <div class="hq-menu-dim" x-show="open" x-transition.opacity @click="open = false" style="display: none;"></div>
     <div x-show="open" x-transition.opacity @click.outside="open = false" role="dialog" aria-label="Notifications"
          class="hq-menu-panel bg-paper border border-line rounded-card shadow-float"
-         :style="'--hq-menu-top:' + top + 'px'" style="display: none;">
+         data-hq-sheet @hq-sheet-close="open = false" style="display: none;">
+        <div class="hq-sheet-grab" data-hq-sheet-grab><span class="hq-sheet-handle"></span></div>
         <div class="flex items-center justify-between gap-3 border-b border-line" style="padding: 12px 16px;">
             <span class="text-ink" style="font-size: 0.875rem; font-weight: 600;">Notifications</span>
             <span class="help num">{{ $unreadCount }} unread</span>

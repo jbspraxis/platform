@@ -25,6 +25,11 @@ for (const file of walk(VIEWS)) {
     for (const [, n] of src.matchAll(/setAttribute\(\s*'data-lucide'\s*,\s*'([a-z0-9-]+)'\s*\)/g)) names.add(n);
 }
 
+// HQ's navigation names its icons in PHP (app/Support/HqNav.php): each section()'s fourth argument, and barIcon
+const nav = readFileSync('app/Support/HqNav.php', 'utf8');
+for (const [, n] of nav.matchAll(/self::section\(\s*'[^']*',\s*'[^']*',\s*'[^']*',\s*'([a-z0-9-]+)'/g)) names.add(n);
+for (const [, n] of nav.matchAll(/barIcon:\s*'([a-z0-9-]+)'/g)) names.add(n);
+
 const found = [], missing = [];
 for (const n of [...names].sort()) (lucide[pascal(n)] ? found : missing).push(n);
 if (missing.length) console.warn(`icons.mjs: not in lucide, left out: ${missing.join(', ')}`);

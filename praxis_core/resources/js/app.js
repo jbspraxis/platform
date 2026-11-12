@@ -1,4 +1,6 @@
 import './toasts';
+// HQ on phones: the top bar's title, the module's pages, sheets and pull to refresh (docs/HQ_PHONE.md)
+import './hq-phone';
 import { createIcons } from 'lucide';
 import icons from './icons';
 

@@ -8,7 +8,7 @@ Agreed with the owner on 30 October 2026. Staff read and send their **own mailbo
 
 | # | Question | Decision |
 |---|---|---|
-| 1 | When a PR is done | **Deploy each PR live as it is finished** (the owner signs in to cPanel in the built-in browser; Claude uploads). Mail stays **visible to Owner accounts only** until reading (PR 2) and sending (PR 3) are both live; then the owner presses *Open Mail to everyone* on Mailboxes. |
+| 1 | When a PR is done | **Deploy each PR live as it is finished** (the owner signs in to cPanel in the built-in browser; Claude uploads). Mail stays **visible to Owner accounts only** until reading (PR 2) and sending (PR 3) are both live; then the owner presses *Open Mail to everyone* on Mailboxes. **Opened to everyone on 12 Nov 2026** (owner; migration `2026_11_12_100000_open_mail_to_everyone`), as Mail became one of the four places on HQ's phone bottom bar (`docs/HQ_PHONE.md`). An Owner account can still limit it on Mailboxes. |
 | 2 | Who adds a shared mailbox | Holders of the **Shared mailboxes: Create** permission (`mailboxes.create`; Owner and Partner have it). The person who adds one becomes its first manager. |
 | 3 | Access levels | **Three fixed levels**: *Read* (sees all mail), *Read and send* (also replies, sends, files, deletes), *Manager* (also invites people, changes levels, updates the password, renames, removes). |
 | 4 | From line on shared mail | **The mailbox**: `"JBS Praxis Intelligence" <intelligence@jbspraxis.com>`. Who wrote it shows in **their own signature** below the message; HQ records the sender (`mail_messages.sent_by`). |

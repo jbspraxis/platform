@@ -14,8 +14,9 @@ use Illuminate\Support\Facades\DB;
 /**
  * Who may do what in HQ Mail (docs/MAIL.md, "Access"). Every Mail screen, action and query goes through here.
  *
- * Using Mail at all: the mail.view permission, and Mail must be open to the person: until the owner opens it to
- * everyone (Mailboxes page), only Owner accounts can use it (owner decision 1).
+ * Using Mail at all: the mail.view permission, and Mail must be open to the person. It is open to everyone with the
+ * permission since 12 Nov 2026 (migration 2026_11_12_100000); an Owner account can limit it to Owner accounts again
+ * on the Mailboxes page (owner decision 1).
  *
  * Levels on a mailbox, lowest first:
  *   read    sees every message (opening one marks it read for everyone, as on the server)
