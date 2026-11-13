@@ -288,6 +288,61 @@
                         @endif
                     </section>
 
+                    @if (count($clientNeeds) || $clientNeedsReceived)
+                        <section class="card mb-6" aria-labelledby="portal-needs-title">
+                            <div class="card-header"><h2 class="card-title" id="portal-needs-title">{{ __('portal.needs.title') }}</h2></div>
+                            <p class="m-0 mb-3 text-sm text-muted">{{ __('portal.needs.help') }}</p>
+                            @if ($clientNeedsReceived)
+                                <p class="m-0 mb-3 text-sm text-muted">{{ __('portal.needs.received', ['count' => $clientNeedsReceived]) }}</p>
+                            @endif
+                            @if (count($clientNeeds))
+                                <ul class="m-0 list-none divide-y divide-line p-0">
+                                    @foreach ($clientNeeds as $need)
+                                        <li class="py-3 first:pt-0" wire:key="need-{{ $need['id'] }}">
+                                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                                <div class="min-w-0" style="flex: 1 1 18rem;">
+                                                    <div class="text-xs text-muted">{{ $need['milestone'] }}@if ($need['group']) · {{ $need['group'] }}@endif</div>
+                                                    <div class="text-sm text-ink break-words">{{ $need['title'] }}</div>
+                                                    <div class="mt-1 flex flex-wrap gap-2 text-xs">
+                                                        @if ($need['due']) <span class="text-muted">{{ __('portal.needs.due', ['date' => $need['due']]) }}</span> @endif
+                                                        @if ($need['late_days'] > 0 && $need['status'] !== 'sent') <span class="pill pill-danger">{{ trans_choice('portal.needs.late', $need['late_days'], ['days' => $need['late_days']]) }}</span> @endif
+                                                        @if ($need['status'] === 'sent' && $need['sent']) <span class="text-muted">{{ __('portal.needs.sent_on', ['date' => $need['sent']]) }}</span> @endif
+                                                    </div>
+                                                </div>
+                                                @if ($need['status'] !== 'sent')
+                                                    <button type="button" class="btn btn-secondary btn-sm" wire:click="openNeed({{ $need['id'] }})"><i data-lucide="send"></i> {{ __('portal.needs.mark_sent') }}</button>
+                                                @else
+                                                    <span class="pill pill-info">{{ __('portal.needs.statuses.sent') }}</span>
+                                                @endif
+                                            </div>
+                                            @if ($needItemId === $need['id'])
+                                                <form wire:submit.prevent="submitNeedSent" class="mt-3 flex flex-col gap-3">
+                                                    <div class="field">
+                                                        <label class="label" for="need-note-{{ $need['id'] }}">{{ __('portal.needs.note') }}</label>
+                                                        <textarea id="need-note-{{ $need['id'] }}" class="textarea" rows="2" maxlength="2000" wire:model="needNote" aria-describedby="need-note-help-{{ $need['id'] }}"></textarea>
+                                                        <span class="help" id="need-note-help-{{ $need['id'] }}">{{ __('portal.needs.note_help') }}</span>
+                                                        @error('needNote') <span class="field-error">{{ $message }}</span> @enderror
+                                                    </div>
+                                                    <div class="field">
+                                                        <label class="label" for="need-file-{{ $need['id'] }}">{{ __('portal.needs.file') }}</label>
+                                                        <input id="need-file-{{ $need['id'] }}" type="file" class="input" wire:model="needFile">
+                                                        @error('needFile') <span class="field-error">{{ $message }}</span> @enderror
+                                                    </div>
+                                                    <div class="flex gap-2">
+                                                        <button type="submit" class="btn btn-primary btn-sm" wire:loading.attr="disabled">{{ __('portal.needs.submit') }}</button>
+                                                        <button type="button" class="btn btn-secondary btn-sm" wire:click="cancelNeed">{{ __('portal.needs.cancel') }}</button>
+                                                    </div>
+                                                </form>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @else
+                                <p class="m-0 text-sm text-muted">{{ __('portal.needs.none') }}</p>
+                            @endif
+                        </section>
+                    @endif
+
                     <section class="card">
                         <div class="card-header"><h2 class="card-title">{{ __('portal.overview.activity') }}</h2></div>
                         @if (count($liveLogs))

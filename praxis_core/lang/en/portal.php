@@ -172,6 +172,25 @@ return [
         'log_approved' => 'Task approved in the Client Portal.',
         'log_approved_from_issue' => 'Task approved in the Client Portal when its issue was closed.',
     ],
+    // What the delivery team needs from the client (13 Nov 2026)
+    'needs' => [
+        'title' => 'What we need from you',
+        'help' => 'Each milestone starts on time when these arrive by their date. If one is late, that milestone moves by the same number of days.',
+        'received' => ':count already received. Thank you.',
+        'none' => 'Nothing is waiting on you right now.',
+        'due' => 'Needed by :date',
+        'late' => '{1} 1 day late|[2,*] :days days late',
+        'sent_on' => 'You sent it on :date; the team is checking it.',
+        'mark_sent' => 'Mark as sent',
+        'note' => 'Note for the team',
+        'note_help' => 'Where to find it, or what is still to come.',
+        'file' => 'Attach a file (optional)',
+        'submit' => 'Send',
+        'cancel' => 'Cancel',
+        'note_or_file' => 'Add a note or attach a file.',
+        'sent' => 'Thank you. The team has been told.',
+        'statuses' => ['needed' => 'Needed', 'requested' => 'Requested', 'sent' => 'Sent'],
+    ],
 
     'tasks' => [
         'approve' => 'Approve task',

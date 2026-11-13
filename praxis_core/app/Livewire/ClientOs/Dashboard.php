@@ -69,6 +69,16 @@ class Dashboard extends Component
     public $phases = [];
     #[Locked]
     public $liveLogs = [];
+    // What the delivery team needs from the client, milestone by milestone (13 Nov 2026): the open items, and how
+    // many are received; the form that marks one sent (a note and maybe a file)
+    #[Locked]
+    public $clientNeeds = [];
+    #[Locked]
+    public $clientNeedsReceived = 0;
+    #[Locked]
+    public ?int $needItemId = null;
+    public $needNote = '';
+    public $needFile;
     #[Locked]
     public $activeTasks = [];
 
@@ -150,7 +160,7 @@ class Dashboard extends Component
     // The rows each section shows. Leaving a section empties its rows (loadTab), so the page's state never carries
     // every section at once; the section reloads them when it is opened again
     private const TAB_DATA = [
-        'overview' => ['phases', 'liveLogs'],
+        'overview' => ['phases', 'liveLogs', 'clientNeeds'],
         'sprints' => ['activeTasks'],
         'qa_hub' => ['activeTasks', 'qaTickets', 'selectedTicket', 'ticketComments', 'ticketAttachments'],
         'financials' => ['invoices', 'remittanceAccounts'],
@@ -356,6 +366,15 @@ class Dashboard extends Component
         $milestones = ProjectPlan::milestones($this->activeProject->id);
         $this->phases = $milestones->map(fn ($m) => ['id' => $m->id, 'phase_number' => $m->phase_number, 'title' => $m->title, 'status' => $m->status])->all();
         $this->overallProgress = (int) round(ProjectPlan::progress($milestones));
+
+        // What the team needs from the client: the open items, in milestone order (ClientDependencies)
+        $needs = \App\Support\Projects\ClientDependencies::forProject($this->activeProject->id);
+        $this->clientNeedsReceived = $needs->whereIn('status', ['received', 'waived'])->count();
+        $this->clientNeeds = $needs->whereIn('status', \App\Support\Projects\ClientDependencies::OPEN)->values()->map(fn ($i) => [
+            'id' => (int) $i->id, 'milestone' => 'M' . $i->phase_number, 'group' => trim(($i->group_code ? $i->group_code . ' ' : '') . ($i->group_title ?? '')),
+            'title' => $i->title, 'due' => $i->due_date ? PortalFormat::date($i->due_date) : null, 'late_days' => (int) $i->late_days, 'status' => $i->status,
+            'sent' => $i->sent_at ? PortalFormat::date($i->sent_at) : null,
+        ])->all();
 
         // The client's own approvals only: staff comments on a task stay inside HQ (docs/PROJECTS.md)
         $logs = $this->clientTasks()->join('task_comments', 'task_comments.task_id', '=', 'tasks.id')->where('task_comments.author_type', 'client')->whereNull('task_comments.deleted_at')
@@ -722,6 +741,54 @@ class Dashboard extends Component
         session()->flash('global_success', __('portal.qa.task_approved_from_issue'));
     }
     
+    /** "Mark as sent" on something the team needs: opens the small form */
+    public function openNeed(int $id): void
+    {
+        abort_unless($this->allowed('projects.view'), 403);
+        if (! collect($this->clientNeeds)->contains('id', $id)) {
+            return;
+        }
+        $this->resetErrorBag();
+        $this->needItemId = $id;
+        $this->needNote = '';
+        $this->needFile = null;
+    }
+
+    public function cancelNeed(): void
+    {
+        $this->needItemId = null;
+        $this->reset(['needNote', 'needFile']);
+    }
+
+    public function submitNeedSent(): void
+    {
+        abort_unless($this->allowed('projects.view'), 403);
+        if (! $this->activeProject || ! $this->needItemId) {
+            return;
+        }
+        $this->validate([
+            'needNote' => 'nullable|string|max:2000',
+            'needFile' => 'nullable|file|max:20480|mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx,csv,txt,zip,ppt,pptx',
+        ]);
+        $item = DB::table('milestone_dependencies')->where('id', $this->needItemId)->where('project_id', $this->activeProject->id)->whereNull('deleted_at')
+            ->whereIn('status', \App\Support\Projects\ClientDependencies::OPEN)->first();
+        if (! $item || ! $this->ownsProject($item->project_id)) {
+            $this->cancelNeed();
+            return;
+        }
+        if (trim((string) $this->needNote) === '' && ! $this->needFile) {
+            $this->addError('needNote', __('portal.needs.note_or_file'));
+            return;
+        }
+        $path = $this->needFile ? $this->needFile->store('dependency_files/' . $item->project_id, 'local') : null;
+        $name = $this->needFile ? $this->needFile->getClientOriginalName() : null;
+        \App\Support\Projects\ClientDependencies::markSent($item, $this->user, $this->needNote, $path, $name);
+
+        $this->cancelNeed();
+        $this->loadOverview();
+        session()->flash('global_success', __('portal.needs.sent'));
+    }
+
     public function triggerPopUpload($invoiceId, $amountDue) {
         abort_unless($this->allowed('billing.create'), 403);
         if (!collect($this->invoices)->contains('id', $invoiceId)) return;

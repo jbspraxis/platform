@@ -225,6 +225,11 @@
                         @endif
                     </section>
 
+                    {{-- What this milestone needs from the client (13 Nov 2026) --}}
+                    @if ($phaseId)
+                        <livewire:hq.projects.milestone-dependencies :project-id="$projectId" :phase-id="$phaseId" :key="'deps-' . $phaseId" />
+                    @endif
+
                     <section class="pj-section" aria-labelledby="ms-tasks-title">
                         <div class="card-header" style="margin-bottom: 10px">
                             <h3 id="ms-tasks-title" style="margin: 0">{{ __('projects.milestone.tasks', ['count' => $tasks->count()]) }}</h3>

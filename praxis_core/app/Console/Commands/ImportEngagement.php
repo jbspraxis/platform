@@ -20,10 +20,13 @@ use Illuminate\Support\Str;
  * An organisation that already exists, or an invoice number already used, stops the import before anything is
  * written. --dry-run shows the counts and the Google meetings it would bring in.
  *
- * Bundle (JSON): organization {name, industry, country, city, preferred_language}; opportunity {title, lead_email,
+ * Bundle (JSON): organization {name, industry, country, city, preferred_language, and for its invoices billing_address,
+ * email, phone, registration_number, tax_number}; opportunity {title, lead_email,
  * language, won_at}; sow {reference, signed_at, signed_by_name, hq_signer_name, sections [{key, title, body}]};
  * project {title, description, total_budget, currency, start_date, target_end_date, status}; phases [{key, number,
- * title, description, weight, status}]; sprints [{key, title, start, end, status}]; tasks [{phase, sprint, title,
+ * title, description, weight, status, start, due, dependencies [{group_code, group_title, title, due, integration}]}]
+ * (what the milestone needs from the client: ClientDependencies; no due = the milestone's start, or 7 business days
+ * before it for an integration); sprints [{key, title, start, end, status}]; tasks [{phase, sprint, title,
  * description, status, points}]; invoices [{number, type, phase, reference, currency, status, issued_at, due_date,
  * paid_at, deposit, lines [{description, amount}]}]; qa_tickets [{phase, title, description, severity, status,
  * raised_at, resolved_at}]; meetings [{kind, title, starts_at, ends_at, attendees [{name, email, role}], transcript
@@ -125,6 +128,7 @@ class ImportEngagement extends Command
         $tasks = collect($bundle['tasks'] ?? []);
         $this->table(['Part', 'Count'], [
             ['Phases (milestones)', count($bundle['phases'])],
+            ['Needed from the client', collect($bundle['phases'])->sum(fn ($p) => count($p['dependencies'] ?? []))],
             ['Sprints', count($bundle['sprints'])],
             ['Tasks', $tasks->count() . ' (' . $tasks->countBy('status')->map(fn ($n, $s) => "{$s} {$n}")->implode(', ') . ')'],
             ['Invoices', count($bundle['invoices'] ?? [])],
@@ -154,7 +158,13 @@ class ImportEngagement extends Command
             'country' => $b['organization']['country'] ?? 'Nigeria',
             'city' => $b['organization']['city'] ?? null,
             'preferred_language' => strtoupper($b['organization']['preferred_language'] ?? 'EN'),
-        ] + $stamp());
+            // Printed on its invoices
+            'billing_address' => $b['organization']['billing_address'] ?? null,
+            'email' => isset($b['organization']['email']) ? mb_strtolower(trim($b['organization']['email'])) : null,
+            'phone' => $b['organization']['phone'] ?? null,
+            'tax_identification_number' => $b['organization']['tax_number'] ?? null,
+        ] + (\Illuminate\Support\Facades\Schema::hasColumn('organizations', 'registration_number')
+            ? ['registration_number' => $b['organization']['registration_number'] ?? null] : []) + $stamp());
 
         $projectId = (string) Str::uuid();
         $p = $b['project'];
@@ -200,6 +210,21 @@ class ImportEngagement extends Command
                 'start_date' => $phase['start'] ?? $this->sprintSpan($b, $phase['key'])['start'] ?? null,
                 'due_date' => $phase['due'] ?? $this->sprintSpan($b, $phase['key'])['end'] ?? null,
             ] + $stamp());
+        }
+
+        // What each milestone needs from the client
+        foreach ($b['phases'] as $phase) {
+            $row = DB::table('project_phases')->where('id', $phases[$phase['key']])->first();
+            foreach (array_values($phase['dependencies'] ?? []) as $i => $dep) {
+                \App\Support\Projects\ClientDependencies::add($row, [
+                    'group_code' => $dep['group_code'] ?? null,
+                    'group_title' => $dep['group_title'] ?? null,
+                    'title' => $dep['title'],
+                    'due_date' => $dep['due'] ?? '',
+                    'integration' => ! empty($dep['integration']),
+                    'position' => $i + 1,
+                ], $leadId);
+            }
         }
 
         $sprints = [];

@@ -51,6 +51,8 @@ class SecureFileController extends Controller
                 'pop_receipts', 'pop_receipts_wht' => $user->can('finance.view'),
                 'vault' => $user->can('hr.view'), // candidate CVs
                 // Task comment files (task_files/<task id>/…): whoever may open that task's project page
+                // What a client sent for a milestone (dependency_files/<project id>/…): whoever may open that project
+                'dependency_files' => \App\Support\Projects\ProjectRules::canView(explode('/', $path)[1] ?? ''),
                 'task_files' => ($projectId = DB::table('tasks')->join('project_phases', 'project_phases.id', '=', 'tasks.phase_id')
                     ->where('tasks.id', explode('/', $path)[1] ?? '')->value('project_phases.project_id'))
                     && \App\Support\Projects\ProjectRules::canView($projectId),
@@ -58,8 +60,15 @@ class SecureFileController extends Controller
             };
         }
 
-        // Clients: only QA evidence on their own organisation's projects
-        if (! $user instanceof \App\Models\ClientUser || $folder !== 'qa_evidence' || ! $user->organization_id) {
+        // Clients: QA evidence, and what they sent for a milestone, on their own organisation's projects
+        if (! $user instanceof \App\Models\ClientUser || ! $user->organization_id) {
+            return false;
+        }
+        if ($folder === 'dependency_files') {
+            return DB::table('milestone_dependencies')->join('projects', 'projects.id', '=', 'milestone_dependencies.project_id')
+                ->where('milestone_dependencies.file_path', $path)->where('projects.organization_id', $user->organization_id)->exists();
+        }
+        if ($folder !== 'qa_evidence') {
             return false;
         }
 
