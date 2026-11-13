@@ -57,6 +57,8 @@ final class LeadTimeline
         // because everyone with Leads access reads the timeline and only crm.edit reads the intel
         'intel_added' => 'Intel report added',
         'intel_removed' => 'Intel report removed',
+        // HQ › Clients (docs/CLIENTS.md): a contact invited to the Client Portal
+        'portal_invited' => 'Client Portal invitation',
     ];
 
     /** What "Log activity" on the lead page offers */
