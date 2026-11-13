@@ -132,6 +132,13 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
             Route::redirect('/broadcast-ledger', '/campaigns/broadcasts')->name('hq.crm.broadcast');
         });
 
+        // Clients (docs/CLIENTS.md): active and past clients, the details their invoices print, Client Portal invitations.
+        // Leads access or Finance opens them, so the check is in each screen (ClientAccess), not a single can: middleware
+        Route::prefix('clients')->group(function () {
+            Route::get('/', \App\Livewire\Hq\Clients\ClientList::class)->name('hq.clients');
+            Route::get('/{organization}', \App\Livewire\Hq\Clients\ClientPage::class)->whereUuid('organization')->name('hq.client');
+        });
+
         // Opportunities (docs/OPPORTUNITIES.md): one record per piece of work with a client, under Leads and proposals
         // Who may open these is decided in each screen (OpportunityAccess): the permission, or being on the opportunity's team
         Route::prefix('opportunities')->group(function () {

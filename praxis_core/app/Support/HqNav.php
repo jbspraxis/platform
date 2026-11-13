@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\User;
+use App\Support\Clients\ClientAccess;
 use App\Support\Mail\MailNav;
 use App\Support\Opportunities\OpportunityAccess;
 use Illuminate\Support\Facades\DB;
@@ -91,6 +92,12 @@ final class HqNav
                         $page('Proposals', 'hq.crm.proposal'),
                     ] : []),
                 ])));
+        }
+
+        // Clients (docs/CLIENTS.md): active and past clients and what their invoices print; its own section so the client
+        // details are easy to find (owner, 13 Nov 2026). Leads access or Finance opens it.
+        if (ClientAccess::canView($user)) {
+            $sections[] = self::section('clients', 'Clients', 'Clients', 'building-2', route('hq.clients'), $on('hq.clients', 'hq.client'), []);
         }
 
         // Campaigns (docs/CAMPAIGNS.md): Broadcasts to people who know us; Outreach to researched prospects

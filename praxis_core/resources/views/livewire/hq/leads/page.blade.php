@@ -95,6 +95,10 @@
             </div>
         </div>
         <div class="ld-actions">
+            {{-- A client's invoice details and Client Portal accounts are on its page under Clients (docs/CLIENTS.md) --}}
+            @if ($lead->status === 'Active Client' && \App\Support\Clients\ClientAccess::canView(auth()->user()))
+                <a href="{{ route('hq.client', ['organization' => $lead->id]) }}" class="btn btn-secondary" wire:navigate><i data-lucide="building-2"></i> {{ __('clients.open_client') }}</a>
+            @endif
             @if ($canEdit && ! $lead->assigned_to)
                 <button type="button" class="btn btn-secondary" wire:click="claim" wire:loading.attr="disabled" wire:target="claim"><i data-lucide="user-round"></i> Assign to me</button>
             @endif
