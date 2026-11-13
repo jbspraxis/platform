@@ -11,32 +11,36 @@ use Illuminate\Support\Facades\File;
 /**
  * An invoice as a PDF (owner, 2 Nov 2026; docs/QA-PORTAL.md D11): emailed to the client's billing contacts when it is
  * issued (InvoiceMailer), downloaded in HQ › Finance › Invoices and in the portal's Invoices and payments.
- * resources/views/pdf/invoice.blade.php, rendered like the SOW by ProposalPdf::fromHtml() (dompdf, nothing remote).
- * "Tax invoice" only when it carries VAT, else "Invoice"; the company that bills it with its tax number, the client
- * with theirs, the lines, and the accounts to pay into (ReceivingAccounts: its currency, that company's).
+ * resources/views/pdf/invoice.blade.php on the company letterhead (owner, 13 Nov 2026), laid out to fit one page:
+ * the Documents letterhead's header, and its footer drawn on every page by LetterPdf::fromHtml() (dompdf, nothing
+ * remote). "Tax invoice" only when it carries VAT, else "Invoice"; the company that bills it with its tax number, the
+ * client with theirs, the lines, and the accounts to pay into (ReceivingAccounts: its currency, that company's).
  */
 final class InvoicePdf
 {
     public static function render(object $invoice, ?string $language = null): string
     {
-        [$html, $footer, $page] = self::html($invoice, $language);
+        $language ??= self::language($invoice);
+        [$html, $footerLegal, $footerContact] = self::html($invoice, $language);
         $cache = storage_path('framework/cache/dompdf');
         File::ensureDirectoryExists($cache);
 
-        return ProposalPdf::fromHtml($html, $footer, $page, $cache);
+        return \App\Support\Letters\LetterPdf::fromHtml($html, $footerLegal, $footerContact, $cache, null, $language);
     }
 
-    /** The page's HTML, its footer and the page label, in $language (default: the client's) */
+    /** The page's HTML and the letterhead's two footer lines (legal, contact), in $language (default: the client's) */
     public static function html(object $invoice, ?string $language = null): array
     {
         $language ??= self::language($invoice);
         $previous = App::getLocale();
         App::setLocale($language);
         try {
+            $data = self::data($invoice, $language);
+
             return [
-                view('pdf.invoice', self::data($invoice, $language))->render(),
-                __('invoices.pdf.footer', ['number' => $invoice->invoice_number]),
-                __('proposals.pdf.page'),
+                view('pdf.invoice', $data)->render(),
+                $data['letterhead']['footer_legal'],
+                $data['letterhead']['footer_contact'],
             ];
         } finally {
             App::setLocale($previous);
@@ -83,6 +87,9 @@ final class InvoicePdf
         return [
             'invoice' => $invoice,
             'language' => $language,
+            // The company letterhead (App\Support\Letters\Letterhead): header details, footer lines, the logo
+            'letterhead' => \App\Support\Letters\Letterhead::details($issuer ? (array) $issuer : []),
+            'logo' => \App\Support\Letters\Letterhead::logoDataUri(),
             'title' => self::title($invoice),
             'issuer' => $issuer,
             'client' => $organisation,
