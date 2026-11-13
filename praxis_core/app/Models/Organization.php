@@ -35,6 +35,7 @@ class Organization extends Model
         'assigned_to',
         'billing_address',
         'tax_identification_number',
+        'registration_number',
         'created_by',
         'updated_by',
         // Leads (docs/LEADS.md)

@@ -74,8 +74,17 @@
                 @if ($clientAddress)
                     <div>{!! nl2br(e($clientAddress)) !!}</div>
                 @endif
+                @if ($clientRegistration)
+                    <div>{{ __('invoices.pdf.registration', ['number' => $clientRegistration]) }}</div>
+                @endif
                 @if ($clientTaxId)
                     <div>{{ __('invoices.pdf.tax_number', ['number' => $clientTaxId]) }}</div>
+                @endif
+                @if ($clientEmail)
+                    <div>{{ $clientEmail }}</div>
+                @endif
+                @if ($clientPhone)
+                    <div>{{ $clientPhone }}</div>
                 @endif
             </td>
         </tr>
@@ -120,6 +129,10 @@
             @else
                 {{-- No VAT: no VAT line, and the total is the amount before VAT --}}
                 <tr class="total"><td colspan="3">{{ __('vat.total') }}</td><td class="num">{{ $money($invoice->total_amount) }}</td></tr>
+            @endif
+            @if ($paidSoFar > 0 && $invoice->status !== 'Paid')
+                <tr><td colspan="3">{{ __('invoices.pdf.paid_to_date') }}</td><td class="num">{{ $money(-$paidSoFar) }}</td></tr>
+                <tr class="total"><td colspan="3">{{ __('invoices.pdf.balance_due') }}</td><td class="num">{{ $money(max(0, (float) $invoice->total_amount - $paidSoFar)) }}</td></tr>
             @endif
             @if ($vatNote)
                 <tr><td colspan="4" class="small" style="padding-top: 6pt">{{ $vatNote }}</td></tr>

@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\DB;
  * A milestone is billed by an invoice that names it (invoices.phase_id: an invoice for exactly one milestone, as
  * before) or by one of an invoice's lines (invoice_lines.phase_id). "Live" leaves cancelled invoices out; deleted
  * invoices never count. Every screen that asks "is this milestone invoiced?" asks here.
+ *
+ * An advance on a milestone (Advances, 13 Nov 2026) is not billing it: advance lines and the "less advance" lines that
+ * deduct them are left out, so the milestone is still invoiced in full later. An advance does keep the milestone from
+ * deletion (any()).
  */
 final class MilestoneInvoices
 {
@@ -21,10 +25,12 @@ final class MilestoneInvoices
             return collect();
         }
         $direct = DB::table('invoices')->whereIn('phase_id', $ids)->whereNull('deleted_at')
+            ->where(fn ($q) => $q->whereNull('invoice_type')->orWhere('invoice_type', '!=', Advances::INVOICE_TYPE))
             ->when($liveOnly, fn ($q) => $q->where('status', '!=', 'Cancelled'))
             ->get(['phase_id', 'id as invoice_id']);
         $lines = DB::table('invoice_lines')->join('invoices', 'invoices.id', '=', 'invoice_lines.invoice_id')
             ->whereIn('invoice_lines.phase_id', $ids)->whereNull('invoices.deleted_at')
+            ->whereNotIn('invoice_lines.kind', ['advance', 'less_advance'])
             ->when($liveOnly, fn ($q) => $q->where('invoices.status', '!=', 'Cancelled'))
             ->get(['invoice_lines.phase_id', 'invoices.id as invoice_id']);
 
@@ -40,7 +46,8 @@ final class MilestoneInvoices
     /** Has any invoice, even a cancelled one, billed this milestone? (A billed milestone can't be deleted.) */
     public static function any(string $phaseId): bool
     {
-        return self::pairs([$phaseId], false)->isNotEmpty();
+        return self::pairs([$phaseId], false)->isNotEmpty()
+            || DB::table('invoice_lines')->where('phase_id', $phaseId)->whereIn('kind', ['advance', 'less_advance'])->exists();
     }
 
     /** Each milestone's latest live invoice, keyed by milestone id (its status sets Invoiced or Paid on the board) */

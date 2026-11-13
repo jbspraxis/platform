@@ -26,9 +26,17 @@ return [
         'paid' => 'Paid',
         'paid_on' => 'Paid on :date',
         'footer' => 'JBS Praxis · :number',
+        'paid_to_date' => 'Paid to date',
+        'balance_due' => 'Balance due',
     ],
     'portal' => [
         'pdf' => 'Download PDF',
         'pdf_label' => 'Download invoice :number as a PDF',
+        'paid_left' => 'Paid :paid · :left left',
+    ],
+    // Line wording written when an invoice is created (App\Livewire\Hq\Finance\InvoiceLedger, App\Support\Finance\Advances)
+    'lines' => [
+        'advance_on' => 'Advance on :milestone',
+        'less_advance' => 'Less advance :number',
     ],
 ];

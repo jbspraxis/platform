@@ -398,8 +398,12 @@ class Dashboard extends Component
         // The invoices with a proof of payment waiting for HQ's check, in one query (not one per invoice)
         $pending = $invoices->isEmpty() ? collect() : DB::table('transactions')->whereIn('invoice_id', $invoices->pluck('id'))
             ->where('status', 'Pending Verification')->distinct()->pluck('invoice_id')->flip();
-        $this->invoices = $invoices->map(function($invoice) use ($pending) {
+        // What is already paid on each (payments verified by HQ, or recorded there), and what is left
+        $settled = \App\Support\Finance\InvoicePayments::settled($invoices->pluck('id'));
+        $this->invoices = $invoices->map(function($invoice) use ($pending, $settled) {
             $invoice->has_pending_pop = $pending->has($invoice->id);
+            $invoice->paid_so_far = (float) ($settled[$invoice->id] ?? 0);
+            $invoice->balance = max(0, round((float) $invoice->total_amount - $invoice->paid_so_far, 2));
             return $invoice;
         })->toArray();
         // Only the accounts in the currency of the invoices held by the company that bills them (D8), with the fields shown

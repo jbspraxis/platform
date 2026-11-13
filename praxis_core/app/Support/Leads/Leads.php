@@ -35,6 +35,8 @@ final class Leads
             "{$prefix}phone" => ['nullable', 'string', 'max:30', 'regex:/^\+?[0-9][0-9 ().\-]{4,26}$/'],
             "{$prefix}email" => ['nullable', 'email', 'max:150'],
             "{$prefix}address" => ['nullable', 'string', 'max:2000'],
+            "{$prefix}registration_number" => ['nullable', 'string', 'max:60'],
+            "{$prefix}tax_number" => ['nullable', 'string', 'max:100'],
             "{$prefix}preferred_language" => ['nullable', Rule::in(['EN', 'FR'])],
             "{$prefix}source" => ['nullable', Rule::in(array_keys(Sources::LABELS))],
             "{$prefix}source_detail" => ['nullable', 'string', 'max:255'],
@@ -178,6 +180,8 @@ final class Leads
     public const DETAILS = [
         'name' => 'name', 'country' => 'country', 'city' => 'city', 'industry' => 'industry', 'phone' => 'phone', 'email' => 'email',
         'billing_address' => 'address', 'preferred_language' => 'preferred_language', 'source' => 'source', 'source_detail' => 'source_detail',
+        // Printed on its invoices (13 Nov 2026)
+        'registration_number' => 'registration_number', 'tax_identification_number' => 'tax_number',
     ];
 
     /**
@@ -216,7 +220,8 @@ final class Leads
             $others = array_diff($changed, ['source', 'source_detail']);
             if ($others) {
                 $labels = ['name' => 'name', 'country' => 'country', 'city' => 'city', 'industry' => 'industry', 'phone' => 'phone', 'email' => 'email',
-                    'billing_address' => 'address', 'preferred_language' => 'language'];
+                    'billing_address' => 'address', 'preferred_language' => 'language', 'registration_number' => 'company number',
+                    'tax_identification_number' => 'tax number'];
                 LeadTimeline::record($lead->id, 'details_changed', 'Details changed: ' . collect($others)->map(fn ($c) => $labels[$c] ?? $c)->implode(', ') . '.', [
                     'actor' => $by, 'payload' => ['old' => array_intersect_key($old, array_flip($others))],
                 ]);
