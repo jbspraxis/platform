@@ -466,12 +466,15 @@
                                     </div>
                                     <div class="flex flex-col items-end gap-3">
                                         <div class="text-lg font-semibold text-ink num">{{ PortalFormat::money($inv->total_amount, $inv->currency) }}</div>
+                                        @if (($inv->paid_so_far ?? 0) > 0 && in_array($inv->status, ['Pending', 'Overdue'], true))
+                                            <div class="text-sm text-muted num">{{ __('invoices.portal.paid_left', ['paid' => PortalFormat::money($inv->paid_so_far, $inv->currency), 'left' => PortalFormat::money($inv->balance, $inv->currency)]) }}</div>
+                                        @endif
                                         <a href="{{ route('portal.invoice.pdf', $inv->id) }}" class="btn btn-secondary btn-sm" aria-label="{{ __('invoices.portal.pdf_label', ['number' => $inv->invoice_number]) }}">
                                             <i data-lucide="file-down"></i> {{ __('invoices.portal.pdf') }}
                                         </a>
-@if ($inv->status !== 'Paid' && !$inv->has_pending_pop)
+@if (in_array($inv->status, ['Pending', 'Overdue'], true) && !$inv->has_pending_pop)
                                             @if ($can['billing.create'] ?? false)
-                                                <button type="button" wire:click="triggerPopUpload('{{ $inv->id }}', {{ $inv->total_amount }})" class="btn btn-primary btn-sm">
+                                                <button type="button" wire:click="triggerPopUpload('{{ $inv->id }}', {{ $inv->balance ?? $inv->total_amount }})" class="btn btn-primary btn-sm">
                                                     <i data-lucide="upload"></i> {{ __('portal.finance.upload_pop') }}
                                                 </button>
                                             @endif

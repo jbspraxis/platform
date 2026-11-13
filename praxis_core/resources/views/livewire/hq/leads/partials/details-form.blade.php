@@ -50,6 +50,19 @@
         <textarea id="ld-d-address" class="textarea" rows="2" maxlength="2000" wire:model="details.address"></textarea>
         @error('details.address') <span class="field-error">{{ $message }}</span> @enderror
     </div>
+    <div class="ld-row">
+        <div class="field">
+            <label class="label" for="ld-d-rc">Company number <span class="ld-optional">(RC, optional)</span></label>
+            <input id="ld-d-rc" type="text" class="input" maxlength="60" wire:model="details.registration_number" placeholder="e.g. RC 7319824">
+            @error('details.registration_number') <span class="field-error">{{ $message }}</span> @enderror
+        </div>
+        <div class="field">
+            <label class="label" for="ld-d-tin">Tax number <span class="ld-optional">(TIN, optional)</span></label>
+            <input id="ld-d-tin" type="text" class="input" maxlength="100" wire:model="details.tax_number">
+            @error('details.tax_number') <span class="field-error">{{ $message }}</span> @enderror
+        </div>
+    </div>
+    <p class="help" style="margin: -4px 0 0">The address, company number, tax number, email and phone are printed on this client’s invoices.</p>
     <fieldset class="field" style="border: 0; padding: 0; margin: 0">
         <legend class="label" style="margin-bottom: 6px">Language for emails</legend>
         <div class="ld-radios">

@@ -26,9 +26,17 @@ return [
         'paid' => 'Payée',
         'paid_on' => 'Payée le :date',
         'footer' => 'JBS Praxis · :number',
+        'paid_to_date' => 'Déjà réglé',
+        'balance_due' => 'Reste à payer',
     ],
     'portal' => [
         'pdf' => 'Télécharger le PDF',
         'pdf_label' => 'Télécharger la facture :number en PDF',
+        'paid_left' => 'Réglé :paid · reste :left',
+    ],
+    // Libellés écrits à la création d’une facture (App\Livewire\Hq\Finance\InvoiceLedger, App\Support\Finance\Advances)
+    'lines' => [
+        'advance_on' => 'Avance sur :milestone',
+        'less_advance' => 'Moins l’avance :number',
     ],
 ];

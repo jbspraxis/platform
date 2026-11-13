@@ -41,12 +41,32 @@ class InvoiceLedger extends Component
 
     /**
      * One invoice, several milestones (owner, 10 Nov 2026): the milestones ticked (ids), and the invoice's lines, each
-     * ['phase_id' => milestone id or null for a free line, 'description', 'amount']. A ticked milestone adds its line,
-     * filled with its agreed amount less its deposit share; the amount and wording stay editable. "Add line" adds a
-     * free line. Every line becomes its own invoice line, with its milestone.
+     * ['kind' => 'charge'|'discount', 'phase_id' => milestone id or null for a free line, 'description', 'amount']. A
+     * ticked milestone adds its line, filled with its agreed amount less its deposit share; the amount and wording stay
+     * editable. "Add line" adds a free line; "Add discount" a discount (typed positive, stored negative, 13 Nov 2026).
+     * Every line becomes its own invoice line, with its milestone. Advances on a ticked milestone are taken off by
+     * themselves (App\Support\Finance\Advances): those lines are shown, never typed.
      */
     public array $picked = [];
     public array $lines = [];
+
+    /**
+     * What Create invoice makes (13 Nov 2026): 'invoice' (milestones and lines, as above) or 'advance' (part of one
+     * milestone billed ahead of its acceptance, taken off that milestone's own invoice later).
+     */
+    public string $new_kind = 'invoice';
+    public string $advance_phase_id = '';
+    public $advance_amount = '';
+    public string $advance_description = '';
+
+    /** Record payment (finance.approve): the invoice it is for, and what arrived */
+    public ?string $pay_invoice_id = null;
+    public $pay_amount = '';
+    public string $pay_received_on = '';
+    public string $pay_method = 'Bank Transfer';
+    public string $pay_reference = '';
+    public $pay_wht = '';
+    public string $pay_note = '';
 
     /** At most this many lines on one invoice */
     private const MAX_LINES = 30;
@@ -90,6 +110,7 @@ class InvoiceLedger extends Component
         $due = \App\Support\Projects\Deposit::forMilestone($phase);
 
         return [
+            'kind' => 'charge',
             'phase_id' => (string) $phase->id,
             'description' => Str::limit($due['deposit']
                 ? __('projects.invoice_line_less', ['milestone' => $phase->title, 'percent' => \App\Support\Projects\Deposit::percentLabel($due['deposit']['percent'], app()->getLocale())])
@@ -127,8 +148,46 @@ class InvoiceLedger extends Component
     public function addLine(): void
     {
         if (count($this->lines) < self::MAX_LINES) {
-            $this->lines[] = ['phase_id' => null, 'description' => '', 'amount' => ''];
+            $this->lines[] = ['kind' => 'charge', 'phase_id' => null, 'description' => '', 'amount' => ''];
         }
+    }
+
+    /** A discount: typed as a positive amount, taken off the total (e.g. "Long-term client discount") */
+    public function addDiscount(): void
+    {
+        if (count($this->lines) < self::MAX_LINES) {
+            $this->lines[] = ['kind' => 'discount', 'phase_id' => null, 'description' => '', 'amount' => ''];
+        }
+    }
+
+    /** Choosing the milestone to advance on suggests the wording; the amount is the finance person's */
+    public function updatedAdvancePhaseId($phaseId): void
+    {
+        $phase = collect($this->projectPhases)->firstWhere('id', (string) $phaseId);
+        $this->advance_description = $phase ? Str::limit(__('invoices.lines.advance_on', [
+            'milestone' => \App\Support\Projects\ProjectPlan::code($phase) . ' · ' . \App\Support\Projects\ProjectPlan::title($phase),
+        ]), 250) : '';
+    }
+
+    /** At most this can still be advanced on a milestone: its amount (less deposit) less live advances on it */
+    private function advanceRoom(object $phase): float
+    {
+        return max(0.0, round((float) \App\Support\Projects\Deposit::forMilestone($phase)['due'] - \App\Support\Finance\Advances::advancedOn((string) $phase->id), 2));
+    }
+
+    /** The "less advance" lines for the milestones ticked: shown in the form, written with the invoice */
+    private function deductions(array $milestoneIds): array
+    {
+        return \App\Support\Finance\Advances::deductionLines($milestoneIds,
+            fn ($advance) => Str::limit(__('invoices.lines.less_advance', ['number' => $advance->invoice_number]), 250));
+    }
+
+    /** A line's signed amount: a discount counts against the total */
+    private static function signed(array $line): float
+    {
+        $amount = round(abs((float) ($line['amount'] ?? 0)), 2);
+
+        return ($line['kind'] ?? 'charge') === 'discount' ? -$amount : $amount;
     }
 
     /** Removing a milestone's line unticks the milestone */
@@ -201,6 +260,8 @@ class InvoiceLedger extends Component
         // project's ticks and milestone lines don't carry over; free lines do.
         $this->picked = [];
         $this->lines = array_values(array_filter($this->lines, fn ($l) => empty($l['phase_id'])));
+        $this->advance_phase_id = '';
+        $this->advance_description = '';
         if (!empty($projectId)) {
             $this->projectPhases = $this->offeredPhases((string) $projectId);
 
@@ -237,14 +298,26 @@ class InvoiceLedger extends Component
     {
         abort_unless(Auth::user()->can('finance.create'), 403);
 
+        if ($this->new_kind === 'advance') {
+            $this->createAdvance();
+
+            return;
+        }
+
         // The milestones that may be on it are worked out again here, never taken from the form: this project's, and
         // not already billed by a live invoice
         $offered = $this->new_project_id ? $this->offeredPhases((string) $this->new_project_id)->pluck('id')->map(fn ($id) => (string) $id)->all() : [];
-        $this->lines = array_values(array_map(fn ($l) => [
-            'phase_id' => empty($l['phase_id']) ? null : (string) $l['phase_id'],
-            'description' => trim((string) ($l['description'] ?? '')),
-            'amount' => $l['amount'] ?? '',
-        ], $this->lines));
+        $this->lines = array_values(array_map(function ($l) {
+            $discount = ($l['kind'] ?? 'charge') === 'discount';
+
+            return [
+                'kind' => $discount ? 'discount' : 'charge',
+                // A discount is never a milestone's line
+                'phase_id' => $discount || empty($l['phase_id']) ? null : (string) $l['phase_id'],
+                'description' => trim((string) ($l['description'] ?? '')),
+                'amount' => $l['amount'] ?? '',
+            ];
+        }, $this->lines));
         $this->validate([
             'new_project_id' => 'required|exists:projects,id',
             'lines' => 'required|array|min:1|max:' . self::MAX_LINES,
@@ -254,12 +327,74 @@ class InvoiceLedger extends Component
             'new_payment_terms' => 'required|string',
             'new_remittance_id' => ['required', Rule::in($this->matchingAccounts()->pluck('id')->map(fn ($id) => (string) $id)->all())],
         ]);
+        if (! collect($this->lines)->contains('kind', 'charge')) {
+            $this->addError('lines', 'An invoice needs at least one line to charge, not only discounts.');
 
+            return;
+        }
+
+        $milestoneIds = array_values(array_unique(array_filter(array_column($this->lines, 'phase_id'))));
+        // Advances already invoiced on these milestones come off by themselves (App\Support\Finance\Advances)
+        $lines = array_merge(
+            array_map(fn ($l) => $l + ['advance_invoice_id' => null, 'amount_signed' => self::signed($l)], $this->lines),
+            array_map(fn ($d) => $d + ['amount_signed' => round((float) $d['amount'], 2)], $this->deductions($milestoneIds)),
+        );
+        if (round(array_sum(array_column($lines, 'amount_signed')), 2) <= 0) {
+            $this->addError('lines', 'The discounts and advances take this invoice to nothing. Lower the discount, or check the advances on these milestones.');
+
+            return;
+        }
+
+        $this->issue($this->new_invoice_type, $lines, $milestoneIds, count($milestoneIds) === 1 ? $milestoneIds[0] : null);
+    }
+
+    /**
+     * An advance on one milestone (owner, 13 Nov 2026): part of the milestone billed before its acceptance. One line,
+     * kind 'advance'; the milestone is still offered for its own invoice, which then takes the advance off.
+     */
+    private function createAdvance(): void
+    {
+        $offered = $this->new_project_id ? $this->offeredPhases((string) $this->new_project_id) : collect();
+        $this->advance_description = trim($this->advance_description);
+        $this->validate([
+            'new_project_id' => 'required|exists:projects,id',
+            'advance_phase_id' => ['required', Rule::in($offered->pluck('id')->map(fn ($id) => (string) $id)->all())],
+            'advance_amount' => 'required|numeric|min:0.01|max:9999999999999',
+            'advance_description' => 'required|string|max:255',
+            'new_payment_terms' => 'required|string',
+            'new_remittance_id' => ['required', Rule::in($this->matchingAccounts()->pluck('id')->map(fn ($id) => (string) $id)->all())],
+        ], [
+            'advance_phase_id.required' => 'Choose the milestone this advance is on.',
+            'advance_phase_id.in' => 'That milestone is already invoiced, or belongs to another project.',
+        ], ['advance_amount' => 'amount', 'advance_description' => 'description']);
+
+        $phase = $offered->firstWhere('id', $this->advance_phase_id);
+        $amount = round((float) $this->advance_amount, 2);
+        $room = $this->advanceRoom($phase);
+        if ($amount > $room + 0.004) {
+            $this->addError('advance_amount', 'At most ' . \App\Livewire\Hq\HqMoney::format($this->new_currency, $room) . ' can be advanced on this milestone: its amount less what is already advanced on it.');
+
+            return;
+        }
+
+        $this->issue(\App\Support\Finance\Advances::INVOICE_TYPE, [[
+            'kind' => 'advance',
+            'phase_id' => (string) $phase->id,
+            'advance_invoice_id' => null,
+            'description' => $this->advance_description,
+            'amount_signed' => $amount,
+        ]], [], null);
+    }
+
+    /**
+     * Writes the invoice and its lines (each: kind, phase_id, advance_invoice_id, description, amount_signed), accrues
+     * it in the general ledger, then tells and emails the client's billing people.
+     */
+    private function issue(string $type, array $lines, array $milestoneIds, ?string $phaseId): void
+    {
         $project = DB::table('projects')->where('id', $this->new_project_id)->first();
         $org = DB::table('organizations')->where('id', $project->organization_id)->first();
-        $lines = $this->lines;
-        $amountDue = round(array_sum(array_map(fn ($l) => round((float) $l['amount'], 2), $lines)), 2);
-        $milestoneIds = array_values(array_unique(array_filter(array_column($lines, 'phase_id'))));
+        $amountDue = round(array_sum(array_map(fn ($l) => round((float) $l['amount_signed'], 2), $lines)), 2);
 
         // 1. VAT: only when the company issuing it (the project's opportunity's billing company, else Nigeria's) charges
         // VAT today, at 0% for a client abroad (App\Support\Finance\Vat); the invoice records what it applied, and who
@@ -286,9 +421,11 @@ class InvoiceLedger extends Component
         $invoiceId = (string) Str::uuid();
         $invNumber = 'INV-' . date('Ym') . '-' . rand(1000, 9999);
         $timestamp = now();
+        $deducted = array_values(array_filter(array_column($lines, 'advance_invoice_id')));
 
-        DB::transaction(function () use ($invoiceId, $invNumber, $project, $org, $vat, $vatAmount, $totalAmount, $dueDate, $fxRate, $timestamp, $lines, $amountDue, $milestoneIds) {
-            // Someone else may have invoiced one of these milestones since the form opened: then nothing is created
+        DB::transaction(function () use ($invoiceId, $invNumber, $project, $org, $vat, $vatAmount, $totalAmount, $dueDate, $fxRate, $timestamp, $lines, $amountDue, $milestoneIds, $phaseId, $type, $deducted) {
+            // Someone else may have invoiced one of these milestones, or used one of its advances, since the form
+            // opened: then nothing is created
             if ($milestoneIds !== []) {
                 DB::table('project_phases')->whereIn('id', $milestoneIds)->lockForUpdate()->get(['id']);
                 if (\App\Support\Finance\MilestoneInvoices::billed($milestoneIds) !== []) {
@@ -296,14 +433,21 @@ class InvoiceLedger extends Component
                         'lines' => 'A milestone on this invoice was invoiced a moment ago. Close this window, open Create invoice again and tick the milestones still to invoice.',
                     ]);
                 }
+                $open = \App\Support\Finance\Advances::open($milestoneIds)->pluck('invoice_id')->map(fn ($id) => (string) $id)->sort()->values()->all();
+                if ($open !== collect($deducted)->sort()->values()->all()) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'lines' => 'An advance on one of these milestones changed a moment ago. Close this window and open Create invoice again.',
+                    ]);
+                }
             }
 
             DB::table('invoices')->insert([
                 'id' => $invoiceId,
                 'project_id' => $project->id,
-                // An invoice for exactly one milestone names it, as before; with several, each line names its own
-                'phase_id' => count($milestoneIds) === 1 ? $milestoneIds[0] : null,
-                'invoice_type' => $this->new_invoice_type,
+                // An invoice for exactly one milestone names it, as before; with several, each line names its own. An
+                // advance never names it (it doesn't bill the milestone: Advances)
+                'phase_id' => $phaseId,
+                'invoice_type' => $type,
                 'invoice_number' => $invNumber,
                 'amount_due' => $amountDue,
                 'vat_amount' => $vatAmount,
@@ -328,15 +472,19 @@ class InvoiceLedger extends Component
                 'updated_at' => $timestamp
             ]);
 
-            // 3. INVOICE LINES, one per line in the form's order, each with its milestone (id is auto-increment; no timestamps)
+            // 3. INVOICE LINES, one per line in the form's order, each with its milestone, then the advances taken off
+            // (id is auto-increment; no timestamps)
+            $metric = ['discount' => 'Discount', 'advance' => 'Advance', 'less_advance' => 'Advance deducted'];
             DB::table('invoice_lines')->insert(array_map(fn ($line) => [
                 'invoice_id' => $invoiceId,
+                'kind' => $line['kind'],
+                'advance_invoice_id' => $line['advance_invoice_id'] ?? null,
                 'phase_id' => $line['phase_id'],
                 'description' => Str::limit($line['description'], 252),
-                'metric_of_billing' => $line['phase_id'] ? 'Phase Completion' : 'Fixed Fee',
+                'metric_of_billing' => $metric[$line['kind']] ?? ($line['phase_id'] ? 'Phase Completion' : 'Fixed Fee'),
                 'quantity' => 1,
-                'unit_price' => round((float) $line['amount'], 2),
-                'total_price' => round((float) $line['amount'], 2),
+                'unit_price' => round((float) $line['amount_signed'], 2),
+                'total_price' => round((float) $line['amount_signed'], 2),
             ], $lines));
 
             // Accrue the receivable in the general ledger, as the proposal gateway does for deposits
@@ -348,8 +496,78 @@ class InvoiceLedger extends Component
         $reached = $this->emailToClient($invoiceId);
 
         $this->showCreateModal = false;
-        $this->reset(['new_project_id', 'picked', 'lines']);
-        session()->flash('success', "Invoice {$invNumber} created for " . ($org->name ?? 'the client') . '. ' . $this->emailedLine($reached));
+        $this->reset(['new_project_id', 'picked', 'lines', 'new_kind', 'advance_phase_id', 'advance_amount', 'advance_description']);
+        session()->flash('success', ($type === \App\Support\Finance\Advances::INVOICE_TYPE ? 'Advance invoice ' : 'Invoice ') . "{$invNumber} created for " . ($org->name ?? 'the client') . '. ' . $this->emailedLine($reached));
+    }
+
+    /** Record payment: opens the form for an unpaid invoice, the amount left filled in */
+    public function openRecordPayment(string $invoiceId): void
+    {
+        abort_unless(Auth::user()->can('finance.approve'), 403);
+
+        $invoice = DB::table('invoices')->where('id', $invoiceId)->whereNull('deleted_at')->whereIn('status', self::CANCELLABLE)->first();
+        if (! $invoice) {
+            session()->flash('warning', 'Only a sent or overdue invoice can take a payment. Refresh the page and try again.');
+
+            return;
+        }
+        $this->resetErrorBag();
+        $this->pay_invoice_id = (string) $invoice->id;
+        $this->pay_amount = \App\Support\Finance\InvoicePayments::balance($invoice);
+        $this->pay_received_on = now('Africa/Lagos')->toDateString();
+        $this->pay_method = 'Bank Transfer';
+        $this->pay_reference = '';
+        $this->pay_wht = '';
+        $this->pay_note = '';
+    }
+
+    public function closeRecordPayment(): void
+    {
+        $this->pay_invoice_id = null;
+        $this->resetErrorBag();
+    }
+
+    /**
+     * Money that arrived (owner, 13 Nov 2026: a transfer, cash or a cheque the client didn't upload in the portal):
+     * recorded and verified at once, part payments add up, and the invoice is Paid when they reach its total.
+     */
+    public function recordPayment(): void
+    {
+        abort_unless(Auth::user()->can('finance.approve'), 403);
+
+        $this->validate([
+            'pay_invoice_id' => 'required|string',
+            'pay_amount' => 'required|numeric|min:0.01|max:9999999999999',
+            'pay_received_on' => 'required|date|before_or_equal:' . now('Africa/Lagos')->toDateString(),
+            'pay_method' => ['required', Rule::in(\App\Support\Finance\InvoicePayments::METHODS)],
+            'pay_reference' => 'required|string|max:250',
+            'pay_wht' => 'nullable|numeric|min:0|max:9999999999999',
+            'pay_note' => 'nullable|string|max:250',
+        ], [
+            'pay_received_on.before_or_equal' => 'The day the money arrived can’t be in the future.',
+            'pay_reference.required' => 'Add the bank or transfer reference, or say how it was paid (e.g. "Cash, received by Elisha").',
+        ], ['pay_amount' => 'amount', 'pay_received_on' => 'date received', 'pay_method' => 'how it was paid', 'pay_reference' => 'reference', 'pay_wht' => 'withholding tax']);
+
+        try {
+            $result = \App\Support\Finance\InvoicePayments::recordFromHq($this->pay_invoice_id, [
+                'amount' => $this->pay_amount,
+                'received_on' => $this->pay_received_on,
+                'method' => $this->pay_method,
+                'reference' => $this->pay_reference,
+                'wht' => $this->pay_wht === '' || $this->pay_wht === null ? 0 : $this->pay_wht,
+                'note' => $this->pay_note,
+            ], (string) Auth::id());
+        } catch (\DomainException $e) {
+            $this->addError('pay_amount', $e->getMessage());
+
+            return;
+        }
+
+        $invoice = DB::table('invoices')->where('id', $this->pay_invoice_id)->first(['invoice_number', 'currency']);
+        $this->pay_invoice_id = null;
+        session()->flash('success', $result['paid']
+            ? "Payment recorded. Invoice {$invoice->invoice_number} is now paid."
+            : "Payment recorded on {$invoice->invoice_number}. " . \App\Livewire\Hq\HqMoney::format($invoice->currency, $result['balance']) . ' is left to pay.');
     }
 
     /** Finance › Invoices › Email again: the invoice and its PDF to the client's billing contacts */
@@ -403,6 +621,16 @@ class InvoiceLedger extends Component
                 : "Invoice {$invoice->invoice_number} is already cancelled.");
             return;
         }
+        // Money already recorded on it would be lost with it
+        if (\App\Support\Finance\InvoicePayments::hasPayments((string) $invoice->id)) {
+            session()->flash('warning', "Invoice {$invoice->invoice_number} has a payment recorded on it, so it can’t be cancelled. Record what is still owed on it instead, or give a discount on the next invoice.");
+            return;
+        }
+        // An advance another invoice has already taken off: cancelling it would bill the client twice
+        if ($by = \App\Support\Finance\Advances::deductedBy((string) $invoice->id)) {
+            session()->flash('warning', "Advance {$invoice->invoice_number} is taken off invoice {$by->invoice_number}. Cancel {$by->invoice_number} first, then this advance.");
+            return;
+        }
 
         $updated = DB::table('invoices')
             ->where('id', $invoiceId)
@@ -430,6 +658,8 @@ class InvoiceLedger extends Component
             'ip_address' => request()?->ip(),
             'created_at' => now()
         ]);
+        // Its receivable leaves the general ledger with it
+        \App\Livewire\Hq\Finance\GeneralLedgerManager::recordInvoiceCancelled($invoice->id);
         \App\Support\Pwa\ClientNotify::invoice($invoiceId, 'invoice_cancelled');
 
         session()->flash('success', "Invoice {$invoice->invoice_number} cancelled.");
@@ -551,14 +781,26 @@ class InvoiceLedger extends Component
             ->first(['projects.id', 'organizations.country', 'organizations.tax_identification_number']) : null;
         $vat = $project ? Vat::for($project, null, $this->entityOf((string) $project->id)) : null;
 
+        $invoices = $this->invoices();
+        $milestoneIds = array_values(array_unique(array_filter(array_column($this->lines, 'phase_id'))));
+        $deductions = $this->showCreateModal && $this->new_kind === 'invoice' ? $this->deductions($milestoneIds) : [];
+        $advancePhase = $this->new_kind === 'advance' ? collect($this->projectPhases)->firstWhere('id', $this->advance_phase_id) : null;
+
         return view('livewire.hq.finance.invoice-ledger', [
-            'invoices' => $this->invoices(),
+            'invoices' => $invoices,
+            // Verified payments so far on each invoice listed (InvoicePayments): "Paid … · … left"
+            'settled' => \App\Support\Finance\InvoicePayments::settled($invoices->getCollection()->pluck('id')),
+            'deductions' => $deductions,
+            'advanceRoom' => $advancePhase ? $this->advanceRoom($advancePhase) : null,
+            'payInvoice' => $this->pay_invoice_id ? DB::table('invoices')->where('id', $this->pay_invoice_id)->first(['id', 'invoice_number', 'currency', 'total_amount']) : null,
             'activeProjects' => $this->showCreateModal ? $this->activeProjects()->get() : collect(),
             'vat' => $vat,
             // The accounts of the company Vat::for() chose (the same as matchingAccounts(), without looking it up again)
             'matchingAccounts' => $project ? ReceivingAccounts::heldBy($this->new_currency, $vat['entity_id']) : collect(),
             'billingCompany' => $vat['company'] ?? null,
-            'linesTotal' => round(array_sum(array_map(fn ($l) => is_numeric($l['amount'] ?? null) ? round((float) $l['amount'], 2) : 0.0, $this->lines)), 2),
+            // Charges less discounts less the advances taken off
+            'linesTotal' => round(array_sum(array_map(fn ($l) => is_numeric($l['amount'] ?? null) ? self::signed($l) : 0.0, $this->lines))
+                + array_sum(array_column($deductions, 'amount')), 2),
         ]);
     }
 }

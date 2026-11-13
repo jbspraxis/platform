@@ -353,6 +353,12 @@
                                 @if ($lead->billing_address)
                                     <dt>Address</dt><dd style="white-space: pre-line">{{ $lead->billing_address }}</dd>
                                 @endif
+                                @if ($lead->registration_number)
+                                    <dt>Company number</dt><dd>{{ $lead->registration_number }}</dd>
+                                @endif
+                                @if ($lead->tax_identification_number)
+                                    <dt>Tax number</dt><dd>{{ $lead->tax_identification_number }}</dd>
+                                @endif
                                 <dt>Emails in</dt><dd>{{ strtoupper((string) $lead->preferred_language) === 'FR' ? 'French' : 'English' }}</dd>
                                 <dt>Source</dt><dd>{{ \App\Support\Leads\Sources::label($lead->source) }}@if ($lead->source_detail) · {{ $lead->source_detail }}@endif</dd>
                                 <dt>Added</dt><dd>{{ $day($lead->created_at) }}</dd>

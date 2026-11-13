@@ -86,7 +86,11 @@ final class InvoicePdf
             'title' => self::title($invoice),
             'issuer' => $issuer,
             'client' => $organisation,
-            'clientAddress' => $address !== '' && $address !== 'TBD' ? $address : null,
+            // The address as it was when the invoice was issued; an older invoice issued without one shows today's
+            'clientAddress' => $address !== '' && $address !== 'TBD' ? $address : (trim((string) ($organisation->billing_address ?? '')) ?: null),
+            'clientRegistration' => trim((string) ($organisation->registration_number ?? '')) ?: null,
+            'clientEmail' => trim((string) ($organisation->email ?? '')) ?: null,
+            'clientPhone' => trim((string) ($organisation->phone ?? '')) ?: null,
             'clientTaxId' => trim((string) ($invoice->client_tax_id ?: ($organisation->tax_identification_number ?? ''))) ?: null,
             'project' => $project,
             'phase' => $invoice->phase_id ? DB::table('project_phases')->where('id', $invoice->phase_id)->value('title') : null,
@@ -94,7 +98,9 @@ final class InvoicePdf
             'vat' => $vat,
             'vatNote' => Vat::note($vat),
             'accounts' => $accounts,
-            'money' => fn ($amount) => ProposalPdf::money((float) $amount, (string) $invoice->currency, $language),
+            // A discount, an advance taken off or a payment reads "−NGN 100,000.00"
+            'money' => fn ($amount) => ((float) $amount < 0 ? "\u{2212}" : '') . ProposalPdf::money(abs((float) $amount), (string) $invoice->currency, $language),
+            'paidSoFar' => (float) (InvoicePayments::settled([$invoice->id])->get($invoice->id) ?? 0),
             'issued' => $date($invoice->issued_at ? Carbon::parse($invoice->issued_at)->setTimezone('Africa/Lagos') : $invoice->created_at),
             'due' => $date($invoice->due_date),
             'paid' => $invoice->status === 'Paid' ? $date($invoice->paid_at ? Carbon::parse($invoice->paid_at)->setTimezone('Africa/Lagos') : null) ?? '' : null,

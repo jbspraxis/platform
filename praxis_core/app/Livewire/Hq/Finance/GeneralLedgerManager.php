@@ -282,6 +282,34 @@ class GeneralLedgerManager extends Component
         );
     }
 
+    // 1a. INVOICE CANCELLED: the accrual posted when it was issued is reversed (13 Nov 2026; before, a cancelled
+    // invoice stayed in the client's receivable). Nothing to reverse if it was never accrued, or already reversed.
+    public static function recordInvoiceCancelled($invoiceId)
+    {
+        $issued = DB::table('journal_entries')->where('source_module', 'Invoicing')->where('source_id', $invoiceId)
+            ->where('reference_number', 'not like', 'JRN-VOID-%')->orderBy('created_at')->first();
+        if (! $issued || DB::table('journal_entries')->where('source_module', 'Invoicing')->where('source_id', $invoiceId)
+            ->where('reference_number', 'like', 'JRN-VOID-%')->exists()) {
+            return;
+        }
+        $invoice = DB::table('invoices')->where('id', $invoiceId)->first();
+        $lines = DB::table('journal_lines')->where('journal_entry_id', $issued->id)->get(['account_id', 'memo', 'debit_amount', 'credit_amount']);
+
+        self::postDoubleEntry(
+            'JRN-VOID-' . $invoice->invoice_number,
+            "Invoice {$invoice->invoice_number} cancelled: accrual reversed",
+            'Invoicing',
+            $invoiceId,
+            $invoice->region_code ?? 'GLOBAL',
+            $lines->map(fn ($l) => [
+                'account_id' => $l->account_id,
+                'memo' => 'Reversal: ' . $l->memo,
+                'debit' => (float) $l->credit_amount,
+                'credit' => (float) $l->debit_amount,
+            ])->all()
+        );
+    }
+
     // 1b. CASH RECEIPT (client payment verified in Payment verification)
     // Dr bank (cash received), WHT receivable (tax the client withheld) and bank fees (small
     // shortfall written off); Cr the client’s receivable, and any excess to client overpayments.

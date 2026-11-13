@@ -75,11 +75,15 @@
                                 <div class="font-medium text-ink">{{ $inv->project_title }}</div>
                                 <div class="help flex items-center gap-1"><i data-lucide="building-2" style="width: 14px; height: 14px;"></i> {{ $inv->client_name }}</div>
                             </td>
+                            @php $paidSoFar = (float) ($settled[$inv->id] ?? 0); $partPaid = $paidSoFar > 0 && in_array($inv->status, ['Pending', 'Overdue'], true); @endphp
                             <td class="num">
                                 <span class="font-semibold text-ink">{{ \App\Livewire\Hq\HqMoney::format($inv->currency, $inv->total_amount) }}</span>
+                                @if ($partPaid)
+                                    <div class="help" style="font-variant-numeric: tabular-nums;">Paid {{ \App\Livewire\Hq\HqMoney::format($inv->currency, $paidSoFar) }} · {{ \App\Livewire\Hq\HqMoney::format($inv->currency, max(0, (float) $inv->total_amount - $paidSoFar)) }} left</div>
+                                @endif
                             </td>
                             <td>
-                                <span class="pill {{ $statusPills[$inv->status] ?? 'pill-neutral' }}">{{ $statusLabels[$inv->status] ?? $inv->status }}</span>
+                                <span class="pill {{ $statusPills[$inv->status] ?? 'pill-neutral' }}">{{ $partPaid && $inv->status === 'Pending' ? 'Part paid' : ($statusLabels[$inv->status] ?? $inv->status) }}</span>
                                 <div class="help mt-1" style="font-variant-numeric: tabular-nums;">Due {{ \Carbon\Carbon::parse($inv->due_date)->format('j M Y') }}</div>
                             </td>
                             <td>
@@ -87,6 +91,12 @@
                                     <a href="{{ route('hq.finance.invoice-pdf', $inv->id) }}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">
                                         <i data-lucide="file-text"></i> Download PDF
                                     </a>
+
+                                    @if(in_array($inv->status, ['Pending', 'Overdue'], true) && auth()->user()->can('finance.approve'))
+                                        <button type="button" wire:click="openRecordPayment('{{ $inv->id }}')" class="btn btn-secondary btn-sm">
+                                            <i data-lucide="banknote"></i> Record payment
+                                        </button>
+                                    @endif
 
                                     @if($inv->status !== 'Cancelled' && auth()->user()->can('finance.create'))
                                         <button type="button" wire:click="emailInvoice('{{ $inv->id }}')" wire:loading.attr="disabled" wire:target="emailInvoice('{{ $inv->id }}')" class="btn btn-ghost btn-sm"
@@ -139,6 +149,65 @@
         @endif
     </div>
 
+    @if($payInvoice)
+        <div class="modal-backdrop" wire:keydown.escape="closeRecordPayment">
+            <div class="modal" style="max-width: 520px;" role="dialog" aria-modal="true" aria-labelledby="record-pay-title">
+                <div class="mb-4 flex items-start justify-between gap-4">
+                    <h2 id="record-pay-title" class="modal-title">Record a payment on {{ $payInvoice->invoice_number }}</h2>
+                    <button type="button" wire:click="closeRecordPayment" class="btn btn-ghost btn-sm" aria-label="Close"><i data-lucide="x"></i></button>
+                </div>
+                <form wire:submit.prevent="recordPayment" class="flex flex-col gap-4">
+                    <p class="help" style="margin: 0;">Money that reached the account: a transfer, cash or a cheque. It counts as verified at once and goes to the general ledger. Part payments add up; the invoice is paid when they reach {{ \App\Livewire\Hq\HqMoney::format($payInvoice->currency, $payInvoice->total_amount) }}.</p>
+                    <div class="flex flex-wrap gap-4">
+                        <div class="field" style="flex: 1 1 12rem;">
+                            <label class="label" for="pay-amt">Amount received ({{ $payInvoice->currency }})</label>
+                            <input id="pay-amt" type="number" inputmode="decimal" step="0.01" min="0.01" wire:model="pay_amount" class="input" style="font-variant-numeric: tabular-nums;" required>
+                            @error('pay_amount') <span class="field-error">{{ $message }}</span> @enderror
+                        </div>
+                        <div class="field" style="flex: 1 1 10rem;">
+                            <label class="label" for="pay-date">Date received</label>
+                            <input id="pay-date" type="date" wire:model="pay_received_on" class="input" max="{{ now('Africa/Lagos')->toDateString() }}" required>
+                            @error('pay_received_on') <span class="field-error">{{ $message }}</span> @enderror
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-4">
+                        <div class="field" style="flex: 1 1 10rem;">
+                            <label class="label" for="pay-method">How it was paid</label>
+                            <select id="pay-method" wire:model="pay_method" class="select">
+                                @foreach(\App\Support\Finance\InvoicePayments::METHODS as $m)
+                                    <option value="{{ $m }}">{{ $m }}</option>
+                                @endforeach
+                            </select>
+                            @error('pay_method') <span class="field-error">{{ $message }}</span> @enderror
+                        </div>
+                        <div class="field" style="flex: 1 1 12rem;">
+                            <label class="label" for="pay-ref">Reference</label>
+                            <input id="pay-ref" type="text" maxlength="250" wire:model="pay_reference" class="input" placeholder="e.g. Nomba transfer ref 4410…" required>
+                            @error('pay_reference') <span class="field-error">{{ $message }}</span> @enderror
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="label" for="pay-wht">Withholding tax deducted by the client <span class="help">(optional)</span></label>
+                        <input id="pay-wht" type="number" inputmode="decimal" step="0.01" min="0" wire:model="pay_wht" class="input" style="font-variant-numeric: tabular-nums;">
+                        @error('pay_wht') <span class="field-error">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="field">
+                        <label class="label" for="pay-note">Note <span class="help">(optional)</span></label>
+                        <input id="pay-note" type="text" maxlength="250" wire:model="pay_note" class="input" placeholder="e.g. First part, balance due at go-live">
+                        @error('pay_note') <span class="field-error">{{ $message }}</span> @enderror
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" wire:click="closeRecordPayment" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" class="btn btn-primary" wire:loading.attr="disabled" wire:target="recordPayment">
+                            <span wire:loading.remove wire:target="recordPayment">Record payment</span>
+                            <span wire:loading wire:target="recordPayment">Recording…</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
     @if($showCreateModal)
         <div class="modal-backdrop">
             <div class="modal" style="max-width: 640px;" role="dialog" aria-modal="true" aria-labelledby="create-invoice-title">
@@ -161,6 +230,41 @@
                     </div>
 
                     @php $milestoneCodes = collect($projectPhases)->mapWithKeys(fn ($p) => [(string) $p->id => \App\Support\Projects\ProjectPlan::code($p) . ' · ' . \App\Support\Projects\ProjectPlan::title($p)]); @endphp
+
+                    <fieldset class="field" aria-describedby="inv-kind-help">
+                        <legend class="label">What are you invoicing?</legend>
+                        <div class="flex flex-wrap gap-4" style="margin-top: 0.25rem;">
+                            <label class="flex items-center gap-2"><input type="radio" class="radio" wire:model.live="new_kind" value="invoice"> Milestones or work</label>
+                            <label class="flex items-center gap-2"><input type="radio" class="radio" wire:model.live="new_kind" value="advance"> An advance on a milestone</label>
+                        </div>
+                        <span id="inv-kind-help" class="help">An advance bills part of a milestone before it is accepted. When you invoice that milestone, the advance is taken off by itself.</span>
+                    </fieldset>
+
+                    @if($new_kind === 'advance')
+                        <div class="field">
+                            <label class="label" for="inv-adv-ms">Milestone</label>
+                            <select id="inv-adv-ms" wire:model.live="advance_phase_id" class="select">
+                                <option value="">Choose the milestone</option>
+                                @foreach($projectPhases as $phase)
+                                    <option value="{{ $phase->id }}">{{ $milestoneCodes[(string) $phase->id] }} ({{ $new_currency }} {{ number_format((float) $phase->due, 2) }})</option>
+                                @endforeach
+                            </select>
+                            @error('advance_phase_id') <span class="field-error">{{ $message }}</span> @enderror
+                        </div>
+                        <div class="field">
+                            <label class="label" for="inv-adv-amt">Advance amount before VAT ({{ $new_currency }})</label>
+                            <input id="inv-adv-amt" type="number" inputmode="decimal" step="0.01" min="0.01" wire:model.live.debounce.400ms="advance_amount" class="input" style="font-variant-numeric: tabular-nums;" aria-describedby="inv-adv-amt-help">
+                            @if($advanceRoom !== null)
+                                <span id="inv-adv-amt-help" class="help">Up to {{ $new_currency }} {{ number_format($advanceRoom, 2) }}: the milestone’s amount less any advance already on it.</span>
+                            @endif
+                            @error('advance_amount') <span class="field-error">{{ $message }}</span> @enderror
+                        </div>
+                        <div class="field">
+                            <label class="label" for="inv-adv-desc">Line on the invoice</label>
+                            <textarea id="inv-adv-desc" wire:model="advance_description" class="textarea" rows="2" maxlength="255"></textarea>
+                            @error('advance_description') <span class="field-error">{{ $message }}</span> @enderror
+                        </div>
+                    @else
                     @if(!empty($projectPhases) && count($projectPhases) > 0)
                         <fieldset class="field" aria-describedby="inv-ms-help">
                             <legend class="label">Milestones to invoice</legend>
@@ -182,16 +286,21 @@
                     <div class="field">
                         <div class="flex items-center justify-between gap-3">
                             <span class="label" id="inv-lines-label">Lines</span>
-                            <button type="button" wire:click="addLine" class="btn btn-secondary btn-sm"><i data-lucide="plus" aria-hidden="true"></i> Add line</button>
+                            <div class="flex gap-2">
+                                <button type="button" wire:click="addLine" class="btn btn-secondary btn-sm"><i data-lucide="plus" aria-hidden="true"></i> Add line</button>
+                                <button type="button" wire:click="addDiscount" class="btn btn-secondary btn-sm"><i data-lucide="badge-percent" aria-hidden="true"></i> Add discount</button>
+                            </div>
                         </div>
                         @forelse($lines as $i => $line)
                             <div wire:key="inv-line-{{ $i }}-{{ $line['phase_id'] ?? 'free' }}" style="display: grid; grid-template-columns: minmax(0, 1fr) 9.5rem auto; gap: 0.5rem; align-items: start; margin-top: 0.75rem;">
                                 <div>
                                     @if(!empty($line['phase_id']))
                                         <span class="help" style="display: block;">{{ $milestoneCodes[(string) $line['phase_id']] ?? 'Milestone' }}</span>
+                                    @elseif(($line['kind'] ?? 'charge') === 'discount')
+                                        <span class="help" style="display: block;">Discount: taken off the total</span>
                                     @endif
                                     <label class="sr-only" for="inv-line-desc-{{ $i }}">Line {{ $i + 1 }}: description</label>
-                                    <textarea id="inv-line-desc-{{ $i }}" wire:model="lines.{{ $i }}.description" class="textarea" rows="2" maxlength="255" placeholder="e.g. Change order: three extra reports"></textarea>
+                                    <textarea id="inv-line-desc-{{ $i }}" wire:model="lines.{{ $i }}.description" class="textarea" rows="2" maxlength="255" placeholder="{{ ($line['kind'] ?? 'charge') === 'discount' ? 'e.g. Long-term client discount' : 'e.g. Change order: three extra reports' }}"></textarea>
                                     @error("lines.$i.description") <span class="field-error">{{ $message }}</span> @enderror
                                     @error("lines.$i.phase_id") <span class="field-error">{{ $message }}</span> @enderror
                                 </div>
@@ -205,6 +314,12 @@
                         @empty
                             <p class="help" style="margin-top: 0.5rem;">Tick a milestone above, or add a line.</p>
                         @endforelse
+                        @foreach($deductions as $d)
+                            <div class="flex items-start justify-between gap-3" style="margin-top: 0.75rem; font-variant-numeric: tabular-nums;">
+                                <span>{{ $d['description'] }}<span class="help" style="display: block;">{{ $milestoneCodes[$d['phase_id']] ?? 'Milestone' }} · taken off by itself</span></span>
+                                <span>{{ $new_currency }} {{ number_format($d['amount'], 2) }}</span>
+                            </div>
+                        @endforeach
                         @error('lines') <span class="field-error">{{ $message }}</span> @enderror
                         @if(count($lines) > 0)
                             <div class="flex items-center justify-between gap-3" style="margin-top: 0.75rem; font-variant-numeric: tabular-nums;">
@@ -213,6 +328,7 @@
                             </div>
                         @endif
                     </div>
+                    @endif
 
                     <div class="field">
                         <label class="label" for="inv-terms">Payment terms</label>

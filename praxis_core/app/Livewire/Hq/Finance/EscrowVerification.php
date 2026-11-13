@@ -109,29 +109,9 @@ class EscrowVerification extends Component
                 'updated_at' => now()
             ]);
 
-            // 2. Is the invoice now fully cleared? Count every verified payment, not just this one
-            $verified = DB::table('transactions')->where('invoice_id', $invoice->id)->where('status', 'Verified')
-                ->selectRaw('COALESCE(SUM(amount_claimed + COALESCE(wht_deducted, 0) + COALESCE(tolerance_writeoff, 0)), 0) as settled, COALESCE(SUM(wht_deducted), 0) as wht')
-                ->first();
-
-            if ((float) $verified->settled >= (float) $invoice->total_amount) {
-                DB::table('invoices')->where('id', $invoice->id)->update([
-                    'status' => 'Paid',
-                    'wht_amount' => $verified->wht, // Sync WHT to invoice
-                    'paid_at' => now(),
-                    'updated_at' => now()
-                ]);
-            } else {
-                // Partial payment: the invoice stays unpaid, but its due date can be extended
-                $updateData = ['wht_amount' => $verified->wht, 'updated_at' => now()];
-
-                if ($this->extend_guillotine_days > 0) {
-                    $updateData['status'] = 'Pending'; // Restores portal access if it was overdue
-                    $updateData['due_date'] = Carbon::parse($invoice->due_date)->addDays($this->extend_guillotine_days);
-                }
-
-                DB::table('invoices')->where('id', $invoice->id)->update($updateData);
-            }
+            // 2. Is the invoice now fully cleared? Every verified payment counts, HQ-recorded ones too (InvoicePayments);
+            // a part payment leaves it unpaid, its due date optionally extended
+            \App\Support\Finance\InvoicePayments::settle($invoice, (int) $this->extend_guillotine_days);
 
 
             // 4. Audit trail
