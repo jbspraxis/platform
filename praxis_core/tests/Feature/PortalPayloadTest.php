@@ -140,7 +140,7 @@ class PortalPayloadTest extends TestCase
         $invoices = collect($portal->get('invoices'));
         $this->assertCount(8, $invoices);
         $this->assertSame([$waiting], $invoices->where('has_pending_pop', true)->pluck('id')->all());
-        $this->assertSame(['id', 'invoice_number', 'issued_at', 'due_date', 'status', 'total_amount', 'currency', 'has_pending_pop'], array_keys((array) $invoices->first()));
+        $this->assertSame(['id', 'invoice_number', 'issued_at', 'due_date', 'status', 'total_amount', 'currency', 'has_pending_pop', 'paid_so_far', 'balance'], array_keys((array) $invoices->first()));
     }
 
     public function test_the_bell_and_the_sign_in_settings_add_no_queries_to_a_page_load(): void
