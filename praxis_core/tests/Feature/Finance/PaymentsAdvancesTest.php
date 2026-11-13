@@ -117,6 +117,7 @@ class PaymentsAdvancesTest extends TestCase
         $this->assertEquals(-100000, (float) $lines[2]->total_price);
         [$html] = InvoicePdf::html($invoice);
         $this->assertStringContainsString("\u{2212}NGN", $html, 'The discount prints with a minus');
+        $this->assertStringContainsString('class="num neg"', $html, 'and in red, set apart from the column before it');
 
         // Only a discount is refused; a discount bigger than the charges too
         $this->form()->call('addDiscount')->set('lines.0.description', 'Nothing')->set('lines.0.amount', '5')

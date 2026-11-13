@@ -28,7 +28,10 @@
         .lines { width: 100%; border-collapse: collapse; margin: 4pt 0 10pt; }
         .lines th { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.4pt; color: #5E6679; text-align: left; font-weight: normal; padding: 6pt 6pt 6pt 0; border-bottom: 0.75pt solid #0C142B; }
         .lines td { padding: 6pt 6pt 6pt 0; border-bottom: 0.5pt solid #D8DEE6; vertical-align: top; color: #0C142B; }
-        .lines .num { text-align: right; white-space: nowrap; padding-right: 0; }
+        /* Room between Unit price and Amount: the figures are right-aligned, so without it a long one ran into the next */
+        .lines .num { text-align: right; white-space: nowrap; padding-left: 14pt; padding-right: 0; }
+        /* A discount, an advance taken off, a payment: shown in red (13 Nov 2026) */
+        .lines td.neg { color: #B42318; }
         .lines tfoot td { border-bottom: 0; padding-top: 4pt; padding-bottom: 2pt; }
         .lines tfoot .total td { border-top: 0.75pt solid #0C142B; font-weight: bold; padding-top: 6pt; }
         .account { margin: 0 0 8pt; padding: 8pt 10pt; background: #F2F5F7; page-break-inside: avoid; }
@@ -116,8 +119,9 @@
                 <tr>
                     <td>{{ $line->description }}</td>
                     <td>{{ rtrim(rtrim(number_format((float) ($line->quantity ?? 1), 2, '.', ''), '0'), '.') }}</td>
-                    <td class="num">{{ $money($line->unit_price ?? $line->total_price) }}</td>
-                    <td class="num">{{ $money($line->total_price) }}</td>
+                    @php $unit = (float) ($line->unit_price ?? $line->total_price); @endphp
+                    <td class="num{{ $unit < 0 ? ' neg' : '' }}">{{ $money($unit) }}</td>
+                    <td class="num{{ (float) $line->total_price < 0 ? ' neg' : '' }}">{{ $money($line->total_price) }}</td>
                 </tr>
             @endforeach
         </tbody>
@@ -131,7 +135,7 @@
                 <tr class="total"><td colspan="3">{{ __('vat.total') }}</td><td class="num">{{ $money($invoice->total_amount) }}</td></tr>
             @endif
             @if ($paidSoFar > 0 && $invoice->status !== 'Paid')
-                <tr><td colspan="3">{{ __('invoices.pdf.paid_to_date') }}</td><td class="num">{{ $money(-$paidSoFar) }}</td></tr>
+                <tr><td colspan="3">{{ __('invoices.pdf.paid_to_date') }}</td><td class="num neg">{{ $money(-$paidSoFar) }}</td></tr>
                 <tr class="total"><td colspan="3">{{ __('invoices.pdf.balance_due') }}</td><td class="num">{{ $money(max(0, (float) $invoice->total_amount - $paidSoFar)) }}</td></tr>
             @endif
             @if ($vatNote)
