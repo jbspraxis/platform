@@ -157,14 +157,16 @@
             </div>
 
             @if ($files || $issueMode)
-                <button type="button" class="chat-send" @click="submit()" :disabled="sending || uploading" aria-label="{{ $issueMode ? __('chat.issue.submit') : __('chat.send') }}" title="{{ $issueMode ? __('chat.issue.submit') : __('chat.send') }}">
+                {{-- Each button has its own key, so a redraw swaps them instead of turning one into another (which left
+                     both the send and mic buttons showing after a message with a file) --}}
+                <button type="button" class="chat-send" wire:key="chat-send-ready" @click="submit()" :disabled="sending || uploading" aria-label="{{ $issueMode ? __('chat.issue.submit') : __('chat.send') }}" title="{{ $issueMode ? __('chat.issue.submit') : __('chat.send') }}">
                     <i data-lucide="send-horizontal" aria-hidden="true"></i>
                 </button>
             @else
-                <button type="button" class="chat-send" x-show="hasText" style="display: none;" @click="submit()" :disabled="sending || uploading" aria-label="{{ __('chat.send') }}" title="{{ __('chat.send') }}">
+                <button type="button" class="chat-send" wire:key="chat-send-text" x-show="hasText" style="display: none;" @click="submit()" :disabled="sending || uploading" aria-label="{{ __('chat.send') }}" title="{{ __('chat.send') }}">
                     <i data-lucide="send-horizontal" aria-hidden="true"></i>
                 </button>
-                <button type="button" class="chat-send is-mic" x-show="!hasText" @click="startRecording()" aria-label="{{ __('chat.voice') }}" title="{{ __('chat.voice') }}">
+                <button type="button" class="chat-send is-mic" wire:key="chat-mic" x-show="!hasText" @click="startRecording()" aria-label="{{ __('chat.voice') }}" title="{{ __('chat.voice') }}">
                     <i data-lucide="mic" aria-hidden="true"></i>
                 </button>
             @endif
