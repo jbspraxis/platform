@@ -361,9 +361,25 @@ class ProjectChat
         }
 
         return (int) DB::table('chat_messages')->insertGetId([
-            'project_id' => $ticket->project_id, 'author_type' => $ticket->submitted_by_type ?? 'staff', 'author_id' => $ticket->submitted_by,
+            'project_id' => $ticket->project_id, 'author_type' => self::ticketAuthorType($ticket), 'author_id' => $ticket->submitted_by,
             'kind' => 'issue', 'body' => $ticket->description, 'qa_ticket_id' => $ticket->id, 'created_at' => $ticket->created_at ?? now(),
         ]);
+    }
+
+    /**
+     * Who raised a ticket: its submitted_by_type, unless that says client while the id is a staff member's (tickets
+     * saved without the type took the column's default, 'client': opportunities:import before 13 Nov 2026)
+     */
+    public static function ticketAuthorType(object $ticket): string
+    {
+        $type = ($ticket->submitted_by_type ?? null) === 'client' ? 'client' : 'staff';
+        if ($type === 'client' && $ticket->submitted_by
+            && ! DB::table('client_users')->where('id', $ticket->submitted_by)->exists()
+            && DB::table('users')->where('id', $ticket->submitted_by)->exists()) {
+            return 'staff';
+        }
+
+        return $type;
     }
 
     /** A client reports an issue in the chat: the QA ticket (as before) and its card */

@@ -215,6 +215,31 @@ class DeliveryChatTest extends TestCase
             ->assertSet('openChat', true)->assertSet('activeProjectId', $second);
     }
 
+    public function test_a_ticket_imported_without_its_author_type_shows_as_the_lead_s(): void
+    {
+        // opportunities:import saved the lead's tickets without submitted_by_type: the column's default said client
+        $ticketId = (string) Str::uuid();
+        $this->insertRow('qa_tickets', ['id' => $ticketId, 'project_id' => $this->projectId, 'title' => 'M1 handover point 10: Record the demos',
+            'description' => 'Milestone demos are recorded.', 'status' => 'Closed', 'severity' => 'Low', 'submitted_by' => $this->lead->id]);
+        $this->assertSame('client', DB::table('qa_tickets')->where('id', $ticketId)->value('submitted_by_type'));
+
+        // A card made now is the lead's: on JBS Praxis's side, with the name
+        $card = ProjectChat::cardFor($ticketId);
+        $this->assertSame('staff', DB::table('chat_messages')->where('id', $card)->value('author_type'));
+        $this->hqThread($this->engineer)->assertSee('M1 handover point 10: Record the demos')->assertSee('Delivery Test');
+        $this->portalChat()->assertSee('Delivery T.');
+
+        // Rows made before the fix are repaired by the migration: the ticket and its card
+        DB::table('chat_messages')->where('id', $card)->update(['author_type' => 'client']);
+        (require database_path('migrations/2026_11_13_400001_fix_authors_of_imported_tickets.php'))->up();
+        $this->assertSame('staff', DB::table('qa_tickets')->where('id', $ticketId)->value('submitted_by_type'));
+        $this->assertSame('staff', DB::table('chat_messages')->where('id', $card)->value('author_type'));
+        // A client's own ticket stays the client's
+        ProjectChat::reportIssue($this->projectId, $this->admin, null, 'Real client issue', 'Medium', 'Details');
+        (require database_path('migrations/2026_11_13_400001_fix_authors_of_imported_tickets.php'))->up();
+        $this->assertSame('client', DB::table('qa_tickets')->where('title', 'Real client issue')->value('submitted_by_type'));
+    }
+
     public function test_files_and_voice_notes_travel_with_messages_and_open_only_for_those_who_may_see_them(): void
     {
         Storage::fake('local');

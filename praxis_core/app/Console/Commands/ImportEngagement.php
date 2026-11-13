@@ -320,6 +320,7 @@ class ImportEngagement extends Command
                 'id' => (string) Str::uuid(),
                 'project_id' => $projectId,
                 'submitted_by' => $leadId,
+                'submitted_by_type' => 'staff', // the lead raised it (the column's default is 'client')
                 'title' => Str::limit($ticket['title'], 197),
                 'description' => $ticket['description'] ?? '',
                 'severity' => $ticket['severity'] ?? 'Low',

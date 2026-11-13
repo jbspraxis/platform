@@ -90,7 +90,7 @@ return new class extends Migration
                 $created = $ticket->created_at ?? now();
                 $card = DB::table('chat_messages')->insertGetId([
                     'project_id' => $ticket->project_id,
-                    'author_type' => $hasTicketType ? ($ticket->submitted_by_type ?? 'client') : 'client',
+                    'author_type' => $hasTicketType ? ($ticket->submitted_by_type ?? 'client') : 'client', // corrected by 2026_11_13_400001 where a staff member raised it
                     'author_id' => $ticket->submitted_by,
                     'kind' => 'issue',
                     'body' => $ticket->description,
