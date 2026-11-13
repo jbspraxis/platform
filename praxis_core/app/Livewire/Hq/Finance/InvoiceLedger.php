@@ -419,7 +419,10 @@ class InvoiceLedger extends Component
         }
 
         $invoiceId = (string) Str::uuid();
-        $invNumber = 'INV-' . date('Ym') . '-' . rand(1000, 9999);
+        // invoice_number is unique: draw again until the number is free, as DepositInvoice does (a clash used to fail)
+        do {
+            $invNumber = 'INV-' . date('Ym') . '-' . random_int(1000, 9999);
+        } while (DB::table('invoices')->where('invoice_number', $invNumber)->exists());
         $timestamp = now();
         $deducted = array_values(array_filter(array_column($lines, 'advance_invoice_id')));
 

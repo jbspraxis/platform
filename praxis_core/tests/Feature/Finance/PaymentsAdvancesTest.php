@@ -197,4 +197,36 @@ class PaymentsAdvancesTest extends TestCase
             $this->assertStringContainsString(e($text), $html, $text);
         }
     }
+
+    public function test_a_typical_invoice_fits_one_page_on_the_letterhead(): void
+    {
+        // Owner, 13 Nov 2026: the company letterhead, and everything on one page
+        $org = (string) Str::uuid();
+        $this->insertRow('organizations', ['id' => $org, 'name' => 'MyCity App Ltd', 'status' => 'Active Client', 'country' => 'Nigeria',
+            'billing_address' => "MTN Plaza, No. 1 Awolowo Road
+Falomo Roundabout, Ikoyi
+Lagos 101233, Nigeria", 'registration_number' => 'RC 7617757',
+            'tax_identification_number' => '2522545765472', 'email' => 'admin@mycityapp.io', 'phone' => '+234 916 000 6213']);
+        DB::table('projects')->where('id', $this->project)->update(['organization_id' => $org]);
+        $form = $this->form();
+        foreach ([['Code under control and Nomba live, on written acceptance, less the 50% deposit', 87500],
+                  ['Paystack live and admin modules in use, on written acceptance, less the 50% deposit', 100000],
+                  ['Go-live, repository handover and training, on written acceptance, less the 50% deposit', 62500],
+                  ['Additional scope: own ticket platform and go-live work, on written acceptance', 300000]] as $i => [$text, $amount]) {
+            $form->call('addLine')->set("lines.{$i}.description", $text)->set("lines.{$i}.amount", (string) $amount);
+        }
+        $form->call('addDiscount')->set('lines.4.description', 'Long-term client discount, agreed 12 Nov 2026 (this invoice replaces INV-202611-2722)')
+            ->set('lines.4.amount', '100000')->call('draftSubsequentInvoice')->assertHasNoErrors();
+        $invoice = $this->latestInvoice();
+        InvoicePayments::recordFromHq($invoice->id, ['amount' => 300000, 'received_on' => now()->toDateString(), 'method' => 'Bank Transfer', 'reference' => 'r'], (string) auth()->id());
+
+        [$html, $legal, $contact] = InvoicePdf::html(DB::table('invoices')->where('id', $invoice->id)->first());
+        $this->assertStringContainsString('data:image/svg+xml;base64,', $html, 'The letterhead logo');
+        $this->assertStringContainsString('JBS Praxis LLC', $legal);
+        $pdf = InvoicePdf::render(DB::table('invoices')->where('id', $invoice->id)->first());
+        $this->assertSame(1, preg_match_all('#/Type\s*/Page[^s]#', $pdf), 'One page');
+        if ($out = getenv('INVOICE_PDF_OUT')) {
+            file_put_contents($out, $pdf);
+        }
+    }
 }
