@@ -138,6 +138,7 @@ final class HqNav
                     $page('All projects', 'hq.ops.deployments', ['hq.ops.deployments', 'hq.ops.project']),
                     $page('Milestone boards', 'hq.ops.boards.directory', ['hq.ops.boards.directory', 'hq.ops.board']),
                 ] : []),
+                $can('qa.view') ? $page('Client messages', 'hq.ops.messages') : null,
                 $can('qa.view') ? $page('Quality and issues', 'hq.ops.qa') : null,
                 $can('timesheets.view') ? $page('Time tracking', 'hq.ops.timers') : null,
                 $can('signoffs.view') ? $page('Sign-offs', 'hq.ops.signoffs') : null,

@@ -7,6 +7,8 @@
 @import '../pwa/hq-pwa.css';
 /* HQ on phones: the top bar, the bottom bar, More and the sheets (docs/HQ_PHONE.md); after hq-pwa.css, whose safe areas it uses */
 @import './hq-phone.css';
+/* The conversation between a client and its delivery team, in the Client Portal and HQ (docs/CHAT.md) */
+@import './chat.css';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';

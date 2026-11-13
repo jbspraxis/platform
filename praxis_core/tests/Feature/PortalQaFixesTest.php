@@ -78,11 +78,12 @@ class PortalQaFixesTest extends TestCase
         $portal->call('switchTab', 'overview')->assertSee('Your project space opens when the work starts')
             ->call('switchTab', 'financials')->assertSee('Your project space opens when the work starts')
             ->call('switchTab', 'team')->assertSee('Adaeze');
-        $portal->set('qaTitle', 'Map blank')->set('qaDescription', 'Nothing shows')->call('submitQaTicket')
-            ->set('newCommentText', 'Any news?')->call('postTicketComment')
-            ->call('submitProofOfPayment')->call('approveTask', (string) Str::uuid())->call('teleportToQa', (string) Str::uuid(), 'Task')
+        // No project, no conversation: the section says why, and nothing can be reported
+        $portal->call('switchTab', 'qa_hub')->assertDontSee('chat-fab', false)
+            ->call('submitProofOfPayment')->call('approveTask', (string) Str::uuid())
             ->assertOk();
         $this->assertSame(0, DB::table('qa_tickets')->count());
+        $this->assertSame(0, DB::table('chat_messages')->count());
     }
 
     public function test_a_missing_document_gives_a_404_without_internal_names(): void

@@ -63,8 +63,11 @@ class AuditFixesTest extends TestCase
         $this->assertSame([$shown], collect($portal->call('switchTab', 'sprints')->get('activeTasks'))->pluck('id')->all());
         $portal->call('approveTask', $internal);
         $this->assertSame('QA_Review', DB::table('tasks')->where('id', $internal)->value('status'));
-        $portal->call('switchTab', 'qa_hub');
-        $this->assertSame([$shown], collect($portal->get('activeTasks'))->pluck('id')->all());
+        // Reporting an issue (in the conversation, docs/CHAT.md) offers the task shown to the client only, and refuses the other
+        Livewire::actingAs($client, 'client')->test(\App\Livewire\ClientOs\DeliveryChat::class, ['projectId' => $project])->call('startIssue')
+            ->assertViewHas('tasks', fn ($tasks) => collect($tasks)->pluck('id')->all() === [$shown])
+            ->set('issueTaskId', $internal)->set('issueTitle', 'Queue slow')->set('draft', 'It is slow')->call('send')->assertHasErrors('issueTaskId');
+        $this->assertSame(0, DB::table('qa_tickets')->where('project_id', $project)->count());
 
         // No portal notice for an internal task in client review; one for the task shown to the client
         $this->assertSame(0, ClientNotify::task($internal));

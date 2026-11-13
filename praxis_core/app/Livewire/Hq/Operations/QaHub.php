@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Support\People;
 use App\Support\ProjectAccess;
+use App\Support\Chat\ProjectChat;
 
 #[Layout('components.layouts.hq')]
 class QaHub extends Component
@@ -155,19 +156,19 @@ class QaHub extends Component
         if (!$this->selectedTicket) return;
         $ticketId = $this->selectedTicket['id'];
 
-        // Load Native Threading (Comments)
-        $comments = DB::table('qa_comments')
-            ->where('qa_comments.ticket_id', $ticketId)
-            ->select('qa_comments.*')
-            ->orderBy('qa_comments.created_at', 'asc');
-        $this->ticketComments = People::joinAuthor($comments, 'qa_comments.user_id', 'qa_comments.author_type')->get()->toArray();
+        // The issue's replies: the messages about it in the client's conversation (docs/CHAT.md), internal notes too
+        $comments = DB::table('chat_messages')
+            ->where('chat_messages.qa_ticket_id', $ticketId)->where('chat_messages.kind', 'text')->whereNull('chat_messages.deleted_at')
+            ->select('chat_messages.id', 'chat_messages.body as comment_text', 'chat_messages.is_internal as is_internal_only', 'chat_messages.created_at')
+            ->orderBy('chat_messages.created_at')->orderBy('chat_messages.id');
+        $this->ticketComments = People::joinAuthor($comments, 'chat_messages.author_id', 'chat_messages.author_type')->get()->toArray();
 
-        // Load Evidence Gallery (Attachments)
-        $attachments = DB::table('qa_attachments')
-            ->where('qa_attachments.ticket_id', $ticketId)
-            ->select('qa_attachments.*')
-            ->orderBy('qa_attachments.created_at', 'desc');
-        $this->ticketAttachments = People::joinAuthor($attachments, 'qa_attachments.uploaded_by', 'qa_attachments.uploader_type', 'uploader')->get()->toArray();
+        // Its files: those of its card and of the messages about it (a name, a kind and a link each)
+        $this->ticketAttachments = DB::table('chat_attachments')
+            ->join('chat_messages', 'chat_messages.id', '=', 'chat_attachments.message_id')
+            ->where('chat_messages.qa_ticket_id', $ticketId)->whereNull('chat_messages.deleted_at')
+            ->orderByDesc('chat_attachments.id')
+            ->get(['chat_attachments.id', 'chat_attachments.file_name', 'chat_attachments.kind', 'chat_messages.is_internal'])->toArray();
 
         // Check for Active COPQ Timer
         if ($this->selectedTicket['task_id']) {
@@ -184,8 +185,9 @@ class QaHub extends Component
         // Auto-Update Status to Investigating if it was Open (only for someone who works tickets: qa.edit)
         if ($this->selectedTicket['status'] === 'Open' && Auth::user()->can('qa.edit')) {
             DB::table('qa_tickets')->where('id', $ticketId)->update(['status' => 'Investigating', 'updated_at' => now()]);
-            // The client who reported it hears that someone is on it (docs/PWA.md)
+            // The client who reported it hears that someone is on it (docs/PWA.md), and the conversation says so
             \App\Support\Pwa\ClientNotify::ticket($ticketId, 'ticket_investigating');
+            ProjectChat::event($ticketId, 'investigating', 'staff', Auth::id());
             unset($this->tickets); // the list shows the new status
             $this->selectedTicket['status'] = 'Investigating';
         }
@@ -221,19 +223,14 @@ class QaHub extends Component
 
         $this->validate(['newCommentText' => 'required|string|min:2'], [], ['newCommentText' => 'reply']);
 
-        DB::table('qa_comments')->insert([
-            'id' => (string) Str::uuid(),
-            'ticket_id' => $this->selectedTicket['id'],
-            'user_id' => Auth::id(),
-            'comment_text' => $this->newCommentText,
-            'is_internal_only' => $this->isInternalOnly ? 1 : 0,
-            'created_at' => now(),
-            'updated_at' => now()
+        // A reply in the client's conversation, answering the issue's card; the client's accounts hear of it
+        // unless it is an internal note (ProjectChat::post)
+        ProjectChat::post($this->selectedTicket['project_id'], 'staff', Auth::id(), [
+            'body' => $this->newCommentText,
+            'ticket' => $this->selectedTicket['id'],
+            'reply_to' => ProjectChat::cardFor($this->selectedTicket['id']),
+            'internal' => (bool) $this->isInternalOnly,
         ]);
-        // A reply the client can see (not an internal note) reaches the client who reported the issue
-        if (! $this->isInternalOnly) {
-            \App\Support\Pwa\ClientNotify::ticket($this->selectedTicket['id'], 'ticket_reply');
-        }
 
         $this->newCommentText = '';
         $this->isInternalOnly = false;
@@ -249,17 +246,11 @@ class QaHub extends Component
             'newAttachment' => 'required|file|max:10240' // Max 10MB (Selection 4-B)
         ], [], ['newAttachment' => 'file']);
 
-        $path = $this->newAttachment->store('qa_evidence', 'local');
-
-        DB::table('qa_attachments')->insert([
-            'id' => (string) Str::uuid(),
-            'ticket_id' => $this->selectedTicket['id'],
-            'uploaded_by' => Auth::id(),
-            'file_name' => $this->newAttachment->getClientOriginalName(),
-            'file_path' => $path,
-            'mime_type' => $this->newAttachment->getMimeType(),
-            'size_bytes' => $this->newAttachment->getSize(),
-            'created_at' => now()
+        // A file in the client's conversation, answering the issue's card (the client sees it, as before)
+        ProjectChat::post($this->selectedTicket['project_id'], 'staff', Auth::id(), [
+            'files' => [ProjectChat::store($this->newAttachment, $this->selectedTicket['project_id'])],
+            'ticket' => $this->selectedTicket['id'],
+            'reply_to' => ProjectChat::cardFor($this->selectedTicket['id']),
         ]);
 
         $this->newAttachment = null;
@@ -346,6 +337,7 @@ class QaHub extends Component
         });
 
         \App\Support\Pwa\ClientNotify::ticket($this->selectedTicket['id'], 'ticket_resolved');
+        ProjectChat::event($this->selectedTicket['id'], 'resolved', 'staff', Auth::id());
 
         // Close offcanvas and refresh grid
         $this->dispatch('close-offcanvas');

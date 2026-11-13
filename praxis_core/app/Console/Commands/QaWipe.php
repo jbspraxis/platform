@@ -328,6 +328,10 @@ class QaWipe extends Command
             ['qa_comments', $this->any('qa_comments', ['ticket_id' => $ids['tickets']])],
             ['qa_attachments', $this->any('qa_attachments', ['ticket_id' => $ids['tickets']])],
             ['qa_tickets', $this->any('qa_tickets', ['id' => $ids['tickets']])],
+            // The conversation with the delivery team (docs/CHAT.md): its messages, files and readers
+            ['chat_attachments', $this->any('chat_attachments', ['project_id' => $ids['projects']])],
+            ['chat_readers', $this->any('chat_readers', ['project_id' => $ids['projects']])],
+            ['chat_messages', $this->any('chat_messages', ['project_id' => $ids['projects']])],
             ['task_comments', $this->any('task_comments', ['task_id' => $ids['tasks']])],
             ['task_dependencies', $this->any('task_dependencies', ['task_id' => $ids['tasks'], 'depends_on_task_id' => $ids['tasks']])],
             ['task_people', $this->any('task_people', ['task_id' => $ids['tasks']])],
@@ -392,6 +396,10 @@ class QaWipe extends Command
         $add('local', $this->pluck($this->any('task_comments', ['task_id' => $ids['tasks']]), 'attachment_path'));
         foreach ($ids['tasks'] as $taskId) {
             $add('local', Storage::disk('local')->allFiles('task_files/' . $taskId));
+        }
+        // The conversation's photos, files and voice notes (chat/<project id>/…)
+        foreach ($ids['projects'] as $projectId) {
+            $add('local', Storage::disk('local')->allFiles('chat/' . $projectId));
         }
         $add('public', $this->pluck($this->any('client_portal_settings', ['organization_id' => $ids['org'][0]]), 'logo_path'));
 

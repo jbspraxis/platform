@@ -102,7 +102,7 @@ class PortalPayloadTest extends TestCase
             ->assertSee(route('portal.signoff.gateway', ['token' => DB::table('project_signoffs')->value('token')]), false);
     }
 
-    public function test_an_issue_opens_whole_and_only_from_the_list_shown(): void
+    public function test_an_issue_opens_whole_in_the_conversation_and_only_on_the_clients_own_project(): void
     {
         $this->seedProject();
         $long = str_repeat('Every step to reproduce the problem on the map. ', 8);
@@ -116,12 +116,15 @@ class PortalPayloadTest extends TestCase
         $this->assertSame(Str::limit($long, 100), $listed->excerpt);
         $this->assertObjectNotHasProperty('description', $listed);
 
-        $portal->call('openTicket', $ticket)->assertDispatched('open-qa');
-        $this->assertSame($long, $portal->get('selectedTicket')->description);
-        $this->assertSame('Critical', $portal->get('selectedTicket')->severity);
-
-        $portal->call('openTicket', $elsewhere)->assertSet('selectedTicket', null);
-        $portal->call('openTicket', $ticket)->call('switchTab', 'sprints')->assertSet('selectedTicket', null)->assertSet('ticketComments', []);
+        // The list opens the issue's card in the conversation (docs/CHAT.md), where it is shown whole
+        $this->assertGreaterThan(0, $listed->card_id);
+        \Livewire\Livewire::actingAs($this->client, 'client')->test(\App\Livewire\ClientOs\DeliveryChat::class, ['projectId' => $this->projectId])
+            ->assertSee(trim($long))->assertSee('Critical')->assertDontSee('Not yours');
+        // Another organisation's project has no conversation for this client
+        $other = DB::table('qa_tickets')->where('id', $elsewhere)->value('project_id');
+        \Livewire\Livewire::actingAs($this->client, 'client')->test(\App\Livewire\ClientOs\DeliveryChat::class, ['projectId' => $other])->assertForbidden();
+        // The section's rows go when the client moves on
+        $portal->call('switchTab', 'sprints')->assertSet('qaTickets', [])->assertSet('qaChat', []);
     }
 
     public function test_invoices_find_their_pending_payments_in_one_query(): void

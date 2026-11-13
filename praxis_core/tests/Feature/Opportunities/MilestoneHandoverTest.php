@@ -272,10 +272,12 @@ class MilestoneHandoverTest extends TestCase
 
         // Fixed and replied to: the meeting and the sign-off text say how each point was closed
         DB::table('qa_tickets')->where('id', $export->qa_ticket_id)->update(['status' => 'Resolved', 'resolved_at' => '2026-11-06 09:00:00', 'resolved_by' => $owner->id]);
-        $this->insertRow('qa_comments', ['id' => (string) Str::uuid(), 'ticket_id' => $export->qa_ticket_id, 'user_id' => $owner->id, 'author_type' => 'staff',
-            'comment_text' => 'The export now pages through every row.', 'is_internal_only' => 0, 'created_at' => now()->subMinute()]);
-        $this->insertRow('qa_comments', ['id' => (string) Str::uuid(), 'ticket_id' => $export->qa_ticket_id, 'user_id' => $owner->id, 'author_type' => 'staff',
-            'comment_text' => 'Internal: check the memory limit.', 'is_internal_only' => 1, 'created_at' => now()]);
+        // Replies live in the client's conversation (docs/CHAT.md)
+        $ticketProject = DB::table('qa_tickets')->where('id', $export->qa_ticket_id)->value('project_id');
+        $this->insertRow('chat_messages', ['project_id' => $ticketProject, 'qa_ticket_id' => $export->qa_ticket_id, 'author_id' => $owner->id, 'author_type' => 'staff',
+            'kind' => 'text', 'body' => 'The export now pages through every row.', 'is_internal' => 0, 'created_at' => now()->subMinute()]);
+        $this->insertRow('chat_messages', ['project_id' => $ticketProject, 'qa_ticket_id' => $export->qa_ticket_id, 'author_id' => $owner->id, 'author_type' => 'staff',
+            'kind' => 'text', 'body' => 'Internal: check the memory limit.', 'is_internal' => 1, 'created_at' => now()]);
         $this->actingAs($s['lead']);
         Livewire::test(MeetingsTab::class, ['opportunityId' => $s['o']->id])->call('toggle', $m->id)
             ->assertSee('Resolved on 6 November 2026')->assertSee('Issue: Open')->assertSee('Last reply: The export now pages through every row.')

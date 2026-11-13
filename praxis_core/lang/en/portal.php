@@ -137,7 +137,7 @@ return [
     'subtitles' => [
         'overview' => 'Where your project stands: progress by milestone, budget and the latest updates from your delivery team.',
         'sprints' => 'Every task in this project and where it stands. When a task is ready for your review, approve it or report an issue.',
-        'qa_hub' => 'Report an issue on a deliverable, or send a message to your delivery team.',
+        'qa_hub' => 'Your conversation with your delivery team, and the issues it follows until they are fixed.',
         'financials' => 'Your invoices for this project, our payment details and your proofs of payment.',
         'vault' => 'Your signed proposals and project handovers, and how your portal looks.',
         'team' => 'Invite colleagues from your organisation and choose what they can see. Your organisation can have up to :max Client Portal accounts.',
@@ -375,7 +375,7 @@ return [
         'sections' => 'Sections',
         'overview' => 'Your project at a glance: status, progress by milestone, budget, your project lead and the latest updates from your delivery team.',
         'sprints' => 'Every task and where it stands: to do, in progress, awaiting your review or done. When a task is ready for your review, approve it or report an issue.',
-        'qa_hub' => 'Report an issue on a task, set its priority and add screenshots or documents. You can also send a general message to your delivery team. Each issue keeps its full conversation.',
+        'qa_hub' => 'One conversation with your delivery team for each project, open from any section with Message your delivery team: questions, files, photos, voice notes. To report an issue on a task, use the shield in the conversation (or Report an issue in Project progress): it stays listed here with its status until you approve the fix.',
         'financials' => 'Your invoices for this project and our payment details. After you pay, upload your proof of payment. We verify it and update the invoice.',
         'vault' => 'Your signed proposals and project handovers, each with a signature fingerprint (SHA-256). You can also add your logo and colours to the portal.',
         'team' => 'Invite colleagues who use your organisation’s email domain (up to :max Client Portal accounts in all), choose their role, and limit them to one project if you wish. You can suspend or restore their access at any time.',
@@ -564,6 +564,8 @@ return [
             'ticket_investigating' => ['label' => 'Issue', 'title' => 'We’re looking into your issue', 'body' => 'We’re looking into the issue you reported: “:ticket”.'],
             'ticket_reply' => ['label' => 'Issue', 'title' => 'New reply about your issue', 'body' => 'Your delivery team replied about “:ticket”.'],
             'ticket_resolved' => ['label' => 'Issue', 'title' => 'Issue resolved', 'body' => 'The issue you reported, “:ticket”, is resolved.'],
+            'chat_message' => ['label' => 'Message', 'title' => ':name replied', 'body' => '“:text” (:project)'],
+            'chat_file' => ['label' => 'Message', 'title' => ':name sent you a file', 'body' => 'Open the conversation about :project to see it.'],
         ],
     ],
 ];

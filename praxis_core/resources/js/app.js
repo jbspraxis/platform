@@ -1,6 +1,8 @@
 import './toasts';
 // HQ on phones: the top bar's title, the module's pages, sheets and pull to refresh (docs/HQ_PHONE.md)
 import './hq-phone';
+// The conversation between a client and its delivery team, in the Client Portal and HQ (docs/CHAT.md)
+import './chat';
 import { createIcons } from 'lucide';
 import icons from './icons';
 

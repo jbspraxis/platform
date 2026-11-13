@@ -172,6 +172,8 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
                 Route::get('/sprint-board/{id}', fn (string $id) => redirect()->route('hq.ops.project', ['project' => $id, 'tab' => 'board']))->name('hq.ops.board');
             });
             Route::get('/qa-hub', \App\Livewire\Hq\Operations\QaHub::class)->middleware('can:qa.view')->name('hq.ops.qa');
+            // Every client's conversation with its delivery team, one per project (docs/CHAT.md)
+            Route::get('/client-messages', \App\Livewire\Hq\ClientMessages\Inbox::class)->middleware('can:qa.view')->name('hq.ops.messages');
             Route::get('/silent-timers', \App\Livewire\Hq\Operations\SilentTimers::class)->middleware('can:timesheets.view')->name('hq.ops.timers');
             // Sign-offs, and drafting case studies and Insights articles from them; reviewing articles is under Marketing → Insights articles
             Route::get('/project-signoffs', \App\Livewire\Hq\Operations\SignoffManager::class)->middleware('can:signoffs.view')->name('hq.ops.signoffs');
@@ -215,6 +217,8 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
 
         // Private uploads (receipts, payment proofs, QA evidence, CVs), checked per file
         Route::get('/files/{path}', [\App\Http\Controllers\SecureFileController::class, 'show'])->where('path', '.*')->name('hq.file');
+        // Photos, files and voice notes of client conversations, checked per file (docs/CHAT.md)
+        Route::get('/chat/files/{attachment}', [\App\Http\Controllers\ChatFileController::class, 'show'])->whereNumber('attachment')->name('hq.chat.file');
     });
 
     // STANDALONE TRACKER TASK FORCE (Isolated Authentication)
@@ -324,6 +328,8 @@ Route::domain(Hosts::portal())->group(function () use ($notOwnRoute, $legacy) {
 
         // QA evidence on the client's own projects, checked per file
         Route::get('/files/{path}', [\App\Http\Controllers\SecureFileController::class, 'show'])->where('path', '.*')->name('portal.file');
+        // Photos, files and voice notes of the conversation with the delivery team (docs/CHAT.md)
+        Route::get('/chat/files/{attachment}', [\App\Http\Controllers\ChatFileController::class, 'show'])->whereNumber('attachment')->name('portal.chat.file');
     });
 
     // Old /client/..., /portal/... links; everything else here is 404

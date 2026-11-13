@@ -12,6 +12,7 @@ use App\Support\People;
 use App\Support\Opportunities\PortalLinks;
 use App\Support\Opportunities\Sows;
 use App\Support\Projects\ProjectPlan;
+use App\Support\Chat\ProjectChat;
 use App\Support\Access;
 use App\Support\MailLocale;
 use App\Mail\TeamMemberInvitation;
@@ -82,24 +83,15 @@ class Dashboard extends Component
     #[Locked]
     public $activeTasks = [];
 
-    // QA Hub State
+    // Quality and issues: the issues of the project (their cards in the conversation), and the conversation's
+    // unread count and last message. The conversation itself is App\Livewire\ClientOs\DeliveryChat (docs/CHAT.md)
     #[Locked]
     public $qaTickets = [];
-    public $qaTaskId = '';
-    public $qaTitle = '';
-    public $qaSeverity = 'Medium';
-    public $qaDescription = '';
-
-    // QA Offcanvas State
     #[Locked]
-    public $selectedTicket = null;
+    public $qaChat = [];
+    // Opened from a notification (/?chat=<project>): the conversation opens with the page
     #[Locked]
-    public $ticketComments = [];
-    public $initialAttachment;
-    public $newCommentText = '';
-    #[Locked]
-    public $ticketAttachments = [];
-    public $newQaAttachment;
+    public bool $openChat = false;
 
     // Financial State
     #[Locked]
@@ -162,7 +154,7 @@ class Dashboard extends Component
     private const TAB_DATA = [
         'overview' => ['phases', 'liveLogs', 'clientNeeds'],
         'sprints' => ['activeTasks'],
-        'qa_hub' => ['activeTasks', 'qaTickets', 'selectedTicket', 'ticketComments', 'ticketAttachments'],
+        'qa_hub' => ['qaTickets', 'qaChat'],
         'financials' => ['invoices', 'remittanceAccounts'],
         'vault' => ['vaultSows', 'vaultSignoffs', 'vaultContracts', 'vaultProposals', 'vaultMeetings'],
         'team' => ['teamMembers', 'clientRoles'],
@@ -245,6 +237,13 @@ class Dashboard extends Component
                        ?? collect($this->allProjects)->firstWhere('status', 'Scoping')
                        ?? $this->allProjects[0];
                        
+        // A notification about the conversation (/?chat=<project id>) opens it on its project
+        $askedChat = request()->query('chat');
+        if (is_string($askedChat) && $askedChat !== '' && ($this->can['qa.view'] ?? false)) {
+            $this->openChat = true;
+            $defaultProject = collect($this->allProjects)->firstWhere('id', $askedChat) ?? $defaultProject;
+        }
+
         $this->switchProject($defaultProject->id);
     }
 
@@ -395,18 +394,44 @@ class Dashboard extends Component
     public function loadQaHub()
     {
         if (!$this->activeProject || !$this->allowed('qa.view')) return;
-        $this->activeTasks = $this->clientTasks()->select('tasks.id', 'tasks.title', 'tasks.status')->get()->toArray();
         // A ticket on an internal task keeps its own title; the task's is not shown. The list shows the start of the
-        // description (excerpt); the whole text is read when the ticket is opened
-        $this->qaTickets = DB::table('qa_tickets')->leftJoin('tasks', fn ($j) => $j->on('qa_tickets.task_id', '=', 'tasks.id')->where('tasks.is_client_visible', 1))
+        // description (excerpt), its card in the conversation (opened from the list) and how many replies it has
+        $tickets = DB::table('qa_tickets')->leftJoin('tasks', fn ($j) => $j->on('qa_tickets.task_id', '=', 'tasks.id')->where('tasks.is_client_visible', 1))
             ->where('qa_tickets.project_id', $this->activeProject->id)->whereNull('qa_tickets.deleted_at')
             ->select('qa_tickets.id', 'qa_tickets.task_id', 'qa_tickets.title', 'qa_tickets.status', 'qa_tickets.severity', 'qa_tickets.created_at', 'qa_tickets.description', 'tasks.title as task_title')
-            ->orderBy('qa_tickets.created_at', 'desc')->get()
-            ->map(function ($ticket) {
-                $ticket->excerpt = Str::limit((string) $ticket->description, 100);
-                unset($ticket->description);
-                return $ticket;
-            })->toArray();
+            ->orderBy('qa_tickets.created_at', 'desc')->get();
+        // Tickets made outside the conversation (handover points, imports) get their card now
+        $cards = $tickets->isEmpty() ? collect() : DB::table('chat_messages')->whereIn('qa_ticket_id', $tickets->pluck('id'))->where('kind', 'issue')->pluck('id', 'qa_ticket_id');
+        foreach ($tickets as $ticket) {
+            if (! isset($cards[$ticket->id])) {
+                $cards[$ticket->id] = ProjectChat::cardFor($ticket->id);
+            }
+        }
+        $replies = $cards->isEmpty() ? collect() : ProjectChat::visible($this->activeProject->id, 'client')->whereIn('m.reply_to_id', $cards->values())
+            ->where('m.kind', 'text')->groupBy('m.reply_to_id')->selectRaw('m.reply_to_id, COUNT(*) as n')->pluck('n', 'reply_to_id');
+        $this->qaTickets = $tickets->map(function ($ticket) use ($cards, $replies) {
+            $ticket->excerpt = Str::limit((string) $ticket->description, 100);
+            unset($ticket->description);
+            $ticket->card_id = (int) ($cards[$ticket->id] ?? 0);
+            $ticket->replies = (int) ($replies[$ticket->card_id] ?? 0);
+            return $ticket;
+        })->toArray();
+
+        // The conversation: unread for this person, and its last message in a line
+        [$messages] = ProjectChat::messages($this->activeProject->id, 'client', 1);
+        $last = $messages[0] ?? null;
+        $this->qaChat = [
+            'unread' => ProjectChat::unread($this->activeProject->id, 'client', $this->user->id),
+            'last' => $last ? [
+                'name' => $last['party'] === 'client' && $last['author_id'] === $this->user->id ? __('chat.you') : $last['name'],
+                'time' => PortalFormat::date($last['at'], 'datetime'),
+                'text' => match ($last['kind']) {
+                    'issue' => __('chat.summary.issue', ['title' => $last['ticket']['title'] ?? '']),
+                    'event' => __('chat.events.' . $last['event'] . '.short'),
+                    default => $last['body'] !== '' ? Str::limit(preg_replace('/\s+/u', ' ', $last['body']), 160) : __('chat.summary.' . ($last['files'][0]['kind'] ?? 'file')),
+                },
+            ] : null,
+        ];
     }
 
     public function loadFinancials()
@@ -525,62 +550,6 @@ class Dashboard extends Component
 
     // --- FORM SUBMISSIONS ---
 
-    public function submitQaTicket()
-    {
-        abort_unless($this->allowed('qa.create'), 403);
-        if (!$this->activeProject) return;
-        $this->validate([
-            'qaTitle' => 'required|string|max:150', 
-            'qaDescription' => 'required|string', 
-            'qaSeverity' => 'required|in:Low,Medium,Critical',
-            'initialAttachment' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120' // 5MB Limit
-        ]);
-
-        if (!$this->activeProject || (!empty($this->qaTaskId) && !$this->ownsTask($this->qaTaskId))) {
-            return;
-        }
-
-        DB::transaction(function () {
-            $ticketId = (string) Str::uuid(); 
-            $isGeneralMessage = empty($this->qaTaskId);
-            // The title is what the client typed; a general message has no task (older tickets carry a
-            // "[DIRECT COMM] " or "[BUG REPORT] " prefix, which the portal hides)
-            $finalTitle = $this->qaTitle;
-            
-            DB::table('qa_tickets')->insert([
-                'id' => $ticketId, 'project_id' => $this->activeProject->id, 'task_id' => $isGeneralMessage ? null : $this->qaTaskId,
-                'title' => $finalTitle, 'description' => $this->qaDescription, 'status' => 'Open', 'severity' => $this->qaSeverity,
-                'submitted_by' => $this->user->id, 'submitted_by_type' => 'client', 'created_at' => now(), 'updated_at' => now()
-            ]);
-
-            // NEW: Process attachment if uploaded during creation
-            if ($this->initialAttachment) {
-                $path = $this->initialAttachment->store('qa_evidence', 'local');
-                DB::table('qa_attachments')->insert([
-                    'id' => (string) Str::uuid(),
-                    'ticket_id' => $ticketId,
-                    'uploaded_by' => $this->user->id, 'uploader_type' => 'client',
-                    'file_name' => $this->initialAttachment->getClientOriginalName(),
-                    'file_path' => $path,
-                    'mime_type' => $this->initialAttachment->getMimeType(),
-                    'size_bytes' => $this->initialAttachment->getSize(),
-                    'created_at' => now()
-                ]);
-            }
-
-            $notifications = [];
-            foreach (Access::staffWith('qa.edit') as $adminId) {
-                $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => $isGeneralMessage ? 'Message from a client' : 'Issue reported by a client', 'message' => "{$this->user->first_name} {$this->user->last_name} ({$this->organization->name}) " . ($isGeneralMessage ? 'sent a message' : 'reported an issue') . " on {$this->activeProject->title}: “{$this->qaTitle}”. Reply in Quality and issues.", 'link_url' => route('hq.ops.qa', ['project' => $this->activeProject->id]), 'type' => 'Project', 'created_at' => now()];
-            }
-            if(!empty($notifications)) DB::table('notifications')->insert($notifications);
-        });
-        
-        $sentKey = empty($this->qaTaskId) ? 'portal.qa.sent_message' : 'portal.qa.sent_issue';
-        $this->reset(['qaTitle', 'qaDescription', 'qaTaskId', 'qaSeverity', 'initialAttachment']); 
-        $this->loadQaHub(); 
-        session()->flash('qa_success', __($sentKey));
-    }
-    
     // --- DIRECT SPRINT APPROVALS ---
     public function approveTask($taskId)
     {
@@ -610,142 +579,6 @@ class Dashboard extends Component
             'message' => $message, 'link_url' => route('hq.ops.project', ['project' => $this->activeProject->id, 'tab' => 'board']), 'type' => 'Project', 'created_at' => now()]);
     }
 
-    public function teleportToQa($taskId, $taskTitle)
-    {
-        abort_unless($this->allowed('qa.create'), 403);
-        if (!$this->activeProject || !$this->ownsTask($taskId)) return;
-        $this->qaTaskId = $taskId;
-        $this->qaTitle = __('portal.qa.prefill', ['task' => $taskTitle]);
-        $this->switchTab('qa_hub');
-    }
-
-    // --- QA HUB OFFCANVAS & COMMUNICATION ---
-    public function openTicket($ticketId)
-    {
-        abort_unless($this->allowed('qa.view'), 403);
-        // One of the issues listed (the active project's); the list keeps an excerpt, so the ticket is read again whole
-        $this->selectedTicket = $this->activeProject && collect($this->qaTickets)->contains('id', $ticketId)
-            ? DB::table('qa_tickets')->where('id', $ticketId)->where('project_id', $this->activeProject->id)->whereNull('deleted_at')
-                ->first(['id', 'task_id', 'title', 'description', 'status', 'severity'])
-            : null;
-        if (!$this->selectedTicket) return;
-
-        // Fetch non-internal comments only (the fields the conversation shows, with the author's name)
-        $comments = DB::table('qa_comments')
-            ->where('qa_comments.ticket_id', $ticketId)
-            ->where('qa_comments.is_internal_only', 0)
-            ->select('qa_comments.user_id', 'qa_comments.comment_text', 'qa_comments.created_at')
-            ->orderBy('qa_comments.created_at', 'asc');
-        $this->ticketComments = People::joinAuthor($comments, 'qa_comments.user_id', 'qa_comments.author_type')->get()->toArray();
-
-        // NEW: Fetch Evidence/Attachments (a name and a link each)
-        $this->ticketAttachments = DB::table('qa_attachments')
-            ->where('ticket_id', $ticketId)
-            ->orderBy('created_at', 'desc')
-            ->get(['file_name', 'file_path'])->toArray();
-
-        $this->dispatch('open-qa');
-    }
-
-    // NEW: Handle Client Uploads
-    public function uploadQaEvidence()
-    {
-        abort_unless($this->allowed('qa.create'), 403);
-        if (!$this->selectedTicket) return;
-
-        $this->validate([
-            'newQaAttachment' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120' // 5MB max
-        ]);
-
-        $path = $this->newQaAttachment->store('qa_evidence', 'local');
-
-        DB::table('qa_attachments')->insert([
-            'id' => (string) Str::uuid(),
-            'ticket_id' => $this->selectedTicket->id,
-            'uploaded_by' => $this->user->id, 'uploader_type' => 'client',
-            'file_name' => $this->newQaAttachment->getClientOriginalName(),
-            'file_path' => $path,
-            'mime_type' => $this->newQaAttachment->getMimeType(),
-            'size_bytes' => $this->newQaAttachment->getSize(),
-            'created_at' => now()
-        ]);
-
-        $this->newQaAttachment = null;
-        $this->openTicket($this->selectedTicket->id); // Refresh drawer
-    }
-
-    public function postTicketComment()
-    {
-        abort_unless($this->allowed('qa.create'), 403);
-        if (!$this->activeProject || !$this->selectedTicket) return;
-
-        $this->validate(['newCommentText' => 'required|string|min:2|max:5000']);
-
-        DB::table('qa_comments')->insert([
-            'id' => (string) Str::uuid(), 'ticket_id' => $this->selectedTicket->id, 'user_id' => $this->user->id, 'author_type' => 'client',
-            'comment_text' => $this->newCommentText, 'is_internal_only' => 0,
-            'created_at' => now(), 'updated_at' => now()
-        ]);
-
-        // Notify HQ
-        $notifications = [];
-        foreach (Access::staffWith('qa.edit') as $adminId) {
-            $notifications[] = ['id' => (string) Str::uuid(), 'user_id' => $adminId, 'title' => 'Client replied to an issue', 'message' => "{$this->user->first_name} {$this->user->last_name} ({$this->organization->name}) replied on “{$this->selectedTicket->title}”. Read it in Quality and issues.", 'link_url' => route('hq.ops.qa', ['project' => $this->activeProject->id]), 'type' => 'Project', 'created_at' => now()];
-        }
-        if(!empty($notifications)) DB::table('notifications')->insert($notifications);
-
-        $this->newCommentText = '';
-        $this->openTicket($this->selectedTicket->id); // Refresh thread
-    }
-
-    public function approveTicketFix()
-    {
-        abort_unless($this->allowed('projects.approve'), 403);
-        if (!$this->selectedTicket) return;
-
-        DB::table('qa_tickets')->where('id', $this->selectedTicket->id)->update(['status' => 'Closed', 'updated_at' => now()]);
-        if ($this->selectedTicket->task_id) {
-            DB::table('tasks')->where('id', $this->selectedTicket->task_id)->update(['status' => 'Done', 'updated_at' => now()]);
-        }
-        
-        $this->dispatch('close-qa');
-        $this->loadQaHub();
-        session()->flash('global_success', __('portal.qa.fix_approved'));
-    }
-    
-    public function approveAndLockFromQa()
-    {
-        abort_unless($this->allowed('projects.approve'), 403);
-        if (!$this->selectedTicket) return;
-
-        // 1. Force close the QA Ticket
-        DB::table('qa_tickets')->where('id', $this->selectedTicket->id)->update([
-            'status' => 'Closed', 
-            'updated_at' => now()
-        ]);
-
-        // 2. Lock the Linked Task to Done
-        if ($this->selectedTicket->task_id) {
-            DB::table('tasks')->where('id', $this->selectedTicket->task_id)->update([
-                'status' => 'Done', 
-                'updated_at' => now()
-            ]);
-            
-            DB::table('task_comments')->insert([
-                // The 'id' => (string) Str::uuid() has been removed below
-                'task_id' => $this->selectedTicket->task_id, 
-                'user_id' => $this->user->id,
-                'author_type' => 'client',
-                'comment_text' => __('portal.tasks.approved_from_issue_comment', [], 'en'),
-                'created_at' => now()
-            ]);
-        }
-
-        $this->dispatch('close-qa');
-        $this->loadQaHub(); // Progress shows the task as done when it is opened (each section reloads its rows)
-        session()->flash('global_success', __('portal.qa.task_approved_from_issue'));
-    }
-    
     /** "Mark as sent" on something the team needs: opens the small form */
     public function openNeed(int $id): void
     {

@@ -43,9 +43,8 @@
 @endphp
 <div class="portal-app"
      style="--portal-accent: {{ $clientColour ?? 'var(--color-deep-teal)' }}; --portal-indicator: {{ $clientColour ?? 'var(--color-bright-teal)' }};"
-     x-data="{ showGuide: false, showSignIn: false, showQaOffcanvas: false, mobileMenuOpen: false }"
-     @open-qa.window="showQaOffcanvas = true" @close-qa.window="showQaOffcanvas = false"
-     @keydown.escape.window="showGuide = false; showSignIn = false; showQaOffcanvas = false">
+     x-data="{ showGuide: false, showSignIn: false, mobileMenuOpen: false }"
+     @keydown.escape.window="showGuide = false; showSignIn = false">
 
     <style>
         /* Portal-only layout on top of the shared shell (resources/css/app.css); brand tokens only */
@@ -82,7 +81,8 @@
         .portal-drawer-foot { padding: 16px 24px; border-top: 1px solid var(--color-line); }
         .portal-sign-in-slot > div:empty { min-height: 160px; border-radius: 8px; background: var(--color-mist); }
 
-        .portal-fab { position: fixed; right: 24px; bottom: 24px; z-index: 40; box-shadow: var(--shadow-float); }
+        .portal-chat-icon { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: 50%; background: var(--color-teal-tint); color: var(--color-deep-teal); }
+        .portal-chat-icon svg { width: 22px; height: 22px; }
 
         @media (max-width: 900px) {
             .portal-menu-btn { display: inline-flex; }
@@ -91,7 +91,6 @@
             .portal-app .topbar { height: auto; min-height: 56px; padding: 8px 16px; gap: 12px; }
             .portal-desktop-only { display: none !important; }
             .portal-mobile-only { display: flex; }
-            .portal-fab { right: 16px; bottom: 16px; }
         }
     </style>
 
@@ -379,7 +378,7 @@
                                                 </button>
                                             @endif
                                             @if ($can['qa.create'] ?? false)
-                                                <button type="button" wire:click="teleportToQa('{{ $task->id }}', '{{ addslashes($task->title) }}')" class="btn btn-secondary btn-sm">
+                                                <button type="button" @click="$dispatch('open-delivery-chat', { task: @js($task->id) })" class="btn btn-secondary btn-sm">
                                                     <i data-lucide="shield-alert"></i> {{ __('portal.tasks.report') }}
                                                 </button>
                                             @endif
@@ -396,7 +395,7 @@
                         @endforelse
                     </section>
 
-                {{-- ===================== QUALITY AND ISSUES ===================== --}}
+                {{-- ===================== QUALITY AND ISSUES: the conversation and its issues (docs/CHAT.md) ===================== --}}
                 @elseif ($activeTab === 'qa_hub' && $activeProject)
                     <div class="alert alert-info mb-6" role="note">
                         <i data-lucide="clock"></i>
@@ -406,82 +405,51 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-                        <section class="card">
-                            <div class="card-header"><h2 class="card-title">{{ __('portal.qa.form_title') }}</h2></div>
-
-
-                            @if ($can['qa.create'] ?? false)
-                                <form wire:submit.prevent="submitQaTicket" class="flex flex-col gap-4">
-                                    @if ($qaTaskId)
-                                        <div class="callout flex flex-wrap items-center justify-between gap-3">
-                                            <div class="min-w-0">
-                                                <div class="stat-label">{{ __('portal.qa.about_task') }}</div>
-                                                <div class="font-semibold text-ink break-words">{{ collect($activeTasks)->firstWhere('id', $qaTaskId)->title ?? __('portal.qa.unknown_task') }}</div>
-                                            </div>
-                                            <button type="button" wire:click="$set('qaTaskId', '')" class="btn btn-ghost btn-sm">
-                                                <i data-lucide="x"></i> {{ __('portal.qa.remove_task') }}
-                                            </button>
-                                        </div>
-                                    @else
-                                        <p class="help m-0">{{ __('portal.qa.general_help') }}</p>
-                                    @endif
-
-                                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                                        <div class="field sm:col-span-2">
-                                            <label for="qa-title-input" class="label">{{ __('portal.qa.subject') }}</label>
-                                            <input type="text" id="qa-title-input" wire:model="qaTitle" class="input" required x-init="setTimeout(() => $el.focus(), 100)">
-                                            @error('qaTitle') <span class="field-error">{{ $message }}</span> @enderror
-                                        </div>
-                                        <div class="field">
-                                            <label for="qa-severity" class="label">{{ __('portal.qa.priority') }}</label>
-                                            <select id="qa-severity" wire:model="qaSeverity" class="select">
-                                                @foreach (['Low', 'Medium', 'Critical'] as $severity)
-                                                    <option value="{{ $severity }}">{{ $label('status.severity', $severity) }}</option>
-                                                @endforeach
-                                            </select>
-                                            @error('qaSeverity') <span class="field-error">{{ $message }}</span> @enderror
-                                        </div>
-                                    </div>
-
-                                    <div class="field">
-                                        <label for="qa-description" class="label">{{ __('portal.qa.details') }}</label>
-                                        <textarea id="qa-description" wire:model="qaDescription" class="textarea" rows="5" required aria-describedby="qa-description-help"></textarea>
-                                        <span id="qa-description-help" class="help">{{ __('portal.qa.details_help') }}</span>
-                                        @error('qaDescription') <span class="field-error">{{ $message }}</span> @enderror
-                                    </div>
-
-                                    <div class="field">
-                                        <label for="qa-attachment" class="label">{{ __('portal.qa.attachment') }} <span class="font-normal text-muted">({{ __('portal.common.optional') }})</span></label>
-                                        <input type="file" id="qa-attachment" wire:model="initialAttachment" class="input" accept=".png,.jpg,.jpeg,.pdf" aria-describedby="qa-attachment-help">
-                                        <span id="qa-attachment-help" class="help">{{ __('portal.common.file_help') }}</span>
-                                        @error('initialAttachment') <span class="field-error">{{ $message }}</span> @enderror
-                                    </div>
-
-                                    <button type="submit" class="btn btn-primary self-start" wire:loading.attr="disabled" wire:target="submitQaTicket, initialAttachment">
-                                        <span wire:loading.remove wire:target="submitQaTicket"><i data-lucide="send" class="inline h-4 w-4 align-[-3px]"></i> {{ $qaTaskId ? __('portal.qa.submit_issue') : __('portal.qa.submit_message') }}</span>
-                                        <span wire:loading wire:target="submitQaTicket">{{ __('portal.common.sending') }}</span>
-                                    </button>
-                                </form>
-                            @else
-                                <p class="help m-0">{{ __('portal.qa.no_create') }}</p>
+                    <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-5">
+                        <section class="card lg:col-span-2">
+                            <div class="flex items-start gap-4">
+                                <span class="portal-chat-icon" aria-hidden="true"><i data-lucide="messages-square"></i></span>
+                                <div class="min-w-0">
+                                    <h2 class="card-title m-0">{{ __('chat.hub.conversation') }}</h2>
+                                    <p class="help mb-0 mt-1">{{ __('chat.hub.conversation_help') }}</p>
+                                </div>
+                            </div>
+                            @if ($qaChat['last'] ?? null)
+                                <div class="mt-4 rounded-lg border border-line bg-mist p-3 text-sm">
+                                    <div class="text-xs text-muted">{{ __('chat.hub.last', ['name' => $qaChat['last']['name'], 'time' => $qaChat['last']['time']]) }}</div>
+                                    <div class="mt-1 text-ink break-words">{{ $qaChat['last']['text'] }}</div>
+                                </div>
                             @endif
+                            <div class="mt-4 flex flex-wrap gap-2">
+                                <button type="button" class="btn btn-primary" @click="$dispatch('open-delivery-chat')">
+                                    <i data-lucide="message-circle"></i> {{ __('chat.hub.open') }}
+                                    @if (($qaChat['unread'] ?? 0) > 0)
+                                        <span class="pill pill-danger num">{{ trans_choice('chat.hub.unread', $qaChat['unread'], ['count' => $qaChat['unread']]) }}</span>
+                                    @endif
+                                </button>
+                                @if ($can['qa.create'] ?? false)
+                                    <button type="button" class="btn btn-secondary" @click="$dispatch('open-delivery-chat', { issue: true })">
+                                        <i data-lucide="shield-alert"></i> {{ __('chat.issue.report') }}
+                                    </button>
+                                @endif
+                            </div>
                         </section>
 
-                        <section class="card">
-                            <div class="card-header"><h2 class="card-title">{{ __('portal.qa.list_title') }}</h2></div>
+                        <section class="card lg:col-span-3">
+                            <div class="card-header"><h2 class="card-title">{{ __('chat.hub.issues') }}</h2></div>
                             <div class="flex flex-col gap-3">
                                 @forelse ($qaTickets as $ticket)
-                                    <button type="button" wire:click="openTicket('{{ $ticket->id }}')"
-                                            class="w-full cursor-pointer rounded-lg border border-line bg-paper p-4 text-left hover:bg-mist">
+                                    <button type="button" @click="$dispatch('open-delivery-chat', { focus: {{ (int) ($ticket->card_id ?? 0) }} })"
+                                            class="w-full cursor-pointer rounded-lg border border-line bg-paper p-4 text-left hover:bg-mist"
+                                            aria-label="{{ $ticketTitle($ticket->title) }}: {{ __('chat.issue.open_in_chat') }}">
                                         <span class="flex flex-wrap items-start justify-between gap-2">
                                             <span class="min-w-0 font-semibold text-ink break-words">{{ $ticketTitle($ticket->title) }}</span>
                                             <span class="pill {{ $pill('issue', $ticket->status) }}">{{ $label('status.issue', $ticket->status) }}</span>
                                         </span>
                                         <span class="mt-1 block text-xs text-muted">
-                                            {{ $ticket->task_id ? __('portal.qa.type_issue') : __('portal.qa.type_message') }}
-                                            · {{ PortalFormat::date($ticket->created_at, 'datetime') }}
+                                            {{ PortalFormat::date($ticket->created_at, 'datetime') }}
                                             · {{ __('portal.qa.priority_value', ['priority' => $label('status.severity', $ticket->severity)]) }}
+                                            · {{ trans_choice('chat.issue.replies', (int) $ticket->replies, ['count' => (int) $ticket->replies]) }}
                                         </span>
                                         <span class="mt-2 block text-sm text-slate break-words">{{ $ticket->excerpt }}</span>
                                         @if ($ticket->task_title)
@@ -490,8 +458,8 @@
                                     </button>
                                 @empty
                                     <div class="empty-state">
-                                        <strong>{{ __('portal.qa.empty') }}</strong>
-                                        {{ __('portal.qa.empty_help') }}
+                                        <strong>{{ __('chat.hub.issues_empty') }}</strong>
+                                        {{ __('chat.hub.issues_empty_help') }}
                                     </div>
                                 @endforelse
                             </div>
@@ -918,12 +886,10 @@
         </div>
     </div>
 
-    {{-- Message the delivery team from any section --}}
+    {{-- The conversation with the delivery team, from any section (docs/CHAT.md): its own component, keyed by project,
+         so moving between sections never redraws it. It stays open during a payment hold: the client can still talk to us. --}}
     @if (($can['qa.view'] ?? false) && $activeProject)
-        <button type="button" wire:click="switchTab('qa_hub')" class="btn btn-primary portal-fab {{ $activeTab === 'qa_hub' ? 'hidden' : '' }}"
-                aria-label="{{ __('portal.nav.message') }}" title="{{ __('portal.nav.message') }}">
-            <i data-lucide="message-square"></i> <span class="hidden sm:inline">{{ __('portal.nav.message') }}</span>
-        </button>
+        <livewire:client-os.delivery-chat :project-id="$activeProject->id" :locale="app()->getLocale()" :start-open="$openChat" :key="'delivery-chat-' . $activeProject->id" />
     @endif
 
 
@@ -955,109 +921,6 @@
             </div>
         </div>
     @endif
-
-    {{-- ===== An issue or message: details, files, conversation ===== --}}
-    <div class="portal-overlay" :class="{ 'is-open': showQaOffcanvas }" @click="showQaOffcanvas = false"></div>
-    <aside class="portal-drawer" :class="{ 'is-open': showQaOffcanvas }" role="dialog" aria-modal="true" aria-labelledby="issue-title">
-        @if ($selectedTicket)
-            <div class="portal-drawer-head">
-                <div class="min-w-0">
-                    <div class="text-xs text-muted tabular-nums">
-                        {{ $selectedTicket->task_id ? __('portal.qa.type_issue') : __('portal.qa.type_message') }}
-                        · {{ __('portal.qa.reference', ['ref' => strtoupper(substr($selectedTicket->id, 0, 8))]) }}
-                    </div>
-                    <h2 id="issue-title" class="m-0 mt-1 text-lg font-semibold text-ink break-words">{{ $ticketTitle($selectedTicket->title) }}</h2>
-                    <div class="mt-2 flex flex-wrap gap-2">
-                        <span class="pill {{ $pill('issue', $selectedTicket->status) }}">{{ $label('status.issue', $selectedTicket->status) }}</span>
-                        <span class="pill {{ $pill('severity', $selectedTicket->severity) }}">{{ __('portal.qa.priority_value', ['priority' => $label('status.severity', $selectedTicket->severity)]) }}</span>
-                    </div>
-                </div>
-                <button type="button" @click="showQaOffcanvas = false" class="btn btn-ghost btn-sm" aria-label="{{ __('portal.common.close') }}" title="{{ __('portal.common.close') }}"><i data-lucide="x"></i></button>
-            </div>
-
-            <div class="portal-drawer-body">
-                <div class="mb-6 rounded-lg bg-mist p-4 text-sm text-slate break-words">
-                    {!! nl2br(e($selectedTicket->description)) !!}
-                </div>
-
-                <h3 class="section-title text-base">{{ __('portal.qa.attachments') }}</h3>
-                <div class="mb-4 flex flex-col gap-2">
-                    @forelse ($ticketAttachments as $att)
-                        <a href="{{ route('portal.file', ['path' => $att->file_path]) }}" target="_blank" rel="noopener"
-                           class="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-deep-teal no-underline hover:bg-mist" title="{{ $att->file_name }}">
-                            <i data-lucide="paperclip" class="h-4 w-4 text-muted"></i>
-                            <span class="min-w-0 truncate">{{ $att->file_name }}</span>
-                        </a>
-                    @empty
-                        <p class="help m-0">{{ __('portal.qa.no_attachments') }}</p>
-                    @endforelse
-                </div>
-
-                @if (in_array($selectedTicket->status, ['Open', 'Investigating']) && ($can['qa.create'] ?? false))
-                    <div class="field mb-6">
-                        <label for="qa-new-file" class="label">{{ __('portal.qa.add_file') }}</label>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <input type="file" id="qa-new-file" wire:model="newQaAttachment" class="input min-w-0 flex-1" accept=".png,.jpg,.jpeg,.pdf" aria-describedby="qa-new-file-help">
-                            <button type="button" wire:click="uploadQaEvidence" class="btn btn-secondary" wire:loading.attr="disabled" wire:target="newQaAttachment, uploadQaEvidence">
-                                <span wire:loading.remove wire:target="uploadQaEvidence"><i data-lucide="upload" class="inline h-4 w-4 align-[-3px]"></i> {{ __('portal.qa.upload') }}</span>
-                                <span wire:loading wire:target="uploadQaEvidence">{{ __('portal.common.uploading') }}</span>
-                            </button>
-                        </div>
-                        <span id="qa-new-file-help" class="help">{{ __('portal.common.file_help') }}</span>
-                        @error('newQaAttachment') <span class="field-error">{{ $message }}</span> @enderror
-                    </div>
-                @endif
-
-                <h3 class="section-title text-base">{{ __('portal.qa.conversation') }}</h3>
-                <div class="flex flex-col gap-3">
-                    @forelse ($ticketComments as $comment)
-                        @php $mine = ($comment->author_type ?? null) === 'client' && $comment->user_id === $user->id; @endphp
-                        <div class="rounded-lg border border-line p-3 {{ $mine ? 'bg-teal-tint' : 'bg-paper' }}">
-                            <div class="mb-1 flex flex-wrap justify-between gap-2 text-xs text-muted">
-                                <span class="font-semibold text-ink">{{ $mine ? __('portal.common.you') : trim($comment->first_name . ' ' . $comment->last_name) }}</span>
-                                <span class="tabular-nums">{{ PortalFormat::date($comment->created_at, 'datetime') }}</span>
-                            </div>
-                            <div class="text-sm text-slate break-words">{!! nl2br(e($comment->comment_text)) !!}</div>
-                        </div>
-                    @empty
-                        <p class="help m-0">{{ __('portal.qa.no_replies') }}</p>
-                    @endforelse
-                </div>
-
-                @if (in_array($selectedTicket->status, ['Open', 'Investigating', 'Resolved']))
-                    @if ($can['qa.create'] ?? false)
-                        <div class="field mt-6">
-                            <label for="qa-reply" class="label">{{ __('portal.qa.reply') }}</label>
-                            <textarea id="qa-reply" wire:model="newCommentText" class="textarea" rows="3"></textarea>
-                            @error('newCommentText') <span class="field-error">{{ $message }}</span> @enderror
-                            <button type="button" wire:click="postTicketComment" class="btn btn-primary mt-2 self-start" wire:loading.attr="disabled" wire:target="postTicketComment">
-                                <i data-lucide="send"></i> {{ __('portal.qa.send_reply') }}
-                            </button>
-                        </div>
-                    @endif
-
-                    @if ($selectedTicket->task_id && $selectedTicket->status !== 'Closed' && ($can['projects.approve'] ?? false))
-                        <div class="mt-6 border-t border-line pt-6">
-                            <button type="button" wire:click="approveAndLockFromQa" wire:confirm="{{ __('portal.qa.approve_task_confirm') }}" class="btn btn-secondary w-full whitespace-normal">
-                                <i data-lucide="check"></i> {{ __('portal.qa.approve_task') }}
-                            </button>
-                        </div>
-                    @endif
-                @endif
-            </div>
-
-            @if ($selectedTicket->status === 'Resolved')
-                <div class="portal-drawer-foot" style="background: var(--color-success-tint);">
-                    <p class="m-0 mb-3 text-sm text-success">{{ __('portal.qa.resolved_note') }}</p>
-                    @if ($can['projects.approve'] ?? false)
-                        <button type="button" wire:click="approveTicketFix" class="btn btn-primary w-full whitespace-normal">
-                            <i data-lucide="circle-check"></i> {{ __('portal.qa.approve_fix') }}
-                        </button>
-                    @endif
-                </div>
-            @endif
-        @endif
-    </aside>
 
     {{-- ===== Sign-in settings: passkeys and the PIN (docs/SIGN_IN.md) ===== --}}
     <div class="portal-overlay" :class="{ 'is-open': showSignIn }" @click="showSignIn = false"></div>
