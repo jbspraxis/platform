@@ -441,7 +441,32 @@ function chatVoice(durationMs) {
     };
 }
 
+// HQ's floating Client messages button (App\Livewire\Hq\ClientMessages\Launcher), kept across pages: hidden on the
+// Client messages page itself, which shows the same conversations
+const MESSAGES_PAGE = '/operations/client-messages';
+
+function chatLauncher() {
+    return {
+        here: false,
+        phone: false,
+        back: false,
+        init() {
+            this.phone = window.matchMedia('(max-width: 900px)').matches;
+            this.here = location.pathname.startsWith(MESSAGES_PAGE);
+            this._navigated = () => {
+                this.here = location.pathname.startsWith(MESSAGES_PAGE);
+                if (this.here && this.$wire.open) this.$wire.hide();
+            };
+            document.addEventListener('livewire:navigated', this._navigated);
+        },
+        destroy() {
+            document.removeEventListener('livewire:navigated', this._navigated);
+        },
+    };
+}
+
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('chatRoom', chatRoom);
     window.Alpine.data('chatVoice', chatVoice);
+    window.Alpine.data('chatLauncher', chatLauncher);
 });

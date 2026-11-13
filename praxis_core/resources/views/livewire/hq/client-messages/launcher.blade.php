@@ -12,9 +12,7 @@
     $label = 'Client messages' . ($unread ? ', ' . $unread . ' unread' : '');
 @endphp
 <div class="chat-launcher"
-     x-data="{ here: location.pathname.startsWith('/operations/client-messages'), phone: window.matchMedia('(max-width: 900px)').matches, back: false }"
-     x-init="document.addEventListener('livewire:navigated', () => { here = location.pathname.startsWith('/operations/client-messages'); if (here) $wire.hide(); })"
-     x-show="!here" @chat-back="$wire.back()" @keydown.escape="if (!$event.defaultPrevented) { back = true; $wire.hide(); }"
+     x-data="chatLauncher" x-show="!here" @chat-back="$wire.back()" @keydown.escape="if (!$event.defaultPrevented) { back = true; $wire.hide(); }"
      wire:poll.30s.visible="refresh">
     @unless ($open)
         <button type="button" class="chat-fab hq-lift" wire:click="show" aria-haspopup="dialog" aria-label="{{ $label }}" title="{{ $label }}"
