@@ -400,15 +400,19 @@ class ProjectChat
     /** Keep an uploaded file on the private disk under chat/<project>/ and describe it for post() */
     public static function store(UploadedFile $file, string $projectId, ?string $kind = null, ?int $durationMs = null): array
     {
+        // Read everything about the upload first: storing a Livewire upload on the same disk moves it out of
+        // livewire-tmp, and asking its size afterwards fails (seen live, 13 Nov 2026: a PDF gave an error 500)
         $mime = (string) ($file->getMimeType() ?: $file->getClientMimeType());
+        $size = (int) $file->getSize();
         $kind ??= str_starts_with($mime, 'image/') && in_array(strtolower($file->getClientOriginalExtension()), ['jpg', 'jpeg', 'png', 'gif', 'webp'], true) ? 'image' : 'file';
+        $original = $file->getClientOriginalName();
         $path = $file->store('chat/' . $projectId, 'local');
-        $name = $file->getClientOriginalName() ?: basename($path);
+        $name = $original ?: basename($path);
         if ($kind === 'voice') {
             $name = 'voice-note-' . now()->setTimezone('Africa/Lagos')->format('Ymd-His') . '.' . (pathinfo($path, PATHINFO_EXTENSION) ?: 'webm');
         }
 
-        return ['path' => $path, 'name' => $name, 'mime' => $mime, 'size' => (int) $file->getSize(), 'kind' => $kind,
+        return ['path' => $path, 'name' => $name, 'mime' => $mime, 'size' => $size, 'kind' => $kind,
             'duration' => $durationMs !== null ? max(0, min($durationMs, self::MAX_VOICE_SECONDS * 1000 + 999)) : null];
     }
 
