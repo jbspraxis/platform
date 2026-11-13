@@ -98,6 +98,12 @@
                                         </button>
                                     @endif
 
+                                    @if($paidSoFar > 0)
+                                        <button type="button" wire:click="openReceipts('{{ $inv->id }}')" class="btn btn-ghost btn-sm">
+                                            <i data-lucide="receipt"></i> Receipts
+                                        </button>
+                                    @endif
+
                                     @if($inv->status !== 'Cancelled' && auth()->user()->can('finance.create'))
                                         <button type="button" wire:click="emailInvoice('{{ $inv->id }}')" wire:loading.attr="disabled" wire:target="emailInvoice('{{ $inv->id }}')" class="btn btn-ghost btn-sm"
                                                 title="{{ $inv->emailed_at ? 'Emailed ' . \Carbon\Carbon::parse($inv->emailed_at)->setTimezone('Africa/Lagos')->format('j M Y, H:i') : 'Not emailed yet' }}">
@@ -204,6 +210,47 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    @endif
+
+    {{-- Receipts: each verified payment of the invoice, its receipt to download or email again (docs/RECEIPTS.md) --}}
+    @if($receiptsInvoice)
+        <div class="modal-backdrop" wire:keydown.escape="closeReceipts">
+            <div class="modal" style="max-width: 620px;" role="dialog" aria-modal="true" aria-labelledby="receipts-title">
+                <div class="mb-4 flex items-start justify-between gap-4">
+                    <h2 id="receipts-title" class="modal-title">Receipts for {{ $receiptsInvoice->invoice_number }}</h2>
+                    <button type="button" wire:click="closeReceipts" class="btn btn-ghost btn-sm" aria-label="Close"><i data-lucide="x"></i></button>
+                </div>
+                <p class="help" style="margin: 0 0 12px;">Each payment has its own receipt, emailed to the client’s billing contacts when the payment was recorded or verified.</p>
+                <div class="flex flex-col gap-3">
+                    @forelse($receiptRows as $r)
+                        <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line p-3">
+                            <div class="min-w-0">
+                                <div class="font-semibold text-ink num" style="text-align: left;">{{ $r->receipt_number }}</div>
+                                <div class="help" style="font-variant-numeric: tabular-nums;">
+                                    {{ \App\Livewire\Hq\HqMoney::format($receiptsInvoice->currency, $r->amount_claimed) }}
+                                    · {{ \Carbon\Carbon::parse($r->received_on ?: \Carbon\Carbon::parse($r->verified_at ?? $r->created_at)->setTimezone('Africa/Lagos'))->format('j M Y') }}
+                                    · {{ $r->method }} · {{ \Illuminate\Support\Str::limit($r->tx_hash_or_ref, 40) }}
+                                </div>
+                                <div class="help">{{ $r->receipt_emailed_at ? 'Emailed ' . \Carbon\Carbon::parse($r->receipt_emailed_at)->setTimezone('Africa/Lagos')->format('j M Y, H:i') : 'Not emailed yet' }}</div>
+                            </div>
+                            <div class="flex gap-2">
+                                <a href="{{ route('hq.finance.receipt-pdf', $r->id) }}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm"><i data-lucide="file-text"></i> Download</a>
+                                @can('finance.create')
+                                    <button type="button" wire:click="emailReceipt('{{ $r->id }}')" wire:loading.attr="disabled" wire:target="emailReceipt('{{ $r->id }}')" class="btn btn-secondary btn-sm">
+                                        <i data-lucide="mail"></i> {{ $r->receipt_emailed_at ? 'Email again' : 'Email receipt' }}
+                                    </button>
+                                @endcan
+                            </div>
+                        </div>
+                    @empty
+                        <p class="help" style="margin: 0;">No verified payment on this invoice yet.</p>
+                    @endforelse
+                </div>
+                <div class="modal-actions">
+                    <button type="button" wire:click="closeReceipts" class="btn btn-secondary">Close</button>
+                </div>
             </div>
         </div>
     @endif

@@ -93,6 +93,8 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
                 // Invoicing & Escrow
                 Route::get('/invoice-ledger', \App\Livewire\Hq\Finance\InvoiceLedger::class)->name('hq.finance.invoices');
                 Route::get('/invoice-ledger/{invoice}/pdf', [\App\Http\Controllers\InvoicePdfController::class, 'hq'])->whereUuid('invoice')->name('hq.finance.invoice-pdf');
+                // A payment's receipt (docs/RECEIPTS.md)
+                Route::get('/receipts/{transaction}/pdf', [\App\Http\Controllers\ReceiptPdfController::class, 'hq'])->whereUuid('transaction')->name('hq.finance.receipt-pdf');
                 Route::get('/escrow-verification', \App\Livewire\Hq\Finance\EscrowVerification::class)->name('hq.finance.escrow');
 
                 // Core IFRS Accounting
@@ -325,6 +327,8 @@ Route::domain(Hosts::portal())->group(function () use ($notOwnRoute, $legacy) {
         Route::get('/', \App\Livewire\ClientOs\Dashboard::class)->name('client.dashboard');
         // An invoice's PDF, for an account that sees invoices on that project (docs/QA-PORTAL.md D11)
         Route::get('/invoices/{invoice}/pdf', [\App\Http\Controllers\InvoicePdfController::class, 'portal'])->whereUuid('invoice')->name('portal.invoice.pdf');
+        // A payment's receipt, for an account that sees invoices (docs/RECEIPTS.md)
+        Route::get('/receipts/{transaction}/pdf', [\App\Http\Controllers\ReceiptPdfController::class, 'portal'])->whereUuid('transaction')->name('portal.receipt.pdf');
 
         // QA evidence on the client's own projects, checked per file
         Route::get('/files/{path}', [\App\Http\Controllers\SecureFileController::class, 'show'])->where('path', '.*')->name('portal.file');

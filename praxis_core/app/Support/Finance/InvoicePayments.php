@@ -75,7 +75,7 @@ final class InvoicePayments
      * Finance records money that arrived: verified at once, settles the invoice, posts the receipt to the general
      * ledger and leaves an audit line. $data: amount, received_on (Y-m-d), method, reference, wht, note.
      *
-     * @return array{paid: bool, transaction_id: string, balance: float}
+     * @return array{paid: bool, transaction_id: string, balance: float, receipt: ?string}
      */
     public static function recordFromHq(string $invoiceId, array $data, string $userId): array
     {
@@ -114,6 +114,7 @@ final class InvoicePayments
             ]);
 
             $paid = self::settle($invoice);
+            $receipt = PaymentReceipts::number($txId); // docs/RECEIPTS.md
 
             DB::table('system_audit_logs')->insert([
                 'user_id' => $userId,
@@ -130,10 +131,11 @@ final class InvoicePayments
 
             $fresh = DB::table('invoices')->where('id', $invoice->id)->first();
 
-            return ['paid' => $paid, 'transaction_id' => $txId, 'balance' => self::balance($fresh)];
+            return ['paid' => $paid, 'transaction_id' => $txId, 'balance' => self::balance($fresh), 'receipt' => $receipt];
         });
 
         \App\Support\Pwa\ClientNotify::invoice($invoiceId, 'payment_verified');
+        PaymentReceipts::sendAfterResponse($result['transaction_id']);
 
         return $result;
     }

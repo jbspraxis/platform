@@ -503,6 +503,22 @@
                                             @endif
                                         @endif
                                     </div>
+                                    {{-- A receipt for each payment received (docs/RECEIPTS.md) --}}
+                                    @if (! empty($inv->receipts))
+                                        <div class="w-full border-t border-line pt-3">
+                                            <div class="stat-label">{{ __('invoices.portal.receipts') }}</div>
+                                            <ul class="m-0 mt-2 flex list-none flex-col gap-2 p-0">
+                                                @foreach ($inv->receipts as $r)
+                                                    <li class="flex flex-wrap items-center justify-between gap-2 text-sm">
+                                                        <span class="text-slate tabular-nums">{{ __('invoices.portal.receipt_line', ['number' => $r['number'], 'amount' => PortalFormat::money($r['amount'], $inv->currency), 'date' => PortalFormat::date($r['date'])]) }}</span>
+                                                        <a href="{{ route('portal.receipt.pdf', $r['id']) }}" class="btn btn-ghost btn-sm" aria-label="{{ __('invoices.portal.receipt_label', ['number' => $r['number']]) }}">
+                                                            <i data-lucide="receipt"></i> {{ __('invoices.portal.receipt_download') }}
+                                                        </a>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endif
                                 </div>
                             @empty
                                 <div class="empty-state">
