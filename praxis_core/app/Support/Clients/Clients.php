@@ -95,6 +95,11 @@ final class Clients
         foreach ($invoices as $invoice) {
             $owed[$invoice->organization_id][$invoice->currency] = round(($owed[$invoice->organization_id][$invoice->currency] ?? 0) + $invoice->left, 2);
         }
+        // Currencies in a fixed order (alphabetical), however the invoices came back
+        foreach ($owed as &$byCurrency) {
+            ksort($byCurrency);
+        }
+        unset($byCurrency);
 
         return $owed;
     }
