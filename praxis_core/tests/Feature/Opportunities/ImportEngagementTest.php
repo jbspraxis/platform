@@ -167,4 +167,36 @@ class ImportEngagementTest extends TestCase
         $this->assertDatabaseMissing('organizations', ['name' => 'Southwind Ltd']);
         $this->assertSame(0, DB::table('opportunities')->count());
     }
+
+    public function test_the_client_details_and_what_each_milestone_needs_come_in_too(): void
+    {
+        Mail::fake();
+        Notification::fake();
+        $lead = $this->staff('owner', ['owner']);
+        $this->google();
+        $bundle = $this->bundle($lead->email, [
+            'organization' => ['name' => 'Northwind Ltd', 'industry' => 'Technology', 'city' => 'Lagos', 'billing_address' => '51 George Tiene Crescent, Lagos',
+                'email' => 'Hello@Northwind.test', 'phone' => '+234 814 454 4735', 'tax_number' => 'TIN-1'],
+            'phases' => [
+                ['key' => 'M1', 'number' => 1, 'title' => 'Core operations', 'weight' => 60, 'status' => 'Active', 'start' => '2026-11-16', 'due' => '2026-11-23',
+                    'dependencies' => [
+                        ['group_code' => '1.A', 'group_title' => 'People', 'title' => 'Employee list'],
+                        ['group_code' => '1.B', 'group_title' => 'ERP', 'title' => 'Sandbox access', 'integration' => true],
+                        ['title' => 'Branding pack', 'due' => '2026-11-18'],
+                    ]],
+                ['key' => 'M2', 'number' => 2, 'title' => 'Payroll', 'weight' => 40, 'status' => 'Pending'],
+            ],
+        ]);
+
+        $this->artisan('opportunities:import', ['bundle' => $bundle])->expectsOutputToContain('Needed from the client')->assertSuccessful();
+
+        $org = DB::table('organizations')->where('name', 'Northwind Ltd')->first();
+        $this->assertSame(['51 George Tiene Crescent, Lagos', 'hello@northwind.test', '+234 814 454 4735', 'TIN-1'],
+            [$org->billing_address, $org->email, $org->phone, $org->tax_identification_number]);
+        $m1 = DB::table('project_phases')->where('phase_number', 1)->whereIn('project_id', DB::table('projects')->where('organization_id', $org->id)->pluck('id'))->value('id');
+        $items = DB::table('milestone_dependencies')->where('phase_id', $m1)->orderBy('position')->get();
+        $this->assertSame(['Employee list', 'Sandbox access', 'Branding pack'], $items->pluck('title')->all());
+        $this->assertSame(['2026-11-16', '2026-11-05', '2026-11-18'], $items->pluck('due_date')->all());
+        $this->assertSame(['needed', 'needed', 'needed'], $items->pluck('status')->all());
+    }
 }

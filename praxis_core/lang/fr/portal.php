@@ -153,6 +153,25 @@ return [
         'no_permission' => "Vous n’avez pas l’autorisation d’ouvrir cette rubrique. Demandez à votre interlocuteur principal de modifier votre rôle.",
     ],
 
+    // Ce que l’équipe attend du client (13 nov. 2026)
+    'needs' => [
+        'title' => 'Ce que nous attendons de vous',
+        'help' => 'Chaque jalon démarre à temps quand ces éléments arrivent à la date prévue. En cas de retard, le jalon est décalé d’autant de jours.',
+        'received' => ':count déjà reçu(s). Merci.',
+        'none' => 'Rien ne vous est demandé pour le moment.',
+        'due' => 'Attendu le :date',
+        'late' => '{1} 1 jour de retard|[2,*] :days jours de retard',
+        'sent_on' => 'Envoyé le :date ; l’équipe le vérifie.',
+        'mark_sent' => 'Marquer comme envoyé',
+        'note' => 'Note pour l’équipe',
+        'note_help' => 'Où le trouver, ou ce qui reste à venir.',
+        'file' => 'Joindre un fichier (facultatif)',
+        'submit' => 'Envoyer',
+        'cancel' => 'Annuler',
+        'note_or_file' => 'Ajoutez une note ou joignez un fichier.',
+        'sent' => 'Merci. L’équipe a été prévenue.',
+        'statuses' => ['needed' => 'À fournir', 'requested' => 'Demandé', 'sent' => 'Envoyé'],
+    ],
     'overview' => [
         'project' => "Projet",
         'status' => "Statut",
