@@ -184,6 +184,6 @@ class OperationsControlsTest extends TestCase
 
         $hub->set('newCommentText', 'Looking into it')->call('postComment')
             ->assertDispatched('praxis-toast', $this->toast('We couldn’t find that issue. Refresh the list and open it again.'));
-        $this->assertSame(0, DB::table('qa_comments')->where('ticket_id', $this->ownTicket)->count());
+        $this->assertSame(0, DB::table('chat_messages')->where('qa_ticket_id', $this->ownTicket)->where('kind', 'text')->count());
     }
 }

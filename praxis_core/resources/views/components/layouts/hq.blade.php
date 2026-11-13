@@ -243,6 +243,14 @@
 @auth
     <livewire:hq.timer-presence />
 @endauth
+{{-- Client messages, from every page (docs/CHAT.md): the button with the unread count and its panel, kept across pages --}}
+@auth
+    @can('qa.view')
+        @persist('client-messages')
+            <livewire:hq.client-messages.launcher />
+        @endpersist
+    @endcan
+@endauth
 {{-- Every confirmation and error, in the corner over the page (resources/views/components/flash.blade.php) --}}
 <x-flash />
 @livewireScripts

@@ -137,7 +137,7 @@ return [
     'subtitles' => [
         'overview' => "Où en est votre projet\u{00A0}: avancement par jalon, budget et dernières nouvelles de votre équipe projet.",
         'sprints' => "Toutes les tâches de ce projet et leur état. Lorsqu’une tâche est prête pour votre validation, approuvez-la ou signalez une anomalie.",
-        'qa_hub' => "Signalez une anomalie sur un livrable ou envoyez un message à votre équipe projet.",
+        'qa_hub' => "Votre conversation avec votre équipe projet, et les anomalies qu’elle suit jusqu’à leur correction.",
         'financials' => "Vos factures pour ce projet, nos coordonnées de paiement et vos justificatifs de paiement.",
         'vault' => "Vos propositions signées et vos livraisons de projet validées, et l’apparence de votre portail.",
         'team' => "Invitez des collègues de votre organisation et choisissez ce que chaque personne peut voir. Votre organisation peut disposer de :max\u{00A0}comptes au maximum sur le portail client.",
@@ -370,7 +370,7 @@ return [
         'sections' => "Rubriques",
         'overview' => "Votre projet en un coup d’œil\u{00A0}: statut, avancement par jalon, budget, responsable de projet et dernières nouvelles de votre équipe projet.",
         'sprints' => "Toutes les tâches et leur état\u{00A0}: à faire, en cours, en attente de votre validation ou terminée. Lorsqu’une tâche est prête pour votre validation, approuvez-la ou signalez une anomalie.",
-        'qa_hub' => "Signalez une anomalie sur une tâche, indiquez sa priorité et joignez des captures d’écran ou des documents. Vous pouvez aussi envoyer un message général à votre équipe projet. Chaque anomalie conserve l’historique complet des échanges.",
+        'qa_hub' => "Une conversation avec votre équipe projet pour chaque projet, accessible depuis toutes les rubriques avec Écrire à votre équipe projet\u{00A0}: questions, fichiers, photos, messages vocaux. Pour signaler une anomalie sur une tâche, utilisez le bouclier dans la conversation (ou Signaler une anomalie dans Avancement du projet)\u{00A0}: elle reste listée ici avec son état jusqu’à ce que vous validiez la correction.",
         'financials' => "Vos factures pour ce projet et nos coordonnées de paiement. Après votre paiement, déposez votre justificatif\u{00A0}: nous le vérifions et mettons à jour la facture.",
         'vault' => "Vos propositions signées et vos livraisons de projet validées, chacune avec une empreinte de signature (SHA-256). Vous pouvez aussi ajouter votre logo et vos couleurs au portail.",
         'team' => "Invitez des collègues qui utilisent le domaine de messagerie de votre organisation (jusqu’à :max\u{00A0}comptes sur le portail client au total), choisissez leur rôle et limitez leur accès à un seul projet si vous le souhaitez. Vous pouvez suspendre ou rétablir leur accès à tout moment.",
@@ -607,6 +607,8 @@ return [
             'ticket_investigating' => ['label' => "Anomalie", 'title' => "Nous examinons votre anomalie", 'body' => "Nous examinons l’anomalie que vous avez signalée\u{00A0}: «\u{00A0}:ticket\u{00A0}»."],
             'ticket_reply' => ['label' => "Anomalie", 'title' => "Nouvelle réponse sur votre anomalie", 'body' => "Votre équipe projet a répondu au sujet de «\u{00A0}:ticket\u{00A0}»."],
             'ticket_resolved' => ['label' => "Anomalie", 'title' => "Anomalie résolue", 'body' => "L’anomalie que vous avez signalée, «\u{00A0}:ticket\u{00A0}», est résolue."],
+            'chat_message' => ['label' => "Message", 'title' => ":name vous a répondu", 'body' => "«\u{202F}:text\u{202F}» (:project)"],
+            'chat_file' => ['label' => "Message", 'title' => ":name vous a envoyé un fichier", 'body' => "Ouvrez la conversation sur :project pour le consulter."],
         ],
     ],
 ];

@@ -144,7 +144,7 @@
     </main>
 
     <!-- Messages -->
-    <button type="button" class="hq-lift fixed bottom-6 right-6 z-30 grid h-14 w-14 place-items-center rounded-full bg-deep-teal text-white hover:bg-petrol" style="box-shadow: var(--shadow-float);"
+    <button type="button" class="hq-lift hq-page-fab fixed bottom-6 right-6 z-30 grid h-14 w-14 place-items-center rounded-full bg-deep-teal text-white hover:bg-petrol" style="box-shadow: var(--shadow-float);"
             @click="modals.chat = true; scrollChatToBottom()" aria-label="Open messages" title="Messages">
         <i data-lucide="message-circle" class="h-6 w-6"></i>
     </button>

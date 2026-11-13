@@ -164,9 +164,10 @@
                 <h3 class="section-title text-ui">Evidence</h3>
                 <div class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
                     @forelse($ticketAttachments as $att)
-                        <a href="{{ route('hq.file', ['path' => $att->file_path]) }}" target="_blank" class="flex flex-col items-center gap-2 rounded-lg border border-line p-3 text-center text-caption no-underline hover:border-deep-teal">
-                            <i data-lucide="image" class="h-5 w-5 text-muted"></i>
+                        <a href="{{ route('hq.chat.file', $att->id) }}" target="_blank" rel="noopener" class="flex flex-col items-center gap-2 rounded-lg border border-line p-3 text-center text-caption no-underline hover:border-deep-teal" title="{{ $att->file_name }}">
+                            <i data-lucide="{{ $att->kind === 'image' ? 'image' : ($att->kind === 'voice' ? 'mic' : 'file') }}" class="h-5 w-5 text-muted"></i>
                             <span class="break-all">{{ Str::limit($att->file_name, 18) }}</span>
+                            @if($att->is_internal) <span class="text-warning">Internal</span> @endif
                         </a>
                     @empty
                         <p class="help col-span-full">No files added yet.</p>
@@ -189,7 +190,13 @@
                 @endif
 
                 <div class="divider"></div>
-                <h3 class="section-title text-ui">Conversation</h3>
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h3 class="section-title text-ui">Conversation</h3>
+                    {{-- The issue lives in the client's conversation with the delivery team (docs/CHAT.md) --}}
+                    <a href="{{ route('hq.ops.messages', ['project' => $selectedTicket['project_id']]) }}" class="btn btn-ghost btn-sm" wire:navigate>
+                        <i data-lucide="messages-square"></i> Open the client conversation
+                    </a>
+                </div>
 
                 @forelse($ticketComments as $comment)
                     <div class="mb-3 rounded-lg border p-4 {{ $comment->is_internal_only ? 'border-warning bg-warning-tint' : 'border-line bg-paper' }}">
@@ -201,7 +208,8 @@
                             <span class="num">{{ \Carbon\Carbon::parse($comment->created_at)->setTimezone('Africa/Lagos')->format('j M, H:i') }}</span>
                         </div>
                         <div class="text-small text-slate">
-                            {!! nl2br(e($comment->comment_text)) !!}
+                            {!! nl2br(e((string) $comment->comment_text)) !!}
+                            @if(trim((string) $comment->comment_text) === '')<span class="text-muted">A file (see Evidence).</span>@endif
                         </div>
                     </div>
                 @empty

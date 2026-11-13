@@ -38,6 +38,8 @@ Schedule::command('outreach:remind')->weekdays()->dailyAt('07:30')->timezone('Af
 // The The 120-Minute Idle Killswitch Command on hours spent working and the The QA SLA Auto-Approver Command from clients.
 Schedule::command('ops:qa-auto-approve')->everyMinute();
 Schedule::command('ops:timer-killswitch')->everyFiveMinutes();
+// Client conversations (docs/CHAT.md): an email when a message isn't read within an hour, at most one an hour per person
+Schedule::command('chat:email-unread')->everyFiveMinutes()->withoutOverlapping(10);
 
 // The Fetch fresh Exchange Rates right at Midnight
 Schedule::command('finance:sync-exchange-rates')->dailyAt('00:00');

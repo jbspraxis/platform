@@ -469,8 +469,10 @@ final class Handovers
             return [];
         }
 
-        return DB::table('qa_comments')->whereIn('ticket_id', $ticketIds)->where('is_internal_only', 0)
-            ->orderBy('created_at')->orderBy('id')->get(['ticket_id', 'comment_text'])
+        // The replies live in the client's conversation (docs/CHAT.md): its messages about the ticket, not internal notes
+        return DB::table('chat_messages')->whereIn('qa_ticket_id', $ticketIds)->where('kind', 'text')->where('is_internal', 0)
+            ->whereNull('deleted_at')->whereNotNull('body')->where('body', '!=', '')
+            ->orderBy('created_at')->orderBy('id')->get(['qa_ticket_id as ticket_id', 'body as comment_text'])
             ->mapWithKeys(fn ($c) => [$c->ticket_id => Str::limit(trim(preg_replace('/\s+/u', ' ', $c->comment_text)), 300)])->all();
     }
 

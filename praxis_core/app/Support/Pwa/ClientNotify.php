@@ -31,6 +31,9 @@ class ClientNotify
         'ticket_investigating' => ['portal.qa.view', 'search'],
         'ticket_reply' => ['portal.qa.view', 'message-square'],
         'ticket_resolved' => ['portal.qa.view', 'circle-check'],
+        // The conversation with the delivery team (docs/CHAT.md): a message with words, or a file alone
+        'chat_message' => ['portal.qa.view', 'message-circle'],
+        'chat_file' => ['portal.qa.view', 'paperclip'],
     ];
 
     // Where each kind opens in the portal (the dashboard tab)
@@ -38,6 +41,7 @@ class ClientNotify
         'invoice_issued' => 'financials', 'invoice_overdue' => 'financials', 'invoice_cancelled' => 'financials',
         'payment_verified' => 'financials', 'payment_rejected' => 'financials',
         'task_review' => 'sprints', 'task_review_reminder' => 'sprints', 'ticket_investigating' => 'qa_hub', 'ticket_reply' => 'qa_hub', 'ticket_resolved' => 'qa_hub',
+        'chat_message' => 'qa_hub', 'chat_file' => 'qa_hub',
     ];
 
     private static bool $pushQueued = false;
