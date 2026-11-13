@@ -439,16 +439,21 @@ class Dashboard extends Component
         if (!$this->activeProject || !$this->allowed('billing.view')) return;
         $invoices = DB::table('invoices')->where('project_id', $this->activeProject->id)->orderBy('created_at', 'desc')
             ->get(['id', 'invoice_number', 'issued_at', 'due_date', 'status', 'total_amount', 'currency']);
-        // In one query (not one per invoice): the invoices with a proof of payment waiting for HQ's check, and what is
-        // already paid on each (verified payments, HQ-recorded ones too), so the client sees what is left
+        // In one query (not one per invoice), each invoice's payments: a proof of payment waiting for HQ's check, what is
+        // already paid (verified payments, HQ-recorded ones too) so the client sees what is left, and each verified
+        // payment's receipt (docs/RECEIPTS.md): number, amount, day received
         $payments = $invoices->isEmpty() ? collect() : DB::table('transactions')->whereIn('invoice_id', $invoices->pluck('id'))->whereNull('deleted_at')
-            ->groupBy('invoice_id')
-            ->selectRaw("invoice_id, MAX(CASE WHEN status = 'Pending Verification' THEN 1 ELSE 0 END) as pending, COALESCE(SUM(CASE WHEN status = 'Verified' THEN amount_claimed + COALESCE(wht_deducted, 0) + COALESCE(tolerance_writeoff, 0) ELSE 0 END), 0) as settled")
-            ->get()->keyBy('invoice_id');
+            ->orderByRaw('COALESCE(verified_at, created_at)')
+            ->get(['id', 'invoice_id', 'status', 'amount_claimed', 'wht_deducted', 'tolerance_writeoff', 'receipt_number', 'received_on', 'verified_at', 'created_at'])
+            ->groupBy('invoice_id');
         $this->invoices = $invoices->map(function($invoice) use ($payments) {
-            $invoice->has_pending_pop = (int) ($payments->get($invoice->id)->pending ?? 0) === 1;
-            $invoice->paid_so_far = round((float) ($payments->get($invoice->id)->settled ?? 0), 2);
+            $rows = $payments->get($invoice->id) ?? collect();
+            $verified = $rows->where('status', 'Verified');
+            $invoice->has_pending_pop = $rows->contains('status', 'Pending Verification');
+            $invoice->paid_so_far = round((float) $verified->sum(fn ($t) => (float) $t->amount_claimed + (float) $t->wht_deducted + (float) $t->tolerance_writeoff), 2);
             $invoice->balance = max(0, round((float) $invoice->total_amount - $invoice->paid_so_far, 2));
+            $invoice->receipts = $verified->whereNotNull('receipt_number')->map(fn ($r) => ['id' => $r->id, 'number' => $r->receipt_number,
+                'amount' => (float) $r->amount_claimed, 'date' => $r->received_on ?: ($r->verified_at ?? $r->created_at)])->values()->all();
             return $invoice;
         })->toArray();
         // Only the accounts in the currency of the invoices held by the company that bills them (D8), with the fields shown

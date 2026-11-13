@@ -112,6 +112,8 @@ class EscrowVerification extends Component
             // 2. Is the invoice now fully cleared? Every verified payment counts, HQ-recorded ones too (InvoicePayments);
             // a part payment leaves it unpaid, its due date optionally extended
             \App\Support\Finance\InvoicePayments::settle($invoice, (int) $this->extend_guillotine_days);
+            // 3. Its receipt number; the receipt is emailed once the response is out (docs/RECEIPTS.md)
+            \App\Support\Finance\PaymentReceipts::number($tx->id);
 
 
             // 4. Audit trail
@@ -138,10 +140,13 @@ class EscrowVerification extends Component
         }
 
         \App\Support\Pwa\ClientNotify::invoice($this->selectedTx->invoice_id ?? null, 'payment_verified');
+        if ($this->selectedTx->id ?? null) {
+            \App\Support\Finance\PaymentReceipts::sendAfterResponse($this->selectedTx->id);
+        }
 
         $this->showVerifyModal = false;
         $this->loadTransactions();
-        session()->flash('success', 'Payment verified and recorded in the general ledger.');
+        session()->flash('success', 'Payment verified and recorded in the general ledger. Its receipt is emailed to the client’s billing contacts.');
     }
 
     public function rejectTransaction()

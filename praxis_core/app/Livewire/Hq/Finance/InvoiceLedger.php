@@ -62,6 +62,9 @@ class InvoiceLedger extends Component
     /** Record payment (finance.approve): the invoice it is for, and what arrived */
     public ?string $pay_invoice_id = null;
     public $pay_amount = '';
+    // Receipts: the invoice whose payments and receipts are shown (docs/RECEIPTS.md)
+    #[\Livewire\Attributes\Locked]
+    public ?string $receipts_invoice_id = null;
     public string $pay_received_on = '';
     public string $pay_method = 'Bank Transfer';
     public string $pay_reference = '';
@@ -566,11 +569,49 @@ class InvoiceLedger extends Component
             return;
         }
 
-        $invoice = DB::table('invoices')->where('id', $this->pay_invoice_id)->first(['invoice_number', 'currency']);
+        $invoice = DB::table('invoices')->where('id', $this->pay_invoice_id)->first(['id', 'invoice_number', 'currency', 'project_id']);
         $this->pay_invoice_id = null;
-        session()->flash('success', $result['paid']
+        $to = \App\Support\Finance\InvoiceMailer::recipients($invoice)->pluck('email')->all();
+        $receiptLine = $to
+            ? " Receipt {$result['receipt']} is being emailed to " . implode(', ', $to) . '.'
+            : " Receipt {$result['receipt']} wasn’t emailed: no active portal account at the client sees invoices. Download it from Receipts.";
+        session()->flash('success', ($result['paid']
             ? "Payment recorded. Invoice {$invoice->invoice_number} is now paid."
-            : "Payment recorded on {$invoice->invoice_number}. " . \App\Livewire\Hq\HqMoney::format($invoice->currency, $result['balance']) . ' is left to pay.');
+            : "Payment recorded on {$invoice->invoice_number}. " . \App\Livewire\Hq\HqMoney::format($invoice->currency, $result['balance']) . ' is left to pay.') . $receiptLine);
+    }
+
+    /** Receipts: the payments of an invoice with their receipts (docs/RECEIPTS.md) */
+    public function openReceipts(string $invoiceId): void
+    {
+        $this->receipts_invoice_id = DB::table('invoices')->where('id', $invoiceId)->whereNull('deleted_at')->exists() ? $invoiceId : null;
+    }
+
+    public function closeReceipts(): void
+    {
+        $this->receipts_invoice_id = null;
+    }
+
+    /** Email a payment's receipt (again) to the client's billing contacts */
+    public function emailReceipt(string $transactionId): void
+    {
+        abort_unless(Auth::user()->can('finance.create'), 403);
+        $receipt = \App\Support\Finance\PaymentReceipts::find($transactionId);
+        if (! $receipt) {
+            session()->flash('warning', 'We couldn’t find that receipt. Refresh the page and try again.');
+
+            return;
+        }
+        try {
+            $reached = \App\Support\Finance\PaymentReceipts::send($transactionId);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Receipt email not prepared', ['transaction_id' => $transactionId, 'message' => $e->getMessage()]);
+            $reached = null;
+        }
+        session()->flash($reached ? 'success' : 'warning', "Receipt {$receipt->receipt_number}: " . match (true) {
+            $reached === null => 'We couldn’t prepare its email. Try again; if it keeps failing, check the server log.',
+            $reached === [] => 'Nobody at the client was emailed: no active portal account there sees invoices. Invite their finance contact, then send it again.',
+            default => 'Emailed with its PDF to ' . implode(', ', $reached) . '.',
+        });
     }
 
     /** Finance › Invoices › Email again: the invoice and its PDF to the client's billing contacts */
@@ -796,6 +837,8 @@ class InvoiceLedger extends Component
             'deductions' => $deductions,
             'advanceRoom' => $advancePhase ? $this->advanceRoom($advancePhase) : null,
             'payInvoice' => $this->pay_invoice_id ? DB::table('invoices')->where('id', $this->pay_invoice_id)->first(['id', 'invoice_number', 'currency', 'total_amount']) : null,
+            'receiptsInvoice' => $this->receipts_invoice_id ? DB::table('invoices')->where('id', $this->receipts_invoice_id)->first(['id', 'invoice_number', 'currency']) : null,
+            'receiptRows' => $this->receipts_invoice_id ? \App\Support\Finance\PaymentReceipts::forInvoice($this->receipts_invoice_id) : collect(),
             'activeProjects' => $this->showCreateModal ? $this->activeProjects()->get() : collect(),
             'vat' => $vat,
             // The accounts of the company Vat::for() chose (the same as matchingAccounts(), without looking it up again)
