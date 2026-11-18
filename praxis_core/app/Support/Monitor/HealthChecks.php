@@ -169,26 +169,43 @@ class HealthChecks
         $last = collect(['appointments', 'crm_notes', 'copq_assessments'])
             ->map(fn ($t) => DB::table($t)->max('created_at'))->filter()->max();
 
-        return self::enquiriesFrom($last, config('site_api.live_since'));
+        return self::enquiriesFrom($last, config('site_api.live_since'), FormsSelfTest::last());
     }
 
     /**
-     * The enquiries check from the last enquiry and the day the site went live, so it can be tested. With no
-     * enquiry recorded yet (a new site, or test enquiries cleared away, as on 11 Nov 2026), the same 14- and 30-day
-     * limits count from the day the site went live instead: an empty history is a fault only once it has lasted that long.
+     * Website forms: whether the forms work, from their daily self-test (FormsSelfTest), plus when the last enquiry
+     * came in. Owner, 18 Nov 2026: a quiet spell with no enquiry is information for the team, not a fault; the
+     * check goes amber or red only when the forms themselves stop working (or their test stops running).
+     *
+     * @param  ?array  $test  FormsSelfTest::last(): ['at', 'ok', 'failed' => [form => reason]]
      */
-    public static function enquiriesFrom($last, $liveSince): array
+    public static function enquiriesFrom($last, $liveSince, ?array $test = null): array
     {
-        $from = $last ?: $liveSince;
-        if (!$from) {
-            return ['label' => 'Website enquiries', 'state' => 'warn', 'detail' => 'No enquiry has ever been recorded.', 'fix' => null];
+        $enquiries = $last
+            ? 'Last enquiry (booking, contact form or cost report) ' . self::ago($last) . '.'
+            : ($liveSince
+                ? 'No enquiry yet (booking, contact form or cost report) since the site went live ' . self::ago($liveSince) . '.'
+                : 'No enquiry has been recorded yet.');
+
+        if ($test === null) {
+            return ['label' => 'Website forms', 'state' => 'unknown',
+                'detail' => 'The daily forms test has not run yet (the monitor runs it within 5 minutes). ' . $enquiries, 'fix' => null];
         }
-        $days = (int) Carbon::parse($from)->diffInDays(now(), true);
-        return ['label' => 'Website enquiries', 'state' => $days > 30 ? 'bad' : ($days > 14 ? 'warn' : 'ok'),
-            'detail' => $last
-                ? 'Last enquiry (booking, contact form or cost report) ' . self::ago($last) . '.'
-                : 'No enquiry yet (booking, contact form or cost report); the site went live ' . self::ago($liveSince) . '.',
-            'fix' => $days > 14 ? 'Test the contact and booking forms yourself, and check the site is getting visitors.' : null];
+        if (!$test['ok']) {
+            $failed = collect((array) ($test['failed'] ?? []))->map(fn ($why, $form) => "{$form} {$why}")->implode('; ');
+            return ['label' => 'Website forms', 'state' => 'bad',
+                'detail' => 'The forms test failed ' . self::ago($test['at']) . ': ' . $failed . '. ' . $enquiries,
+                'fix' => 'Send the contact form on jbspraxis.com yourself, then see Errors here and storage/logs. The test runs again every hour until it passes.'];
+        }
+        if (Carbon::parse($test['at'])->diffInHours(now(), true) > 48) {
+            return ['label' => 'Website forms', 'state' => 'warn',
+                'detail' => 'The daily forms test last passed ' . self::ago($test['at']) . ' and has not run since. ' . $enquiries,
+                'fix' => 'The monitor runs it: check the Scheduler (cron) line above.'];
+        }
+
+        return ['label' => 'Website forms', 'state' => 'ok',
+            'detail' => 'The contact, booking and cost calculator forms passed their daily test ' . self::ago($test['at']) . '. ' . $enquiries,
+            'fix' => null];
     }
 
     private static function rates(): array

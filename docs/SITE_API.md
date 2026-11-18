@@ -335,3 +335,13 @@ name (40 characters).
   DB_USERNAME=root DB_PASSWORD=… DB_DATABASE=praxis_test php vendor/bin/phpunit tests/Feature/SiteApiTest.php
   tests/Feature/WebsiteSettingsScreenTest.php` on an empty throwaway database; they refuse any name that doesn't
   start with `praxis_test` or `praxis_pr`.
+
+### 6.8 HQ's daily forms test (18 November 2026)
+
+HQ checks its own form endpoints once a day, through System health › Website forms (`App\Support\Monitor\FormsSelfTest`, which `monitor:run` triggers):
+- It sends `POST /enquiries`, `POST /bookings` and `POST /calculator/assessments` from HQ to its own public address. Each request has an empty JSON body (`{}`) and is signed exactly as in 6.1, with the first key in `SITE_API_KEYS`, visitor IP `127.0.0.1` and locale `en`.
+- Each answer must be `422 invalid`. That proves the web server, the signature check, the route and the form's validation all respond.
+- An empty form never reaches its service, so nothing is stored, nothing is emailed, and no visitor limit is used.
+- If any other answer comes back, the check turns red and the monitor alerts. The test then reruns every hour until it passes.
+- Expect these three requests in the access log once a day. They are not visitors.
+- Owner's rule: having no enquiries for a while is only information on that check, never a problem.

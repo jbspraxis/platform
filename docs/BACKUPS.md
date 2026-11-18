@@ -20,7 +20,7 @@ As found on the server on 4 Nov 2026 (read in cPanel; the account owned exactly 
 |---|---|---|---|
 | praxis (HQ, the portal, jbspraxis.com) | `smartqaq_praxis_core` | ~19 MB | `praxis_core/storage/app/private`, `praxis_core/storage/app/public`, `praxis_site/storage/app` (jbspraxis.com's own files) |
 | lpc (bureau.lpc.cm, lpc.cm) | `smartqaq_lpc_core` | ~23 MB | `public_html/bureau.lpc.cm/uploads`, `public_html/lpc.cm/uploads` |
-| nfelia (nfelia.com, nfelia.lpc.cm) | `smartqaq_nfelia_core` | ~6 MB | `public_html/nfelia.com/uploads`, `public_html/nfelia.com/storage`, `public_html/nfelia.lpc.cm/uploads`, `public_html/nfelia.lpc.cm/storage` (both storage folders without `framework`, `release`, `tmp`) |
+| nfelia (nfelia.com; nfelia.lpc.cm only redirects there since 11 Nov 2026) | `smartqaq_nfelia_core` | ~6 MB | `public_html/nfelia.com/uploads`, `public_html/nfelia.com/storage` (storage without `framework`, `release`, `tmp`) |
 | hodlc (hodlc.lpc.cm) | `smartqaq_hodlc` | ~20 MB | `public_html/hodlc.lpc.cm/uploads` |
 | smartls (smartls.cm, the account's main domain) | `smartqaq_smartls` | ~5 MB | `public_html/uploads`, `public_html/administration/uploads`, `public_html/administration/upload`, `public_html/administration/storage`, `public_html/assets/uploads`, `uploads` (the private one in the home) |
 
