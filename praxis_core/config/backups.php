@@ -62,11 +62,12 @@ return [
             'files' => ['public_html/bureau.lpc.cm/uploads', 'public_html/lpc.cm/uploads'],
         ],
         'nfelia' => [
-            'label' => 'nfelia.com and nfelia.lpc.cm',
+            'label' => 'nfelia.com (nfelia.lpc.cm redirects there)',
             'databases' => ['smartqaq_nfelia_core'],
-            // storage/ holds the private records, order proofs, signatures and MoMo receipts; its pdf/ only caches
-            'files' => ['public_html/nfelia.com/uploads', 'public_html/nfelia.com/storage',
-                'public_html/nfelia.lpc.cm/uploads', 'public_html/nfelia.lpc.cm/storage'],
+            // storage/ holds the private records, order proofs, signatures and MoMo receipts; its pdf/ only caches.
+            // nfelia.lpc.cm was retired on 11 Nov 2026: its folder holds only a redirect to nfelia.com (the old app copy
+            // is archived privately in ~/old_sites), so it has no upload folders left to back up.
+            'files' => ['public_html/nfelia.com/uploads', 'public_html/nfelia.com/storage'],
             'exclude' => ['framework', 'release', 'tmp'],
         ],
         // HOD Lekki moved from hodlc.lpc.cm to its own domain on 11 Nov 2026: the app now lives in

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Support\Monitor\ErrorMonitor;
+use App\Support\Monitor\FormsSelfTest;
 use App\Support\Monitor\LogScanner;
 use App\Support\Monitor\MonitorAlerts;
 use Illuminate\Console\Command;
@@ -10,8 +11,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * The HQ System Health monitor's background work, every 5 minutes (routes/console.php):
- * heartbeat, read new log lines, alert on new errors and red checks, the 8am digest,
- * and at 3am delete old events.
+ * heartbeat, read new log lines, the website forms' daily self-test, alert on new errors and red checks,
+ * the 8am digest, and at 3am delete old events.
  */
 class MonitorRun extends Command
 {
@@ -23,6 +24,12 @@ class MonitorRun extends Command
         ErrorMonitor::setState('heartbeat', now()->toDateTimeString());
 
         $scanned = LogScanner::scanAll();
+        // Before the health alerts, so a form that stopped working alerts on this run
+        try {
+            FormsSelfTest::runIfDue();
+        } catch (\Throwable $e) {
+            report($e);
+        }
         $alerted = MonitorAlerts::newErrors();
         $health = MonitorAlerts::health();
         $digest = MonitorAlerts::digest();
