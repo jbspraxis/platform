@@ -88,7 +88,7 @@
         <link rel="alternate" hreflang="fr" href="{{ $alternates['fr'] }}">
         <link rel="alternate" hreflang="x-default" href="{{ $alternates['en'] }}">
     @endif
-    <meta property="og:type" content="website">
+    <meta property="og:type" content="{{ trim($__env->yieldContent('og_type')) ?: 'website' }}">
     <meta property="og:site_name" content="JBS Praxis">
     <meta property="og:title" content="{!! $title !!}">
     <meta property="og:description" content="{!! $description !!}">

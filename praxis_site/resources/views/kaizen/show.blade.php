@@ -1,6 +1,9 @@
 @extends('layouts.site')
 
 @section('title', $article['title'])
+{{-- A shared link shows what the article says (its summary), as an article --}}
+@section('description', \App\Support\Articles::plain($article['summary']) ?: $article['title'])
+@section('og_type', 'article')
 
 @section('content')
     <article class="stack">
