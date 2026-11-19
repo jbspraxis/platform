@@ -68,6 +68,23 @@ final class Articles
     }
 
     /** Paragraphs of escaped text, with **bold** kept. */
+    /**
+     * An article's text as one plain line for a link preview (og:description, meta description): no **bold**
+     * markers, no line breaks, cut at a word within $limit characters. Owner, 19 Nov 2026: a shared Kaizen link
+     * showed the site's generic line instead of what the article says.
+     */
+    public static function plain(?string $text, int $limit = 200): string
+    {
+        $text = trim((string) preg_replace('/\s+/u', ' ', str_replace('**', '', (string) $text)));
+        if (mb_strlen($text) <= $limit) {
+            return $text;
+        }
+        $cut = mb_substr($text, 0, $limit);
+        $space = mb_strrpos($cut, ' ');
+
+        return rtrim($space !== false && $space > $limit * 0.6 ? mb_substr($cut, 0, $space) : $cut, " ,.;:") . '…';
+    }
+
     public static function html(?string $text): HtmlString
     {
         $text = trim((string) $text);
