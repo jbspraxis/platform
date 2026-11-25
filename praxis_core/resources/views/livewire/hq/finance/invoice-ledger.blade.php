@@ -46,12 +46,108 @@
 
 
     <div class="tabs" role="tablist">
+        <button type="button" role="tab" wire:click="setTab('Drafts')" class="tab {{ $activeTab === 'Drafts' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'Drafts' ? 'true' : 'false' }}">Drafts @if($draftCount > 0)<span class="pill pill-neutral" style="margin-left: 0.25rem;">{{ $draftCount }}</span>@endif</button>
         <button type="button" role="tab" wire:click="setTab('Pending')" class="tab {{ $activeTab === 'Pending' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'Pending' ? 'true' : 'false' }}">Sent</button>
         <button type="button" role="tab" wire:click="setTab('Overdue')" class="tab {{ $activeTab === 'Overdue' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'Overdue' ? 'true' : 'false' }}">Overdue</button>
         <button type="button" role="tab" wire:click="setTab('Paid')" class="tab {{ $activeTab === 'Paid' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'Paid' ? 'true' : 'false' }}">Paid</button>
         <button type="button" role="tab" wire:click="setTab('Cancelled')" class="tab {{ $activeTab === 'Cancelled' ? 'is-active' : '' }}" aria-selected="{{ $activeTab === 'Cancelled' ? 'true' : 'false' }}">Cancelled</button>
     </div>
 
+    @if($activeTab === 'Drafts')
+    {{-- Drafts (App\Support\Finance\InvoiceDrafts): not invoices yet; the client sees nothing until Issue and send --}}
+    <div class="card p-0">
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Draft</th>
+                        <th>Project and client</th>
+                        <th class="num text-right">Total</th>
+                        <th>Status</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($drafts as $draft)
+                        <tr wire:key="draft-{{ $draft->id }}">
+                            <td>
+                                <div class="num text-left font-semibold text-ink">{{ $draft->invoice_number }}</div>
+                                <div class="help">{{ $draft->invoice_type }}</div>
+                            </td>
+                            <td>
+                                <div class="font-medium text-ink">{{ $draft->project_title }}</div>
+                                <div class="help flex items-center gap-1"><i data-lucide="building-2" style="width: 14px; height: 14px;"></i> {{ $draft->client_name }}</div>
+                            </td>
+                            <td class="num">
+                                <span class="font-semibold text-ink">{{ \App\Livewire\Hq\HqMoney::format($draft->currency, $draft->preview->total_amount) }}</span>
+                                @if((float) $draft->preview->vat_amount > 0)
+                                    <div class="help" style="font-variant-numeric: tabular-nums;">incl. VAT {{ \App\Livewire\Hq\HqMoney::format($draft->currency, $draft->preview->vat_amount) }}</div>
+                                @endif
+                            </td>
+                            <td>
+                                <span class="pill pill-warning">Draft, not sent</span>
+                                <div class="help mt-1">Saved {{ \Carbon\Carbon::parse($draft->updated_at)->setTimezone('Africa/Lagos')->format('j M Y, H:i') }}@if($draft->saved_by) by {{ $draft->saved_by }}@endif</div>
+                            </td>
+                            <td>
+                                <div class="flex justify-end gap-2">
+                                    <a href="{{ route('hq.finance.invoice-draft-pdf', $draft->id) }}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">
+                                        <i data-lucide="file-text"></i> Preview PDF
+                                    </a>
+                                    @can('finance.create')
+                                        <button type="button" wire:click="editDraft('{{ $draft->id }}')" class="btn btn-ghost btn-sm">
+                                            <i data-lucide="pencil"></i> Edit
+                                        </button>
+                                        <div x-data="{ open: false }" @keydown.escape.window="open = false">
+                                            <button type="button" @click="open = true" class="btn btn-primary btn-sm">
+                                                <i data-lucide="send"></i> Issue and send
+                                            </button>
+                                            <div class="modal-backdrop" x-show="open" x-cloak style="display: none; text-align: left;" @click.self="open = false"
+                                                 x-effect="if (open) $nextTick(() => $refs.keepDraft.focus())">
+                                                <div class="modal" role="dialog" aria-modal="true" aria-labelledby="issue-draft-title-{{ $draft->id }}" style="max-width: 500px; white-space: normal;">
+                                                    <h2 id="issue-draft-title-{{ $draft->id }}" class="modal-title">Issue and send {{ $draft->invoice_number }}?</h2>
+                                                    <p class="text-small text-muted" style="margin: 0;">{{ $draft->client_name }}’s billing contacts get it by email with its PDF, and it shows in their portal for {{ \App\Livewire\Hq\HqMoney::format($draft->currency, $draft->preview->total_amount) }}. It is dated today and posted to the general ledger.</p>
+                                                    <div class="modal-actions">
+                                                        <button type="button" x-ref="keepDraft" @click="open = false" class="btn btn-secondary">Keep as draft</button>
+                                                        <button type="button" wire:click="issueDraft('{{ $draft->id }}')" @click="open = false" class="btn btn-primary">Issue and send</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div x-data="{ open: false }" @keydown.escape.window="open = false">
+                                            <button type="button" @click="open = true" class="btn btn-ghost btn-sm" style="color: var(--color-danger);">
+                                                <i data-lucide="trash-2"></i> Discard
+                                            </button>
+                                            <div class="modal-backdrop" x-show="open" x-cloak style="display: none; text-align: left;" @click.self="open = false"
+                                                 x-effect="if (open) $nextTick(() => $refs.keepDraft2.focus())">
+                                                <div class="modal" role="dialog" aria-modal="true" aria-labelledby="discard-draft-title-{{ $draft->id }}" style="max-width: 500px; white-space: normal;">
+                                                    <h2 id="discard-draft-title-{{ $draft->id }}" class="modal-title">Discard draft {{ $draft->invoice_number }}?</h2>
+                                                    <p class="text-small text-muted" style="margin: 0;">It was never sent, so the client sees no change. Its milestones can be invoiced again. The discard stays in the audit log.</p>
+                                                    <div class="modal-actions">
+                                                        <button type="button" x-ref="keepDraft2" @click="open = false" class="btn btn-secondary">Keep draft</button>
+                                                        <button type="button" wire:click="discardDraft('{{ $draft->id }}')" @click="open = false" class="btn btn-danger">Discard draft</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endcan
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5">
+                                <div class="empty-state">
+                                    <strong>No drafts</strong>
+                                    Create invoice › Save as draft keeps an invoice here for review. Nothing reaches the client until you issue and send it.
+                                </div>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @else
     <div class="card p-0">
         <div class="table-wrap">
             <table class="table">
@@ -154,6 +250,7 @@
             <div class="p-4">{{ $invoices->links() }}</div>
         @endif
     </div>
+    @endif
 
     @if($payInvoice)
         <div class="modal-backdrop" wire:keydown.escape="closeRecordPayment">
@@ -259,7 +356,7 @@
         <div class="modal-backdrop">
             <div class="modal" style="max-width: 640px;" role="dialog" aria-modal="true" aria-labelledby="create-invoice-title">
                 <div class="mb-4 flex items-start justify-between gap-4">
-                    <h2 id="create-invoice-title" class="modal-title">Create invoice</h2>
+                    <h2 id="create-invoice-title" class="modal-title">{{ $editingDraft ? 'Draft ' . $editingDraft : 'Create invoice' }}</h2>
                     <button type="button" wire:click="$set('showCreateModal', false)" class="btn btn-ghost btn-sm" aria-label="Close"><i data-lucide="x"></i></button>
                 </div>
 
@@ -409,11 +506,17 @@
                         {{ $vat ? \App\Support\Finance\Vat::describe($vat) : __('vat.invoice_help') }} {{ $vat ? \App\Support\Finance\Vat::note($vat) : '' }} If the invoice isn’t in USD, the exchange rate is fixed when you create it.
                     </div>
 
+                    <p class="help" style="margin: 0;">{{ $editingDraft ? 'Issue and send emails it to the client’s billing contacts and shows it in their portal. Save as draft keeps your changes; nothing is sent.' : 'Create and send emails it to the client’s billing contacts and shows it in their portal. Save as draft keeps it in Drafts for review; nothing is sent.' }}</p>
+
                     <div class="modal-actions">
                         <button type="button" wire:click="$set('showCreateModal', false)" class="btn btn-secondary">Cancel</button>
+                        <button type="button" wire:click="saveDraft" class="btn btn-secondary" wire:loading.attr="disabled">
+                            <span wire:loading.remove wire:target="saveDraft">Save as draft</span>
+                            <span wire:loading wire:target="saveDraft">Saving…</span>
+                        </button>
                         <button type="submit" class="btn btn-primary" wire:loading.attr="disabled">
-                            <span wire:loading.remove wire:target="draftSubsequentInvoice">Create invoice</span>
-                            <span wire:loading wire:target="draftSubsequentInvoice">Creating…</span>
+                            <span wire:loading.remove wire:target="draftSubsequentInvoice">{{ $editingDraft ? 'Issue and send' : 'Create and send' }}</span>
+                            <span wire:loading wire:target="draftSubsequentInvoice">Sending…</span>
                         </button>
                     </div>
                 </form>

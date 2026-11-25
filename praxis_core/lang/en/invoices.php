@@ -3,6 +3,8 @@
 // Invoices as the client gets them (App\Support\Finance\InvoicePdf; docs/QA-PORTAL.md D11)
 return [
     'pdf' => [
+        'draft' => 'Draft, not issued',
+        'draft_mark' => 'DRAFT',
         'invoice' => 'Invoice',
         'tax_invoice' => 'Tax invoice',
         'from' => 'From',

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Support\Access;
+use App\Support\Finance\InvoiceDrafts;
 use App\Support\Finance\InvoicePdf;
+use Illuminate\Support\Collection;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -37,11 +39,19 @@ class InvoicePdfController extends Controller
         return $this->pdf($row, 'attachment', app()->getLocale() === 'fr' ? 'fr' : 'en');
     }
 
-    private function pdf(object $invoice, string $disposition, ?string $language): Response
+    /** A draft as it would be issued today, marked DRAFT (InvoiceDrafts::preview()): HQ only */
+    public function draft(string $draft): Response
     {
-        return response(InvoicePdf::render($invoice, $language), 200, [
+        [$invoice, $lines] = InvoiceDrafts::preview(InvoiceDrafts::find($draft) ?? abort(404));
+
+        return $this->pdf($invoice, 'inline', null, $lines, 'DRAFT-');
+    }
+
+    private function pdf(object $invoice, string $disposition, ?string $language, ?Collection $lines = null, string $prefix = ''): Response
+    {
+        return response(InvoicePdf::render($invoice, $language, $lines), 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => $disposition . '; filename="' . InvoicePdf::filename($invoice) . '"',
+            'Content-Disposition' => $disposition . '; filename="' . $prefix . InvoicePdf::filename($invoice) . '"',
             'Cache-Control' => 'private, no-store',
             'X-Robots-Tag' => 'noindex',
         ]);

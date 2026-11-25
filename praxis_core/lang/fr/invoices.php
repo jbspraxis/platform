@@ -3,6 +3,8 @@
 // Les factures telles que le client les reçoit (App\Support\Finance\InvoicePdf ; docs/QA-PORTAL.md D11)
 return [
     'pdf' => [
+        'draft' => 'Brouillon, non émise',
+        'draft_mark' => 'BROUILLON',
         'invoice' => 'Facture',
         'tax_invoice' => 'Facture',
         'from' => 'Émise par',
