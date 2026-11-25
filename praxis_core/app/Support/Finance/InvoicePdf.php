@@ -4,6 +4,7 @@ namespace App\Support\Finance;
 
 use App\Support\Opportunities\ProposalPdf;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -18,10 +19,14 @@ use Illuminate\Support\Facades\File;
  */
 final class InvoicePdf
 {
-    public static function render(object $invoice, ?string $language = null): string
+    /**
+     * $lines: the invoice's lines when they aren't stored yet (a draft's preview, InvoiceDrafts::preview()); a draft
+     * (status "Draft") is marked DRAFT, not issued, on the page.
+     */
+    public static function render(object $invoice, ?string $language = null, ?Collection $lines = null): string
     {
         $language ??= self::language($invoice);
-        [$html, $footerLegal, $footerContact] = self::html($invoice, $language);
+        [$html, $footerLegal, $footerContact] = self::html($invoice, $language, $lines);
         $cache = storage_path('framework/cache/dompdf');
         File::ensureDirectoryExists($cache);
 
@@ -29,13 +34,13 @@ final class InvoicePdf
     }
 
     /** The page's HTML and the letterhead's two footer lines (legal, contact), in $language (default: the client's) */
-    public static function html(object $invoice, ?string $language = null): array
+    public static function html(object $invoice, ?string $language = null, ?Collection $lines = null): array
     {
         $language ??= self::language($invoice);
         $previous = App::getLocale();
         App::setLocale($language);
         try {
-            $data = self::data($invoice, $language);
+            $data = self::data($invoice, $language, $lines);
 
             return [
                 view('pdf.invoice', $data)->render(),
@@ -68,14 +73,14 @@ final class InvoicePdf
         return Vat::applied($invoice->vat_applied ?? null, $invoice->vat_rate ?? null) ? __('invoices.pdf.tax_invoice') : __('invoices.pdf.invoice');
     }
 
-    private static function data(object $invoice, string $language): array
+    private static function data(object $invoice, string $language, ?Collection $lines = null): array
     {
         $project = DB::table('projects')->where('id', $invoice->project_id)->first();
         $organisation = $project ? DB::table('organizations')->where('id', $project->organization_id)->first() : null;
         // The company recorded on the invoice, even if it has been deactivated since; none recorded: Nigeria's
         $issuer = $invoice->billing_entity_id ? DB::table('mdm_legal_entities')->where('id', $invoice->billing_entity_id)->first() : Vat::issuer(null);
         $vat = Vat::recorded($invoice->vat_applied ?? null, $invoice->vat_rate ?? null, $issuer?->id, $organisation, $issuer);
-        $lines = DB::table('invoice_lines')->where('invoice_id', $invoice->id)->orderBy('id')->get();
+        $lines ??= DB::table('invoice_lines')->where('invoice_id', $invoice->id)->orderBy('id')->get();
         if ($lines->isEmpty()) {
             $lines = collect([(object) ['description' => (string) $invoice->invoice_type, 'quantity' => 1, 'unit_price' => $invoice->amount_due, 'total_price' => $invoice->amount_due]]);
         }
@@ -107,7 +112,8 @@ final class InvoicePdf
             'accounts' => $accounts,
             // A discount, an advance taken off or a payment reads "−NGN 100,000.00"
             'money' => fn ($amount) => ((float) $amount < 0 ? "\u{2212}" : '') . ProposalPdf::money(abs((float) $amount), (string) $invoice->currency, $language),
-            'paidSoFar' => (float) (InvoicePayments::settled([$invoice->id])->get($invoice->id) ?? 0),
+            'paidSoFar' => ($invoice->status ?? null) === 'Draft' ? 0.0 : (float) (InvoicePayments::settled([$invoice->id])->get($invoice->id) ?? 0),
+            'draft' => ($invoice->status ?? null) === 'Draft',
             'issued' => $date($invoice->issued_at ? Carbon::parse($invoice->issued_at)->setTimezone('Africa/Lagos') : $invoice->created_at),
             'due' => $date($invoice->due_date),
             'paid' => $invoice->status === 'Paid' ? $date($invoice->paid_at ? Carbon::parse($invoice->paid_at)->setTimezone('Africa/Lagos') : null) ?? '' : null,

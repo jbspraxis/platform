@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Support\Access;
+use App\Support\Finance\InvoiceDrafts;
 use App\Support\Finance\ReceivingAccounts;
 use App\Support\Finance\Vat;
 use Illuminate\Validation\Rule;
@@ -26,7 +27,7 @@ class InvoiceLedger extends Component
     private const PER_PAGE = 50;
 
     // The invoices, the projects to invoice and the VAT are read when the page renders (never kept in the page)
-    public $activeTab = 'Pending'; // Pending, Overdue, Paid, Cancelled
+    public $activeTab = 'Pending'; // Drafts, Pending, Overdue, Paid, Cancelled
 
     // Create Invoice State
     public $showCreateModal = false;
@@ -58,6 +59,16 @@ class InvoiceLedger extends Component
     public string $advance_phase_id = '';
     public $advance_amount = '';
     public string $advance_description = '';
+
+    /**
+     * The draft the form was opened from (Edit, or Issue and send: App\Support\Finance\InvoiceDrafts). Save as draft
+     * then updates it; Create invoice issues it and marks it issued. Set here only, never by the page.
+     */
+    #[\Livewire\Attributes\Locked]
+    public ?string $draft_id = null;
+
+    /** Save as draft is running: issue() keeps the draft instead of creating the invoice */
+    private bool $asDraft = false;
 
     /** Record payment (finance.approve): the invoice it is for, and what arrived */
     public ?string $pay_invoice_id = null;
@@ -188,9 +199,7 @@ class InvoiceLedger extends Component
     /** A line's signed amount: a discount counts against the total */
     private static function signed(array $line): float
     {
-        $amount = round(abs((float) ($line['amount'] ?? 0)), 2);
-
-        return ($line['kind'] ?? 'charge') === 'discount' ? -$amount : $amount;
+        return InvoiceDrafts::signed($line);
     }
 
     /** Removing a milestone's line unticks the milestone */
@@ -208,14 +217,15 @@ class InvoiceLedger extends Component
     }
 
     /**
-     * The project's milestones no live invoice bills yet, in order, each with its board column (so Finance sees which
+     * The project's milestones no live invoice bills yet (nor another live draft), in order, each with its board column (so Finance sees which
      * are accepted: the SOW invoices on written acceptance) and the amount its line would carry. Any of them can be
      * ticked (owner, 10 Nov 2026).
      */
     private function offeredPhases(string $projectId): \Illuminate\Support\Collection
     {
         $phases = DB::table('project_phases')->where('project_id', $projectId)->whereNull('deleted_at')->orderBy('phase_number')->get();
-        $billed = \App\Support\Finance\MilestoneInvoices::billed($phases->pluck('id'));
+        // A live draft keeps its milestones too (InvoiceDrafts), except the draft this form is editing
+        $billed = array_merge(\App\Support\Finance\MilestoneInvoices::billed($phases->pluck('id')), InvoiceDrafts::held($phases->pluck('id'), $this->draft_id));
 
         return $phases->reject(fn ($p) => in_array((string) $p->id, $billed, true))->values()->map(function ($p) {
             $p->column = \App\Support\Projects\ProjectPlan::column($p);
@@ -278,6 +288,25 @@ class InvoiceLedger extends Component
         } else {
             $this->projectPhases = [];
         }
+    }
+
+    /** Drafts: each with what it would be if issued now (InvoiceDrafts::preview()), newest first */
+    private function drafts(): \Illuminate\Support\Collection
+    {
+        return DB::table('invoice_drafts')
+            ->join('projects', 'invoice_drafts.project_id', '=', 'projects.id')
+            ->join('organizations', 'projects.organization_id', '=', 'organizations.id')
+            ->leftJoin('users', 'users.id', '=', 'invoice_drafts.updated_by')
+            ->whereNull('invoice_drafts.deleted_at')
+            ->orderByDesc('invoice_drafts.updated_at')
+            ->select('invoice_drafts.*', 'projects.title as project_title', 'organizations.name as client_name', 'users.first_name as saved_by')
+            ->limit(self::PER_PAGE)
+            ->get()
+            ->map(function ($draft) {
+                [$draft->preview] = InvoiceDrafts::preview($draft);
+
+                return $draft;
+            });
     }
 
     /** The tab's invoices, soonest due first: only what the list shows */
@@ -395,6 +424,12 @@ class InvoiceLedger extends Component
      */
     private function issue(string $type, array $lines, array $milestoneIds, ?string $phaseId): void
     {
+        // Save as draft: everything above was checked as for an invoice; nothing is created, sent or posted
+        if ($this->asDraft) {
+            $this->storeDraft($type);
+
+            return;
+        }
         $project = DB::table('projects')->where('id', $this->new_project_id)->first();
         $org = DB::table('organizations')->where('id', $project->organization_id)->first();
         $amountDue = round(array_sum(array_map(fn ($l) => round((float) $l['amount_signed'], 2), $lines)), 2);
@@ -405,14 +440,8 @@ class InvoiceLedger extends Component
         $vatAmount = $vat['applies'] ? round($amountDue * $vat['rate'] / 100, 2) : 0.0;
         $totalAmount = $amountDue + $vatAmount;
 
-        // 2. Due date: handle "Receipt" and "Net X" terms
-        if (stripos(strtolower($this->new_payment_terms), 'receipt') !== false) {
-            $days = 0;
-        } else {
-            $parsedDays = (int) filter_var($this->new_payment_terms, FILTER_SANITIZE_NUMBER_INT);
-            $days = $parsedDays > 0 ? $parsedDays : 10; // Only fallback if explicitly 0 but not "Receipt"
-        }
-        $dueDate = now()->addDays($days);
+        // 2. Due date: "Due on Receipt" is today, "Net X" X days on (from the day it is issued, a draft too)
+        $dueDate = InvoiceDrafts::dueDate((string) $this->new_payment_terms);
 
         // Lock Current Exchange Rate (as it is now in Master data)
         $fxRate = 1.000000;
@@ -422,14 +451,24 @@ class InvoiceLedger extends Component
         }
 
         $invoiceId = (string) Str::uuid();
-        // invoice_number is unique: draw again until the number is free, as DepositInvoice does (a clash used to fail)
-        do {
-            $invNumber = 'INV-' . date('Ym') . '-' . random_int(1000, 9999);
-        } while (DB::table('invoices')->where('invoice_number', $invNumber)->exists());
+        // invoice_number is unique: a draft's own number when it is still free, else one drawn until free (not kept
+        // by a live draft either), as DepositInvoice does (a clash used to fail)
+        $draftId = $this->draft_id;
+        $kept = $draftId ? DB::table('invoice_drafts')->where('id', $draftId)->value('invoice_number') : null;
+        $invNumber = $kept && ! DB::table('invoices')->where('invoice_number', $kept)->exists() ? $kept : InvoiceDrafts::freshNumber();
         $timestamp = now();
         $deducted = array_values(array_filter(array_column($lines, 'advance_invoice_id')));
 
-        DB::transaction(function () use ($invoiceId, $invNumber, $project, $org, $vat, $vatAmount, $totalAmount, $dueDate, $fxRate, $timestamp, $lines, $amountDue, $milestoneIds, $phaseId, $type, $deducted) {
+        DB::transaction(function () use ($invoiceId, $invNumber, $project, $org, $vat, $vatAmount, $totalAmount, $dueDate, $fxRate, $timestamp, $lines, $amountDue, $milestoneIds, $phaseId, $type, $deducted, $draftId) {
+            // Issuing a draft: only once (two people may press Issue and send together)
+            if ($draftId) {
+                $draft = DB::table('invoice_drafts')->where('id', $draftId)->lockForUpdate()->first(['id', 'deleted_at']);
+                if (! $draft || $draft->deleted_at !== null) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'lines' => 'This draft was issued or discarded a moment ago. Close this window and check Drafts and Sent.',
+                    ]);
+                }
+            }
             // Someone else may have invoiced one of these milestones, or used one of its advances, since the form
             // opened: then nothing is created
             if ($milestoneIds !== []) {
@@ -495,6 +534,13 @@ class InvoiceLedger extends Component
 
             // Accrue the receivable in the general ledger, as the proposal gateway does for deposits
             \App\Livewire\Hq\Finance\GeneralLedgerManager::recordInvoiceIssued($invoiceId);
+
+            if ($draftId) {
+                DB::table('invoice_drafts')->where('id', $draftId)->update([
+                    'issued_invoice_id' => $invoiceId, 'issued_at' => $timestamp, 'deleted_at' => $timestamp,
+                    'updated_by' => Auth::id(), 'updated_at' => $timestamp,
+                ]);
+            }
         });
         // The client's billing people hear about it in their portal and on their devices (docs/PWA.md), and get it by
         // email with its PDF (docs/QA-PORTAL.md D11)
@@ -502,8 +548,190 @@ class InvoiceLedger extends Component
         $reached = $this->emailToClient($invoiceId);
 
         $this->showCreateModal = false;
-        $this->reset(['new_project_id', 'picked', 'lines', 'new_kind', 'advance_phase_id', 'advance_amount', 'advance_description']);
-        session()->flash('success', ($type === \App\Support\Finance\Advances::INVOICE_TYPE ? 'Advance invoice ' : 'Invoice ') . "{$invNumber} created for " . ($org->name ?? 'the client') . '. ' . $this->emailedLine($reached));
+        $this->resetForm();
+        if ($draftId) {
+            $this->activeTab = 'Pending';
+            $this->resetPage();
+        }
+        session()->flash('success', ($type === \App\Support\Finance\Advances::INVOICE_TYPE ? 'Advance invoice ' : 'Invoice ') . "{$invNumber} " . ($draftId ? 'issued' : 'created') . ' for ' . ($org->name ?? 'the client') . '. ' . $this->emailedLine($reached));
+    }
+
+    /** The form back to empty, and no longer tied to a draft */
+    private function resetForm(): void
+    {
+        $this->reset(['new_project_id', 'projectPhases', 'picked', 'lines', 'new_kind', 'advance_phase_id', 'advance_amount', 'advance_description', 'new_invoice_type', 'new_payment_terms', 'new_remittance_id', 'draft_id']);
+        $this->resetErrorBag();
+    }
+
+    /**
+     * Create invoice › Save as draft (owner, 25 Nov 2026): checked exactly as Create invoice checks it, then kept in
+     * invoice_drafts. Not in the client's portal, no email or alert, nothing in the general ledger (InvoiceDrafts).
+     */
+    public function saveDraft(): void
+    {
+        abort_unless(Auth::user()->can('finance.create'), 403);
+
+        $this->asDraft = true;
+        try {
+            $this->draftSubsequentInvoice();
+        } finally {
+            $this->asDraft = false;
+        }
+    }
+
+    /** Writes the form into its draft (a new one, or the one being edited) */
+    private function storeDraft(string $type): void
+    {
+        $advance = $this->new_kind === 'advance';
+        $now = now();
+        $row = [
+            'project_id' => $this->new_project_id,
+            'kind' => $advance ? 'advance' : 'invoice',
+            'invoice_type' => $type,
+            'currency' => $this->new_currency,
+            'payment_terms' => $this->new_payment_terms,
+            'remittance_account_id' => $this->new_remittance_id,
+            'lines' => json_encode($advance ? [] : array_map(fn ($l) => [
+                'kind' => $l['kind'],
+                'phase_id' => $l['phase_id'],
+                'description' => $l['description'],
+                'amount' => round(abs((float) $l['amount']), 2),
+            ], $this->lines), JSON_UNESCAPED_UNICODE),
+            'advance_phase_id' => $advance ? $this->advance_phase_id : null,
+            'advance_amount' => $advance ? round((float) $this->advance_amount, 2) : null,
+            'advance_description' => $advance ? $this->advance_description : null,
+            'updated_by' => Auth::id(),
+            'updated_at' => $now,
+        ];
+
+        $number = DB::transaction(function () use ($row, $now) {
+            if ($this->draft_id) {
+                $draft = DB::table('invoice_drafts')->where('id', $this->draft_id)->lockForUpdate()->first(['id', 'invoice_number', 'deleted_at']);
+                if (! $draft || $draft->deleted_at !== null) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'lines' => 'This draft was issued or discarded a moment ago. Close this window and check Drafts and Sent.',
+                    ]);
+                }
+                DB::table('invoice_drafts')->where('id', $draft->id)->update($row);
+
+                return $draft->invoice_number;
+            }
+            $number = InvoiceDrafts::freshNumber();
+            DB::table('invoice_drafts')->insert($row + [
+                'id' => (string) Str::uuid(),
+                'invoice_number' => $number,
+                'created_by' => Auth::id(),
+                'created_at' => $now,
+            ]);
+
+            return $number;
+        });
+        $client = DB::table('projects')->join('organizations', 'organizations.id', '=', 'projects.organization_id')
+            ->where('projects.id', $this->new_project_id)->value('organizations.name');
+
+        $this->showCreateModal = false;
+        $this->resetForm();
+        $this->activeTab = 'Drafts';
+        $this->resetPage();
+        session()->flash('success', "Draft {$number} saved for " . ($client ?: 'the client') . '. Nothing was sent: the client sees it only once you press Issue and send.');
+    }
+
+    /** Drafts › Edit: the draft back in the form, its milestones ticked */
+    public function editDraft(string $draftId): void
+    {
+        abort_unless(Auth::user()->can('finance.create'), 403);
+
+        $draft = InvoiceDrafts::find($draftId);
+        if (! $draft) {
+            session()->flash('warning', 'That draft was issued or discarded. Refresh the page.');
+
+            return;
+        }
+        $this->loadDraft($draft);
+        $this->showCreateModal = true;
+    }
+
+    /**
+     * Drafts › Issue and send: the draft through Create invoice as it stands (checked again, VAT and due date from
+     * today), then emailed and notified as every invoice is. A problem opens the form with the draft in it.
+     */
+    public function issueDraft(string $draftId): void
+    {
+        abort_unless(Auth::user()->can('finance.create'), 403);
+
+        $draft = InvoiceDrafts::find($draftId);
+        if (! $draft) {
+            session()->flash('warning', 'That draft was issued or discarded. Refresh the page.');
+
+            return;
+        }
+        $this->loadDraft($draft);
+        $this->showCreateModal = true;
+        $this->draftSubsequentInvoice();
+    }
+
+    /** Drafts › Discard: never sent, so nothing to undo at the client; kept in the audit log */
+    public function discardDraft(string $draftId): void
+    {
+        abort_unless(Auth::user()->can('finance.create'), 403);
+
+        $draft = InvoiceDrafts::find($draftId);
+        $discarded = $draft ? DB::table('invoice_drafts')->where('id', $draft->id)->whereNull('deleted_at')
+            ->update(['deleted_at' => now(), 'updated_by' => Auth::id(), 'updated_at' => now()]) : 0;
+        if (! $discarded) {
+            session()->flash('warning', 'That draft was issued or discarded already. Refresh the page.');
+
+            return;
+        }
+        DB::table('system_audit_logs')->insert([
+            'user_id' => Auth::id(),
+            'action' => 'INVOICE_DRAFT_DISCARDED',
+            'description' => "Discarded draft invoice {$draft->invoice_number}. It was never sent.",
+            'target_table' => 'invoice_drafts',
+            'target_id' => $draft->id,
+            'old_values' => json_encode(['invoice_number' => $draft->invoice_number, 'lines' => InvoiceDrafts::lines($draft)]),
+            'new_values' => null,
+            'ip_address' => request()?->ip(),
+            'created_at' => now(),
+        ]);
+        if ($this->draft_id === $draft->id) {
+            $this->showCreateModal = false;
+            $this->resetForm();
+        }
+        session()->flash('success', "Draft {$draft->invoice_number} discarded. It was never sent.");
+    }
+
+    private function loadDraft(object $draft): void
+    {
+        $this->resetErrorBag();
+        $this->draft_id = (string) $draft->id;
+        $this->new_project_id = (string) $draft->project_id;
+        $this->projectPhases = $this->offeredPhases((string) $draft->project_id);
+        $this->new_currency = $draft->currency;
+        $this->new_kind = $draft->kind === 'advance' ? 'advance' : 'invoice';
+        if ($this->new_kind === 'invoice') {
+            $this->new_invoice_type = $draft->invoice_type;
+        }
+        $this->new_payment_terms = $draft->payment_terms;
+        $this->new_remittance_id = (string) $draft->remittance_account_id;
+        $this->lines = array_map(fn ($l) => [
+            'kind' => ($l['kind'] ?? 'charge') === 'discount' ? 'discount' : 'charge',
+            'phase_id' => ($l['phase_id'] ?? null) ? (string) $l['phase_id'] : null,
+            'description' => (string) ($l['description'] ?? ''),
+            'amount' => $l['amount'] ?? '',
+        ], InvoiceDrafts::lines($draft));
+        $this->picked = InvoiceDrafts::milestones($draft);
+        $this->advance_phase_id = (string) ($draft->advance_phase_id ?? '');
+        $this->advance_amount = $draft->advance_amount !== null ? (float) $draft->advance_amount : '';
+        $this->advance_description = (string) ($draft->advance_description ?? '');
+    }
+
+    /** Closing the form opened from a draft leaves the draft as it was, and the form empty for the next invoice */
+    public function updatedShowCreateModal($open): void
+    {
+        if (! $open && $this->draft_id) {
+            $this->resetForm();
+        }
     }
 
     /** Record payment: opens the form for an unpaid invoice, the amount left filled in */
@@ -825,13 +1053,17 @@ class InvoiceLedger extends Component
             ->first(['projects.id', 'organizations.country', 'organizations.tax_identification_number']) : null;
         $vat = $project ? Vat::for($project, null, $this->entityOf((string) $project->id)) : null;
 
-        $invoices = $this->invoices();
+        $drafts = $this->activeTab === 'Drafts' ? $this->drafts() : collect();
+        $invoices = $this->activeTab === 'Drafts' ? new \Illuminate\Pagination\LengthAwarePaginator([], 0, self::PER_PAGE) : $this->invoices();
         $milestoneIds = array_values(array_unique(array_filter(array_column($this->lines, 'phase_id'))));
         $deductions = $this->showCreateModal && $this->new_kind === 'invoice' ? $this->deductions($milestoneIds) : [];
         $advancePhase = $this->new_kind === 'advance' ? collect($this->projectPhases)->firstWhere('id', $this->advance_phase_id) : null;
 
         return view('livewire.hq.finance.invoice-ledger', [
             'invoices' => $invoices,
+            'drafts' => $drafts,
+            'draftCount' => DB::table('invoice_drafts')->whereNull('deleted_at')->count(),
+            'editingDraft' => $this->draft_id ? DB::table('invoice_drafts')->where('id', $this->draft_id)->value('invoice_number') : null,
             // Verified payments so far on each invoice listed (InvoicePayments): "Paid … · … left"
             'settled' => \App\Support\Finance\InvoicePayments::settled($invoices->getCollection()->pluck('id')),
             'deductions' => $deductions,

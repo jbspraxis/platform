@@ -36,6 +36,8 @@
         .titlebar td { vertical-align: bottom; padding: 0; }
         h1 { font-family: 'DejaVu Serif', serif; font-weight: normal; color: {{ $ink }}; font-size: 19pt; line-height: 1.1; margin: 0; }
         .number { text-align: right; font-size: 10.5pt; color: {{ $ink }}; }
+        .draft { display: inline-block; margin-left: 6pt; padding: 1pt 5pt; border: 0.75pt solid #B42318; color: #B42318; font-size: 7.5pt; letter-spacing: 0.4pt; text-transform: uppercase; }
+        .draft-mark { position: fixed; top: 300pt; left: 0; right: 0; text-align: center; font-size: 96pt; letter-spacing: 8pt; color: #B42318; opacity: 0.08; transform: rotate(-30deg); }
         .paid { display: inline-block; margin-left: 6pt; padding: 1pt 5pt; border: 0.75pt solid #1F7A4D; color: #1F7A4D; font-size: 7.5pt; letter-spacing: 0.4pt; text-transform: uppercase; }
 
         /* The client, and the invoice's dates, side by side */
@@ -77,6 +79,10 @@
     </style>
 </head>
 <body>
+    @if ($draft)
+        {{-- A draft (App\Support\Finance\InvoiceDrafts): for review in HQ, never sent like this --}}
+        <div class="draft-mark">{{ __('invoices.pdf.draft_mark') }}</div>
+    @endif
     {{-- The letterhead: the company that bills this invoice --}}
     <table class="head" role="presentation">
         <tr>
@@ -105,7 +111,7 @@
     <table class="titlebar" role="presentation">
         <tr>
             <td><h1>{{ $title }}</h1></td>
-            <td class="number">{{ $invoice->invoice_number }}@if ($paid !== null)<span class="paid">{{ $paid !== '' ? __('invoices.pdf.paid_on', ['date' => $paid]) : __('invoices.pdf.paid') }}</span>@endif</td>
+            <td class="number">{{ $invoice->invoice_number }}@if ($draft)<span class="draft">{{ __('invoices.pdf.draft') }}</span>@elseif ($paid !== null)<span class="paid">{{ $paid !== '' ? __('invoices.pdf.paid_on', ['date' => $paid]) : __('invoices.pdf.paid') }}</span>@endif</td>
         </tr>
     </table>
 

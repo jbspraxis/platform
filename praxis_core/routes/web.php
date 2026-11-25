@@ -93,6 +93,8 @@ Route::domain(Hosts::hq())->group(function () use ($notOwnRoute, $legacy) {
                 // Invoicing & Escrow
                 Route::get('/invoice-ledger', \App\Livewire\Hq\Finance\InvoiceLedger::class)->name('hq.finance.invoices');
                 Route::get('/invoice-ledger/{invoice}/pdf', [\App\Http\Controllers\InvoicePdfController::class, 'hq'])->whereUuid('invoice')->name('hq.finance.invoice-pdf');
+                // A draft's PDF, marked DRAFT (App\Support\Finance\InvoiceDrafts): HQ only, never the portal
+                Route::get('/invoice-drafts/{draft}/pdf', [\App\Http\Controllers\InvoicePdfController::class, 'draft'])->whereUuid('draft')->name('hq.finance.invoice-draft-pdf');
                 // A payment's receipt (docs/RECEIPTS.md)
                 Route::get('/receipts/{transaction}/pdf', [\App\Http\Controllers\ReceiptPdfController::class, 'hq'])->whereUuid('transaction')->name('hq.finance.receipt-pdf');
                 Route::get('/escrow-verification', \App\Livewire\Hq\Finance\EscrowVerification::class)->name('hq.finance.escrow');

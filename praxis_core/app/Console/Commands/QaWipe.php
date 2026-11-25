@@ -342,6 +342,7 @@ class QaWipe extends Command
             ['sprints', $this->any('sprints', ['id' => $ids['sprints']])],
             ['phase_dependencies', $this->any('phase_dependencies', ['phase_id' => $ids['phases'], 'depends_on_phase_id' => $ids['phases']])],
             ['change_reports', $this->any('change_reports', ['project_id' => $ids['projects']])],
+            ['invoice_drafts', $this->any('invoice_drafts', ['project_id' => $ids['projects']])],
             ['invoice_lines', $this->any('invoice_lines', ['invoice_id' => $ids['invoices']])],
             ['transactions', $this->any('transactions', ['id' => $ids['transactions']])],
             ['project_drafts', $this->any('project_drafts', ['id' => $ids['drafts']])],
