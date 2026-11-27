@@ -7,6 +7,7 @@ use App\Models\Mail\MailFolder;
 use App\Models\Mail\MailMessage;
 use App\Models\Mail\MailThread;
 use App\Models\User;
+use App\Support\Mail\Compose\Outbox;
 use App\Support\Mail\Imap\ImapException;
 use App\Support\Mail\MailAccess;
 use App\Support\Mail\MailActions;
@@ -160,6 +161,12 @@ class Inbox extends Component
 
     public function selectFolder(string $folder): void
     {
+        // The phone folder picker's "Outbox" is a page of its own (Scheduled and unsent), not a folder of the mailbox
+        if ($folder === 'outbox') {
+            $this->redirectRoute('hq.mail.compose.outbox', navigate: true);
+
+            return;
+        }
         $this->folder = $folder === 'inbox' ? null : $folder;
         $this->search = '';
         $this->resetView();
@@ -548,6 +555,7 @@ class Inbox extends Component
             'folders' => $this->folders,
             'currentFolder' => $folder,
             'boxUnread' => $this->boxUnread(),
+            'outboxCount' => Outbox::make()->waiting($user, withAccount: false)->count(),
             'rows' => $list['rows'],
             'total' => $list['total'],
             'perPage' => ThreadList::PER_PAGE,

@@ -92,12 +92,7 @@ class ComposeOutbox extends Component
 
     public function render()
     {
-        $user = Auth::user();
-        $accountIds = MailAccess::accountIds($user, 'send');
-        $rows = MailOutbox::with('account')->where('user_id', $user->id)->whereIn('account_id', $accountIds)
-            ->whereIn('status', ['queued', 'failed', 'draft'])->orderByRaw("FIELD(status, 'failed', 'queued', 'draft')")
-            ->orderByDesc('updated_at')->limit(200)->get()
-            ->filter(fn ($r) => $r->status !== 'draft' || (! empty($r->payload['touched']) && Outbox::make()->hasContent($r->payload ?? [])));
+        $rows = Outbox::make()->waiting(Auth::user());
 
         return view('livewire.hq.mail.compose.outbox', [
             'failed' => $rows->where('status', 'failed'),

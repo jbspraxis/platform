@@ -22,7 +22,14 @@
                 @foreach ($folders as $f)
                     @php $n = $f->role === 'drafts' ? $f->total_count : $f->unread_count; @endphp
                     <option value="{{ $f->role === 'other' ? $f->id : $f->role }}" @selected($currentFolder && $f->id === $currentFolder->id)>{{ $f->label() }}{{ $n > 0 ? " ({$n})" : '' }}</option>
+                    {{-- Outbox: a page of its own (Scheduled and unsent), right below Drafts --}}
+                    @if ($f->role === 'drafts')
+                        <option value="outbox">Outbox{{ $outboxCount > 0 ? " ({$outboxCount})" : '' }}</option>
+                    @endif
                 @endforeach
+                @if ($folders->isNotEmpty() && ! $folders->contains('role', 'drafts'))
+                    <option value="outbox">Outbox{{ $outboxCount > 0 ? " ({$outboxCount})" : '' }}</option>
+                @endif
             </select>
         </div>
 
