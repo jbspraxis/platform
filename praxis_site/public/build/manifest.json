@@ -1,0 +1,54 @@
+{
+  "node_modules/@fontsource-variable/newsreader/files/newsreader-latin-ext-opsz-normal.woff2": {
+    "file": "assets/newsreader-latin-ext-opsz-normal-BQn1nviT.woff2",
+    "src": "node_modules/@fontsource-variable/newsreader/files/newsreader-latin-ext-opsz-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/newsreader/files/newsreader-latin-opsz-normal.woff2": {
+    "file": "assets/newsreader-latin-opsz-normal-s-izfB6B.woff2",
+    "src": "node_modules/@fontsource-variable/newsreader/files/newsreader-latin-opsz-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/newsreader/files/newsreader-vietnamese-opsz-normal.woff2": {
+    "file": "assets/newsreader-vietnamese-opsz-normal-BjhtXyW2.woff2",
+    "src": "node_modules/@fontsource-variable/newsreader/files/newsreader-vietnamese-opsz-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-cyrillic-ext-wght-normal.woff2": {
+    "file": "assets/plus-jakarta-sans-cyrillic-ext-wght-normal-lLTsRRxN.woff2",
+    "src": "node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-cyrillic-ext-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-ext-wght-normal.woff2": {
+    "file": "assets/plus-jakarta-sans-latin-ext-wght-normal-DmpS2jIq.woff2",
+    "src": "node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-ext-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2": {
+    "file": "assets/plus-jakarta-sans-latin-wght-normal-eXO_dkmS.woff2",
+    "src": "node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-vietnamese-wght-normal.woff2": {
+    "file": "assets/plus-jakarta-sans-vietnamese-wght-normal-qRpaaN48.woff2",
+    "src": "node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-vietnamese-wght-normal.woff2"
+  },
+  "resources/css/app.css": {
+    "file": "assets/app-D5iepOKb.css",
+    "src": "resources/css/app.css",
+    "isEntry": true,
+    "name": "app",
+    "names": [
+      "app.css"
+    ]
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-R0aNrEwp.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true,
+    "dynamicImports": [
+      "resources/js/motion/cinematic.js"
+    ]
+  },
+  "resources/js/motion/cinematic.js": {
+    "file": "assets/cinematic-DOAEh-ig.js",
+    "name": "cinematic",
+    "src": "resources/js/motion/cinematic.js",
+    "isDynamicEntry": true
+  }
+}
