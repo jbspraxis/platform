@@ -38,6 +38,7 @@
         .mr-nav ul { list-style: none; margin: 0; padding: 0; }
         .mr-nav-btn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; border: 0; border-radius: var(--radius-control); background: none; color: var(--color-slate); font: inherit; font-size: 0.875rem; line-height: 1.25rem; text-align: left; cursor: pointer; }
         .mr-nav-btn:hover { background: var(--color-paper); color: var(--color-ink); }
+        a.mr-nav-btn, a.mr-nav-btn:hover { text-decoration: none; }
         .mr-nav-btn.is-active { background: var(--color-teal-tint); color: var(--color-petrol); font-weight: 600; }
         .mr-nav-btn span.mr-nav-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .mr-nav-count { font-size: 0.75rem; font-weight: 600; color: var(--color-ink); font-variant-numeric: tabular-nums; }
@@ -251,9 +252,17 @@
                                 @if ($count > 0)<span class="mr-nav-count" aria-label="{{ $count }} {{ $f->role === 'drafts' ? 'drafts' : 'unread' }}">{{ $count }}</span>@endif
                             </button>
                         </li>
+                        {{-- Outbox: HQ's own scheduled and unsent mail, right below Drafts --}}
+                        @if ($f->role === 'drafts')
+                            @include('livewire.hq.mail.partials.outbox-link')
+                        @endif
                     @empty
                         <li class="help" style="padding: 4px 8px;">HQ is reading this mailbox's folders.</li>
                     @endforelse
+                    {{-- A mailbox with no Drafts folder: Outbox goes last --}}
+                    @if ($folders->isNotEmpty() && ! $folders->contains('role', 'drafts'))
+                        @include('livewire.hq.mail.partials.outbox-link')
+                    @endif
                 </ul>
             </nav>
 

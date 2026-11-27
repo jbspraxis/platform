@@ -12,6 +12,7 @@ use App\Support\Mail\MailFetch;
 use App\Support\Mail\MailServer;
 use App\Support\Mail\MailTransport;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -345,6 +346,24 @@ final class Outbox
     public function removeFiles(MailOutbox $outbox): void
     {
         Storage::disk('local')->deleteDirectory(config('mail_compose.upload_dir', 'mail-outbox') . '/' . $outbox->id);
+    }
+
+    /**
+     * What "Scheduled and unsent" lists for the person: their own rows from mailboxes they can still send from, that
+     * are failed, queued or an unfinished draft (a draft counts once it was touched and has something in it). Failed
+     * first, then queued, then drafts; newest first within each. The page and the Mail folder list's Outbox count
+     * both read this, so the two always agree.
+     *
+     * @return Collection<int, MailOutbox>
+     */
+    public function waiting(User $user, bool $withAccount = true): Collection
+    {
+        $query = MailOutbox::query()->where('user_id', $user->id)->whereIn('account_id', MailAccess::accountIds($user, 'send'))
+            ->whereIn('status', ['queued', 'failed', 'draft'])->orderByRaw("FIELD(status, 'failed', 'queued', 'draft')")
+            ->orderByDesc('updated_at')->limit(200);
+
+        return ($withAccount ? $query->with('account') : $query)->get()
+            ->filter(fn (MailOutbox $r) => $r->status !== 'draft' || (! empty($r->payload['touched']) && $this->hasContent($r->payload ?? [])));
     }
 
     /** Anything worth keeping: a recipient, a subject, some text or a file */
